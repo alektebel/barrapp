@@ -14,6 +14,7 @@ import numpy as np
 
 from barra import schema as S
 from barra.classify import ANCHOR_FIXED, OVER_BAR, classify, features
+from barra.metrics import implausibilities
 from barra.quality import WEIGHTS, band, score_rep, smoothness_component
 
 
