@@ -248,7 +248,6 @@ private fun MainPane(
             )
 
             state.days.isEmpty() -> EmptyState(
-                greeting = greeting(state.profile.firstName),
                 onAdd = onPick,
                 onSeeExample = vm::openExample,
             )

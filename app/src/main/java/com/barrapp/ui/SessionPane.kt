@@ -67,7 +67,6 @@ import com.barrapp.ui.parts.bandColor
  */
 @Composable
 fun EmptyState(
-    greeting: String,
     onAdd: () -> Unit,
     onSeeExample: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
@@ -77,12 +76,9 @@ fun EmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.widthIn(max = 380.dp).padding(32.dp),
         ) {
-            Text(
-                greeting,
-                style = MaterialTheme.typography.labelMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-            Spacer(Modifier.height(14.dp))
+            // The greeting lives in the shell header. Repeating it here read as
+            // the app saying hello twice on the one screen where it has least
+            // to say.
             Text(
                 "You have no training recordings",
                 style = MaterialTheme.typography.headlineMedium,

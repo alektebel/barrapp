@@ -26,6 +26,14 @@ source scripts/env.sh
 # app/build/outputs/bundle/release/app-release.aab
 ```
 
+## The app
+
+Three questions, then a home screen: training calendar on the left, the session
+in the middle, progress and a coach on the right. Add a clip and it is trimmed to
+the exercise, the movement is recognised, reps are counted, and each gets a
+baseline quality proxy. What each screen does and — importantly — what was and
+was not verified: [`docs/APP.md`](docs/APP.md).
+
 ## The measurement core
 
 The `barra/` Python package is what the server runs: pose extraction, rep
