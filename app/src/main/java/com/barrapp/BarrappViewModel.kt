@@ -315,8 +315,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         SessionStore.appendChat(app, turn)
         _state.update { it.copy(chat = SessionStore.chat(app), coachThinking = true) }
         viewModelScope.launch {
+            val snapshot = _state.value
             val answer = withContext(Dispatchers.Default) {
-                Coach.answer(question, _state.value)
+                Coach.answer(question, snapshot.days, snapshot.profile)
             }
             delay(250)
             SessionStore.appendChat(app, ChatTurn(fromUser = false, text = answer))

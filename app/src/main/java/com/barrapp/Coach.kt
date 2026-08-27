@@ -1,6 +1,7 @@
 package com.barrapp
 
 import com.barrapp.data.DayEntry
+import com.barrapp.data.Profile
 import kotlin.math.abs
 
 /**
@@ -23,10 +24,14 @@ object Coach {
 
     private const val FLOOR = 3
 
-    fun answer(question: String, state: UiState): String {
+    /** Takes the measurements and the profile, not the UI state: the answers
+     *  are arithmetic over training, and nothing here should depend on which
+     *  screen happens to be open. It also makes this the one part of the app
+     *  that can be type-checked without the Compose toolchain. */
+    fun answer(question: String, allDays: List<DayEntry>, profile: Profile): String {
         val q = question.lowercase()
-        val days = state.days.sortedBy { it.date }
-        val name = state.profile.firstName
+        val days = allDays.sortedBy { it.date }
+        val name = profile.firstName
 
         if (days.isEmpty()) {
             return "Nothing has been measured yet, so there is nothing I can tell you that " +
@@ -44,7 +49,7 @@ object Coach {
                 whyUnscored()
 
             q.containsAny("film", "record", "camera", "phone", "angle", "next one") ->
-                filming(state.profile.repTarget)
+                filming(profile.repTarget)
 
             q.containsAny("score", "quality", "number", "mean") ->
                 whatTheScoreIs()
