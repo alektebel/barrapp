@@ -57,8 +57,16 @@ DIP = Movement(
     name="dip", origin="wrist", direction="descending", signal="shoulder_above_bar",
     min_rep_s=0.6, turn_label="bottom", aliases=("dips",),
 )
+# Geometrically a dip lying down: hands fixed, shoulders above them, body
+# descending. What separates the two is which way the torso points - see
+# classify.torso_tilt - not anything in this profile.
+PUSH_UP = Movement(
+    name="push_up", origin="wrist", direction="descending",
+    signal="shoulder_above_bar", min_rep_s=0.5, turn_label="bottom",
+    aliases=("pushup", "push-up", "press-up", "pressup"),
+)
 
-MOVEMENTS = {m.name: m for m in (SQUAT, MUSCLE_UP, PULL_UP, DIP)}
+MOVEMENTS = {m.name: m for m in (SQUAT, MUSCLE_UP, PULL_UP, DIP, PUSH_UP)}
 _ALIASES = {a: m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
 
 DEFAULT = SQUAT

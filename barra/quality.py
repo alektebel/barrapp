@@ -69,8 +69,14 @@ def range_component(values: dict, arm: float) -> tuple[float, str]:
     divisor. Hang depth and lockout height count equally: half a rep from the
     top and half from the bottom are the same amount of missing rep.
     """
-    if not np.isfinite(arm) or arm <= 0:
-        return float("nan"), "arm reach could not be measured"
+    from .metrics import usable_reference
+
+    if not usable_reference(arm):
+        return float("nan"), (
+            "the torso-length ruler is not usable on this clip "
+            f"(arm reads {arm:.2f} torso), so range cannot be scored"
+            if np.isfinite(arm) else "arm reach could not be measured"
+        )
     hang = _clip01(values.get("start_depth", float("nan")) / arm)
     lockout = _clip01(values.get("peak_height", float("nan")) / arm)
     return 0.5 * (hang + lockout), (

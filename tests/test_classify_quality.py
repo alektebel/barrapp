@@ -7,6 +7,7 @@ that property alone.
 """
 from __future__ import annotations
 
+import pathlib
 import unittest
 
 import numpy as np
@@ -69,6 +70,34 @@ def dip_clip(n_reps=3, fpr=60, seed=0):
     return kp
 
 
+def pushup_clip(n_reps=3, fpr=60, seed=0):
+    """Hands fixed on the floor, torso laid out flat, body descending onto them.
+
+    Geometrically the same shape as a dip apart from the one thing that
+    separates them: where the torso points.
+    """
+    rng = np.random.default_rng(seed)
+    torso, total = 120.0, n_reps * 60 + 40
+    kp = np.zeros((total, 17, 3), np.float32)
+    hx, floor = 260.0, 620.0
+    for f in range(total):
+        drop = 0.0 if f >= n_reps * fpr else np.sin(np.pi * ((f % fpr) / fpr)) ** 2
+        sh_y = floor - 78.0 + drop * 46.0          # shoulders stay above the hands
+        _fill(kp, f, (
+            ("left_wrist", hx - 34, floor), ("right_wrist", hx + 34, floor),
+            ("left_elbow", hx - 40, sh_y + 34), ("right_elbow", hx + 40, sh_y + 34),
+            ("left_shoulder", hx - 30, sh_y), ("right_shoulder", hx + 30, sh_y),
+            # torso runs backwards along the floor, not downwards
+            ("left_hip", hx + torso - 18, sh_y + 26), ("right_hip", hx + torso + 18, sh_y + 26),
+            ("left_knee", hx + 1.9 * torso - 18, sh_y + 40),
+            ("right_knee", hx + 1.9 * torso + 18, sh_y + 40),
+            ("left_ankle", hx + 2.7 * torso - 18, sh_y + 52),
+            ("right_ankle", hx + 2.7 * torso + 18, sh_y + 52),
+            ("nose", hx - 6, sh_y - 22),
+        ), rng)
+    return kp
+
+
 def squat_clip(n_reps=3, fpr=60, seed=0):
     """Feet planted, hands free at the sides, hips travelling vertically."""
     rng = np.random.default_rng(seed)
@@ -114,6 +143,27 @@ class TestClassifier(unittest.TestCase):
     def test_dip_and_squat(self):
         self.assertEqual(classify(dip_clip()).exercise, "dip")
         self.assertEqual(classify(squat_clip()).exercise, "squat")
+
+    def test_push_up_is_a_dip_lying_down(self):
+        """Same hands-fixed, shoulders-above shape. What separates them is that
+        a dip has your legs below your hands and a push-up has nothing below
+        them - a comparison of heights, which projection does not distort."""
+        push = classify(pushup_clip())
+        dip = classify(dip_clip())
+        self.assertEqual(push.exercise, "push_up")
+        self.assertEqual(dip.exercise, "dip")
+        self.assertEqual(push.runner_up, "dip")
+        self.assertLess(push.features["body_below_hands"], 0.25)
+        self.assertGreater(dip.features["body_below_hands"], 0.25)
+
+    def test_torso_angle_is_not_used_to_decide(self):
+        """Filmed head-on, a real push-up's torso projects to 5 degrees from
+        vertical - indistinguishable from a dip. The angle is reported as a
+        diagnostic and must not drive the decision."""
+        source = (pathlib.Path(__file__).resolve().parents[1]
+                  / "barra" / "classify.py").read_text()
+        decision = source[source.index("def classify("):]
+        self.assertNotIn("torso_tilt", decision)
 
     def test_walking_is_not_a_movement(self):
         """The failure that produced textbook muscle-ups from real footage of
@@ -174,6 +224,31 @@ class TestQualityProxy(unittest.TestCase):
         self.assertIn("swing", q.context)
         self.assertNotIn("swing", q.components)
         self.assertEqual(set(q.components), set(WEIGHTS))
+
+    def test_a_descending_rep_starting_above_the_hands_is_fine(self):
+        """A dip and a push-up start above the hands by construction. Applying
+        the hanging check to them rejected all 19 reps of a correctly segmented
+        push-up clip."""
+        from barra.movements import MUSCLE_UP, PUSH_UP
+
+        started_high = {"peak_height": 0.6, "start_depth": -0.6, "rom": 0.5}
+        self.assertEqual(implausibilities(started_high, PUSH_UP, arm=1.2), [])
+        self.assertTrue(implausibilities(started_high, MUSCLE_UP, arm=1.2))
+
+    def test_an_unusable_ruler_disables_range_rather_than_the_score(self):
+        """Filmed head-on, a push-up's torso projects to almost nothing and the
+        arm:torso ratio came out at 2.7. Lengths are then meaningless, but
+        timing is not - so the rep is scored on what survives, with a note."""
+        from barra.metrics import usable_reference
+
+        self.assertFalse(usable_reference(2.70))
+        self.assertTrue(usable_reference(1.20))
+        q = score_rep(self.base(), arm=2.70, signal=np.linspace(-1, 1, 80),
+                      start=0, turn=79)
+        self.assertIsNotNone(q.score)
+        self.assertIsNone(q.components["range"]["value"])
+        self.assertIn("partial", q.context)
+        self.assertIn("control", q.context["partial"])
 
     def test_score_is_bounded(self):
         wild = {"start_depth": 9.0, "peak_height": 9.0, "tempo_ratio": 9.0}

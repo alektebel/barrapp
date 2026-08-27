@@ -6,7 +6,8 @@ whether they stay there, because that is what actually distinguishes these
 movements:
 
     squat      feet planted, hands free, hips travel vertically
-    dip        hands fixed, shoulders ALWAYS above the hands
+    dip        hands fixed, shoulders above them, and your LEGS BELOW them
+    push-up    hands fixed, shoulders above them, and nothing below them
     pull-up    hands fixed above the head, shoulders never rise above them
     muscle-up  as a pull-up, but the shoulders finish above the hands
 
@@ -31,6 +32,13 @@ from .movements import (MOVEMENTS, midpoint, pair_confidence, robust_torso)
 
 MIN_CONF = 0.5
 
+# Landmarks compared against hand height. Wrists and face are excluded: the
+# first is the reference, the second sits above the shoulders in every one of
+# these movements and would only dilute the fraction.
+_BODY = ["left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
+         "left_hip", "right_hip", "left_knee", "right_knee",
+         "left_ankle", "right_ankle"]
+
 # Shoulders this far above the hands (in torso-lengths) counts as "over the bar".
 # A pull-up tops out below zero; a muscle-up finishes well above it. The gap is
 # wide, so the threshold does not need to be precise.
@@ -41,6 +49,18 @@ ANCHOR_FIXED = 0.80
 # The shoulders must move at least this far relative to the hands for the hands
 # to count as a handhold rather than as arms hanging off a moving torso.
 ARTICULATION = 0.20
+# Fraction of the visible body that hangs below the hands. In a dip your legs
+# do; in a push-up your hands are the lowest thing you have.
+#
+# The obvious discriminator - torso angle - does NOT work, and it is worth
+# saying why: filmed head-on, a push-up's torso is foreshortened onto almost
+# nothing, so the shoulder-to-hip line projects near-vertical and reads exactly
+# like a dip. Measured on real footage it came out at 5 degrees from vertical.
+# This test compares heights instead, which projection does not distort, and it
+# works from whatever keypoints happen to be visible - on that same clip the
+# ankles were never seen at all.
+BELOW_HANDS_DIP = 0.25
+LOW_MARGIN = 0.15
 
 
 @dataclass
@@ -83,6 +103,26 @@ def features(kp: np.ndarray) -> dict:
     above = np.where(ws, (wrist[:, 1] - shoulder[:, 1]) / torso, np.nan)
     hip_over_ankle = np.where(a_ok & h_ok, (ankle[:, 1] - hip[:, 1]) / torso, np.nan)
 
+    # Angle of the torso from vertical. Kept as a diagnostic only - see
+    # BELOW_HANDS_DIP for why it is not used to decide anything.
+    dx = np.abs(shoulder[:, 0] - hip[:, 0])
+    dy = np.abs(shoulder[:, 1] - hip[:, 1])
+    tilt = np.where(s_ok & h_ok, np.degrees(np.arctan2(dx, np.maximum(dy, 1e-6))), np.nan)
+
+    # How much of the body hangs below the hands, over frames where the hands
+    # were seen. Uses whatever landmarks are confident in that frame rather
+    # than requiring a fixed set.
+    below = []
+    for i in range(len(kp)):
+        if not w_ok[i]:
+            continue
+        heights = [
+            (kp[i, S.KP_INDEX[n], 1] - wrist[i, 1]) / torso
+            for n in _BODY if kp[i, S.KP_INDEX[n], 2] >= MIN_CONF
+        ]
+        if heights:
+            below.append(float(np.mean([h > LOW_MARGIN for h in heights])))
+
     def pct(a, q):
         a = a[np.isfinite(a)]
         return float(np.percentile(a, q)) if a.size else float("nan")
@@ -104,6 +144,8 @@ def features(kp: np.ndarray) -> dict:
         "arm_articulation": pct(above, 95) - pct(above, 5),
         "hip_travel": (pct(hip_over_ankle, 95) - pct(hip_over_ankle, 5))
         if np.isfinite(pct(hip_over_ankle, 95)) else float("nan"),
+        "torso_tilt": pct(tilt, 50),
+        "body_below_hands": float(np.median(below)) if below else float("nan"),
     }
 
 
@@ -149,11 +191,26 @@ def classify(kp: np.ndarray) -> Classification:
         )
 
     if anchored and articulated and f["hands_below_frac"] >= 0.80:
+        below = f["body_below_hands"]
+        if not np.isfinite(below):
+            return Classification(
+                "unknown", 0.0,
+                "hands fixed below the shoulders, but too little of the body was "
+                "seen to tell a dip from a push-up",
+                f,
+            )
+        if below >= BELOW_HANDS_DIP:
+            return Classification(
+                "dip", 0.78,
+                f"hands fixed below the shoulders, with {below:.0%} of the body "
+                "hanging below them - the legs are off the ground",
+                f, runner_up="push_up",
+            )
         return Classification(
-            "dip", 0.78,
-            "hands fixed and below the shoulders throughout, with the body "
-            "moving past them",
-            f, runner_up=None,
+            "push_up", 0.78,
+            "hands fixed below the shoulders and nothing hanging below them, so "
+            "the hands are on the floor rather than on bars",
+            f, runner_up="dip",
         )
 
     if not anchored and not planted:
@@ -183,6 +240,7 @@ HUMAN = {
     "muscle_up": "Muscle-up",
     "pull_up": "Pull-up",
     "dip": "Dip",
+    "push_up": "Push-up",
     "squat": "Squat",
     "unknown": "Not recognised",
 }

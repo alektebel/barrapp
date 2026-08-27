@@ -97,30 +97,49 @@ def implausibilities(values: dict[str, float], movement: Movement,
     confidence-based quality score waves it through. These checks catch it,
     because geometry does not care how sure the model was: on a bar movement
     the shoulders cannot rise further above the hands than the arms are long.
+
+    Direction matters. An ASCENDING bar movement starts hanging below the hands,
+    so a rep that starts above them is a segmentation failure. A DESCENDING one
+    - a dip, a push-up - starts above them by construction, and applying the
+    hanging check to it rejects every correct rep. Found the hard way on a clip
+    of 19 perfectly segmented push-ups, none of which scored.
     """
-    if movement.origin != "wrist" or not np.isfinite(arm):
+    if movement.origin != "wrist" or not usable_reference(arm):
         return []
     limit = arm * PLAUSIBILITY_MARGIN
     out = []
     peak, depth = values.get("peak_height"), values.get("start_depth")
-    if np.isfinite(peak) and peak > limit:
+    if np.isfinite(peak) and abs(peak) > limit:
         out.append(
-            f"shoulders reach {peak:.2f} torso above the bar but the arms are "
-            f"only {arm:.2f} long - the wrist or shoulder track is wrong"
+            f"shoulders reach {abs(peak):.2f} torso from the hands but the arms "
+            f"are only {arm:.2f} long - the wrist or shoulder track is wrong"
         )
-    if np.isfinite(depth) and depth < 0:
-        out.append(
-            f"rep starts {-depth:.2f} torso ABOVE the bar, so the detected start "
-            "is not a hang"
-        )
-    elif np.isfinite(depth) and depth > limit:
-        out.append(
-            f"rep starts {depth:.2f} torso below the bar, deeper than an "
-            f"arm length ({arm:.2f})"
-        )
+    if movement.direction == "ascending":
+        if np.isfinite(depth) and depth < 0:
+            out.append(
+                f"rep starts {-depth:.2f} torso ABOVE the bar, so the detected "
+                "start is not a hang"
+            )
+        elif np.isfinite(depth) and depth > limit:
+            out.append(
+                f"rep starts {depth:.2f} torso below the bar, deeper than an "
+                f"arm length ({arm:.2f})"
+            )
     if np.isfinite(values.get("rom", np.nan)) and values["rom"] > 2 * limit:
         out.append(f"range of motion {values['rom']:.2f} torso exceeds twice the arm reach")
     return out
+
+
+# Anatomical band for shoulder-to-wrist reach in torso-lengths. Real adults sit
+# near 1.2. Outside this band the TORSO is what was measured wrongly, not the
+# arm - filmed head-on, a push-up's torso projects to almost nothing and the
+# ratio came out at 2.7 on real footage. Every length in torso units is then
+# meaningless, so they are reported as unmeasurable rather than scored.
+REACH_BAND = (0.60, 1.90)
+
+
+def usable_reference(arm: float) -> bool:
+    return bool(np.isfinite(arm) and REACH_BAND[0] <= arm <= REACH_BAND[1])
 
 
 @dataclass
