@@ -107,7 +107,8 @@ def api(event, _context):
             "id": job_id,
             "owner": owner,
             "status": "created",
-            "exercise": body.get("exercise") or "muscle_up",
+            # See local_server.py: detection is the safer default.
+            "exercise": body.get("exercise") or "auto",
             "createdAt": _now(),
         }
         table.put_item(Item=item)

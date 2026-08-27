@@ -29,6 +29,22 @@ _METRIC_ORDER = [
 ]
 
 
+def _trace(signal, start: int, end: int, n: int = 48) -> list[float]:
+    """A small, evenly-sampled copy of the rep's own trace, for the phone to
+    draw. Downsampled here rather than on the device: the shape is the point,
+    and 48 points carry it at any size a phone will draw it."""
+    try:
+        import numpy as np
+    except ImportError:
+        return []
+    seg = np.asarray(signal[start:end + 1], dtype=float)
+    if seg.size < 4:
+        return []
+    xs = np.linspace(0, seg.size - 1, n)
+    ys = np.interp(xs, np.arange(seg.size), seg)
+    return [round(float(v), 4) for v in ys]
+
+
 def _num(value) -> str:
     try:
         x = float(value)
@@ -40,88 +56,127 @@ def _num(value) -> str:
 
 
 def process_job(job: dict, video_path: Path) -> dict:
-    metrics = analyze_clip(video_path, job.get("exercise") or "muscle_up")
-    return write_report(metrics)
+    """Measure one clip and return the payload the phone renders.
+
+    `exercise` may be omitted or "auto": the clip is then classified from its
+    own geometry rather than from what the athlete remembered to tap.
+    """
+    requested = (job.get("exercise") or "auto").strip() or "auto"
+    metrics = analyze_clip(video_path, requested, session=job.get("session"))
+    report = write_report(metrics)
+    # The prose model owns exactly three keys. Everything else the UI draws -
+    # the detected movement, the trim window, per-rep scores and traces - is
+    # carried through untouched.
+    #
+    # Inverted on purpose: an allow-list of measurement keys has to be updated
+    # every time one is added, and the failure mode is a field that silently
+    # never reaches the phone. A deny-list of the three prose keys cannot drift.
+    prose = {"headline", "narrative", "nextSession"}
+    for key, value in metrics.items():
+        if key not in prose:
+            report[key] = value
+    return report
 
 
-def analyze_clip(video_path: Path, exercise: str = "muscle_up") -> dict:
+def _empty(exercise: str, blockers: list[str], **extra) -> dict:
+    """A result the app can render when nothing could be measured.
+
+    Every key the success path returns is present, because a client that has to
+    ask whether a field exists ends up guessing what its absence means. A clip
+    that produced nothing is a complete answer, not a partial one.
+    """
+    base = {
+        "exercise": exercise,
+        "detected": None,
+        "n_reps": 0,
+        "n_candidates": 0,
+        "fps": 0.0,
+        "duration_s": 0.0,
+        "trim": None,
+        "session": date.today().isoformat(),
+        "sessionScore": None,
+        "sessionBand": "unmeasured",
+        "sessions": [],
+        "reps": [],
+        "blockers": blockers,
+    }
+    base.update(extra)
+    return base
+
+
+def analyze_clip(video_path: Path, exercise: str = "auto",
+                 session: str | None = None) -> dict:
     if not video_path.exists() or video_path.stat().st_size == 0:
-        return {
-            "exercise": exercise,
-            "n_reps": 0,
-            "sessions": [],
-            "reps": [],
-            "blockers": ["No video arrived at the server."],
-        }
+        return _empty(exercise, ["No video arrived at the server."])
 
     try:
-        from barra.ingest import probe_video, segment_reps_verbose
-        from barra.metrics import METRIC_SPEC, MIN_REP_QUALITY, rep_metrics
-        from barra.movements import resolve
+        from barra.classify import HUMAN, classify
+        from barra.ingest import _clean_signal, probe_video, segment_reps_verbose
+        from barra.metrics import (METRIC_SPEC, MIN_REP_QUALITY, arm_reach,
+                                   rep_metrics)
+        from barra.movements import resolve, tracking_signal
         from barra.pose import available_backends, get_backend
+        from barra.quality import band as qband
+        from barra.quality import score_rep
     except ImportError as exc:
-        return {
-            "exercise": exercise,
-            "n_reps": 0,
-            "sessions": [],
-            "reps": [],
-            "blockers": [
-                f"barra is not importable on this host ({exc}). "
-                "Use server/.venv (pip install -e ../barrapp[mediapipe])."
-            ],
-        }
+        return _empty(exercise, [
+            f"barra is not importable on this host ({exc}). "
+            "Use server/.venv (pip install -e ../barrapp[mediapipe])."
+        ])
 
     backends = available_backends()
     if not backends:
-        return {
-            "exercise": exercise,
-            "n_reps": 0,
-            "sessions": [],
-            "reps": [],
-            "blockers": [
-                "No pose backend installed. In server/.venv run: "
-                "pip install -e ../barrapp[mediapipe]"
-            ],
-        }
+        return _empty(exercise, [
+            "No pose backend installed. In server/.venv run: "
+            "pip install -e ../barrapp[mediapipe]"
+        ])
 
     info = probe_video(video_path)
     if not info.get("ok"):
-        return {
-            "exercise": exercise,
-            "n_reps": 0,
-            "sessions": [],
-            "reps": [],
-            "blockers": [f"Could not open the clip: {info.get('reason', 'unknown')}"],
-        }
+        return _empty(exercise,
+                      [f"Could not open the clip: {info.get('reason', 'unknown')}"])
 
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
     try:
         pose = get_backend(backends[0]).estimate(video_path)
     except Exception as exc:  # noqa: BLE001
-        return {
-            "exercise": exercise,
-            "n_reps": 0,
-            "sessions": [],
-            "reps": [],
-            "blockers": [f"Pose estimation failed: {exc}"],
-        }
+        return _empty(exercise, [f"Pose estimation failed: {exc}"])
     fps = pose.fps or info["fps"] or 30.0
+
+    # Detect the movement from the clip itself. A movement the athlete named is
+    # respected, but the detection still runs so the phone can say when the two
+    # disagree - measuring a muscle-up with squat geometry produces numbers that
+    # look fine and mean nothing.
+    detection = classify(pose.keypoints)
+    detected = {
+        "exercise": detection.exercise,
+        "label": HUMAN.get(detection.exercise, detection.exercise),
+        "confidence": round(float(detection.confidence), 2),
+        "reason": detection.reason,
+        "runnerUp": detection.runner_up,
+    }
+    chosen = exercise
+    if exercise in ("", "auto", None):
+        if detection.exercise == "unknown":
+            return _empty("auto", [detection.reason], detected=detected,
+                          duration_s=round(float(info.get("duration_s") or 0), 2))
+        chosen = detection.exercise
+
     try:
-        movement = resolve(exercise)
+        movement = resolve(chosen)
     except SystemExit as exc:
-        return {
-            "exercise": exercise,
-            "n_reps": 0,
-            "sessions": [],
-            "reps": [],
-            "blockers": [str(exc)],
-        }
+        return _empty(chosen, [str(exc)], detected=detected)
+
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement)
 
-    session = date.today().isoformat()
+    session = session or date.today().isoformat()
+    raw_signal, sig_conf = tracking_signal(pose.keypoints, movement)
+    signal, _valid = _clean_signal(raw_signal, sig_conf)
+    arm = arm_reach(pose.keypoints)
     reps = []
     usable = 0
     extra_blockers: list[str] = []
+    scores: list[int] = []
     for i, (start, turn, end) in enumerate(found):
         measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement)
         lines = []
@@ -138,6 +193,14 @@ def analyze_clip(video_path: Path, exercise: str = "muscle_up") -> dict:
             extra_blockers.extend(measured.problems)
         transition = next((m["value"] for m in lines if m["key"] == "transition_s"), "")
         total = next((m["value"] for m in lines if m["key"] == "total_s"), "")
+        q = score_rep(
+            measured.values, arm, signal, start, turn,
+            plausible=measured.plausible,
+            rep_quality=measured.quality.get("rep", 0.0),
+            min_rep_quality=MIN_REP_QUALITY,
+        )
+        if q.score is not None:
+            scores.append(q.score)
         reps.append({
             "session": session,
             "label": f"r{i + 1}",
@@ -147,18 +210,54 @@ def analyze_clip(video_path: Path, exercise: str = "muscle_up") -> dict:
             "metrics": lines,
             "plausible": plausible,
             "problems": list(measured.problems),
+            "startS": round(start / fps, 2),
+            "endS": round(end / fps, 2),
+            "turnS": round(turn / fps, 2),
+            "score": q.score,
+            "band": qband(q.score),
+            "scoreNote": q.note,
+            "components": [
+                {"name": name, "value": c["value"], "weight": c["weight"],
+                 "why": c["why"]}
+                for name, c in q.components.items()
+            ],
+            "aside": [
+                {"name": name, "value": v["value"], "why": v["why"]}
+                for name, v in q.context.items() if isinstance(v, dict)
+            ],
+            "trace": _trace(signal, start, end),
         })
 
     blockers = list(dict.fromkeys(reasons + extra_blockers))
     note = f"{len(found)} segmented, {usable} usable"
     if usable < 3:
         note += " — need 3 for a session median"
+
+    # The trim the phone plays back: from the first rep's start to the last
+    # rep's end, with a little air either side. Everything outside it is the
+    # walk to the bar and the walk away, which is not the exercise.
+    trim = None
+    if found:
+        pad = 0.6
+        first, last = found[0][0], found[-1][2]
+        trim = {
+            "startS": max(0.0, round(first / fps - pad, 2)),
+            "endS": round(min(info.get("duration_s") or last / fps,
+                              last / fps + pad), 2),
+        }
+
+    session_score = int(round(sum(scores) / len(scores))) if scores else None
     return {
         "exercise": movement.name,
+        "detected": detected,
         "n_reps": usable,
         "n_candidates": len(found),
         "fps": round(float(fps), 3),
         "duration_s": round(float(info.get("duration_s") or 0), 2),
+        "trim": trim,
+        "session": session,
+        "sessionScore": session_score,
+        "sessionBand": qband(session_score),
         "sessions": [{"date": session, "reps": usable, "note": note}],
         "reps": reps,
         "blockers": blockers,

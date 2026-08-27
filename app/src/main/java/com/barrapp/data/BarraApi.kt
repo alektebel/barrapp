@@ -143,11 +143,66 @@ class BarraApi(context: Context) {
                         },
                         problems = (0 until problemsJson.length()).map { problemsJson.getString(it) },
                         plausible = row.optBoolean("plausible", true),
+                        startS = row.optDouble("startS", 0.0).orZero(),
+                        endS = row.optDouble("endS", 0.0).orZero(),
+                        turnS = row.optDouble("turnS", 0.0).orZero(),
+                        // Absent means "not measurable", which is not the same
+                        // as zero and must never be drawn as a bad rep.
+                        score = if (row.isNull("score")) null else row.optInt("score"),
+                        band = row.optString("band").ifBlank { "unmeasured" },
+                        scoreNote = row.optString("scoreNote"),
+                        components = row.optJSONArray("components").mapObjects { c ->
+                            ScorePart(
+                                name = c.optString("name"),
+                                value = if (c.isNull("value")) null else c.optDouble("value").orZero(),
+                                weight = c.optDouble("weight", 0.0).orZero(),
+                                why = c.optString("why"),
+                            )
+                        },
+                        asides = row.optJSONArray("aside").mapObjects { a ->
+                            Aside(
+                                name = a.optString("name"),
+                                value = a.optDouble("value", 0.0).orZero(),
+                                why = a.optString("why"),
+                            )
+                        },
+                        trace = row.optJSONArray("trace").let { t ->
+                            if (t == null) emptyList()
+                            else (0 until t.length()).map { i -> t.optDouble(i, 0.0).toFloat() }
+                        },
                     )
                 },
                 blockers = (0 until blockers.length()).map { blockers.getString(it) },
                 nextSession = json.optString("nextSession"),
+                exercise = json.optString("exercise"),
+                detected = json.optJSONObject("detected")?.let { d ->
+                    Detected(
+                        exercise = d.optString("exercise"),
+                        label = d.optString("label"),
+                        confidence = d.optDouble("confidence", 0.0).orZero(),
+                        reason = d.optString("reason"),
+                        runnerUp = d.optString("runnerUp").ifBlank { null },
+                    )
+                },
+                trim = json.optJSONObject("trim")?.let { t ->
+                    Trim(t.optDouble("startS", 0.0).orZero(), t.optDouble("endS", 0.0).orZero())
+                },
+                sessionDate = json.optString("session"),
+                sessionScore = if (json.isNull("sessionScore")) null else json.optInt("sessionScore"),
+                sessionBand = json.optString("sessionBand").ifBlank { "unmeasured" },
+                repCount = json.optInt("n_reps"),
+                candidateCount = json.optInt("n_candidates"),
+                durationS = json.optDouble("duration_s", 0.0).orZero(),
             )
+        }
+
+        /** JSONObject.optDouble returns NaN for a missing key, which then
+         *  propagates silently into every arithmetic result downstream. */
+        private fun Double.orZero(): Double = if (isNaN() || isInfinite()) 0.0 else this
+
+        private fun <T> JSONArray?.mapObjects(block: (JSONObject) -> T): List<T> {
+            if (this == null) return emptyList()
+            return (0 until length()).mapNotNull { optJSONObject(it) }.map(block)
         }
 
         fun sampleFromAssets(context: Context): Analysis {

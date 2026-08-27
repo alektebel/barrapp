@@ -15,6 +15,7 @@ data class Job(
     val error: String? = null,
 )
 
+/** What the server made of one clip. */
 data class Analysis(
     val headline: String,
     val narrative: String,
@@ -22,7 +23,31 @@ data class Analysis(
     val reps: List<RepRow>,
     val blockers: List<String>,
     val nextSession: String,
+    val exercise: String = "",
+    val detected: Detected? = null,
+    /** The stretch of the clip that is actually the exercise, in seconds. */
+    val trim: Trim? = null,
+    val sessionDate: String = "",
+    val sessionScore: Int? = null,
+    val sessionBand: String = "unmeasured",
+    val repCount: Int = 0,
+    val candidateCount: Int = 0,
+    val durationS: Double = 0.0,
 )
+
+data class Detected(
+    val exercise: String,
+    val label: String,
+    val confidence: Double,
+    val reason: String,
+    val runnerUp: String? = null,
+) {
+    val certain: Boolean get() = confidence >= 0.65
+}
+
+data class Trim(val startS: Double, val endS: Double) {
+    val lengthS: Double get() = (endS - startS).coerceAtLeast(0.0)
+}
 
 data class SessionRow(
     val date: String,
@@ -36,6 +61,21 @@ data class MetricLine(
     val cls: String,
 )
 
+/** One component of the quality proxy, shown so the total can be taken apart. */
+data class ScorePart(
+    val name: String,
+    val value: Double?,
+    val weight: Double,
+    val why: String,
+)
+
+/** Measured, reported beside the score, deliberately not folded into it. */
+data class Aside(
+    val name: String,
+    val value: Double,
+    val why: String,
+)
+
 data class RepRow(
     val session: String,
     val label: String,
@@ -45,4 +85,34 @@ data class RepRow(
     val metrics: List<MetricLine> = emptyList(),
     val problems: List<String> = emptyList(),
     val plausible: Boolean = true,
+    val startS: Double = 0.0,
+    val endS: Double = 0.0,
+    val turnS: Double = 0.0,
+    /** null when the rep could not be measured - never a low score instead. */
+    val score: Int? = null,
+    val band: String = "unmeasured",
+    val scoreNote: String = "",
+    val components: List<ScorePart> = emptyList(),
+    val asides: List<Aside> = emptyList(),
+    /** Small copy of the rep's own trace, for drawing. */
+    val trace: List<Float> = emptyList(),
+)
+
+/** One day in the calendar. Several clips on one day fold into one entry. */
+data class DayEntry(
+    val date: String,
+    val exercise: String,
+    val exerciseLabel: String,
+    val reps: Int,
+    val score: Int?,
+    val band: String,
+    val jobIds: List<String>,
+) {
+    val measured: Boolean get() = score != null
+}
+
+data class ChatTurn(
+    val fromUser: Boolean,
+    val text: String,
+    val at: Long = System.currentTimeMillis(),
 )

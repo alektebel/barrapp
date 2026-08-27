@@ -129,7 +129,10 @@ class Handler(BaseHTTPRequestHandler):
                 "id": job_id,
                 "owner": owner,
                 "status": "created",
-                "exercise": body.get("exercise") or "muscle_up",
+                # "auto" by default: the movement is detected from the clip, so a client
+                # that omits the field does not get squat geometry applied to a
+                # muscle-up, which produces numbers that look fine and mean nothing.
+                "exercise": body.get("exercise") or "auto",
                 "createdAt": _now(),
                 "result": None,
                 "error": None,
@@ -204,6 +207,7 @@ def _run(job_id: str) -> None:
         result = process_job(job, video)
         with LOCK:
             JOBS[job_id]["result"] = result
+            JOBS[job_id]["exercise"] = result.get("exercise") or job.get("exercise")
             JOBS[job_id]["status"] = "done"
     except Exception as exc:  # noqa: BLE001
         with LOCK:

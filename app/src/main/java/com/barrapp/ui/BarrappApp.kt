@@ -1,286 +1,363 @@
 package com.barrapp.ui
 
 import android.app.Activity
-import android.content.Intent
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barrapp.BarrappViewModel
 import com.barrapp.DeviceId
+import com.barrapp.Pane
 import com.barrapp.Screen
-import com.barrapp.data.Analysis
-import com.barrapp.data.Job
+import com.barrapp.ui.parts.Eyebrow
+import com.barrapp.ui.parts.Panel
 
-private val exercises = listOf(
-    "muscle_up" to "Muscle-up",
-    "pull_up" to "Pull-up",
-    "dip" to "Dip",
-    "squat" to "Squat",
-)
+/**
+ * The shell.
+ *
+ * One layout rule: below 840dp the three panes are one at a time with a bottom
+ * bar; at or above it they sit side by side. There is no tablet build and no
+ * phone build - the panes are the same composables either way, so a fix lands
+ * in both. The breakpoint is measured from the window, not the device, so a
+ * split-screen phone gets the compact layout it deserves.
+ */
+private val WIDE = 840.dp
+private val CALENDAR_WIDTH = 300.dp
+private val INSIGHT_WIDTH = 340.dp
 
 @Composable
 fun BarrappApp(vm: BarrappViewModel = viewModel()) {
     val state by vm.state.collectAsStateWithLifecycle()
-    Box(Modifier.fillMaxSize().safeDrawingPadding()) {
+    val context = LocalContext.current
+
+    // Android 13+ asks before it may post anything. Requested on the way into
+    // Home rather than on first launch, so the ask lands after the app has
+    // shown what it is for.
+    val notificationPermission = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { }
+    LaunchedEffect(state.screen) {
+        if (state.screen == Screen.Home && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    val pickVideo = rememberLauncherForActivityResult(
+        ActivityResultContracts.GetContent()
+    ) { uri -> vm.upload(uri) }
+
+    val recordVideo = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) vm.upload(result.data?.data)
+    }
+
+    Box(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .safeDrawingPadding()
+    ) {
         when (state.screen) {
-        Screen.Privacy -> PrivacyScreen(onAccept = vm::acceptPrivacy, showBack = DeviceId.privacyAccepted(LocalContext.current), onBack = vm::openHome)
-        Screen.Home -> HomeScreen(state.jobs, vm::openCapture, vm::openDemo, vm::openJob, vm::openPrivacy)
-        Screen.Capture -> CaptureScreen(vm)
-        Screen.Report -> {
-            val analysis = state.demo ?: state.current?.result
-            ReportScreen(
-                status = state.current?.status ?: if (state.demo != null) "done" else state.status,
-                error = state.current?.error ?: state.error,
-                analysis = analysis,
-                canDelete = state.current != null,
+            Screen.Privacy -> PrivacyScreen(
+                onAccept = vm::acceptPrivacy,
+                showBack = DeviceId.privacyAccepted(context),
                 onBack = vm::openHome,
-                onDelete = vm::deleteCurrent,
             )
-        }
+
+            Screen.Onboarding -> Onboarding(
+                initial = state.profile,
+                onDone = vm::saveProfile,
+            )
+
+            Screen.Processing -> ProcessingState(
+                stage = state.stage,
+                exerciseGuess = state.current?.result?.detected?.label,
+                error = state.error,
+                onCancel = vm::cancelUpload,
+            )
+
+            Screen.Coach -> CoachScreen(
+                turns = state.chat,
+                thinking = state.coachThinking,
+                suggestions = vm.suggestions(),
+                onSend = vm::ask,
+                onBack = vm::openHome,
+            )
+
+            Screen.Home -> HomeShell(
+                vm = vm,
+                onPick = { pickVideo.launch("video/*") },
+                onRecord = { recordVideo.launch(vm.recordIntent()) },
+            )
         }
     }
 }
 
 @Composable
-private fun HomeScreen(
-    jobs: List<Job>,
-    onFilm: () -> Unit,
-    onDemo: () -> Unit,
-    onOpen: (Job) -> Unit,
-    onPrivacy: () -> Unit,
+private fun HomeShell(
+    vm: BarrappViewModel,
+    onPick: () -> Unit,
+    onRecord: () -> Unit,
 ) {
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(24.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp),
-    ) {
-        item {
-            Text("barrapp", style = MaterialTheme.typography.headlineLarge)
-            Spacer(Modifier.height(8.dp))
-            Text(
-                "Film a set. The server measures it against your own variation. No score, no coaching.",
-                style = MaterialTheme.typography.bodyLarge,
-            )
-            Spacer(Modifier.height(20.dp))
-            Button(onClick = onFilm, modifier = Modifier.fillMaxWidth()) {
-                Text("Film a set")
-            }
-            TextButton(onClick = onDemo) {
-                Text("Open the Aug 2026 muscle-up block")
-            }
-            TextButton(onClick = onPrivacy) {
-                Text("Privacy")
-            }
-            Spacer(Modifier.height(12.dp))
-            Text("Recent", style = MaterialTheme.typography.titleMedium)
-        }
-        if (jobs.isEmpty()) {
-            item { Text("Nothing uploaded yet.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
-        }
-        items(jobs, key = { it.id }) { job ->
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .clickable { onOpen(job) }
-                    .padding(vertical = 8.dp)
-            ) {
-                Text("${job.exercise.replace('_', ' ')}  ·  ${job.status}")
-                Text(
-                    job.createdAt.ifBlank { job.id },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
-    }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun CaptureScreen(vm: BarrappViewModel) {
     val state by vm.state.collectAsStateWithLifecycle()
-    val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-        vm.setVideo(uri)
-    }
-    val record = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            vm.setVideo(result.data?.data)
-        }
-    }
 
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp)
-    ) {
-        TextButton(onClick = vm::openHome) { Text("Back") }
-        Text("New set", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(16.dp))
-        Text("Movement")
-        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            exercises.forEach { (id, label) ->
-                FilterChip(
-                    selected = state.exercise == id,
-                    onClick = { vm.setExercise(id) },
-                    label = { Text(label) },
-                )
-            }
-        }
-        Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { record.launch(vm.recordIntent().also { it.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION) }) }) {
-                Text("Record")
-            }
-            OutlinedButton(onClick = { pick.launch("video/*") }) {
-                Text("Pick clip")
-            }
-        }
-        Spacer(Modifier.height(8.dp))
-        Text(
-            if (state.video != null) "Clip attached." else "Tripod, same spot, whole lockout in frame, trim to the working set.",
-            style = MaterialTheme.typography.bodyMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        if (state.busy) {
-            Spacer(Modifier.height(16.dp))
-            LinearProgressIndicator(Modifier.fillMaxWidth())
-            Text(state.status)
-        }
-        state.error?.let {
-            Spacer(Modifier.height(8.dp))
-            Text(it, color = MaterialTheme.colorScheme.error)
-        }
-        Spacer(Modifier.height(24.dp))
-        Button(
-            onClick = vm::send,
-            enabled = state.video != null && !state.busy,
-            modifier = Modifier.fillMaxWidth(),
-        ) {
-            Text("Send to server")
-        }
-    }
-}
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= WIDE
+        val medium = maxWidth >= 600.dp && !wide
 
-@Composable
-private fun ReportScreen(
-    status: String,
-    error: String?,
-    analysis: Analysis?,
-    canDelete: Boolean,
-    onBack: () -> Unit,
-    onDelete: () -> Unit,
-) {
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(24.dp)
-    ) {
-        TextButton(onClick = onBack) { Text("Back") }
-        when {
-            analysis != null -> {
-                AnalysisBody(analysis)
-                if (canDelete) {
-                    Spacer(Modifier.height(24.dp))
-                    OutlinedButton(onClick = onDelete, modifier = Modifier.fillMaxWidth()) {
-                        Text("Delete this clip")
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.width(CALENDAR_WIDTH).fillMaxHeight()) {
+                    ShellHeader(state.profile.firstName, vm::openPrivacy)
+                    CalendarPane(
+                        days = state.days,
+                        selected = state.selectedDate,
+                        onSelect = vm::selectDate,
+                    )
+                }
+                VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                Box(Modifier.weight(1f).fillMaxHeight()) {
+                    MainPane(vm, onPick, onRecord)
+                }
+                VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                Box(Modifier.width(INSIGHT_WIDTH).fillMaxHeight()) {
+                    InsightPane(
+                        days = state.days,
+                        repTarget = state.profile.repTarget,
+                        weeklyNote = state.weeklyNote,
+                        onOpenCoach = vm::openCoach,
+                    )
+                }
+            }
+        } else if (medium) {
+            Row(Modifier.fillMaxSize()) {
+                Column(Modifier.width(CALENDAR_WIDTH).fillMaxHeight()) {
+                    ShellHeader(state.profile.firstName, vm::openPrivacy)
+                    CalendarPane(
+                        days = state.days,
+                        selected = state.selectedDate,
+                        onSelect = vm::selectDate,
+                    )
+                }
+                VerticalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+                Column(Modifier.weight(1f).fillMaxHeight()) {
+                    Box(Modifier.weight(1f)) {
+                        when (state.pane) {
+                            Pane.Progress -> InsightPane(
+                                days = state.days,
+                                repTarget = state.profile.repTarget,
+                                weeklyNote = state.weeklyNote,
+                                onOpenCoach = vm::openCoach,
+                            )
+                            else -> MainPane(vm, onPick, onRecord)
+                        }
+                    }
+                    CompactBar(
+                        pane = state.pane,
+                        showCalendar = false,
+                        onSelect = vm::showPane,
+                        onAdd = onPick,
+                    )
+                }
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                ShellHeader(state.profile.firstName, vm::openPrivacy)
+                Box(Modifier.weight(1f)) {
+                    when (state.pane) {
+                        Pane.Calendar -> CalendarPane(
+                            days = state.days,
+                            selected = state.selectedDate,
+                            onSelect = vm::selectDate,
+                        )
+                        Pane.Progress -> InsightPane(
+                            days = state.days,
+                            repTarget = state.profile.repTarget,
+                            weeklyNote = state.weeklyNote,
+                            onOpenCoach = vm::openCoach,
+                        )
+                        Pane.Session -> MainPane(vm, onPick, onRecord)
                     }
                 }
-            }
-            status == "failed" -> Text(error ?: "The server could not use this clip.", color = MaterialTheme.colorScheme.error)
-            else -> {
-                Text("Measuring…", style = MaterialTheme.typography.headlineMedium)
-                Spacer(Modifier.height(12.dp))
-                LinearProgressIndicator(Modifier.fillMaxWidth())
-                Spacer(Modifier.height(8.dp))
-                Text("This is not a score. The server is counting reps and checking whether the clip is even usable.")
-                error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                CompactBar(
+                    pane = state.pane,
+                    showCalendar = true,
+                    onSelect = vm::showPane,
+                    onAdd = onPick,
+                )
             }
         }
     }
 }
 
 @Composable
-private fun AnalysisBody(analysis: Analysis) {
-    Text(analysis.headline, style = MaterialTheme.typography.headlineMedium)
-    Spacer(Modifier.height(16.dp))
-    Text(analysis.narrative, style = MaterialTheme.typography.bodyLarge)
-    if (analysis.sessions.isNotEmpty()) {
-        Spacer(Modifier.height(20.dp))
-        Text("Sessions", style = MaterialTheme.typography.titleMedium)
-        analysis.sessions.forEach { row ->
-            Text("${row.date}   ${row.reps} rep${if (row.reps == 1) "" else "s"}")
-            if (row.note.isNotBlank()) {
-                Text(row.note, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-        }
-    }
-    if (analysis.reps.isNotEmpty()) {
-        Spacer(Modifier.height(20.dp))
-        Text("Reps", style = MaterialTheme.typography.titleMedium)
-        analysis.reps.forEach { row ->
-            Spacer(Modifier.height(8.dp))
-            Text(
-                if (row.plausible) row.label else "${row.label} (rejected)",
-                style = MaterialTheme.typography.titleSmall,
+private fun MainPane(
+    vm: BarrappViewModel,
+    onPick: () -> Unit,
+    onRecord: () -> Unit,
+) {
+    val state by vm.state.collectAsStateWithLifecycle()
+    val analysis = state.analysis
+
+    Box(Modifier.fillMaxSize()) {
+        when {
+            analysis != null -> SessionDetail(
+                analysis = analysis,
+                onAdd = onPick,
+                onDelete = if (state.current != null) vm::deleteCurrent else null,
             )
-            if (row.metrics.isNotEmpty()) {
-                row.metrics.forEach { line ->
-                    Text("${line.name}:  ${line.value}  ${line.cls}")
-                }
-            } else {
+
+            state.days.isEmpty() -> EmptyState(
+                greeting = greeting(state.profile.firstName),
+                onAdd = onPick,
+                onSeeExample = vm::openExample,
+            )
+
+            else -> Column(
+                Modifier.fillMaxSize().padding(20.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
                 Text(
-                    "transition ${row.transitionS}s  total ${row.totalS}s  ${row.cls}",
-                    fontFamily = FontFamily.Monospace,
-                    style = MaterialTheme.typography.bodySmall,
+                    "Pick a day to see it",
+                    style = MaterialTheme.typography.titleMedium,
                 )
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Or add another clip.",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(22.dp))
+                AddButton(onPick, large = true)
+                Spacer(Modifier.height(10.dp))
+                TextButton(onClick = onRecord) { Text("Record now instead") }
             }
-            row.problems.forEach { Text(it, color = MaterialTheme.colorScheme.error) }
+        }
+
+        state.error?.let { message ->
+            Box(
+                Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(16.dp)
+            ) {
+                Panel {
+                    Text(
+                        message,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
+            }
         }
     }
-    if (analysis.blockers.isNotEmpty()) {
-        Spacer(Modifier.height(20.dp))
-        Text("Blockers", style = MaterialTheme.typography.titleMedium)
-        analysis.blockers.forEach { Text("· $it") }
+}
+
+@Composable
+private fun ShellHeader(name: String, onPrivacy: () -> Unit) {
+    Row(
+        Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("barrapp", style = MaterialTheme.typography.titleMedium)
+            Text(
+                greeting(name),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        TextButton(onClick = onPrivacy) {
+            Icon(Icons.Filled.Info, contentDescription = "Privacy", Modifier.size(18.dp))
+        }
     }
-    if (analysis.nextSession.isNotBlank()) {
-        Spacer(Modifier.height(20.dp))
-        Text("Next session", style = MaterialTheme.typography.titleMedium)
-        Text(analysis.nextSession)
+}
+
+@Composable
+private fun CompactBar(
+    pane: Pane,
+    showCalendar: Boolean,
+    onSelect: (Pane) -> Unit,
+    onAdd: () -> Unit,
+) {
+    NavigationBar(containerColor = MaterialTheme.colorScheme.surface) {
+        if (showCalendar) {
+            NavigationBarItem(
+                selected = pane == Pane.Calendar,
+                onClick = { onSelect(Pane.Calendar) },
+                icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                label = { Text("Calendar") },
+            )
+        }
+        NavigationBarItem(
+            selected = pane == Pane.Session,
+            onClick = { onSelect(Pane.Session) },
+            icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+            label = { Text("Session") },
+        )
+        NavigationBarItem(
+            selected = false,
+            onClick = onAdd,
+            icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+            label = { Text("Add") },
+        )
+        NavigationBarItem(
+            selected = pane == Pane.Progress,
+            onClick = { onSelect(Pane.Progress) },
+            icon = { Icon(Icons.Filled.Info, contentDescription = null) },
+            label = { Text("Progress") },
+        )
     }
+}
+
+private fun greeting(name: String): String {
+    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
+    val part = when (hour) {
+        in 5..11 -> "Morning"
+        in 12..17 -> "Afternoon"
+        else -> "Evening"
+    }
+    return "$part, $name"
 }
 
 @Composable
@@ -295,23 +372,31 @@ private fun PrivacyScreen(onAccept: () -> Unit, showBack: Boolean, onBack: () ->
             TextButton(onClick = onBack) { Text("Back") }
         }
         Text("Privacy", style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(14.dp))
         Text(
-            "barrapp measures your own reps from a clip you send. It is not coaching and not medical advice.",
+            "barrapp measures your own reps from a clip you send. It is not coaching and not " +
+                "medical advice.",
             style = MaterialTheme.typography.bodyLarge,
         )
-        Spacer(Modifier.height(12.dp))
-        Text("What we collect")
-        Text("The video you upload, the exercise you pick, and a random device id stored on this phone. We do not ask for your name, email, or Google account.")
-        Spacer(Modifier.height(12.dp))
-        Text("What we do with it")
-        Text("The clip is sent to our AWS server, which runs pose estimation and returns numbers (timing, range of motion). Clips are private to this device id, not public, and are deleted automatically after 30 days. You can delete a clip from its report.")
-        Spacer(Modifier.height(12.dp))
-        Text("What we do not do")
-        Text("We do not sell data, run ads, or share clips. We do not diagnose injury or score 'good form'.")
-        Spacer(Modifier.height(12.dp))
-        Text("The full policy is also in docs/privacy.md in the project, which you must host at a public URL before Play Store review.")
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(20.dp))
+        Section(
+            "What we collect",
+            "The video you upload and a random device id stored on this phone. Your name, age " +
+                "and how often you train stay on the phone and are never sent anywhere.",
+        )
+        Section(
+            "What we do with it",
+            "The clip goes to our server, which runs pose estimation and returns numbers — " +
+                "timing, range of motion, rep count. Clips are private to this device id and " +
+                "are deleted automatically after 30 days. You can delete one from its session.",
+        )
+        Section(
+            "What we do not do",
+            "We do not sell data, run ads, or share clips. We do not diagnose injury or score " +
+                "'good form'. Every number compares you against your own previous reps, never " +
+                "against anyone else.",
+        )
+        Spacer(Modifier.height(28.dp))
         if (!showBack) {
             Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
                 Text("I understand — continue")
@@ -320,3 +405,13 @@ private fun PrivacyScreen(onAccept: () -> Unit, showBack: Boolean, onBack: () ->
     }
 }
 
+@Composable
+private fun Section(title: String, body: String) {
+    Column(Modifier.padding(bottom = 18.dp)) {
+        Eyebrow(title)
+        Spacer(Modifier.height(6.dp))
+        Text(body, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(10.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+    }
+}
