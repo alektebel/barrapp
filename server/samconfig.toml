@@ -1,0 +1,14 @@
+version = 0.1
+
+[default.deploy.parameters]
+stack_name = "sam-app"
+resolve_s3 = true
+s3_prefix = "sam-app"
+region = "eu-west-1"
+confirm_changeset = true
+capabilities = "CAPABILITY_IAM"
+disable_rollback = false
+image_repositories = ["WorkerFunction=257394490122.dkr.ecr.eu-west-1.amazonaws.com/samapp7427b055/workerfunction5fd3ab0brepo"]
+
+[default.global.parameters]
+region = "eu-west-1"

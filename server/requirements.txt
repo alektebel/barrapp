@@ -1,0 +1,2 @@
+# Lambda-only. The local server uses the stdlib.
+urllib3>=2.0

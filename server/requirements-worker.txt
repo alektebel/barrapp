@@ -1,0 +1,6 @@
+# mediapipe 0.10.x requires numpy<2. Use 1.26 wheels on Amazon Linux 2023 / cp312.
+numpy==1.26.4
+scipy==1.14.1
+opencv-python-headless==4.10.0.84
+mediapipe==0.10.21
+boto3
