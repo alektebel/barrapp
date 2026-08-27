@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+
+# Sample videos are the user's data: never committed. The drop-zone docs are.
+data/videos/**
+!data/videos/README.md
+!data/videos/sessions.example.csv
+!data/videos/.gitkeep
+
+# All pipeline artefacts are reproducible from data/ + the CLI.
+out/**
+!out/.gitkeep

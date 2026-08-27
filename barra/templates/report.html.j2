@@ -1,0 +1,293 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Barra - deviation report</title>
+<style>
+:root{--bg:#0d1014;--panel:#12151a;--line:#242a33;--fg:#d8dee9;--dim:#8b95a5;
+      --accent:#f0a35e;--ok:#7bc98a;--bad:#e5707a;--null:#5e9ef0}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+     font:14px/1.55 ui-sans-serif,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px}
+h1{font-size:24px;margin:0 0 4px} h2{font-size:18px;margin:38px 0 12px;
+   padding-bottom:6px;border-bottom:1px solid var(--line)}
+h3{font-size:15px;margin:24px 0 8px} h4{font-size:13px;margin:16px 0 6px;color:var(--dim)}
+.sub{color:var(--dim);font-size:12px;margin-bottom:24px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;
+       padding:16px 18px;margin:14px 0}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line)}
+th{color:var(--dim);font-weight:600;font-size:11px;text-transform:uppercase;
+   letter-spacing:.04em}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.scroll{overflow-x:auto}
+img{max-width:100%;display:block;border-radius:6px;margin:10px 0}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11px;
+     font-weight:600;letter-spacing:.02em}
+.tag.flag{background:rgba(229,112,122,.16);color:var(--bad)}
+.tag.ok{background:rgba(123,201,138,.14);color:var(--ok)}
+.tag.warn{background:rgba(240,163,94,.16);color:var(--accent)}
+.note{border-left:3px solid var(--accent);padding:10px 14px;margin:14px 0;
+      background:rgba(240,163,94,.06);font-size:13px}
+.note.bad{border-color:var(--bad);background:rgba(229,112,122,.07)}
+.note.ok{border-color:var(--ok);background:rgba(123,201,138,.06)}
+.k{color:var(--dim)} .mono{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+a{color:var(--null)}
+.rep{border-top:1px solid var(--line);padding-top:16px;margin-top:20px}
+ul{margin:6px 0 0;padding-left:20px} li{margin:3px 0}
+</style></head><body><div class="wrap">
+
+<h1>Barra &mdash; self-referential deviation report</h1>
+<div class="sub">Generated {{ generated }} &middot; every deviation is expressed
+in torso-lengths and reported against this subject's own leave-one-out null
+distribution. No cross-subject comparison is made anywhere.</div>
+
+<h2>1. Viewpoint bins</h2>
+<div class="panel">
+<table><thead><tr><th>Bin</th><th class="num">Reps</th><th>Status</th></tr></thead>
+<tbody>
+{% for b in ["SAGITTAL","OBLIQUE","FRONTAL","UNKNOWN"] %}
+<tr><td class="mono">{{ b }}</td><td class="num">{{ counts.get(b, 0) }}</td>
+<td>{% if b == "UNKNOWN" %}<span class="tag warn">excluded</span> viewpoint not
+identifiable{% elif counts.get(b,0) == 0 %}<span class="k">no reps</span>
+{% elif counts.get(b,0) < min_reps_per_bin %}<span class="tag warn">underpowered</span>
+fewer than {{ min_reps_per_bin }} reps &mdash; excluded from all comparisons
+{% else %}<span class="tag ok">usable</span>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table>
+</div>
+
+<div class="panel"><h4>Per-set azimuth estimates</h4><div class="scroll">
+<table><thead><tr><th>Video</th><th>Session</th><th class="num">Azimuth</th>
+<th class="num">Interval</th><th>Bin</th><th class="num">Frames</th></tr></thead><tbody>
+{% for v in viewpoints %}
+<tr><td class="mono">{{ v.video }}</td><td class="k">{{ v.session_id }}</td>
+<td class="num">{{ "%.0f"|format(v.azimuth_deg) if v.azimuth_deg == v.azimuth_deg else "n/a" }}&deg;</td>
+<td class="num k">{{ "%.0f&ndash;%.0f"|format(v.azimuth_lo, v.azimuth_hi)|safe if v.azimuth_lo == v.azimuth_lo else "n/a" }}&deg;</td>
+<td class="mono">{{ v.bin }}{% if v.bin_uncertain %} <span class="tag warn">uncertain</span>{% endif %}</td>
+<td class="num">{{ v.n_frames_used }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<p class="k" style="font-size:12px;margin-top:10px">Azimuth is estimated from
+apparent shoulder width relative to torso length, calibrated at R_true =
+{{ viewpoints[0].r_true if viewpoints else "n/a" }} by the
+<span class="mono">{{ viewpoints[0].calibration_method if viewpoints else "n/a" }}</span>
+method. The estimate is ill-conditioned near 90&deg;, so frontal intervals are
+wide; that is a property of the projection, not of the footage.</p>
+</div>
+
+{% if not bins %}
+<div class="note bad">No template has been built, so no null distribution
+exists, so no deviation may be reported. Run
+<span class="mono">barra mark-reference</span> then
+<span class="mono">barra template</span>.</div>
+{% endif %}
+
+{% for b in bins %}
+<h2>2. {{ b.name }} &mdash; the null distribution</h2>
+<div class="panel">
+<p>This is what the subject's <em>own</em> clean reps look like when scored
+against a template built without them. Every deviation number later in this
+report is only meaningful relative to this.</p>
+<img src="{{ b.null_total_png }}" alt="null distribution, total deviation">
+<table><tbody>
+<tr><td>Reference reps in null</td><td class="num">{{ b.resolution.n }}</td></tr>
+<tr><td>Median rep-to-rep deviation</td><td class="num">{{ b.resolution.median|num }}</td></tr>
+<tr><td>Interquartile range</td><td class="num">{{ b.resolution.iqr|num }}</td></tr>
+<tr><td>95th percentile (the flag threshold)</td><td class="num">{{ b.resolution.p95|num }}</td></tr>
+<tr><td>Smallest deviation this tool can call abnormal</td>
+    <td class="num">{{ b.resolution.min_detectable_deviation|num }} torso-lengths</td></tr>
+</tbody></table>
+{% if b.resolution.resolution_limited %}
+<div class="note bad">The null has only {{ b.resolution.n }} observations. An
+empirical 95th percentile estimated from this few points is unstable, and the
+flag threshold inherits that instability. Treat every flag below as
+provisional until more reference reps exist.</div>
+{% endif %}
+{% if b.resolution.spread_ratio > 2.0 %}
+<div class="note">The null is wide: its 95th percentile is
+{{ "%.1f"|format(b.resolution.spread_ratio) }}&times; its median. Any technique
+error that displaces joints by less than
+{{ b.resolution.min_detectable_deviation|num }} torso-lengths falls inside this
+subject's ordinary rep-to-rep variation and this tool cannot see it. That is a
+finding about the method, not a fault in the footage.</div>
+{% endif %}
+<img src="{{ b.null_joints_png }}" alt="per-joint null distribution">
+</div>
+
+{% if b.validation and b.validation.session_analysis %}
+<h3>Tracking between sessions</h3>
+<div class="panel">
+<p>{{ b.validation.session_analysis.conclusion }}</p>
+{% if b.validation.session_analysis.cross_session_available %}
+<table><tbody>
+<tr><td>Within-reference null, median</td><td class="num">{{ b.validation.session_analysis.pooled_median|num }}</td></tr>
+<tr><td>Cross-session null, median</td><td class="num">{{ b.validation.session_analysis.cross_session_median|num }}</td></tr>
+<tr><td>Cross-session null, p95</td><td class="num">{{ b.validation.session_analysis.cross_session_p95|num }}</td></tr>
+<tr><td>Inflation from holding out a session</td>
+    <td class="num">{{ "%.2f"|format(b.validation.session_analysis.inflation_ratio) }}&times;</td></tr>
+{% if b.validation.session_analysis.between_session_spread is defined %}
+<tr><td>Observed spread of clean-rep medians between sessions</td>
+    <td class="num">{{ b.validation.session_analysis.between_session_spread|num }}</td></tr>
+{% endif %}
+</tbody></table>
+{% if b.validation.session_analysis.exceeds_cross_session_null is defined %}
+  {% if b.validation.session_analysis.exceeds_cross_session_null %}
+  <div class="note ok">The between-session spread of clean reps exceeds the
+  cross-session null p95, so a real session-to-session difference is present and
+  measurable. Whether it is <em>improvement</em> is not something this tool can
+  say &mdash; it measures distance from the reference shape, with no direction.</div>
+  {% else %}
+  <div class="note">The between-session spread of clean reps sits inside the
+  cross-session null. On this data, session-to-session differences are not
+  distinguishable from ordinary drift, so progress cannot be tracked between
+  these sessions at this resolution.</div>
+  {% endif %}
+{% endif %}
+{% endif %}
+</div>
+{% endif %}
+
+<h2>3. {{ b.name }} &mdash; per-rep deviations</h2>
+{% if not b.reps %}
+<div class="panel k">No reps scored in this bin. Run
+<span class="mono">barra score &lt;video&gt;</span>.</div>
+{% endif %}
+{% for r in b.reps %}
+<div class="panel rep">
+<h3>{{ r.rep_id }}
+{% if r.flagged %}<span class="tag flag">exceeds own variation</span>
+{% else %}<span class="tag ok">within own variation</span>{% endif %}
+{% if r.is_reference %}<span class="tag warn">reference rep</span>{% endif %}</h3>
+<p><strong>Total deviation {{ r.total|num }}</strong> torso-lengths &mdash;
+<strong>{{ "%.1f"|format(r.percentile) }}th percentile</strong> of this
+subject's own null (n={{ r.n_null }}, p95 = {{ r.p95|num }}).
+<span class="k">Session {{ r.session_id }}.</span></p>
+{% if r.is_reference %}
+<div class="note">This rep helped build the template, so its percentile is
+optimistic. It is shown for completeness and is never used to estimate the
+false positive rate.</div>
+{% endif %}
+<img src="{{ r.joints_png }}" alt="per-joint deviation vs null band">
+<div class="scroll"><table><thead><tr><th>Phase</th>
+<th class="num">Deviation</th><th class="num">Null percentile</th></tr></thead><tbody>
+{% for name, pair in r.phases.items() %}
+<tr><td class="mono">{{ name }}</td><td class="num">{{ pair[0]|num }}</td>
+<td class="num">{{ "%.0f"|format(pair[1]) }}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<h4>Confidence weights used</h4>
+<div class="scroll"><table><thead><tr>
+{% for j, w in r.weights.items() %}<th class="num">{{ j.replace("_"," ") }}</th>{% endfor %}
+</tr></thead><tbody><tr>
+{% for j, w in r.weights.items() %}<td class="num">{{ "%.3f"|format(w) }}</td>{% endfor %}
+</tr></tbody></table></div>
+{% if r.qc_video %}<p><a href="{{ r.qc_video }}">Side-by-side skeleton overlay
+&rarr; {{ r.qc_video }}</a> &mdash; check a flag by eye before believing it.</p>
+{% else %}<p class="k">No QC overlay rendered for this rep.</p>{% endif %}
+</div>
+{% endfor %}
+{% endfor %}
+
+<h2>4. Validation</h2>
+{% if not has_validation %}
+<div class="note bad">Validation has not been run. Until
+<span class="mono">barra validate</span> reports a detection rate <em>and</em> a
+false positive rate on held-out clean reps, nothing above has been shown to
+work. Every flag in section 3 is an unvalidated measurement.</div>
+{% else %}
+{% if validation.threshold_lock and validation.threshold_lock.changed_since_lock %}
+<div class="note bad">The decision thresholds in
+<span class="mono">config.py</span> changed after labels were first seen
+(fingerprint {{ validation.threshold_lock.locked.config_fingerprint }} &rarr;
+{{ validation.threshold_lock.config_fingerprint }}). Post-hoc threshold
+adjustment invalidates these figures. Re-report on fresh data.</div>
+{% endif %}
+{% for b in bins %}{% set v = b.validation %}
+<div class="panel">
+<h3>{{ b.name }}</h3>
+{% if v.error %}<div class="note bad">{{ v.error }}</div>
+{% else %}
+<table><thead><tr><th>Measure</th><th class="num">Value</th><th>Basis</th></tr></thead>
+<tbody>
+<tr><td>False positive rate, held-out clean reps</td>
+    <td class="num">{{ v.fpr_core_clean|pct }}</td>
+    <td class="k">{{ v.n_core_clean }} clean reps, none used to build the template</td></tr>
+{% if v.n_edge_clean %}
+<tr><td>False positive rate, clean reps at the bin edge</td>
+    <td class="num">{{ v.fpr_edge_of_bin|pct }}</td>
+    <td class="k">{{ v.n_edge_clean }} reps filmed near a bin boundary</td></tr>
+{% endif %}
+<tr><td>Detection rate, all induced errors</td>
+    <td class="num">{{ v.detection_overall|pct }}</td><td class="k">pooled</td></tr>
+{% for name, d in v.detection_by_error.items() %}
+<tr><td class="k" style="padding-left:24px">{{ name }}</td>
+    <td class="num">{{ d.rate|pct }}</td>
+    <td class="k">{{ d.detected }}/{{ d.n }} flagged, median null percentile
+    {{ "%.0f"|format(d.median_percentile) }}</td></tr>
+{% endfor %}
+<tr><td>Clean reps held out of the reference set</td>
+    <td class="num">{{ v.clean_holdout_fraction|pct }}</td>
+    <td class="k">at least 30% required</td></tr>
+</tbody></table>
+{% if v.verdict.works %}
+<div class="note ok"><strong>Passes.</strong> FPR {{ v.verdict.fpr|pct }} is at
+or below the {{ max_fpr|pct }} limit and detection {{ v.verdict.detection|pct }}
+is at or above the {{ min_detection|pct }} floor.</div>
+{% else %}
+<div class="note bad"><strong>Does not work on this data.</strong>
+<ul>{% for r in v.verdict.reasons %}<li>{{ r }}</li>{% endfor %}</ul></div>
+{% endif %}
+{% endif %}
+</div>
+{% endfor %}
+<div class="panel">
+<h3>Overall verdict</h3>
+{% if validation.overall_verdict.works %}
+<div class="note ok">{{ validation.overall_verdict.statement }}</div>
+{% else %}
+<div class="note bad">{{ validation.overall_verdict.statement }}</div>
+{% endif %}
+</div>
+{% endif %}
+
+<h2>5. Conclusion</h2>
+{% set any_sep = false %}
+{% for b in bins %}{% if b.separability.available %}
+<div class="panel">
+<h3>{{ b.name }}</h3>
+{% if b.separability.separable_joints or b.separability.separable_phases %}
+<p>Deviations separable from this subject's own variation were found in:</p>
+<ul>
+{% for j in b.separability.separable_joints %}<li class="mono">{{ j }} (joint)</li>{% endfor %}
+{% for p in b.separability.separable_phases %}<li class="mono">{{ p }} (phase)</li>{% endfor %}
+</ul>
+{% else %}
+<p>No joint and no phase separated the induced errors from this subject's own
+rep-to-rep variation at the {{ flag_percentile }}th-percentile threshold while
+staying under a {{ max_fpr|pct }} false positive rate. On this data the
+measurement does not resolve the errors that were induced.</p>
+{% endif %}
+<div class="note">{{ b.separability.n_tests }} channels were tested at the
+{{ flag_percentile }}th percentile, so about
+{{ b.separability.expected_chance_exceedances }} exceedances per rep are
+expected by chance alone. A single joint crossing its band on a single rep is
+not evidence of anything; the rates in the table are.</div>
+<div class="scroll"><table><thead><tr><th>Channel</th><th class="num">Threshold</th>
+<th class="num">Detection</th><th class="num">FPR</th><th>Separable</th></tr></thead><tbody>
+{% for c in b.separability.joints + b.separability.phases %}
+<tr><td class="mono">{{ c.name }}</td><td class="num">{{ c.threshold|num }}</td>
+<td class="num">{{ c.detection|pct }}</td><td class="num">{{ c.fpr|pct }}</td>
+<td>{% if c.separable %}<span class="tag ok">yes</span>{% else %}
+<span class="k">no</span>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+</div>
+{% else %}
+<div class="panel k">{{ b.name }}: no labelled data, so no claim can be made
+about which joints or phases separate. Run
+<span class="mono">barra validate</span> with
+<span class="mono">out/labels.csv</span> in place.</div>
+{% endif %}{% endfor %}
+
+</div></body></html>
