@@ -1,0 +1,2 @@
+# API Lambda only. boto3 ships with the runtime. Keep this zip tiny
+# (MediaPipe / OpenCV belong in the worker image, not here).

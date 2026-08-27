@@ -1,0 +1,53 @@
+{
+  "headline": "Four clips gave three measurable reps, and progress isn't yet trackable.",
+  "narrative": "It's a filming problem, not a training one. Timing is the workhorse: your transition through the bar was 0.12 s on 10 Aug and 0.33 s on both 14 Aug reps.",
+  "sessions": [
+    {"date": "10 Aug (night, front)", "reps": 1, "note": "second rep cut off by the clip ending"},
+    {"date": "14 Aug (day, behind)", "reps": 2, "note": "best footage by a distance"},
+    {"date": "19 Aug (day, front)", "reps": 0, "note": "both clips unusable"}
+  ],
+  "reps": [
+    {
+      "session": "2026-08-10",
+      "label": "r1",
+      "transition_s": "0.12",
+      "total_s": "",
+      "class": "INVARIANT",
+      "plausible": true,
+      "problems": [],
+      "metrics": [
+        {"name": "Transition through the bar", "value": "0.12 s", "class": "INVARIANT", "key": "transition_s"}
+      ]
+    },
+    {
+      "session": "2026-08-14",
+      "label": "r1",
+      "transition_s": "0.33",
+      "total_s": "",
+      "class": "INVARIANT",
+      "plausible": true,
+      "problems": [],
+      "metrics": [
+        {"name": "Transition through the bar", "value": "0.33 s", "class": "INVARIANT", "key": "transition_s"}
+      ]
+    },
+    {
+      "session": "2026-08-14",
+      "label": "r2",
+      "transition_s": "0.33",
+      "total_s": "",
+      "class": "INVARIANT",
+      "plausible": true,
+      "problems": [],
+      "metrics": [
+        {"name": "Transition through the bar", "value": "0.33 s", "class": "INVARIANT", "key": "transition_s"}
+      ]
+    }
+  ],
+  "blockers": [
+    "19 Aug: WA0014 candidates were walking toward the camera, not reps.",
+    "Scale drift: arm:torso 1.09 vs 0.78, so SCALED metrics are not comparable.",
+    "Progress gate: need at least 3 usable reps in a session."
+  ],
+  "nextSession": "Five or six reps, one set, tripod on a marked spot, same side every time (behind worked best), framed so the lockout stays in shot, trimmed to the working set."
+}
