@@ -204,8 +204,14 @@ private fun RepsPerSession(days: List<DayEntry>, target: Int) {
 
     Column {
         Canvas(Modifier.fillMaxWidth().height(76.dp)) {
+            // Pixels, not dp - see RepTrace in parts/Parts.kt.
+            val hair = 1.dp.toPx()
+            val dashOn = 3.dp.toPx()
+            val dashGap = 4.dp.toPx()
+            val radius = 3.dp.toPx()
+            val minBar = 3.dp.toPx()
             val slot = size.width / shown.size
-            val barW = minOf(slot * 0.55f, 18f)
+            val barW = minOf(slot * 0.55f, 18.dp.toPx())
             val floorY = size.height - (MIN_REPS_FOR_COMPARISON.toFloat() / ceiling) * size.height
 
             var x = 0f
@@ -213,10 +219,10 @@ private fun RepsPerSession(days: List<DayEntry>, target: Int) {
                 drawLine(
                     color = dim.copy(alpha = 0.55f),
                     start = Offset(x, floorY),
-                    end = Offset(minOf(x + 4f, size.width), floorY),
-                    strokeWidth = 1f,
+                    end = Offset(minOf(x + dashOn, size.width), floorY),
+                    strokeWidth = hair,
                 )
-                x += 9f
+                x += dashOn + dashGap
             }
             shown.forEachIndexed { i, day ->
                 // A minimum height for any non-zero session. One high-volume day
@@ -225,14 +231,14 @@ private fun RepsPerSession(days: List<DayEntry>, target: Int) {
                 // separate. The scale stays linear - a bar chart that bends its
                 // axis to look tidy is lying about the ratio it is drawing.
                 val raw = (day.reps.toFloat() / ceiling) * size.height
-                val h = if (day.reps > 0) maxOf(raw, 3f) else 0f
+                val h = if (day.reps > 0) maxOf(raw, minBar) else 0f
                 val left = i * slot + (slot - barW) / 2f
                 drawRoundRect(
                     color = if (day.reps >= MIN_REPS_FOR_COMPARISON) primary
                     else outline,
                     topLeft = Offset(left, size.height - h),
                     size = Size(barW, h),
-                    cornerRadius = CornerRadius(3f, 3f),
+                    cornerRadius = CornerRadius(radius, radius),
                 )
             }
         }
@@ -261,31 +267,36 @@ private fun RepsPerSession(days: List<DayEntry>, target: Int) {
  *  not just a line, so the sample size cannot be mistaken for a smooth trend. */
 @Composable
 private fun ScoreTrend(measured: List<DayEntry>) {
-    val line = MaterialTheme.colorScheme.primary
+    val colour = MaterialTheme.colorScheme.primary
     val dim = MaterialTheme.colorScheme.outline
     Canvas(Modifier.fillMaxWidth().height(72.dp)) {
+        // Pixels, not dp - see RepTrace in parts/Parts.kt.
+        val hair = 1.dp.toPx()
+        val line = 2.dp.toPx()
+        val dot = 3.dp.toPx()
+        val edge = 6.dp.toPx()
         val scores = measured.map { (it.score ?: 0).toFloat() }
         val lo = minOf(scores.min() - 6f, 100f)
         val hi = maxOf(scores.max() + 6f, lo + 1f)
-        val pad = 6f
+        val pad = edge
         fun y(v: Float) = size.height - pad - (v - lo) / (hi - lo) * (size.height - 2 * pad)
         fun x(i: Int) =
             if (scores.size == 1) size.width / 2f
-            else i.toFloat() / (scores.size - 1) * (size.width - 12f) + 6f
+            else i.toFloat() / (scores.size - 1) * (size.width - 2 * edge) + edge
 
         drawLine(
             color = dim.copy(alpha = 0.5f),
             start = Offset(0f, size.height - pad),
             end = Offset(size.width, size.height - pad),
-            strokeWidth = 1f,
+            strokeWidth = hair,
         )
         val path = Path().apply {
             moveTo(x(0), y(scores[0]))
             for (i in 1 until scores.size) lineTo(x(i), y(scores[i]))
         }
-        drawPath(path, line, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+        drawPath(path, colour, style = Stroke(width = line, cap = StrokeCap.Round))
         scores.forEachIndexed { i, v ->
-            drawCircle(line, radius = 4f, center = Offset(x(i), y(v)))
+            drawCircle(colour, radius = dot, center = Offset(x(i), y(v)))
         }
     }
 }

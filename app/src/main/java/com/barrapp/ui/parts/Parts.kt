@@ -135,6 +135,13 @@ fun RepTrace(
     val colour = bandColor(band)
     val rule = MaterialTheme.colorScheme.outline
     Canvas(modifier.fillMaxWidth().height(height)) {
+        // DrawScope works in PIXELS, not dp. A literal here is a third of its
+        // apparent weight on a 3x-density phone, which turns every line in this
+        // app into a hairline. DrawScope is a Density, so convert.
+        val hair = 1.dp.toPx()
+        val line = 2.dp.toPx()
+        val dashOn = 4.dp.toPx()
+        val dashGap = 3.dp.toPx()
         val lo = points.min()
         val hi = points.max()
         val span = (hi - lo).takeIf { it > 1e-4f } ?: 1f
@@ -149,17 +156,17 @@ fun RepTrace(
                 drawLine(
                     color = rule,
                     start = Offset(cursor, zero),
-                    end = Offset(minOf(cursor + 5f, size.width), zero),
-                    strokeWidth = 1f,
+                    end = Offset(minOf(cursor + dashOn, size.width), zero),
+                    strokeWidth = hair,
                 )
-                cursor += 10f
+                cursor += dashOn + dashGap
             }
         }
         val path = Path().apply {
             moveTo(x(0), y(points[0]))
             for (i in 1 until points.size) lineTo(x(i), y(points[i]))
         }
-        drawPath(path, colour, style = Stroke(width = 2.5f, cap = StrokeCap.Round))
+        drawPath(path, colour, style = Stroke(width = line, cap = StrokeCap.Round))
     }
 }
 

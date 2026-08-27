@@ -225,29 +225,34 @@ private fun PulsingBar() {
     val colour = MaterialTheme.colorScheme.primary
     val track = MaterialTheme.colorScheme.outline
     Canvas(Modifier.fillMaxWidth().height(34.dp)) {
+        // Pixels, not dp - see RepTrace in parts/Parts.kt.
+        val hair = 1.dp.toPx()
+        val line = 2.5.dp.toPx()
+        val half = 45.dp.toPx()          // half-width of the travelling arc
+        val step = 3.dp.toPx()
         val mid = size.height / 2
         drawLine(
             color = track.copy(alpha = 0.4f),
             start = Offset(0f, mid),
             end = Offset(size.width, mid),
-            strokeWidth = 2f, cap = StrokeCap.Round,
+            strokeWidth = hair, cap = StrokeCap.Round,
         )
         // A rep-shaped pulse travelling left to right: the same arc the app is
         // looking for in the clip.
         val w = size.width
-        val head = phase * (w + 90f) - 45f
+        val head = phase * (w + 2 * half) - half
         val path = Path()
         var first = true
-        var t = -45f
-        while (t <= 45f) {
+        var t = -half
+        while (t <= half) {
             val x = head + t
-            val y = mid - (kotlin.math.cos(t / 45f * Math.PI.toFloat() / 2f) * mid * 0.75f)
+            val y = mid - (kotlin.math.cos(t / half * Math.PI.toFloat() / 2f) * mid * 0.75f)
             if (x in 0f..w) {
                 if (first) { path.moveTo(x, y); first = false } else path.lineTo(x, y)
             }
-            t += 3f
+            t += step
         }
-        if (!first) drawPath(path, colour, style = Stroke(width = 3f, cap = StrokeCap.Round))
+        if (!first) drawPath(path, colour, style = Stroke(width = line, cap = StrokeCap.Round))
     }
 }
 

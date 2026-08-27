@@ -151,8 +151,43 @@ every key the Kotlin client reads is present on every path.
 python -m unittest discover -s tests
 ```
 
-Three classes of defect these do not cover, and which a real build will surface
-first: runtime layout constraints, Compose API signature changes across
-versions, and resource references. Two of the three known layout traps were
-found and fixed by reading (nested scrollables in one direction, a scroll index
-one past the end); a third could remain.
+## How close is the web replica to the real thing?
+
+The replica shares the colour tokens (copied hex for hex from `Color.kt`), the
+type scale, the layout structure, the 840dp breakpoint, the copy, the arithmetic
+and the coach's answers. So the *composition* is what you will get.
+
+What will differ on a device, and none of it is a bug:
+
+- **Material 3 chrome.** The replica hand-draws approximations of the real
+  components. The genuine `NavigationBar` puts a filled pill behind the active
+  icon; `OutlinedTextField` floats its label into a notch in the border and is
+  56dp tall; buttons have state layers and ripples. Expect those to look more
+  finished than the replica, not less.
+- **The system font.** The replica pulls Roboto from Google Fonts. A device uses
+  its own system face, which on Samsung and some others is not Roboto.
+- **Window insets.** The real app is edge-to-edge and pads for the status bar
+  and gesture bar. The replica has no system bars to pad for.
+- **Motion.** Onboarding slides horizontally between steps and the score ring
+  counts up over 700ms; the replica renders both statically.
+
+### The one real difference that WAS a bug
+
+Everything inside a Compose `Canvas` is measured in **pixels, not dp**. Every
+line this app draws - the rep trace, the chart axes, the floor line, the score
+trend, the minimum bar height, the processing pulse - was written with bare
+float literals, so on a 3x-density phone each would have rendered at a third of
+its intended weight. Hairlines where there should be strokes, and a 1dp minimum
+bar instead of 3dp, which quietly undid the fix that made one-rep sessions
+visible in the first place.
+
+The replica could never have caught this: a browser at 1x renders CSS pixels,
+so it drew exactly what was intended. It was caught by asking whether the app
+would really look like the replica, and checking rather than assuming. All of it
+now converts through `DrawScope.toPx()`.
+
+Three classes of defect these checks still do not cover, and which a real build
+will surface first: runtime layout constraints, Compose API signature changes
+across versions, and resource references. Two known layout traps were found and
+fixed by reading (nested scrollables in one direction, a scroll index one past
+the end); a third could remain.
