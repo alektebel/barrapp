@@ -219,7 +219,13 @@ private fun RepsPerSession(days: List<DayEntry>, target: Int) {
                 x += 9f
             }
             shown.forEachIndexed { i, day ->
-                val h = (day.reps.toFloat() / ceiling) * size.height
+                // A minimum height for any non-zero session. One high-volume day
+                // otherwise flattens a 1-rep day to nothing, and "I did one rep"
+                // and "I did none" are the two facts this chart exists to
+                // separate. The scale stays linear - a bar chart that bends its
+                // axis to look tidy is lying about the ratio it is drawing.
+                val raw = (day.reps.toFloat() / ceiling) * size.height
+                val h = if (day.reps > 0) maxOf(raw, 3f) else 0f
                 val left = i * slot + (slot - barW) / 2f
                 drawRoundRect(
                     color = if (day.reps >= MIN_REPS_FOR_COMPARISON) primary

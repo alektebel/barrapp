@@ -288,7 +288,8 @@ fun SessionDetail(
                     Spacer(Modifier.height(8.dp))
                     analysis.blockers.forEach {
                         Text(
-                            "· $it",
+                            "· " + it.replaceFirstChar { c -> c.uppercase() }
+                                .let { line -> if (line.endsWith(".")) line else "$line." },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(vertical = 2.dp),

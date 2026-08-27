@@ -103,7 +103,24 @@ source scripts/env.sh
 ./gradlew assembleDebug
 ```
 
-What *was* run, and what each thing does and does not cover:
+Verification runs in three tiers, strongest first.
+
+**Tier 1 — RUN.** `tools/run_logic_tests.sh` compiles the coach's answers and the
+weekly review's arithmetic and **executes** them on a plain JVM. 40 checks. This
+is why `Coach.answer` takes measurements rather than the UI state, why
+`ReviewText` is split out of the Worker, and why `ProfileStore` is split out of
+`Profile` — the logic was made Android-free so it could be run.
+
+**Tier 2 — TYPE-CHECK.** The data layer against a real `android.jar` (API 35,
+from a GitHub mirror): `SharedPreferences`, `JSONObject`, `Uri`, okhttp. This
+resolves real signatures, so a wrong method or a null-safety mistake is caught.
+
+**Tier 3 — PARSE.** The Compose UI. androidx genuinely cannot be fetched —
+`maven.google.com` 301s to `dl.google.com`, which the network policy blocks, and
+every Google-repo mirror is blocked too. So the UI is checked for syntax and
+structure only, plus the import linter.
+
+What each tier does and does not cover:
 
 **Kotlin parser** — the real `kotlin-compiler-embeddable`, run without the
 Android classpath.

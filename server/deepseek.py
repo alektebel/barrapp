@@ -76,6 +76,17 @@ def _rep_line(rep: dict) -> str:
     return " — ".join(bits)
 
 
+def _sentence(text: str) -> str:
+    """Blockers are written as clause fragments so they can be listed under a
+    heading. Dropped into running prose they need to start with a capital and
+    end with a stop, or the read-out reads as a sentence that lost its way."""
+    text = (text or "").strip()
+    if not text:
+        return ""
+    text = text[0].upper() + text[1:]
+    return text if text[-1] in ".!?" else text + "."
+
+
 def _fallback(payload: dict) -> dict:
     n = int(payload.get("n_reps") or 0)
     exercise = (payload.get("exercise") or "muscle_up").replace("_", " ")
@@ -86,7 +97,8 @@ def _fallback(payload: dict) -> dict:
         headline = f"This {exercise} clip produced no measurable reps."
         narrative = (
             "Nothing was counted. That is a filming or tracking failure, not a training one. "
-            + (" ".join(blockers) if blockers else "Trim to the working set and keep the lockout in frame.")
+            + (" ".join(_sentence(b) for b in blockers) if blockers
+               else "Trim to the working set and keep the lockout in frame.")
             + numbers
         )
     elif n < 3:
