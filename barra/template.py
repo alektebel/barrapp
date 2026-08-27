@@ -92,7 +92,7 @@ def load_rep(row: pd.Series, length: int = RESAMPLE_LENGTH) -> tuple[np.ndarray,
     return dtw.resample(X, length), dtw.resample(C, length)
 
 
-def bottom_index(row: pd.Series, length: int = RESAMPLE_LENGTH) -> int:
+def turn_index(row: pd.Series, length: int = RESAMPLE_LENGTH) -> int:
     """Where the rep's turnaround falls after time normalisation.
 
     Reused from stage 0's segmentation rather than re-derived: in the
@@ -100,7 +100,7 @@ def bottom_index(row: pd.Series, length: int = RESAMPLE_LENGTH) -> int:
     depth information any more and the turnaround has to come from the raw
     trajectory that defined the rep in the first place.
     """
-    start, bottom, end = (int(row[k]) for k in ("start_frame", "bottom_frame", "end_frame"))
+    start, bottom, end = (int(row[k]) for k in ("start_frame", "turn_frame", "end_frame"))
     span = max(end - start, 1)
     return int(round(np.clip((bottom - start) / span, 0.0, 1.0) * (length - 1)))
 
@@ -161,7 +161,7 @@ def build_bin_template(bin_name: str, ref_rows: pd.DataFrame) -> dict:
         series.append(X)
         weights.append(C)
         ids.append(r["rep_id"])
-        bottoms.append(bottom_index(r))
+        bottoms.append(turn_index(r))
 
     if len(series) < S.MIN_REFERENCE_REPS:
         raise SystemExit(

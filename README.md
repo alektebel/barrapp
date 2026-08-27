@@ -17,10 +17,12 @@ measured against.**
 
 | | |
 |---|---|
-| Pipeline | complete, all 11 commands run end to end |
-| Verified on synthetic data | yes — `barra selftest`, 19 invariant tests |
-| Validated on real footage | **no — no videos have been recorded yet** |
-| Verdict (section 8) | **not yet obtainable.** See below. |
+| Pipeline | complete, 13 commands run end to end |
+| Movements | squat, muscle-up, pull-up, dip |
+| Verified on synthetic data | yes — `barra selftest`, 36 invariant tests |
+| Run on real footage | yes — 4 muscle-up clips, 3 sessions, Aug 2026 |
+| Deviation verdict (section 8) | **not obtainable on that footage**: 3 usable reps, and a template needs 8 in one bin |
+| Progress verdict | **not yet trackable**: 1 and 2 usable reps per session, 3 is the minimum |
 
 The `Part A` pipeline the original spec assumed (pose extraction + rep
 segmentation) did not exist in this repository. Rather than stop, this repo
@@ -37,6 +39,16 @@ comfortably inside the spec's 20°-wide `SAGITTAL` bin — produces a larger
 deviation than any of the five deliberately induced technique errors.
 
 Full numbers and what follows from them: [`docs/FINDINGS.md`](docs/FINDINGS.md).
+
+### What the real footage added
+
+Four muscle-up clips across three sessions produced **three** measurable reps.
+Two clips produced none, and the tool records why rather than staying quiet:
+one lost tracking as the athlete left frame at the top, the other contained
+no reps at all — its candidates were the athlete *walking around the rig*, at
+0.9 keypoint confidence. Confidence is not accuracy; the checks that catch this
+are geometric, and they are described in
+[`docs/PROGRESS.md`](docs/PROGRESS.md).
 
 This is a falsification of the recording protocol, not of the idea. The
 prediction it makes — lock the camera to a marked floor position and the null
@@ -149,6 +161,11 @@ The decisions worth arguing about, and why they went the way they did:
 - **The null is leave-one-out.** Each held-out reference rep is scored against
   a template rebuilt without it. A rep that helped build its own template
   would score too well and the null would come out fraudulently tight.
+- **Movements are declared, never guessed.** A squat is measured about the hips;
+  a muscle-up is measured about the bar, because the hands are what stays still
+  and a hip-centred frame would cancel the very motion being measured. An
+  unknown exercise name is an error rather than a silent fallback to squat
+  geometry, which would produce numbers that look fine and mean nothing.
 - **Never compare across viewpoint bins**, and a bin with fewer than 6 reps is
   reported underpowered and excluded. A set whose azimuth interval straddles a
   boundary is binned `UNKNOWN` and dropped — an unknown viewpoint is cheap, a
@@ -184,13 +201,15 @@ to report a detection rate without an FPR beside it.
 | `barra score [VIDEO] [--no-qc]` | stage 4 + percentile |
 | `barra validate` | stage 6 |
 | `barra report` | `out/report.html` |
+| `barra remember [DIR] [--note ...]` | fold this run into the persistent `profile/` |
+| `barra progress` | compare sessions against within-session variation |
 | `barra selftest [--seed N]` | synthetic data; validates nothing |
 | `barra all` | everything after `ingest` |
 
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v      # 19 invariant tests
+python -m unittest discover -s tests -v      # 36 invariant tests
 python scripts/viewpoint_sensitivity.py      # the finding in docs/FINDINGS.md
 ```
 

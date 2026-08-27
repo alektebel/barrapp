@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import base64
 import io
+from pathlib import Path
 
 import matplotlib
 matplotlib.use("Agg")
@@ -181,6 +182,99 @@ def _channel_separability(validation: dict, bin_name: str, nl: pd.DataFrame,
     }
 
 
+def plot_metric_by_session(reps: pd.DataFrame, metric: str, label: str,
+                           unit: str) -> str:
+    """Every rep as a point, session medians joined. No error bars: with this
+    many reps an error bar would imply a precision the data does not have, and
+    showing the actual reps makes the sample size impossible to overlook."""
+    sessions = sorted(reps["session_id"].astype(str).unique())
+    x = {s: i for i, s in enumerate(sessions)}
+    fig, ax = _fig(6.5, 2.6)
+    med = []
+    for s in sessions:
+        v = reps[reps["session_id"].astype(str) == s][metric].to_numpy(dtype=float)
+        v = v[np.isfinite(v)]
+        if not v.size:
+            med.append(np.nan)
+            continue
+        jitter = (np.random.default_rng(0).random(v.size) - 0.5) * 0.12
+        ax.scatter(np.full(v.size, x[s]) + jitter, v, s=46, color=ACCENT,
+                   zorder=3, edgecolor=PLOT_BG, linewidth=0.8)
+        med.append(float(np.median(v)))
+    ax.plot(range(len(sessions)), med, color=NULLC, lw=1.6, marker="o",
+            ms=5, zorder=2, label="session median")
+    ax.set_xticks(range(len(sessions)))
+    ax.set_xticklabels(sessions, fontsize=8)
+    ax.set_xlim(-0.5, len(sessions) - 0.5)
+    ax.set_ylabel(f"{label}\n({unit})", fontsize=8)
+    ax.set_title(label, fontsize=9)
+    return _png(fig)
+
+
+def progress_block() -> dict | None:
+    """Everything the persistent profile knows, compared across sessions."""
+    from .memory import read_reps, status
+    from .metrics import METRIC_SPEC, MIN_REP_QUALITY
+    from .progress import EFFECT_THRESHOLD, MIN_REPS_PER_SESSION, compare
+
+    reps = read_reps()
+    if reps.empty:
+        return None
+    st = status()
+    ledger = st["ledger"]
+    if not ledger.empty and "bin" in ledger.columns:
+        cols = [c for c in ("video_sha", "bin", "side") if c in ledger.columns]
+        reps = reps.merge(ledger[cols], on="video_sha", how="left")
+
+    usable = reps
+    rejected = pd.DataFrame()
+    if "plausible" in reps.columns:
+        usable = reps[reps["plausible"].astype(bool)]
+        rejected = reps[~reps["plausible"].astype(bool)]
+    if "q_rep" in usable.columns:
+        rejected = pd.concat([rejected, usable[usable["q_rep"] < MIN_REP_QUALITY]])
+        usable = usable[usable["q_rep"] >= MIN_REP_QUALITY]
+    if usable.empty:
+        return {"empty": True, "n_rejected": int(len(rejected)),
+                "rejected": rejected.to_dict("records")}
+
+    res = compare(usable)
+    charts = []
+    for m, (rob, label, unit, _hb) in METRIC_SPEC.items():
+        if m in usable.columns and np.isfinite(usable[m]).any():
+            charts.append({"metric": m, "label": label, "unit": unit,
+                           "robustness": rob,
+                           "png": plot_metric_by_session(usable, m, label, unit)})
+
+    comps = res["comparisons"]
+    blockers: list[str] = []
+    if not comps.empty:
+        for bs in comps[~comps["supported"]]["blockers"]:
+            for b in bs:
+                if b not in blockers:
+                    blockers.append(b)
+    return {
+        "empty": False,
+        "blockers": blockers,
+        "sessions": res["sessions"].to_dict("records"),
+        "ledger": ledger.to_dict("records") if not ledger.empty else [],
+        "comparisons": comps.to_dict("records") if not comps.empty else [],
+        "requirements": sorted(
+            res["requirements"].values(),
+            key=lambda r: (r["reps_per_session"]
+                           if np.isfinite(r["reps_per_session"]) else 1e9),
+        ),
+        "verdict": res["verdict"],
+        "charts": charts,
+        "reps": usable.to_dict("records"),
+        "rejected": rejected.to_dict("records"),
+        "n_rejected": int(len(rejected)),
+        "min_reps": MIN_REPS_PER_SESSION,
+        "effect_threshold": EFFECT_THRESHOLD,
+        "subject": st["subject"],
+    }
+
+
 def run() -> str:
     reps = reps_with_bins()          # already carries the bin column
     vp = load_viewpoints()
@@ -237,8 +331,10 @@ def run() -> str:
         if b != "UNKNOWN" and 0 < counts.get(b, 0) < S.MIN_REPS_PER_BIN
     ]
 
+    # Resolve the template against the package, not the working directory:
+    # BARRA_ROOT points at the data root, which need not be the source tree.
     env = Environment(
-        loader=FileSystemLoader(str(PATHS.root / "barra" / "templates")),
+        loader=FileSystemLoader(str(Path(__file__).parent / "templates")),
         autoescape=select_autoescape(["html"]),
     )
     env.filters["pct"] = lambda v: "n/a" if v is None or (
@@ -248,11 +344,13 @@ def run() -> str:
 
     html = env.get_template("report.html.j2").render(
         generated=pd.Timestamp.now().strftime("%Y-%m-%d %H:%M"),
+        progress=progress_block(),
         counts=counts,
         bins=bin_blocks,
         viewpoints=vp.to_dict("records"),
         underpowered=underpowered,
         min_reps_per_bin=S.MIN_REPS_PER_BIN,
+        min_reference_reps=S.MIN_REFERENCE_REPS,
         flag_percentile=FLAG_PERCENTILE,
         max_fpr=MAX_ACCEPTABLE_FPR,
         min_detection=MIN_ACCEPTABLE_DETECTION,

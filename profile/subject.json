@@ -1,0 +1,99 @@
+{
+  "anatomy": {
+    "min_mean_confidence": 0.6,
+    "n_frames_used": 623,
+    "segments": {
+      "femur_left": {
+        "iqr_high": 0.8615935742855072,
+        "iqr_low": 0.48140206933021545,
+        "n_frames": 475,
+        "ratio_to_torso_median": 0.6878353953361511
+      },
+      "femur_right": {
+        "iqr_high": 0.8411866426467896,
+        "iqr_low": 0.42008963227272034,
+        "n_frames": 541,
+        "ratio_to_torso_median": 0.6716064810752869
+      },
+      "forearm_left": {
+        "iqr_high": 0.3750206530094147,
+        "iqr_low": 0.3074139431118965,
+        "n_frames": 382,
+        "ratio_to_torso_median": 0.3371950834989548
+      },
+      "forearm_right": {
+        "iqr_high": 0.3989076316356659,
+        "iqr_low": 0.27713215351104736,
+        "n_frames": 513,
+        "ratio_to_torso_median": 0.3417971432209015
+      },
+      "hip_width": {
+        "iqr_high": 0.3635806292295456,
+        "iqr_low": 0.3212994933128357,
+        "n_frames": 623,
+        "ratio_to_torso_median": 0.34128060936927795
+      },
+      "humerus_left": {
+        "iqr_high": 0.4181373342871666,
+        "iqr_low": 0.2909683883190155,
+        "n_frames": 444,
+        "ratio_to_torso_median": 0.35121117532253265
+      },
+      "humerus_right": {
+        "iqr_high": 0.46397605538368225,
+        "iqr_low": 0.3033006191253662,
+        "n_frames": 529,
+        "ratio_to_torso_median": 0.4125972092151642
+      },
+      "shoulder_width": {
+        "iqr_high": 0.6314546465873718,
+        "iqr_low": 0.5309430360794067,
+        "n_frames": 623,
+        "ratio_to_torso_median": 0.5790576934814453
+      },
+      "tibia_left": {
+        "iqr_high": 0.9140111207962036,
+        "iqr_low": 0.5757532119750977,
+        "n_frames": 469,
+        "ratio_to_torso_median": 0.78126460313797
+      },
+      "tibia_right": {
+        "iqr_high": 0.8941576480865479,
+        "iqr_low": 0.5979254841804504,
+        "n_frames": 521,
+        "ratio_to_torso_median": 0.7916077375411987
+      },
+      "torso_left": {
+        "iqr_high": 1.0597818493843079,
+        "iqr_low": 0.7059018015861511,
+        "n_frames": 623,
+        "ratio_to_torso_median": 0.9937435984611511
+      },
+      "torso_right": {
+        "iqr_high": 1.0957865715026855,
+        "iqr_low": 0.7974106073379517,
+        "n_frames": 623,
+        "ratio_to_torso_median": 1.0244041681289673
+      }
+    },
+    "torso_pixels_per_video": {
+      "VID-20260827-WA0010": 104.97645568847656,
+      "VID-20260827-WA0012": 80.8494873046875
+    },
+    "true_shoulder_width_ratio": 0.5790576934814453
+  },
+  "barra_version": "0.1.0",
+  "exercises": [
+    "muscle_up"
+  ],
+  "history": [],
+  "n_reps": 3,
+  "n_sessions": 3,
+  "n_videos": 4,
+  "sessions": [
+    "2026-08-10",
+    "2026-08-14",
+    "2026-08-19"
+  ],
+  "updated_at": "2026-08-27T15:16:38+00:00"
+}

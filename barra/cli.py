@@ -61,7 +61,8 @@ def cmd_ingest(args) -> int:
 
     _banner("ingest")
     ingest(args.backend, force=args.force,
-           from_part_a=Path(args.from_part_a) if args.from_part_a else None)
+           from_part_a=Path(args.from_part_a) if args.from_part_a else None,
+           videos_dir=Path(args.dir) if args.dir else None)
     return 0
 
 
@@ -123,6 +124,64 @@ def cmd_report(args) -> int:
 
     _banner("report")
     run()
+    return 0
+
+
+def cmd_remember(args) -> int:
+    from pathlib import Path
+
+    from .memory import remember
+
+    _banner("remember - fold this run into the persistent profile")
+    remember(videos_dir=Path(args.dir) if args.dir else None,
+             backend=args.backend, note=args.note or "")
+    return 0
+
+
+def cmd_progress(args) -> int:
+    import numpy as np
+
+    from .memory import read_reps, status
+    from .metrics import METRIC_SPEC
+    from .progress import compare
+
+    _banner("progress - across every session in the profile")
+    reps = read_reps()
+    if reps.empty:
+        raise SystemExit(
+            "the profile holds no reps yet - run `barra remember` after ingesting"
+        )
+    st = status()
+    if not st["ledger"].empty and "bin" in st["ledger"].columns:
+        cols = [c for c in ("video_sha", "bin", "side") if c in st["ledger"].columns]
+        reps = reps.merge(st["ledger"][cols], on="video_sha", how="left")
+    res = compare(reps)
+
+    print(f"  {'session':<14}{'reps':>5}{'usable':>8}{'quality':>9}  viewpoint")
+    for _, r in res["sessions"].iterrows():
+        print(f"  {r['session_id']:<14}{r['n_reps']:>5}{r['n_usable']:>8}"
+              f"{r['mean_quality']:>9.2f}  {r['bins']}")
+
+    comps = res["comparisons"]
+    if not comps.empty:
+        print(f"\n  {'metric':<32}{'from':>9}{'to':>9}{'change':>10}"
+              f"{'x noise':>9}  supported")
+        for _, c in comps[comps["from"] != comps["to"]].iterrows():
+            eff = f"{c['effect']:.1f}" if np.isfinite(c["effect"]) else "n/a"
+            mark = "yes" if c["supported"] else "no"
+            print(f"  {c['label'][:31]:<32}{c['from_value']:>9.3f}"
+                  f"{c['to_value']:>9.3f}{c['change']:>+10.3f}{eff:>9}  {mark}")
+
+    print("\n  reps per session needed to detect a 10% change:")
+    for m, r in sorted(res["requirements"].items(),
+                       key=lambda kv: (kv[1]["reps_per_session"]
+                                       if np.isfinite(kv[1]["reps_per_session"])
+                                       else 1e9)):
+        n = r["reps_per_session"]
+        n_s = f"{int(n)}" if np.isfinite(n) else "unknown (no spread yet)"
+        print(f"    {r['label'][:34]:<36}{r['robustness']:<11}{n_s}")
+
+    print(f"\n  {res['verdict']['statement']}")
     return 0
 
 
@@ -222,6 +281,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("report", help="render out/report.html")
     s.set_defaults(func=cmd_report)
+
+    s = sub.add_parser("remember", help="fold this run into the persistent profile/")
+    s.add_argument("dir", nargs="?", help="video directory (default data/videos)")
+    s.add_argument("--backend", default="mediapipe", help="which backend produced the poses")
+    s.add_argument("--note", help="free-text note stored with these records")
+    s.set_defaults(func=cmd_remember)
+
+    s = sub.add_parser("progress", help="compare sessions against within-session variation")
+    s.set_defaults(func=cmd_progress)
 
     s = sub.add_parser("selftest", help="generate synthetic data and exercise the pipeline")
     s.add_argument("--seed", type=int, default=7)

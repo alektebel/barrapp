@@ -33,7 +33,7 @@ from . import schema as S
 from .config import FLAG_PERCENTILE, PATHS
 from .io_utils import read_parquet, write_parquet
 from .score import score_rep
-from .template import dba, load_rep, bottom_index, pairwise_dtw
+from .template import dba, load_rep, turn_index, pairwise_dtw
 from .viewpoint import reps_with_bins
 
 MIN_LOO_TEMPLATE_REPS = 4   # below this a rebuilt template is not meaningful
@@ -60,7 +60,7 @@ def loo_null(
             continue
         series.append(X); weights.append(C)
         ids.append(r["rep_id"]); sessions.append(str(r["session_id"]))
-        bottoms.append(bottom_index(r))
+        bottoms.append(turn_index(r))
 
     n = len(series)
     if n < S.MIN_REFERENCE_REPS:

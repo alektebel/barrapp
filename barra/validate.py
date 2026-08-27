@@ -67,7 +67,7 @@ def load_labels() -> pd.DataFrame:
 
 
 def run() -> dict:
-    from .template import available_templates, bottom_index
+    from .template import available_templates, turn_index
 
     reps = reps_with_bins()
     labels = load_labels()

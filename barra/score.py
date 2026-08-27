@@ -111,7 +111,7 @@ def run(video: str | None = None, render_qc: bool = True) -> "pd.DataFrame":
     from . import null as null_mod
     from .config import FLAG_PERCENTILE, PATHS
     from .io_utils import write_csv
-    from .template import available_templates, bottom_index, load_rep, load_template
+    from .template import available_templates, load_rep, load_template
     from .viewpoint import reps_with_bins
 
     reps = reps_with_bins()

@@ -7,8 +7,11 @@ __pycache__/
 data/videos/**
 !data/videos/README.md
 !data/videos/sessions.example.csv
+# sessions.csv is metadata, not footage: it is what makes the ledger correct.
+!data/videos/sessions.csv
 !data/videos/.gitkeep
 
 # All pipeline artefacts are reproducible from data/ + the CLI.
 out/**
 !out/.gitkeep
+models/

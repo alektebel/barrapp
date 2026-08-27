@@ -42,6 +42,139 @@ ul{margin:6px 0 0;padding-left:20px} li{margin:3px 0}
 in torso-lengths and reported against this subject's own leave-one-out null
 distribution. No cross-subject comparison is made anywhere.</div>
 
+
+{% if progress %}
+<h2>0. Progress across sessions</h2>
+
+{% if progress.empty %}
+<div class="note bad">No rep in the profile survived quality and plausibility
+checks: {{ progress.n_rejected }} rejected. Nothing can be said about progress
+from footage the pose estimator did not actually track.</div>
+{% else %}
+
+<div class="panel">
+<h3>What the profile remembers</h3>
+<table><thead><tr><th>Session</th><th class="num">Reps used</th>
+<th class="num">Pose quality</th><th>Viewpoint</th></tr></thead><tbody>
+{% for s in progress.sessions %}
+<tr><td class="mono">{{ s.session_id }}</td><td class="num">{{ s.n_reps }}</td>
+<td class="num">{{ "%.2f"|format(s.mean_quality) }}</td>
+<td class="mono">{{ s.bins }}</td></tr>
+{% endfor %}
+</tbody></table>
+{% if progress.n_rejected %}
+<p class="k" style="font-size:12px;margin-top:10px">
+{{ progress.n_rejected }} further rep{{ "s" if progress.n_rejected != 1 }} were
+detected and then rejected. Keypoint confidence does not equal accuracy, so
+every rep is also checked against the subject's own limb lengths:</p>
+<ul style="font-size:12px" class="k">
+{% for r in progress.rejected %}
+<li><span class="mono">{{ r.rep_id }}</span> &mdash; {{ r.problems or "pose quality below threshold" }}</li>
+{% endfor %}
+</ul>
+{% endif %}
+</div>
+
+{% set barren = progress.ledger | selectattr("n_reps", "equalto", 0) | list %}
+{% if barren %}
+<div class="panel">
+<h3>Clips that produced nothing</h3>
+<p class="k" style="font-size:13px">Remembered on purpose. A profile that only
+records successes cannot tell you a session was wasted, or why.</p>
+<ul style="font-size:13px">
+{% for c in barren %}
+<li><span class="mono">{{ c.video }}</span>
+<span class="k">&nbsp;{{ c.session_id }}</span><br>
+<span class="k" style="font-size:12px">{{ c.no_rep_reasons or "no reason recorded" }}</span></li>
+{% endfor %}
+</ul>
+</div>
+{% endif %}
+
+{% if progress.verdict.trackable %}
+<div class="note ok"><strong>Verdict.</strong> {{ progress.verdict.statement }}</div>
+{% else %}
+<div class="note bad"><strong>Verdict.</strong> {{ progress.verdict.statement }}</div>
+{% endif %}
+
+<div class="panel">
+<h3>Every measured rep</h3>
+<p class="k" style="font-size:12px">Each point is one rep; the line joins the
+session medians. With this few reps no error bar is drawn &mdash; it would imply
+a precision the data does not have.</p>
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:12px">
+{% for c in progress.charts %}
+<div><img src="{{ c.png }}" alt="{{ c.label }} by session">
+<div class="k" style="font-size:11px;text-align:center;margin-top:-4px">
+<span class="mono">{{ c.robustness }}</span></div></div>
+{% endfor %}
+</div>
+<p class="k" style="font-size:12px;margin-top:14px">
+<span class="mono">INVARIANT</span> &mdash; timing and counts; comparable between
+any two sessions however they were filmed.
+<span class="mono">SCALED</span> &mdash; a length in torso units; camera distance
+cancels, camera angle does not.
+<span class="mono">PLANAR</span> &mdash; only meaningful from one side; left/right
+symmetry needs a frontal or posterior camera.</p>
+</div>
+
+{% if progress.comparisons %}
+<div class="panel">
+<h3>Session to session</h3>
+<p>A difference between two session medians means nothing until you know how
+much the number moves from rep to rep <em>inside</em> one session. That
+within-session spread is the yardstick, exactly as the null distribution is the
+yardstick for the deviation score. A change is called supported only when it
+exceeds {{ progress.effect_threshold|int }}&times; that spread, both sessions
+have at least {{ progress.min_reps }} reps, and the metric is comparable between
+those two viewpoints.</p>
+<div class="scroll">
+<table><thead><tr><th>Metric</th><th></th><th class="num">From</th>
+<th class="num">To</th><th class="num">Change</th><th class="num">&times; noise</th>
+<th>Supported</th></tr></thead><tbody>
+{% for c in progress.comparisons %}
+<tr><td>{{ c.label }}</td><td class="k mono" style="font-size:10px">{{ c.robustness }}</td>
+<td class="num">{{ "%.3f"|format(c.from_value) }}</td>
+<td class="num">{{ "%.3f"|format(c.to_value) }}</td>
+<td class="num">{{ "%+.3f"|format(c.change) }}</td>
+<td class="num">{% if c.effect == c.effect %}{{ "%.1f"|format(c.effect) }}{% else %}n/a{% endif %}</td>
+<td>{% if c.supported %}<span class="tag ok">{{ c.direction or "changed" }}</span>
+{% else %}<span class="k">no</span>{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+{% if progress.blockers %}
+<div class="note">Nothing above is claimed as real. Every distinct blocker, in
+the tool's own words:
+<ul>{% for b in progress.blockers %}<li>{{ b }}</li>{% endfor %}</ul></div>
+{% endif %}
+</div>
+{% endif %}
+
+<div class="panel">
+<h3>What it would take</h3>
+<p>Reps per session needed to detect a 10% change in each metric, at the
+conventional 5% / 80% level, using the within-session spread measured so far.
+This turns "not enough data" into a number.</p>
+<div class="scroll">
+<table><thead><tr><th>Metric</th><th></th><th class="num">Reps / session</th>
+<th>Estimate</th></tr></thead><tbody>
+{% for r in progress.requirements %}
+<tr><td>{{ r.label }}</td><td class="k mono" style="font-size:10px">{{ r.robustness }}</td>
+<td class="num">{% if r.reps_per_session == r.reps_per_session %}{{ r.reps_per_session|int }}{% else %}&mdash;{% endif %}</td>
+<td class="k">{% if r.estimate_reliable %}from {{ r.n_deviations }} deviations
+{% else %}<span class="tag warn">unreliable</span> only {{ r.n_deviations }}
+deviation{{ "s" if r.n_deviations != 1 }} available{% endif %}</td></tr>
+{% endfor %}
+</tbody></table></div>
+<div class="note">These figures are themselves estimated from the spread
+observed so far. With only a handful of reps in the profile they are indicative
+of an order of magnitude, not a target to hit precisely. They tighten as the
+profile grows &mdash; which is the point of keeping one.</div>
+</div>
+
+{% endif %}
+{% endif %}
+
 <h2>1. Viewpoint bins</h2>
 <div class="panel">
 <table><thead><tr><th>Bin</th><th class="num">Reps</th><th>Status</th></tr></thead>
@@ -76,11 +209,17 @@ method. The estimate is ill-conditioned near 90&deg;, so frontal intervals are
 wide; that is a property of the projection, not of the footage.</p>
 </div>
 
+<h2>2. Per-rep deviation analysis</h2>
 {% if not bins %}
-<div class="note bad">No template has been built, so no null distribution
-exists, so no deviation may be reported. Run
-<span class="mono">barra mark-reference</span> then
-<span class="mono">barra template</span>.</div>
+<div class="note bad">Not available on this data, and deliberately not
+approximated. The deviation score compares a rep against a template built from
+the subject's own reference reps, and its meaning comes entirely from the
+leave-one-out null distribution around that template. Both need at least
+{{ min_reference_reps }} reference reps inside one viewpoint bin, and a bin
+needs {{ min_reps_per_bin }} reps before it is used at all. Producing a
+deviation number from fewer would be a number with no yardstick, which is the
+one thing this tool exists not to do. The session-level metrics in section 0
+need no template and are unaffected.</div>
 {% endif %}
 
 {% for b in bins %}

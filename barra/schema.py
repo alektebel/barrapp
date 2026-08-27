@@ -95,6 +95,7 @@ PHASE_NAMES = (
 # ---------------------------------------------------------------------------
 P_KEYPOINTS = "keypoints"              # out/keypoints/<video>.parquet
 P_REPS = "reps.csv"                    # rep segmentation, one row per rep
+P_INGEST_LOG = "ingest_log.csv"        # one row per video, including those with 0 reps
 P_ANATOMY = "subject_anatomy.json"
 P_NORMALISED = "normalised"            # out/normalised/<video>.parquet
 P_VIEWPOINTS = "viewpoints.csv"
@@ -110,7 +111,7 @@ P_QC = "qc"                            # out/qc/<rep>.mp4
 # Column contracts -----------------------------------------------------------
 # keypoints/<video>.parquet : frame, kp_<joint>_x, kp_<joint>_y, kp_<joint>_c
 # reps.csv                  : rep_id, video, session_id, rep_index,
-#                             start_frame, bottom_frame, end_frame, fps
+#                             start_frame, turn_frame, end_frame, fps
 # normalised/<video>.parquet: frame, n_<joint>_x, n_<joint>_y, c_<joint>
 # viewpoints.csv            : video, session_id, azimuth_deg, azimuth_lo,
 #                             azimuth_hi, bin, n_frames_used

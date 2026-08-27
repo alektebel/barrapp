@@ -42,22 +42,64 @@ from .ingest import frame_to_keypoints, load_reps
 from .io_utils import read_json, read_parquet, write_csv
 from .normalise import torso_length
 
-# Adult shoulder-width : torso-length (shoulder-mid to hip-mid) ratio. Used
-# only as a floor on the calibration, and only to raise the alarm when the
-# footage cannot calibrate itself.
-ANATOMICAL_PRIOR_RATIO = 1.10
+# Adult biacromial width : torso length (shoulder midpoint to hip midpoint),
+# viewed square on. Roughly 0.40 m over 0.50 m. Used only as a sanity band on
+# the self-calibration - a calibration far outside it means the footage cannot
+# calibrate itself and the azimuths are not to be trusted.
+ANATOMICAL_PRIOR_RATIO = 0.80
+ANATOMICAL_PRIOR_RANGE = (0.65, 0.95)
 CALIBRATION_TOLERANCE = 0.15   # relative slack on R_true for the interval
 
 
 def _apparent_ratios(video: str) -> np.ndarray:
+    """Apparent shoulder width in torso-lengths, per usable frame.
+
+    The divisor is one robust torso length for the whole clip, not the
+    per-frame value. A per-frame divisor turns any frame where the pose
+    estimator briefly collapses the torso into a ratio of 50-plus, which then
+    sets the calibration for every clip and mis-bins the entire session.
+    """
+    from .movements import robust_torso
+
     df = read_parquet(PATHS.o(S.P_KEYPOINTS, f"{video}.parquet"), "ingest")
     kp = frame_to_keypoints(df)
     ls, rs = S.KP_INDEX["left_shoulder"], S.KP_INDEX["right_shoulder"]
     w = np.linalg.norm(kp[:, ls, :2] - kp[:, rs, :2], axis=1)
-    t = torso_length(kp)
+    t = robust_torso(kp)
     conf = np.minimum(kp[:, ls, 2], kp[:, rs, 2])
-    ok = (conf >= MIN_MEAN_CONFIDENCE) & (t > 1e-6)
-    return (w[ok] / t[ok]) if ok.any() else np.array([])
+    ok = conf >= MIN_MEAN_CONFIDENCE
+    return (w[ok] / t) if ok.any() else np.array([])
+
+
+def camera_side(video: str) -> tuple[str, float]:
+    """Which side of the subject the camera is on.
+
+    Azimuth alone cannot tell a camera in front of the subject from one behind
+    it: both see the full shoulder width and both come out near 90 degrees. The
+    two are mirror images, so pooling them into one bin would compare a left
+    shoulder against a right one and call the difference technique.
+
+    The cue is the pose estimator's own anatomical labelling: it names the left
+    and right shoulder, so whether anatomical-left sits at greater or lesser
+    image x says which way the subject faces. Face-landmark confidence does NOT
+    work for this - mediapipe reports near-1.0 visibility for face landmarks
+    even on footage shot squarely from behind.
+    """
+    df = read_parquet(PATHS.o(S.P_KEYPOINTS, f"{video}.parquet"), "ingest")
+    kp = frame_to_keypoints(df)
+    idx = [S.KP_INDEX[n] for n in
+           ("left_shoulder", "right_shoulder", "left_hip", "right_hip")]
+    conf = kp[:, idx, 2].min(axis=1)
+    ok = conf >= MIN_MEAN_CONFIDENCE
+    if ok.sum() < 10:
+        return "unknown", 0.0
+    dx = (kp[ok, S.KP_INDEX["left_shoulder"], 0]
+          - kp[ok, S.KP_INDEX["right_shoulder"], 0])
+    frac_front = float(np.mean(dx > 0))
+    agreement = max(frac_front, 1.0 - frac_front)
+    if agreement < 0.70:
+        return "unknown", agreement
+    return ("anterior" if frac_front > 0.5 else "posterior"), agreement
 
 
 def _theta_deg(r_app: np.ndarray | float, r_true: float) -> np.ndarray | float:
@@ -105,24 +147,41 @@ def run(true_shoulder_ratio: float | None = None) -> pd.DataFrame:
         calib_warning = None
     else:
         observed_max = max(float(np.percentile(r, 90)) for r in usable.values())
+        lo, hi = ANATOMICAL_PRIOR_RANGE
         r_true, calib = observed_max, "widest-observed-view"
-        calib_warning = (
-            None
-            if observed_max >= ANATOMICAL_PRIOR_RATIO * 0.85
-            else (
-                f"calibration R_true={observed_max:.3f} is well below the anatomical "
-                f"prior ({ANATOMICAL_PRIOR_RATIO:.2f}); no clip appears to be filmed "
-                "near-frontally, so azimuths are biased HIGH and bins may be wrong. "
-                "Measure the subject's shoulder-width:torso ratio and pass "
-                "--true-shoulder-ratio."
+        calib_warning = None
+        if observed_max < lo:
+            calib_warning = (
+                f"calibration R_true={observed_max:.3f} is below the anatomical band "
+                f"{lo:.2f}-{hi:.2f}; no clip appears to be filmed near-frontally, so "
+                "azimuths are biased HIGH and bins may be wrong. Measure the "
+                "subject's shoulder-width:torso ratio and pass --true-shoulder-ratio."
             )
-        )
+        elif observed_max > hi:
+            calib_warning = (
+                f"calibration R_true={observed_max:.3f} is ABOVE the anatomical band "
+                f"{lo:.2f}-{hi:.2f}. An apparent shoulder width cannot exceed the "
+                "true one, so this is a pose-estimation artefact, not a camera "
+                "angle - most likely the torso is being foreshortened by the "
+                "movement itself. Every azimuth below is suspect; declare the view "
+                "in sessions.csv instead of relying on this estimate."
+            )
 
     rows = []
     rng = np.random.default_rng(0)
     for v in videos:
         r = per_video[v]
         meta = reps[reps["video"] == v].iloc[0]
+        declared = str(meta.get("view") or "").strip().lower() or None
+        declared_bin = str(meta.get("declared_bin") or "").strip().upper() or None
+        if declared_bin and declared_bin not in S.VIEWPOINT_BINS:
+            raise SystemExit(
+                f"{v}: declared bin {declared_bin!r} is not one of "
+                f"{', '.join(S.VIEWPOINT_BINS)}"
+            )
+        side, side_conf = camera_side(v)
+        if declared in ("anterior", "posterior", "left", "right"):
+            side, side_conf = declared, 1.0
         if r.size < 10:
             rows.append(
                 dict(
@@ -130,6 +189,8 @@ def run(true_shoulder_ratio: float | None = None) -> pd.DataFrame:
                     azimuth_lo=np.nan, azimuth_hi=np.nan, bin="UNKNOWN",
                     bin_uncertain=True, n_frames_used=int(r.size),
                     ratio_median=np.nan, ratio_std=np.nan,
+                    side=side, side_confidence=round(side_conf, 3),
+                    view_key=f"UNKNOWN/{side}",
                 )
             )
             continue
@@ -141,12 +202,19 @@ def run(true_shoulder_ratio: float | None = None) -> pd.DataFrame:
         hi = float(np.percentile(_theta_deg(boot, r_true * (1 - CALIBRATION_TOLERANCE)), 97.5))
         med = float(_theta_deg(med_r, r_true))
         b, uncertain = _bin_with_uncertainty(med, lo, hi)
+        if declared_bin:
+            # A declared viewpoint always wins. The estimator is a convenience
+            # for footage nobody annotated, not an authority over the person who
+            # was standing there holding the camera.
+            b, uncertain = declared_bin, False
         rows.append(
             dict(
                 video=v, session_id=meta["session_id"], azimuth_deg=round(med, 2),
                 azimuth_lo=round(lo, 2), azimuth_hi=round(hi, 2), bin=b,
                 bin_uncertain=uncertain, n_frames_used=int(r.size),
                 ratio_median=round(med_r, 4), ratio_std=round(float(np.std(r)), 4),
+                side=side, side_confidence=round(side_conf, 3),
+                bin_declared=bool(declared_bin), view_key=f"{b}/{side}",
             )
         )
 
@@ -169,6 +237,9 @@ def run(true_shoulder_ratio: float | None = None) -> pd.DataFrame:
             else "usable"
         )
         print(f"  {b:<10} {n:>5} {nv:>7}   {status}")
+    print(f"  {'video':<28}{'side':<11}side conf")
+    for _, r in vp.iterrows():
+        print(f"  {r['video'][:27]:<28}{r['side']:<11}{r['side_confidence']:.2f}")
     for _, r in vp.iterrows():
         if r["bin_uncertain"] and r["bin"] != "UNKNOWN":
             print(f"  ! {r['video']}: bin {r['bin']} is uncertain "
@@ -189,10 +260,11 @@ def load_viewpoints() -> pd.DataFrame:
 
 def reps_with_bins() -> pd.DataFrame:
     reps, vp = load_reps(), load_viewpoints()
-    m = reps.merge(
-        vp[["video", "bin", "azimuth_deg", "bin_uncertain"]], on="video", how="left"
-    )
+    cols = ["video", "bin", "azimuth_deg", "bin_uncertain", "side", "view_key"]
+    m = reps.merge(vp[[c for c in cols if c in vp.columns]], on="video", how="left")
     m["bin"] = m["bin"].fillna("UNKNOWN")
+    if "side" in m.columns:
+        m["side"] = m["side"].fillna("unknown")
     return m
 
 

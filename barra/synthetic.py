@@ -183,7 +183,7 @@ def generate(seed: int = 7) -> pd.DataFrame:
             rid = f"{stem}#r{i:02d}"
             rep_rows.append(dict(
                 rep_id=rid, video=stem, session_id=session, exercise="squat",
-                set_index=0, rep_index=i, start_frame=a, bottom_frame=b,
+                set_index=0, rep_index=i, start_frame=a, turn_frame=b,
                 end_frame=c, fps=30.0))
             label_rows.append(dict(rep_id=rid, label=error or "clean",
                                    edge_of_bin=edge, note="synthetic"))

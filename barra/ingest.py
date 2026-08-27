@@ -23,6 +23,8 @@ import numpy as np
 import pandas as pd
 from scipy.signal import find_peaks, savgol_filter
 
+from .movements import resolve
+
 from . import schema as S
 from .config import PATHS
 from .io_utils import read_csv, write_csv, write_parquet, video_stem
@@ -43,6 +45,8 @@ class VideoMeta:
     session_id: str
     exercise: str
     set_index: int
+    view: str | None = None      # declared camera side, overrides estimation
+    bin: str | None = None       # declared viewpoint bin, overrides estimation
 
 
 def discover(videos_dir: Path | None = None) -> list[Path]:
@@ -52,15 +56,15 @@ def discover(videos_dir: Path | None = None) -> list[Path]:
     return sorted(p for p in d.iterdir() if p.suffix.lower() in VIDEO_EXTS)
 
 
-def load_metadata(videos: list[Path]) -> list[VideoMeta]:
-    """Session metadata comes from data/videos/sessions.csv when present, else
+def load_metadata(videos: list[Path], videos_dir: Path | None = None) -> list[VideoMeta]:
+    """Session metadata comes from <videos_dir>/sessions.csv when present, else
     from the filename convention, else from the file's modification date.
 
     session_id matters: it is what makes 'track progress between sessions'
     answerable at all. Two reps from the same day are not independent evidence
     about a training block.
     """
-    sidecar = PATHS.videos / "sessions.csv"
+    sidecar = (videos_dir or PATHS.videos) / "sessions.csv"
     table: dict[str, dict] = {}
     if sidecar.exists():
         df = pd.read_csv(sidecar)
@@ -80,7 +84,11 @@ def load_metadata(videos: list[Path]) -> list[VideoMeta]:
             sess = date.fromtimestamp(p.stat().st_mtime).isoformat()
         exercise = str(row.get("exercise") or (m.group("exercise") if m else "unknown"))
         set_index = int(row.get("set_index") or (m.group("set") if m else 0))
-        metas.append(VideoMeta(stem, p, sess, exercise, set_index))
+        view = row.get("view")
+        view = None if view is None or pd.isna(view) else str(view).strip().lower()
+        vbin = row.get("bin")
+        vbin = None if vbin is None or pd.isna(vbin) else str(vbin).strip().upper()
+        metas.append(VideoMeta(stem, p, sess, exercise, set_index, view, vbin))
     return metas
 
 
@@ -126,71 +134,163 @@ def probe_video(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Rep segmentation
 # ---------------------------------------------------------------------------
-def _depth_signal(kp: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    """Vertical hip-midpoint trajectory, image-y inverted so that 'up' is +.
+def _clean_signal(sig: np.ndarray, conf: np.ndarray,
+                  min_conf: float = 0.35) -> tuple[np.ndarray, np.ndarray]:
+    """Interpolate short low-confidence gaps, smooth, and report which frames
+    were actually observed.
 
-    Returns (signal, confidence). Low-confidence frames are linearly
-    interpolated rather than dropped, so frame indices stay aligned with the
-    video for the QC overlay.
+    Frames are interpolated rather than dropped so that indices stay aligned
+    with the video - the QC overlay and every reported timestamp depend on
+    that. `valid` records what was really seen, so a rep sitting on top of a
+    long invented stretch can be rejected later.
     """
-    hips = kp[:, [S.KP_INDEX["left_hip"], S.KP_INDEX["right_hip"]], :]
-    conf = hips[:, :, 2].mean(axis=1)
-    y = hips[:, :, 1].mean(axis=1)
-    good = conf >= 0.3
-    if good.sum() < 5:
-        return np.zeros_like(y), conf
-    idx = np.arange(len(y))
-    y = np.interp(idx, idx[good], y[good])
-    win = max(5, min(31, (len(y) // 10) | 1))
-    if len(y) > win:
-        y = savgol_filter(y, win, 2)
-    return -y, conf
+    valid = np.isfinite(sig) & (conf >= min_conf)
+    if valid.sum() < 5:
+        return np.zeros_like(sig), valid
+    idx = np.arange(len(sig))
+    out = np.interp(idx, idx[valid], sig[valid])
+    win = max(5, min(21, (len(out) // 12) | 1))
+    if len(out) > win:
+        out = savgol_filter(out, win, 2)
+    return out, valid
 
 
-def segment_reps(kp: np.ndarray, fps: float, min_rep_s: float = 0.8) -> list[tuple[int, int, int]]:
-    """Split a set into reps on the hip-height trajectory.
+def segment_reps(kp: np.ndarray, fps: float, movement=None,
+                 max_invented_frac: float = 0.4,
+                 max_half_rep_s: float = 4.0) -> list[tuple[int, int, int]]:
+    """See `segment_reps_verbose`; returns the reps only."""
+    return segment_reps_verbose(kp, fps, movement, max_invented_frac,
+                                max_half_rep_s)[0]
 
-    A rep runs top -> bottom -> top. Tops are prominent local maxima of the
-    inverted-y signal; the bottom is the minimum between two tops. Prominence
-    is scaled to the set's own range, so it does not depend on pixel scale.
+
+def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
+                         max_invented_frac: float = 0.4,
+                         max_half_rep_s: float = 4.0
+                         ) -> tuple[list[tuple[int, int, int]], list[str]]:
+    """Split a set into reps on the movement's own tracking signal.
+
+    The signal is oriented by the movement profile so that the turnaround is
+    always a maximum, whichever way the movement travels: a squat descends to
+    its bottom, a muscle-up ascends to its lockout, and both come out of
+    `tracking_signal` as a peak. One segmenter therefore covers both, instead
+    of one that silently segments the gaps between reps when handed the wrong
+    exercise.
+
+    A rep runs rest -> turnaround -> rest, with the boundaries taken where the
+    signal crosses a fixed fraction of the rep's own amplitude. Reps built
+    mostly from interpolated frames are rejected: they are a claim about
+    footage the pose estimator never saw.
 
     This is a heuristic and it will be wrong on some sets. That is why
     out/reps.csv is a plain editable file: fix it there and re-run. Nothing
     downstream re-derives segmentation.
     """
-    sig, _ = _depth_signal(kp)
-    if np.allclose(sig, 0):
-        return []
-    rng = float(np.percentile(sig, 95) - np.percentile(sig, 5))
-    if rng <= 0:
-        return []
-    min_dist = max(1, int(min_rep_s * fps))
-    tops, _ = find_peaks(sig, prominence=0.30 * rng, distance=min_dist)
-    if len(tops) < 2:
-        return []
-    reps = []
-    for a, b in zip(tops[:-1], tops[1:]):
-        bottom = int(a + np.argmin(sig[a : b + 1]))
-        depth = min(sig[a], sig[b]) - sig[bottom]
-        # reject "reps" that never actually descended
-        if depth < 0.30 * rng or (b - a) < min_dist:
+    from .movements import DEFAULT, MAX_BAR_TRAVEL, anchor_travel, tracking_signal
+
+    movement = movement or DEFAULT
+    reasons: list[str] = []
+    raw, conf = tracking_signal(kp, movement)
+    sig, valid = _clean_signal(raw, conf)
+    if not valid.any():
+        return [], ["no frame had a usable pose for this movement's landmarks"]
+
+    rest = float(np.percentile(sig[valid], 15))
+    apex = float(np.percentile(sig[valid], 97))
+    amplitude = apex - rest
+    if amplitude <= 1e-6:
+        return [], ["the tracked signal never moved - no movement detected"]
+
+    min_dist = max(1, int(movement.min_rep_s * fps))
+    peaks, _ = find_peaks(sig, prominence=0.35 * amplitude, distance=min_dist)
+    if len(peaks) == 0:
+        return [], ["no turnaround stood out from the noise"]
+
+    # Boundaries: cross a 30%-of-amplitude gate to leave the peak, then keep
+    # walking outward while the signal is still falling, so the rep ends at the
+    # actual rest position rather than at the gate.
+    #
+    # This matters more than it looks. Stopping at the gate would make every
+    # amplitude metric measure the distance from an arbitrary threshold instead
+    # of from the hang, and every duration metric omit the slowest part of the
+    # rep - both wrong in the same direction on every rep, which is exactly the
+    # kind of bias that survives averaging.
+    gate = rest + 0.30 * amplitude
+    max_half = int(max_half_rep_s * fps)
+    reps: list[tuple[int, int, int]] = []
+    for pk in peaks:
+        if sig[pk] < rest + 0.6 * amplitude:
             continue
-        reps.append((int(a), bottom, int(b)))
-    return reps
+        if not valid[pk]:
+            # The turnaround itself was never observed. Everything a rep record
+            # asserts is anchored to it, so an interpolated peak is not a rep.
+            reasons.append(
+                f"turnaround at {pk / fps:.1f}s was never actually tracked - "
+                "the subject left frame or the pose was lost at the top"
+            )
+            continue
+
+        def walk(i: int, step: int) -> int:
+            n, limit = 0, len(sig) - 1
+            while 0 <= i + step <= limit and sig[i + step] > gate and n < max_half:
+                i += step
+                n += 1
+            while 0 <= i + step <= limit and sig[i + step] < sig[i] and n < max_half:
+                i += step
+                n += 1
+            return i
+
+        a, b = walk(pk, -1), walk(pk, +1)
+        if b - a < max(3, min_dist // 2):
+            reasons.append(f"candidate at {pk / fps:.1f}s was too brief to be a rep")
+            continue
+        if valid[a:b + 1].mean() < (1.0 - max_invented_frac):
+            reasons.append(
+                f"candidate at {pk / fps:.1f}s is mostly interpolated - "
+                f"only {valid[a:b + 1].mean():.0%} of its frames were tracked"
+            )
+            continue
+        # The anchor a bar movement is measured against has to stay put.
+        if movement.origin == "wrist":
+            travel = anchor_travel(kp, a, b)
+            if travel > MAX_BAR_TRAVEL:
+                reasons.append(
+                    f"candidate at {pk / fps:.1f}s: the hands travelled "
+                    f"{travel:.1f} torso-lengths, so they were not on a fixed bar "
+                    "- this is movement around the rig, not a rep"
+                )
+                continue
+        # Two reps may legitimately share a boundary frame: a lifter with a
+        # tight cadence returns to the same rest position and goes again, so
+        # one rep ends exactly where the next begins. Only a substantial
+        # overlap means the segmenter has found the same rep twice.
+        if reps:
+            prev_a, _, prev_b = reps[-1]
+            overlap = min(b, prev_b) - max(a, prev_a)
+            if overlap > 0.25 * min(b - a, prev_b - prev_a):
+                if sig[pk] <= sig[reps[-1][1]]:
+                    continue
+                reps.pop()
+        reps.append((int(a), int(pk), int(b)))
+    if not reps and not reasons:
+        reasons.append("candidates were found but none met the rep criteria")
+    return reps, reasons
 
 
-def ingest(backend_name: str, force: bool = False, from_part_a: Path | None = None) -> pd.DataFrame:
+def ingest(backend_name: str, force: bool = False, from_part_a: Path | None = None,
+           videos_dir: Path | None = None) -> pd.DataFrame:
     """Produce out/keypoints/<video>.parquet and out/reps.csv."""
     PATHS.ensure()
-    videos = discover()
+    d = videos_dir or PATHS.videos
+    videos = discover(d)
     if not videos:
         raise SystemExit(
-            f"no videos found in {PATHS.videos}\n"
+            f"no videos found in {d}\n"
             "Add clips there (see data/videos/README.md for the naming convention)."
         )
-    metas = load_metadata(videos)
+    metas = load_metadata(videos, d)
 
-    rows = []
+    rows: list[dict] = []
+    diagnostics: list[dict] = []
     for meta in metas:
         kp_path = PATHS.o(S.P_KEYPOINTS, f"{meta.video}.parquet")
         info = probe_video(meta.path)
@@ -221,23 +321,39 @@ def ingest(backend_name: str, force: bool = False, from_part_a: Path | None = No
             print(f"  + {meta.video}: {len(df)} frames via {be.name}")
 
         kp = frame_to_keypoints(df)
-        for i, (start, bottom, end) in enumerate(segment_reps(kp, fps)):
+        movement = resolve(meta.exercise)
+        found, why = segment_reps_verbose(kp, fps, movement)
+        diagnostics.append({
+            "video": meta.video, "session_id": meta.session_id,
+            "exercise": movement.name, "n_reps": len(found),
+            "n_frames": len(df), "fps": round(float(fps), 4),
+            "mean_confidence": round(float(kp[:, S.ANALYSIS_IDX, 2].mean()), 4),
+            "reasons": " | ".join(dict.fromkeys(why)),
+        })
+        for i, (start, turn, end) in enumerate(found):
             rows.append(
                 {
                     "rep_id": f"{meta.video}#r{i:02d}",
                     "video": meta.video,
                     "session_id": meta.session_id,
-                    "exercise": meta.exercise,
+                    "exercise": movement.name,
                     "set_index": meta.set_index,
+                    "view": meta.view or "",
+                    "declared_bin": meta.bin or "",
                     "rep_index": i,
                     "start_frame": start,
-                    "bottom_frame": bottom,
+                    "turn_frame": turn,
                     "end_frame": end,
                     "fps": round(float(fps), 4),
                 }
             )
-        print(f"    {sum(r['video'] == meta.video for r in rows)} reps segmented")
+        n = sum(r["video"] == meta.video for r in rows)
+        print(f"    {n} reps segmented")
+        if not n and why:
+            for reason in dict.fromkeys(why):
+                print(f"      - {reason}")
 
+    write_csv(pd.DataFrame(diagnostics), PATHS.o(S.P_INGEST_LOG))
     reps = pd.DataFrame(rows)
     if reps.empty:
         raise SystemExit(
