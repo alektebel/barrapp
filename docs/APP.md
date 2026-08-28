@@ -94,7 +94,10 @@ that the server did not measure.
 
 ## When something goes wrong on a phone
 
-There is a **Diagnostics** screen behind the ⓘ on the privacy screen. It exists
+There is a **Diagnostics** screen two taps from anywhere: the ⓘ in the app
+header opens the privacy screen, which has a **Diagnostics** button at the
+bottom. It is behind privacy rather than in the main navigation because it is
+not a feature — it is what you reach for when something looks wrong. It exists
 because the alternative — a user saying "it didn't work" and a developer with
 no way to find out which run they mean — is not debuggable.
 

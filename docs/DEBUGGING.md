@@ -69,7 +69,8 @@ old pose would be worse than none.
 This is the whole point of the chain. A user says "it gave me 43 and that's
 wrong":
 
-1. **On the phone**, open Diagnostics (the ⓘ on the privacy screen). It shows
+1. **On the phone**, open Diagnostics: the ⓘ in the header, then
+   **Diagnostics** at the bottom of the privacy screen. It shows
    the last trace id, the provenance stamp, and the literal command to run.
 2. **Tap Copy report.** It is a paste-able block: device, API base, Android
    build, and the last 120 events — uploads, failures, timeouts, completions —
