@@ -123,18 +123,25 @@ def smoothness_component(signal: np.ndarray, start: int, turn: int) -> tuple[flo
 
 def score_rep(values: dict, arm: float, signal: np.ndarray | None = None,
               start: int = 0, turn: int = 0, plausible: bool = True,
-              rep_quality: float = 1.0, min_rep_quality: float = 0.55) -> Quality:
+              rep_quality: float = 1.0, min_rep_quality: float = 0.55,
+              trace=None, label: str = "") -> Quality:
     """Combine the components into the number the app shows.
 
     Returns `score=None` rather than a low score when the rep could not be
     measured. A pose failure is not bad technique, and showing it as a low mark
     would be the single most misleading thing this app could do.
     """
+    from .trace import NullTrace
+    tr = trace or NullTrace()
+    tr.stage("quality")
     context = {}
     if not plausible:
+        tr.reject(label or "rep", "not scored: the pose estimate is not physically possible")
         return Quality(None, note="This rep could not be measured - the pose "
                                   "estimate is not physically possible.")
     if rep_quality < min_rep_quality:
+        tr.reject(label or "rep", "not scored: too little of the rep was tracked",
+                  rep_quality=rep_quality, min_rep_quality=min_rep_quality)
         return Quality(None, note="Too little of this rep was tracked well "
                                   "enough to score.")
 
@@ -151,10 +158,13 @@ def score_rep(values: dict, arm: float, signal: np.ndarray | None = None,
 
     usable = {k: v for k, v in comps.items() if v["value"] is not None}
     if not usable:
+        tr.reject(label or "rep", "not scored: no component could be measured")
         return Quality(None, comps, note="None of the components could be measured.")
 
     weight = sum(v["weight"] for v in usable.values())
     total = sum(v["value"] * v["weight"] for v in usable.values()) / weight
+    for name, c in comps.items():
+        tr.step(f"component {name}", value=c["value"], weight=c["weight"], why=c["why"])
     if weight < 0.999:
         context["partial"] = (
             "Scored on "
@@ -173,7 +183,12 @@ def score_rep(values: dict, arm: float, signal: np.ndarray | None = None,
                              "why": why + " - needs a consistent camera side, "
                                           "so it is not part of the score"}
 
-    return Quality(int(round(100 * total)), comps, context)
+    score = int(round(100 * total))
+    tr.decision(f"{label or 'rep'} scored {score}",
+                "weighted mean of the components that could be measured",
+                score=score, effective_weight=weight,
+                components={k: v["value"] for k, v in comps.items()})
+    return Quality(score, comps, context)
 
 
 def band(score: int | None) -> str:

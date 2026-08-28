@@ -60,9 +60,16 @@ def process_job(job: dict, video_path: Path) -> dict:
 
     `exercise` may be omitted or "auto": the clip is then classified from its
     own geometry rather than from what the athlete remembered to tap.
+
+    Every job carries a trace id. It goes into the payload, so the phone can
+    show it; into a JSON trace on disk, so the decision chain can be replayed
+    with `barra explain --replay <id>`; and into the log line, so a user report
+    maps to a specific run of a specific build.
     """
     requested = (job.get("exercise") or "auto").strip() or "auto"
-    metrics = analyze_clip(video_path, requested, session=job.get("session"))
+    trace = _new_trace(job, video_path, requested)
+    metrics = analyze_clip(video_path, requested, session=job.get("session"),
+                           trace=trace)
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -75,7 +82,57 @@ def process_job(job: dict, video_path: Path) -> dict:
     for key, value in metrics.items():
         if key not in prose:
             report[key] = value
+
+    if trace is not None:
+        report["traceId"] = trace.id
+        report["provenance"] = _provenance()
+        _write_trace(trace)
+        print(f"[barra] job={job.get('id')} trace={trace.id} "
+              f"exercise={report.get('exercise')} reps={report.get('n_reps')} "
+              f"score={report.get('sessionScore')} "
+              f"rejections={len(trace.rejections)} errors={len(trace.errors)}",
+              flush=True)
     return report
+
+
+def _new_trace(job: dict, video_path: Path, requested: str):
+    try:
+        from barra.trace import Trace, new_id
+    except ImportError:
+        return None
+    t = Trace(
+        new_id(str(job.get("id", ""))),
+        video_path.name,
+        jobId=str(job.get("id", "")),
+        exercise_requested=requested,
+        session=job.get("session"),
+        bytes=video_path.stat().st_size if video_path.exists() else 0,
+    )
+    t.stage("job")
+    t.step("provenance", **_provenance())
+    return t
+
+
+def _provenance() -> dict:
+    try:
+        from barra.provenance import stamp
+
+        return stamp()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": f"provenance unavailable: {exc}"}
+
+
+def _write_trace(trace) -> None:
+    """Traces live under BARRA_TRACE_DIR, or out/traces beside the code.
+
+    Failing to write one must never fail the job: a debugging aid that can take
+    down a measurement is worse than no debugging aid.
+    """
+    try:
+        root = Path(os.environ.get("BARRA_TRACE_DIR", str(BARRA_ROOT / "out" / "traces")))
+        trace.write(root / f"{trace.id}.json")
+    except Exception as exc:  # noqa: BLE001
+        print(f"[barra] could not write trace {trace.id}: {exc}", flush=True)
 
 
 def _empty(exercise: str, blockers: list[str], **extra) -> dict:
@@ -105,8 +162,13 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
 
 
 def analyze_clip(video_path: Path, exercise: str = "auto",
-                 session: str | None = None) -> dict:
+                 session: str | None = None, trace=None) -> dict:
+    from barra.trace import NullTrace
+
+    tr = trace if trace is not None else NullTrace()
+    tr.stage("probe")
     if not video_path.exists() or video_path.stat().st_size == 0:
+        tr.error("no video arrived at the server", path=str(video_path))
         return _empty(exercise, ["No video arrived at the server."])
 
     try:
@@ -132,7 +194,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         ])
 
     info = probe_video(video_path)
+    tr.step("container", **{k: v for k, v in info.items() if k != "ok"})
     if not info.get("ok"):
+        tr.error("could not open the clip", reason=info.get("reason"))
         return _empty(exercise,
                       [f"Could not open the clip: {info.get('reason', 'unknown')}"])
 
@@ -147,7 +211,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     # respected, but the detection still runs so the phone can say when the two
     # disagree - measuring a muscle-up with squat geometry produces numbers that
     # look fine and mean nothing.
-    detection = classify(pose.keypoints)
+    tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps))
+    detection = classify(pose.keypoints, tr)
     detected = {
         "exercise": detection.exercise,
         "label": HUMAN.get(detection.exercise, detection.exercise),
@@ -167,7 +232,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     except SystemExit as exc:
         return _empty(chosen, [str(exc)], detected=detected)
 
-    found, reasons = segment_reps_verbose(pose.keypoints, fps, movement)
+    found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
 
     session = session or date.today().isoformat()
     raw_signal, sig_conf = tracking_signal(pose.keypoints, movement)
@@ -178,7 +243,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     extra_blockers: list[str] = []
     scores: list[int] = []
     for i, (start, turn, end) in enumerate(found):
-        measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement)
+        measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement,
+                               trace=tr, label=f"r{i + 1}")
         lines = []
         for key in _METRIC_ORDER:
             cls, label, unit, _ = METRIC_SPEC[key]
@@ -198,6 +264,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             plausible=measured.plausible,
             rep_quality=measured.quality.get("rep", 0.0),
             min_rep_quality=MIN_REP_QUALITY,
+            trace=tr, label=f"r{i + 1}",
         )
         if q.score is not None:
             scores.append(q.score)

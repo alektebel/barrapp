@@ -157,15 +157,16 @@ def _clean_signal(sig: np.ndarray, conf: np.ndarray,
 
 def segment_reps(kp: np.ndarray, fps: float, movement=None,
                  max_invented_frac: float = 0.4,
-                 max_half_rep_s: float = 4.0) -> list[tuple[int, int, int]]:
+                 max_half_rep_s: float = 4.0, trace=None) -> list[tuple[int, int, int]]:
     """See `segment_reps_verbose`; returns the reps only."""
     return segment_reps_verbose(kp, fps, movement, max_invented_frac,
-                                max_half_rep_s)[0]
+                                max_half_rep_s, trace)[0]
 
 
 def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                          max_invented_frac: float = 0.4,
-                         max_half_rep_s: float = 4.0
+                         max_half_rep_s: float = 4.0,
+                         trace=None,
                          ) -> tuple[list[tuple[int, int, int]], list[str]]:
     """Split a set into reps on the movement's own tracking signal.
 
@@ -186,23 +187,37 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
     downstream re-derives segmentation.
     """
     from .movements import DEFAULT, MAX_BAR_TRAVEL, anchor_travel, tracking_signal
+    from .trace import NullTrace
 
+    tr = trace or NullTrace()
     movement = movement or DEFAULT
+    tr.stage("segment")
     reasons: list[str] = []
     raw, conf = tracking_signal(kp, movement)
     sig, valid = _clean_signal(raw, conf)
+    tr.step("signal built", movement=movement.name, signal=movement.signal,
+            frames=int(len(sig)), observed_frames=int(valid.sum()),
+            observed_frac=float(valid.mean()) if len(valid) else 0.0)
     if not valid.any():
+        tr.reject("all reps", "no frame had a usable pose for this movement's landmarks")
         return [], ["no frame had a usable pose for this movement's landmarks"]
 
     rest = float(np.percentile(sig[valid], 15))
     apex = float(np.percentile(sig[valid], 97))
     amplitude = apex - rest
+    tr.step("amplitude", rest_p15=rest, apex_p97=apex, amplitude=amplitude)
     if amplitude <= 1e-6:
+        tr.reject("all reps", "the tracked signal never moved")
         return [], ["the tracked signal never moved - no movement detected"]
 
     min_dist = max(1, int(movement.min_rep_s * fps))
     peaks, _ = find_peaks(sig, prominence=0.35 * amplitude, distance=min_dist)
+    tr.step("candidate turnarounds", count=int(len(peaks)),
+            at_seconds=[round(float(p) / fps, 2) for p in peaks],
+            prominence_required=0.35 * amplitude, min_separation_frames=min_dist)
     if len(peaks) == 0:
+        tr.reject("all reps", "no turnaround stood out from the noise",
+                  prominence_required=0.35 * amplitude)
         return [], ["no turnaround stood out from the noise"]
 
     # Boundaries: cross a 30%-of-amplitude gate to leave the peak, then keep
@@ -218,7 +233,10 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
     max_half = int(max_half_rep_s * fps)
     reps: list[tuple[int, int, int]] = []
     for pk in peaks:
+        at = round(float(pk) / fps, 2)
         if sig[pk] < rest + 0.6 * amplitude:
+            tr.reject(f"candidate at {at}s", "peak too shallow to be a turnaround",
+                      peak_value=float(sig[pk]), required=rest + 0.6 * amplitude)
             continue
         if not valid[pk]:
             # The turnaround itself was never observed. Everything a rep record
@@ -227,6 +245,8 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                 f"turnaround at {pk / fps:.1f}s was never actually tracked - "
                 "the subject left frame or the pose was lost at the top"
             )
+            tr.reject(f"candidate at {at}s", "the turnaround itself was never tracked",
+                      frame=int(pk))
             continue
 
         def walk(i: int, step: int) -> int:
@@ -242,12 +262,17 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
         a, b = walk(pk, -1), walk(pk, +1)
         if b - a < max(3, min_dist // 2):
             reasons.append(f"candidate at {pk / fps:.1f}s was too brief to be a rep")
+            tr.reject(f"candidate at {at}s", "too brief to be a rep",
+                      frames=int(b - a), min_frames=max(3, min_dist // 2))
             continue
         if valid[a:b + 1].mean() < (1.0 - max_invented_frac):
             reasons.append(
                 f"candidate at {pk / fps:.1f}s is mostly interpolated - "
                 f"only {valid[a:b + 1].mean():.0%} of its frames were tracked"
             )
+            tr.reject(f"candidate at {at}s", "mostly interpolated frames",
+                      observed_frac=float(valid[a:b + 1].mean()),
+                      min_observed=1.0 - max_invented_frac)
             continue
         # The anchor a bar movement is measured against has to stay put.
         if movement.origin == "wrist":
@@ -258,6 +283,9 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                     f"{travel:.1f} torso-lengths, so they were not on a fixed bar "
                     "- this is movement around the rig, not a rep"
                 )
+                tr.reject(f"candidate at {at}s", "the hands were not on anything fixed",
+                          wrist_travel=float(travel), max_travel=MAX_BAR_TRAVEL,
+                          window_s=[round(a / fps, 2), round(b / fps, 2)])
                 continue
         # Two reps may legitimately share a boundary frame: a lifter with a
         # tight cadence returns to the same rest position and goes again, so
@@ -268,9 +296,19 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             overlap = min(b, prev_b) - max(a, prev_a)
             if overlap > 0.25 * min(b - a, prev_b - prev_a):
                 if sig[pk] <= sig[reps[-1][1]]:
+                    tr.reject(f"candidate at {at}s", "overlaps a stronger rep already found",
+                              overlap_frames=int(overlap),
+                              this_peak=float(sig[pk]), kept_peak=float(sig[reps[-1][1]]))
                     continue
+                tr.note("replaced an earlier weaker overlapping rep",
+                        dropped_at_s=round(reps[-1][1] / fps, 2))
                 reps.pop()
         reps.append((int(a), int(pk), int(b)))
+        tr.decision(f"rep {len(reps)}", "accepted",
+                    window_s=[round(a / fps, 2), round(b / fps, 2)],
+                    turnaround_s=at, frames=[int(a), int(pk), int(b)])
+    tr.step("segmentation complete", accepted=len(reps),
+            rejected=len(peaks) - len(reps))
     if not reps and not reasons:
         reasons.append("candidates were found but none met the rep criteria")
     return reps, reasons

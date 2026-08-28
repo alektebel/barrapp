@@ -193,6 +193,17 @@ class BarraApi(context: Context) {
                 repCount = json.optInt("n_reps"),
                 candidateCount = json.optInt("n_candidates"),
                 durationS = json.optDouble("duration_s", 0.0).orZero(),
+                traceId = json.optString("traceId"),
+                provenance = json.optJSONObject("provenance")?.let { p ->
+                    Provenance(
+                        barra = p.optString("barra"),
+                        commit = p.optString("commit"),
+                        python = p.optString("python"),
+                        platform = p.optString("platform"),
+                        poseModel = p.optJSONObject("poseModel")
+                            ?.optString("sha256_12").orEmpty(),
+                    )
+                },
             )
         }
 

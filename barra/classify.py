@@ -29,6 +29,7 @@ import numpy as np
 
 from . import schema as S
 from .movements import (MOVEMENTS, midpoint, pair_confidence, robust_torso)
+from .trace import NullTrace, Trace
 
 MIN_CONF = 0.5
 
@@ -149,7 +150,7 @@ def features(kp: np.ndarray) -> dict:
     }
 
 
-def classify(kp: np.ndarray) -> Classification:
+def classify(kp: np.ndarray, trace: Trace | None = None) -> Classification:
     """Decide the movement, or say the clip does not show one we know.
 
     Order matters. Hanging is checked first because it is the most specific
@@ -159,15 +160,30 @@ def classify(kp: np.ndarray) -> Classification:
     anchor test alone reads that as a dip. What separates them is whether the
     shoulders move relative to the hands at all.
     """
+    tr = trace or NullTrace()
+    tr.stage("classify")
     f = features(kp)
     anchored = f["wrist_travel"] <= ANCHOR_FIXED and f["wrist_seen"] >= 0.4
     articulated = np.isfinite(f["arm_articulation"]) and f["arm_articulation"] >= ARTICULATION
     planted = f["ankle_travel"] <= ANCHOR_FIXED and f["ankle_seen"] >= 0.4
+    tr.step("geometry measured", **f)
+    # The three tests every branch below is built from, each with the number and
+    # the threshold it was compared against.
+    tr.step(
+        "gates",
+        anchored=anchored, wrist_travel=f["wrist_travel"], anchor_max=ANCHOR_FIXED,
+        articulated=articulated, arm_articulation=f["arm_articulation"],
+        articulation_min=ARTICULATION,
+        planted=planted, ankle_travel=f["ankle_travel"],
+    )
 
     if anchored and articulated and f["hands_overhead_frac"] >= 0.35:
         peak = f["shoulder_above_hands_p95"]
         if peak >= OVER_BAR:
             margin = min(1.0, (peak - OVER_BAR) / 0.35)
+            tr.decision("muscle_up", "the shoulders finish above the hands",
+                        peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                        confidence=0.70 + 0.28 * margin)
             return Classification(
                 "muscle_up", 0.70 + 0.28 * margin,
                 f"hanging from a fixed bar, and the shoulders finish {peak:.2f} "
@@ -175,6 +191,9 @@ def classify(kp: np.ndarray) -> Classification:
                 f, runner_up="pull_up",
             )
         margin = min(1.0, (OVER_BAR - peak) / 0.35)
+        tr.decision("pull_up", "the shoulders never rise above the hands",
+                    peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                    confidence=0.70 + 0.25 * margin)
         return Classification(
             "pull_up", 0.70 + 0.25 * margin,
             f"hanging from a fixed bar, and the shoulders never rise above the "
@@ -183,6 +202,9 @@ def classify(kp: np.ndarray) -> Classification:
         )
 
     if planted and not articulated and np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35:
+        tr.decision("squat", "feet planted, hips travelling, arms rigid to the torso",
+                    hip_travel=f["hip_travel"], hip_travel_min=0.35,
+                    ankle_travel=f["ankle_travel"])
         return Classification(
             "squat", 0.78,
             f"feet stayed put, the hips moved through {f['hip_travel']:.2f} "
@@ -193,6 +215,8 @@ def classify(kp: np.ndarray) -> Classification:
     if anchored and articulated and f["hands_below_frac"] >= 0.80:
         below = f["body_below_hands"]
         if not np.isfinite(below):
+            tr.reject("dip/push-up", "too little of the body was seen to tell them apart",
+                      body_below_hands=below)
             return Classification(
                 "unknown", 0.0,
                 "hands fixed below the shoulders, but too little of the body was "
@@ -200,12 +224,16 @@ def classify(kp: np.ndarray) -> Classification:
                 f,
             )
         if below >= BELOW_HANDS_DIP:
+            tr.decision("dip", "the legs hang below the hands",
+                        body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
             return Classification(
                 "dip", 0.78,
                 f"hands fixed below the shoulders, with {below:.0%} of the body "
                 "hanging below them - the legs are off the ground",
                 f, runner_up="push_up",
             )
+        tr.decision("push_up", "nothing hangs below the hands, so they are on the floor",
+                    body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
         return Classification(
             "push_up", 0.78,
             "hands fixed below the shoulders and nothing hanging below them, so "
@@ -214,12 +242,19 @@ def classify(kp: np.ndarray) -> Classification:
         )
 
     if not anchored and not planted:
+        tr.reject("any movement", "hands not fixed and feet not planted",
+                  wrist_travel=f["wrist_travel"], ankle_travel=f["ankle_travel"],
+                  anchor_max=ANCHOR_FIXED)
         return Classification(
             "unknown", 0.0,
             "the hands are not on anything fixed and the feet are not planted, so "
             "this clip does not show a movement barra can measure",
             f,
         )
+    tr.reject("any movement", "no branch matched",
+              anchored=anchored, articulated=articulated, planted=planted,
+              hands_overhead_frac=f["hands_overhead_frac"],
+              hands_below_frac=f["hands_below_frac"])
     return Classification(
         "unknown", 0.0,
         "the clip does not match any movement barra knows: the hands are "

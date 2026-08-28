@@ -10,6 +10,7 @@ import com.barrapp.data.Analysis
 import com.barrapp.data.BarraApi
 import com.barrapp.data.ChatTurn
 import com.barrapp.data.DayEntry
+import com.barrapp.data.EventLog
 import com.barrapp.data.Job
 import com.barrapp.data.Profile
 import com.barrapp.data.ProfileStore
@@ -24,7 +25,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Privacy, Onboarding, Home, Processing, Coach }
+enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics }
 
 /** Which pane the compact layout is showing. Wide layouts show all three. */
 enum class Pane { Calendar, Session, Progress }
@@ -45,6 +46,7 @@ data class UiState(
     val chat: List<ChatTurn> = emptyList(),
     val coachThinking: Boolean = false,
     val weeklyNote: String? = null,
+    val events: List<EventLog.Event> = emptyList(),
 )
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
@@ -109,6 +111,18 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
     fun openCoach() = _state.update { it.copy(screen = Screen.Coach) }
 
+    fun openDiagnostics() = _state.update {
+        it.copy(screen = Screen.Diagnostics, events = EventLog.all(getApplication()))
+    }
+
+    fun clearEvents() {
+        EventLog.forget(getApplication())
+        _state.update { it.copy(events = emptyList()) }
+    }
+
+    fun diagnosticsReport(): String =
+        EventLog.report(getApplication(), DeviceId.get(getApplication()), BuildConfig.API_BASE_URL)
+
     /** The bundled example session, so the first screen is not a blank wall.
      *  Marked by having no job behind it, so it cannot be deleted or recorded
      *  into the calendar as if it were the user's own training. */
@@ -161,6 +175,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 .onFailure { err ->
                     // The calendar is local, so an unreachable server is not a
                     // blank screen - it is a note next to data that still works.
+                    EventLog.warn(app, "could not refresh from the server",
+                        err.message.orEmpty())
                     _state.update { it.copy(error = err.message) }
                 }
         }
@@ -178,6 +194,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     fun upload(uri: Uri?) {
         val video = uri ?: return
         val app = getApplication<Application>()
+        EventLog.info(app, "upload started")
         _state.update {
             it.copy(
                 screen = Screen.Processing,
@@ -200,6 +217,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 _state.update { it.copy(current = job, stage = STAGE_TRIM) }
                 watch(job.id)
             }.onFailure { err ->
+                EventLog.error(app, "upload failed", err.message.orEmpty(),
+                    jobId = _state.value.current?.id.orEmpty())
                 _state.update {
                     it.copy(
                         busy = false,
@@ -225,6 +244,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 val job = runCatching {
                     withContext(Dispatchers.IO) { api.getJob(jobId) }
                 }.getOrElse { err ->
+                    EventLog.error(app, "lost contact while measuring",
+                        err.message.orEmpty(), jobId = jobId)
                     _state.update {
                         it.copy(error = err.message, busy = false, screen = Screen.Home)
                     }
@@ -238,6 +259,16 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 }
                 if (job.status == "done") {
                     job.result?.let { SessionStore.record(app, job.id, it) }
+                    // The trace id is the whole point of logging a success:
+                    // it is what turns "that session looks wrong" into
+                    // `barra explain --replay <id>`.
+                    EventLog.info(
+                        app,
+                        "measured ${job.result?.repCount ?: 0} rep(s) of " +
+                            (job.result?.exercise ?: "unknown"),
+                        "score ${job.result?.sessionScore ?: "—"}",
+                        traceId = job.result?.traceId.orEmpty(), jobId = job.id,
+                    )
                     _state.update {
                         it.copy(
                             screen = Screen.Home,
@@ -253,6 +284,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     return@launch
                 }
                 if (job.status == "failed") {
+                    EventLog.error(app, "the server could not use that clip",
+                        job.error.orEmpty(),
+                        traceId = job.result?.traceId.orEmpty(), jobId = job.id)
                     _state.update {
                         it.copy(
                             screen = Screen.Home,
@@ -265,6 +299,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 }
                 delay(2500)
             }
+            EventLog.warn(app, "measuring timed out on the phone",
+                "the job may still finish on the server", jobId = jobId)
             _state.update {
                 it.copy(
                     busy = false,
@@ -294,7 +330,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     }
                     refresh()
                 }
-                .onFailure { err -> _state.update { it.copy(error = err.message) } }
+                .onFailure { err ->
+                    EventLog.error(app, "could not delete a clip", err.message.orEmpty(),
+                        jobId = job.id)
+                    _state.update { it.copy(error = err.message) }
+                }
         }
     }
 

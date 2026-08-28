@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barrapp.BarrappViewModel
+import com.barrapp.BuildConfig
 import com.barrapp.DeviceId
 import com.barrapp.Pane
 import com.barrapp.Screen
@@ -102,6 +103,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onAccept = vm::acceptPrivacy,
                 showBack = DeviceId.privacyAccepted(context),
                 onBack = vm::openHome,
+                onDiagnostics = vm::openDiagnostics,
             )
 
             Screen.Onboarding -> Onboarding(
@@ -114,6 +116,16 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 exerciseGuess = state.current?.result?.detected?.label,
                 error = state.error,
                 onCancel = vm::cancelUpload,
+            )
+
+            Screen.Diagnostics -> DiagnosticsScreen(
+                events = state.events,
+                latest = state.analysis,
+                deviceId = DeviceId.get(context),
+                apiBase = BuildConfig.API_BASE_URL,
+                report = vm::diagnosticsReport,
+                onClear = vm::clearEvents,
+                onBack = vm::openHome,
             )
 
             Screen.Coach -> CoachScreen(
@@ -360,7 +372,12 @@ private fun greeting(name: String): String {
 }
 
 @Composable
-private fun PrivacyScreen(onAccept: () -> Unit, showBack: Boolean, onBack: () -> Unit) {
+private fun PrivacyScreen(
+    onAccept: () -> Unit,
+    showBack: Boolean,
+    onBack: () -> Unit,
+    onDiagnostics: () -> Unit,
+) {
     Column(
         Modifier
             .fillMaxSize()
@@ -399,6 +416,13 @@ private fun PrivacyScreen(onAccept: () -> Unit, showBack: Boolean, onBack: () ->
         if (!showBack) {
             Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
                 Text("I understand — continue")
+            }
+        } else {
+            // Reached from the info button, which is also where someone goes
+            // when something looks wrong. Diagnostics belongs behind it rather
+            // than behind a hidden gesture nobody discovers.
+            TextButton(onClick = onDiagnostics, modifier = Modifier.fillMaxWidth()) {
+                Text("Diagnostics")
             }
         }
     }

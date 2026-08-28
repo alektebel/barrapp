@@ -185,6 +185,40 @@ def cmd_progress(args) -> int:
     return 0
 
 
+def cmd_explain(args) -> int:
+    from pathlib import Path
+
+    from .explain import explain, recent, replay
+
+    if args.list:
+        rows = recent(args.limit)
+        if not rows:
+            print("  no traces yet - run `barra explain <video>`")
+            return 0
+        print(f"  {'trace':<22}{'subject':<34}{'rej':>5}{'err':>5}{'ms':>7}")
+        for r in rows:
+            print(f"  {r['traceId']:<22}{r['subject'][:33]:<34}"
+                  f"{r['rejections']:>5}{r['errors']:>5}{r['durationMs']:>7}")
+        return 0
+    if args.replay:
+        replay(args.replay, show=args.show)
+        return 0
+    if not args.video:
+        raise SystemExit("give a video path, --replay <id>, or --list")
+
+    path = Path(args.video)
+    if not path.exists():
+        guess = PATHS.videos / args.video
+        if guess.exists():
+            path = guess
+        else:
+            raise SystemExit(f"no such clip: {args.video}")
+    _banner(f"explain {path.name}")
+    explain(path, exercise=args.exercise, show=args.show,
+            write=not args.no_write, fresh=args.fresh)
+    return 0
+
+
 def cmd_selftest(args) -> int:
     from .synthetic import generate
 
@@ -281,6 +315,23 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("report", help="render out/report.html")
     s.set_defaults(func=cmd_report)
+
+    s = sub.add_parser("explain",
+                       help="why did it do that - the whole decision chain for one clip")
+    s.add_argument("video", nargs="?", help="path to a clip, or a name in data/videos")
+    s.add_argument("--exercise", default="auto",
+                   help="force a movement instead of detecting it")
+    s.add_argument("--show", default="decisions",
+                   choices=["all", "decisions", "problems"],
+                   help="all steps, just the choices (default), or only failures")
+    s.add_argument("--replay", metavar="TRACE_ID",
+                   help="print a trace written earlier, or copied off the server")
+    s.add_argument("--list", action="store_true", help="list traces on disk")
+    s.add_argument("--limit", type=int, default=20)
+    s.add_argument("--no-write", action="store_true", help="do not save the trace")
+    s.add_argument("--fresh", action="store_true",
+                   help="re-run pose estimation instead of reusing cached keypoints")
+    s.set_defaults(func=cmd_explain)
 
     s = sub.add_parser("remember", help="fold this run into the persistent profile/")
     s.add_argument("dir", nargs="?", help="video directory (default data/videos)")

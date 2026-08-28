@@ -191,7 +191,8 @@ def _series(kp: np.ndarray, movement: Movement) -> dict[str, np.ndarray]:
 
 
 def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
-                movement: Movement, anatomy: dict | None = None) -> RepMetrics:
+                movement: Movement, anatomy: dict | None = None,
+                trace=None, label: str = "") -> RepMetrics:
     s = _series(kp, movement)
     sl = slice(start, end + 1)
     up = slice(start, turn + 1)
@@ -255,6 +256,17 @@ def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
     arm = arm_reach(kp)
     quality["arm_reach"] = arm
     problems = implausibilities(values, movement, arm)
+
+    from .trace import NullTrace
+    tr = trace or NullTrace()
+    tr.stage("metrics")
+    tr.step(f"measured {label or 'rep'}", frames=[start, turn, end],
+            window_s=[round(start / fps, 2), round(end / fps, 2)],
+            arm_reach=arm, ruler_usable=usable_reference(arm), **values)
+    tr.step(f"pose quality {label or 'rep'}", **quality)
+    for problem in problems:
+        tr.reject(label or "rep", problem, arm_reach=arm,
+                  limit=arm * PLAUSIBILITY_MARGIN if np.isfinite(arm) else None)
     return RepMetrics(values, quality, problems)
 
 
@@ -272,6 +284,7 @@ def compute_all(reps: pd.DataFrame, keypoints_of,
         m = rep_metrics(
             cache[v], int(r["start_frame"]), int(r["turn_frame"]), int(r["end_frame"]),
             float(r["fps"]), resolve(r.get("exercise")), anatomy,
+            label=str(r["rep_id"]),
         )
         rows.append({
             "rep_id": r["rep_id"], "video": v, "session_id": str(r["session_id"]),

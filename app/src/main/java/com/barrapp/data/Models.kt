@@ -33,7 +33,26 @@ data class Analysis(
     val repCount: Int = 0,
     val candidateCount: Int = 0,
     val durationS: Double = 0.0,
+    /** Ties this result to the server's saved decision chain. Shown in
+     *  Diagnostics so a report can name one specific run:
+     *  `barra explain --replay <id>`. */
+    val traceId: String = "",
+    /** What produced these numbers. A score that moved because the build moved
+     *  is not a score that moved because the athlete did. */
+    val provenance: Provenance? = null,
 )
+
+data class Provenance(
+    val barra: String = "",
+    val commit: String = "",
+    val python: String = "",
+    val platform: String = "",
+    val poseModel: String = "",
+) {
+    val summary: String
+        get() = listOf(barra, commit, poseModel.take(12))
+            .filter { it.isNotBlank() }.joinToString(" · ")
+}
 
 data class Detected(
     val exercise: String,
