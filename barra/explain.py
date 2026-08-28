@@ -145,26 +145,9 @@ def replay(trace_id: str, show: str = "all") -> None:
                 "Run `barra explain <video>` first, or copy one off the server."
             )
         path = matches[-1]
-    data = json.loads(path.read_text())
-    keep = {"all": None, "decisions": {"decision", "reject", "error"},
-            "problems": {"reject", "error"}}[show]
-    print(f"trace {data['traceId']}  ·  {data['subject']}")
-    if data.get("context"):
-        print("  " + "  ".join(f"{k}={v}" for k, v in data["context"].items()))
-    stage = None
-    for e in data["entries"]:
-        if keep is not None and e["kind"] not in keep:
-            continue
-        if e["stage"] != stage:
-            stage = e["stage"]
-            print(f"\n[{stage}]")
-        mark = {"decision": "->", "reject": " x", "error": " !",
-                "note": "  ", "step": "  "}[e["kind"]]
-        print(f" {e['atMs']:>5}ms {mark} {e.get('message', '')}")
-        for k, v in (e.get("data") or {}).items():
-            if k in ("outcome", "what"):
-                continue
-            print(f"            {k} = {v}")
+    from .trace import render
+
+    print(render(json.loads(path.read_text()), show=show))
 
 
 def recent(limit: int = 20) -> list[dict]:

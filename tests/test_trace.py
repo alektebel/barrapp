@@ -121,6 +121,43 @@ class TestNullTrace(unittest.TestCase):
         self.assertEqual(len(segment_reps_verbose(kp, 30.0, MUSCLE_UP)[0]), 2)
 
 
+class TestReplayMatchesTheRun(unittest.TestCase):
+    """A trace read back off disk must render exactly as it did live.
+
+    There were two renderers once, and they had already drifted: the replay
+    printed full float precision where the live run printed 4 significant
+    figures. Diffing two runs is one of the reasons traces are written, so a
+    formatting difference between a run and its replay shows up as a spurious
+    diff on every float in the clip.
+    """
+
+    def test_a_replayed_trace_is_byte_identical_to_the_live_one(self):
+        import json
+
+        from barra.trace import render
+
+        t = Trace("t-1", "clip.mp4", exercise_requested="auto")
+        t.stage("classify")
+        t.decision("muscle_up", "the shoulders finish above the hands",
+                   peak=0.947131335735321, threshold=0.12)
+        t.stage("segment")
+        t.reject("candidate at 3s", "the hands were not on anything fixed",
+                 wrist_travel=2.6431189, max_travel=0.8)
+
+        for show in ("all", "decisions", "problems"):
+            live = t.render(show=show)
+            # exactly what write() puts on disk, and replay() reads back
+            replayed = render(json.loads(json.dumps(t.as_dict())), show=show)
+            self.assertEqual(live, replayed, f"drifted at show={show}")
+
+    def test_floats_are_rendered_readably_not_at_full_precision(self):
+        t = Trace("t-2", "clip.mp4")
+        t.stage("s")
+        t.step("measured", value=0.947131335735321)
+        self.assertIn("value = 0.9471", t.render())
+        self.assertNotIn("0.947131335735321", t.render())
+
+
 class TestTrimmingToTheSet(unittest.TestCase):
     """The clip people actually film: walk to the bar, do a set, walk away."""
 

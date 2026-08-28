@@ -9,7 +9,13 @@ from pathlib import Path
 
 from deepseek import write_report
 
-BARRA_ROOT = Path(os.environ.get("BARRA_ROOT", "/home/diegeo/Development/dev/barrapp"))
+# This file lives at <repo>/server/process.py, so the repo is two parents up.
+# It used to default to an absolute path from one developer's laptop, which
+# meant that everywhere else the server wrote its traces to a directory the CLI
+# does not read - `barra explain --replay <id>` could not find a single trace
+# the server had written, which is the one thing that command exists to do.
+# Code that can work out where it lives should not be guessing.
+BARRA_ROOT = Path(os.environ.get("BARRA_ROOT") or Path(__file__).resolve().parent.parent)
 if str(BARRA_ROOT) not in sys.path:
     sys.path.insert(0, str(BARRA_ROOT))
 

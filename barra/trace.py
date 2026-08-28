@@ -156,27 +156,38 @@ class Trace:
     def render(self, width: int = 96, show: str = "all") -> str:
         """Human-readable. `show="decisions"` drops the bookkeeping and leaves
         the choices and rejections, which is what you want nine times in ten."""
-        keep = {"all": None, "decisions": {"decision", "reject", "error"},
-                "problems": {"reject", "error"}}[show]
-        out = [f"trace {self.id}  ·  {self.subject}"]
-        if self.context:
-            out.append("  " + "  ".join(f"{k}={v}" for k, v in self.context.items()))
-        stage = None
-        for e in self.entries:
-            if keep is not None and e.kind not in keep:
+        return render(self.as_dict(), width=width, show=show)
+
+
+def render(data: dict, width: int = 96, show: str = "all") -> str:
+    """Render a trace from its dict form - live or read back off disk.
+
+    One renderer, deliberately. There used to be two, and they had already
+    drifted: replaying a trace printed 0.947131335735321 where the live run
+    printed 0.9471. Since diffing two runs is one of the reasons traces are
+    written at all, a formatting difference between the run and its replay
+    shows up as a diff in every float on the clip.
+    """
+    keep = {"all": None, "decisions": {"decision", "reject", "error"},
+            "problems": {"reject", "error"}}[show]
+    out = [f"trace {data.get('traceId', '?')}  ·  {data.get('subject', '')}"]
+    if data.get("context"):
+        out.append("  " + "  ".join(f"{k}={v}" for k, v in data["context"].items()))
+    stage = None
+    for e in data.get("entries", []):
+        if keep is not None and e["kind"] not in keep:
+            continue
+        if e["stage"] != stage:
+            stage = e["stage"]
+            out.append(f"\n[{stage}]")
+        mark = {"decision": "->", "reject": " x", "error": " !",
+                "note": "  ", "step": "  "}[e["kind"]]
+        out.append(f" {e['atMs']:>5}ms {mark} {e.get('message', '')}"[:width])
+        for k, v in (e.get("data") or {}).items():
+            if k in ("outcome", "what"):
                 continue
-            if e.stage != stage:
-                stage = e.stage
-                out.append(f"\n[{stage}]")
-            mark = {"decision": "->", "reject": " x", "error": " !",
-                    "note": "  ", "step": "  "}[e.kind]
-            line = f" {e.at_ms:>5}ms {mark} {e.message}"
-            out.append(line[:width])
-            for k, v in (e.data or {}).items():
-                if k in ("outcome", "what"):
-                    continue
-                out.append(f"            {k} = {_fmt(v)}"[:width])
-        return "\n".join(out)
+            out.append(f"            {k} = {_fmt(v)}"[:width])
+    return "\n".join(out)
 
 
 def _fmt(v: Any) -> str:
