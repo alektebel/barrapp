@@ -41,6 +41,9 @@ object SessionStore {
                 score = if (o.isNull("score")) null else o.optInt("score"),
                 band = o.optString("band").ifBlank { "unmeasured" },
                 jobIds = (0 until ids.length()).map { i -> ids.optString(i) },
+                traces = o.optJSONObject("traces")?.let { t ->
+                    t.keys().asSequence().associateWith { k -> t.optString(k) }
+                } ?: emptyMap(),
             )
         }.sortedByDescending { it.date }
     }
@@ -74,6 +77,12 @@ object SessionStore {
             score = score,
             band = bandFor(score),
             jobIds = ((prior?.jobIds ?: emptyList()) + jobId).distinct(),
+            // Kept so a day recorded weeks ago can still be replayed against
+            // the exact run that produced its score, rather than a re-run that
+            // may not reproduce it.
+            traces = (prior?.traces ?: emptyMap()) +
+                if (analysis.traceId.isBlank()) emptyMap()
+                else mapOf(jobId to analysis.traceId),
         )
         write(context, existing.values.sortedByDescending { it.date })
     }
@@ -83,7 +92,8 @@ object SessionStore {
             if (jobId !in day.jobIds) day
             else {
                 val ids = day.jobIds - jobId
-                if (ids.isEmpty()) null else day.copy(jobIds = ids)
+                if (ids.isEmpty()) null
+                else day.copy(jobIds = ids, traces = day.traces - jobId)
             }
         }
         write(context, kept)
@@ -101,6 +111,7 @@ object SessionStore {
                     .put("score", d.score ?: JSONObject.NULL)
                     .put("band", d.band)
                     .put("jobIds", JSONArray(d.jobIds))
+                    .put("traces", JSONObject(d.traces as Map<*, *>))
             )
         }
         prefs(context).edit { putString(DAYS, arr.toString()) }

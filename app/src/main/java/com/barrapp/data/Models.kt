@@ -126,8 +126,17 @@ data class DayEntry(
     val score: Int?,
     val band: String,
     val jobIds: List<String>,
+    /**
+     * jobId -> the server trace that produced it. Keyed rather than a parallel
+     * list so deleting one clip cannot silently shift the rest by one and hand
+     * a debugger the wrong run.
+     */
+    val traces: Map<String, String> = emptyMap(),
 ) {
     val measured: Boolean get() = score != null
+
+    /** Newest first, matching the order clips were added to the day. */
+    val traceIds: List<String> get() = jobIds.mapNotNull { traces[it] }.reversed()
 }
 
 data class ChatTurn(

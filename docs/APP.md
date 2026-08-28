@@ -92,6 +92,32 @@ that the server did not measure.
 
 ---
 
+## When something goes wrong on a phone
+
+There is a **Diagnostics** screen behind the ⓘ on the privacy screen. It exists
+because the alternative — a user saying "it didn't work" and a developer with
+no way to find out which run they mean — is not debuggable.
+
+It shows:
+
+- **the last trace id**, and the literal command to run against it:
+  `barra explain --replay 260828-221455-4f8a59`
+- **the provenance stamp** — which build and which pose model produced that
+  answer
+- **device, server and event count**
+- **the event log**: the last 120 uploads, failures, lost connections,
+  timeouts, completions and deletes, newest first, with INFO/WARN/ERROR levels
+- **Copy report**, which renders all of the above as a paste-able block
+
+The report deliberately carries no personal data: device model, API base,
+Android build, and the events. Not the name, age, or any clip.
+
+The id is the whole trick. The server writes a trace under an id, returns that
+id in the payload, the app stores it with the session and shows it here, and
+the CLI replays it. One id, four places, so a complaint about a specific number
+leads to the exact run that produced it rather than to a re-run that may not
+reproduce it. The full chain: [`docs/DEBUGGING.md`](DEBUGGING.md).
+
 ## Building, and what is verified
 
 The Android SDK **cannot be downloaded in the Claude Code sandbox**

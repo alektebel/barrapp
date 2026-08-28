@@ -30,6 +30,7 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import com.barrapp.ui.theme.Numeric
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -311,6 +312,21 @@ fun SessionDetail(
                     Spacer(Modifier.height(8.dp))
                     Text(analysis.nextSession, style = MaterialTheme.typography.bodyMedium)
                 }
+            }
+        }
+
+        // The id of the run that produced everything above it. Small, quiet,
+        // and the only thing standing between "it gave me the wrong number"
+        // and knowing which of hundreds of runs to look at.
+        if (analysis.traceId.isNotBlank()) {
+            item {
+                Text(
+                    "run ${analysis.traceId}" +
+                        (analysis.provenance?.summary?.let { " · $it" } ?: ""),
+                    style = MaterialTheme.typography.labelSmall.merge(Numeric),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 4.dp),
+                )
             }
         }
 

@@ -46,5 +46,20 @@ design in [`docs/FINDINGS.md`](docs/FINDINGS.md) and
 ```bash
 uv venv --python 3.11 .venv && . .venv/bin/activate
 uv pip install -e ".[mediapipe]"
-python -m unittest discover -s tests      # 36 invariant tests
+python -m unittest discover -s tests      # 76 invariant tests
 ```
+
+## When a number looks wrong
+
+Every stage records what it measured, what it required, and where in the clip
+it looked, so any result can be traced back to the evidence behind it:
+
+```bash
+barra explain data/videos/YOUR-CLIP.mp4      # the whole decision chain
+barra explain --replay 260828-221455-4f8a59  # a run the server did earlier
+```
+
+The trace id shown in the app's Diagnostics screen is the same id the server
+logged and the same one on disk, so you are never guessing which run you are
+looking at. How the chain fits together, and the two real defects it has
+already caught: [`docs/DEBUGGING.md`](docs/DEBUGGING.md).

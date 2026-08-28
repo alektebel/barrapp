@@ -145,11 +145,41 @@ object LogicTest {
             single.body)
     }
 
+    /**
+     * A calendar entry keeps the id of the run that produced it, so a score
+     * recorded weeks ago can still be replayed against the exact run behind it.
+     */
+    private fun traceRules() {
+        val d = DayEntry(
+            date = "2026-08-19", exercise = "muscle_up", exerciseLabel = "Muscle-up",
+            reps = 5, score = 78, band = "solid",
+            jobIds = listOf("j-1", "j-2"),
+            traces = mapOf("j-1" to "260828-a", "j-2" to "260828-b"),
+        )
+        check("newest clip's run comes first", d.traceIds == listOf("260828-b", "260828-a"),
+            d.traceIds.toString())
+
+        // Keyed by job id, not a parallel list: deleting the first clip must
+        // not shift the rest by one and hand a debugger the wrong run.
+        val after = d.copy(jobIds = d.jobIds - "j-1", traces = d.traces - "j-1")
+        check("deleting a clip drops only its own run",
+            after.traceIds == listOf("260828-b"), after.traceIds.toString())
+
+        val old = d.copy(traces = emptyMap())
+        check("an entry stored before runs were kept still reads",
+            old.traceIds.isEmpty(), old.traceIds.toString())
+
+        val partial = d.copy(traces = mapOf("j-2" to "260828-b"))
+        check("a clip with no run recorded is skipped, not rendered blank",
+            partial.traceIds == listOf("260828-b"), partial.traceIds.toString())
+    }
+
     @JvmStatic
     fun main(args: Array<String>) {
         profileRules()
         coachRules()
         reviewRules()
+        traceRules()
         println(if (failures == 0) "OK  $checks checks passed"
                 else "FAILED  $failures of $checks checks")
         if (failures > 0) kotlin.system.exitProcess(1)

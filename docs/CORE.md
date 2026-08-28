@@ -201,6 +201,8 @@ to report a detection rate without an FPR beside it.
 | `barra score [VIDEO] [--no-qc]` | stage 4 + percentile |
 | `barra validate` | stage 6 |
 | `barra report` | `out/report.html` |
+| `barra explain VIDEO [--show all\|decisions\|problems]` | why did it do that - the whole decision chain, with the evidence ([`docs/DEBUGGING.md`](DEBUGGING.md)) |
+| `barra explain --replay ID` | re-print a trace written earlier, including one from the server |
 | `barra remember [DIR] [--note ...]` | fold this run into the persistent `profile/` |
 | `barra progress` | compare sessions against within-session variation |
 | `barra selftest [--seed N]` | synthetic data; validates nothing |
@@ -209,7 +211,7 @@ to report a detection rate without an FPR beside it.
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v      # 36 invariant tests
+python -m unittest discover -s tests -v      # 76 invariant tests
 python scripts/viewpoint_sensitivity.py      # the finding in docs/FINDINGS.md
 ```
 
