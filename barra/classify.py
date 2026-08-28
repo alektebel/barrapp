@@ -75,6 +75,23 @@ ARTICULATION = 0.20
 # ankles were never seen at all.
 BELOW_HANDS_DIP = 0.25
 LOW_MARGIN = 0.15
+# Knees held this far above the hips (torso-lengths) means the legs are being
+# raised, not hanging. Measured on real clips the gap is wide and unambiguous:
+# hanging legs sit at -0.33 to -0.69, a knee raise at +0.54.
+KNEES_UP = 0.10
+# A hold is a clip that sits still, not one that moves a short distance. Total
+# range cannot tell the two apart - a 23-second inverted hold and a deliberately
+# shallow pull-up both swept about 0.65 torso-lengths - but time spent parked
+# can: the hold stays within this band of its own median for most of the clip,
+# while a set keeps leaving it.
+#
+# Measured: 0.62 for the real hold against 0.49 for a hanging knee raise, 0.37
+# for a shallow pull-up and 0.04-0.16 for the muscle-up sets. The gap above the
+# knee raise is not large, and the threshold sits in it deliberately close to
+# the hold: a clip wrongly called a hold reports "not measurable", while a hold
+# wrongly accepted invents repetitions out of drift. Those costs are not equal.
+HOLD_BAND = 0.20
+HOLD_FRAC = 0.55
 
 
 @dataclass
@@ -123,6 +140,14 @@ def _best_window(points: np.ndarray, ok: np.ndarray, torso: float,
     return best
 
 
+def _parked(a: np.ndarray) -> float:
+    """Fraction of observed frames sitting within HOLD_BAND of the median."""
+    a = a[np.isfinite(a)]
+    if a.size < 6:
+        return 0.0
+    return float(np.mean(np.abs(a - np.median(a)) <= HOLD_BAND))
+
+
 def features(kp: np.ndarray, fps: float = 30.0) -> dict:
     """Geometric summary of a clip, in torso-lengths. Every value is scale-free
     so it means the same thing whatever the camera distance."""
@@ -166,6 +191,15 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
         a = a[np.isfinite(a)]
         return float(np.percentile(a, q)) if a.size else float("nan")
 
+    # Where the knees are relative to the hips, and how far they travel. In
+    # every bar movement that pulls the body up, the legs hang: the knees sit
+    # well below the hips throughout. In a hanging knee raise they come up
+    # above them, which is the movement's whole definition.
+    knee = midpoint(kp, "left_knee", "right_knee")
+    k_ok = pair_confidence(kp, "left_knee", "right_knee") >= MIN_CONF
+    knee_over_hip = np.where(k_ok & h_ok, (hip[:, 1] - knee[:, 1]) / torso, np.nan)
+    hip_over_hands = np.where(w_ok & h_ok, (wrist[:, 1] - hip[:, 1]) / torso, np.nan)
+
     win = int(max(15, min(len(kp), round(ANCHOR_WINDOW_S * (fps or 30.0)))))
     w_win = _best_window(wrist, w_ok, torso, win)
     a_win = _best_window(ankle, a_ok, torso, win)
@@ -199,10 +233,28 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
         if np.isfinite(pct(hip_over_ankle, 95)) else float("nan"),
         "torso_tilt": pct(tilt, 50),
         "body_below_hands": float(np.median(below)) if below else float("nan"),
+        # Fraction of the clip spent within HOLD_BAND of one position, taken
+        # on whichever of the shoulders or knees moves LEAST relative to the
+        # hands. Both have to be parked for the clip to be a hold: in a knee
+        # raise the shoulders barely move, and judging on them alone would call
+        # every knee raise a hold.
+        "parked_frac": min([_parked(a) for a in (above, knee_over_hip)
+                            if np.isfinite(a).sum() >= 6] or [0.0]),
+        "knee_over_hip": float(np.nanmedian(knee_over_hip))
+        if np.isfinite(knee_over_hip).any() else float("nan"),
+        "knee_excursion": pct(knee_over_hip, 95) - pct(knee_over_hip, 5),
+        "hip_articulation": pct(hip_over_hands, 95) - pct(hip_over_hands, 5),
     }
 
 
-def _why_not(kind: str, travel: float, seen: float) -> str:
+# Below this the landmark is missing for most of the clip, and whatever travel
+# was measured describes the minority of frames it happened to appear in -
+# usually the ones where the athlete is NOT on the bar, which is exactly when a
+# hand is easiest to see and least informative.
+MOSTLY_UNSEEN = 0.50
+
+
+def _why_not(kind: str, travel: float, seen: float, seen_clip: float = 1.0) -> str:
     """Name the condition that actually failed.
 
     Worth the few lines: the previous message said "hands not fixed" whatever
@@ -213,6 +265,16 @@ def _why_not(kind: str, travel: float, seen: float) -> str:
     """
     if not np.isfinite(travel) or seen < MIN_SEEN:
         return f"the {kind} were never seen clearly enough for long enough"
+    if seen_clip < MOSTLY_UNSEEN:
+        # Report the cause, not the symptom. On one real clip the hands sat
+        # above the top edge of the frame for the whole hang, so they were
+        # tracked in 31% of it - and almost only while the athlete stood on the
+        # ground either side of the set. The resulting 3.1 torso-lengths of
+        # "hand travel" is real arithmetic about the wrong frames, and telling
+        # the athlete their hands moved too much sends them to fix the wrong
+        # thing. What they can act on is the framing.
+        return (f"the {kind} were only tracked in {seen_clip:.0%} of the clip - "
+                f"they are out of frame for most of it")
     return f"the {kind} moved {travel:.2f} torso-lengths, past {ANCHOR_FIXED}"
 
 
@@ -232,9 +294,18 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     f = features(kp, fps)
     anchored = (f["wrist_window_travel"] <= ANCHOR_FIXED
                 and f["wrist_window_seen"] >= MIN_SEEN)
-    articulated = np.isfinite(f["arm_articulation"]) and f["arm_articulation"] >= ARTICULATION
+    # Three-valued on purpose. "Not articulated" and "we could not see the arms
+    # well enough to say" are different facts, and collapsing them into one
+    # boolean is how a muscle-up filmed side-on came out as a squat: the far
+    # arm was occluded, arm_articulation was NaN, and `not articulated` read
+    # that NaN as positive evidence that the arms had stayed still. A branch
+    # must never be satisfied by a measurement that was never taken.
+    arms_measured = bool(np.isfinite(f["arm_articulation"]))
+    articulated = arms_measured and f["arm_articulation"] >= ARTICULATION
+    rigid_arms = arms_measured and f["arm_articulation"] < ARTICULATION
     planted = (f["ankle_window_travel"] <= ANCHOR_FIXED
                and f["ankle_window_seen"] >= MIN_SEEN)
+    parked = f["parked_frac"]
     tr.step("geometry measured", **f)
     # The three tests every branch below is built from, each with the number and
     # the threshold it was compared against - and, for the two windowed ones,
@@ -249,7 +320,46 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         articulation_min=ARTICULATION,
         planted=planted, ankle_window_travel=f["ankle_window_travel"],
         ankle_window_seen=f["ankle_window_seen"],
+        arms_measured=arms_measured, parked_frac=parked, parked_max=HOLD_FRAC,
     )
+
+    # A hold is not a set. Checked before anything else, because the branches
+    # below ask *which* movement this is and cannot notice that nothing
+    # happened: a 23-second inverted hold has hands as fixed as any bar
+    # movement and shoulders that drift just enough to look articulated, and
+    # was duly reported as a pull-up with two reps invented out of the drift.
+    if anchored and f["hands_overhead_frac"] >= 0.35 and parked >= HOLD_FRAC:
+        tr.reject("any movement", "the body stays parked - this is a hold, not a set",
+                  parked_frac=parked, parked_max=HOLD_FRAC, band=HOLD_BAND,
+                  arm_articulation=f["arm_articulation"],
+                  knee_excursion=f["knee_excursion"])
+        return Classification(
+            "unknown", 0.0,
+            f"hanging from something fixed, but {parked:.0%} of the clip is spent "
+            "within a fifth of a torso-length of one position - this is a hold, "
+            "not a set of repetitions",
+            f,
+        )
+
+    # Hanging, but with the legs coming up rather than the body. Checked before
+    # the pull-up split because a knee raise satisfies every condition of that
+    # split except the one that matters, and would otherwise be reported as a
+    # pull-up whose shoulders happen never to reach the bar.
+    if (anchored and f["hands_overhead_frac"] >= 0.35
+            and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
+            and f["knee_excursion"] >= f["arm_articulation"]):
+        tr.decision("knee_raise", "the knees are carried above the hips, and travel "
+                    "further than the shoulders do",
+                    knee_over_hip=f["knee_over_hip"], knees_up_threshold=KNEES_UP,
+                    knee_excursion=f["knee_excursion"],
+                    arm_articulation=f["arm_articulation"], confidence=0.80)
+        return Classification(
+            "knee_raise", 0.80,
+            f"hanging from a fixed bar with the knees carried "
+            f"{f['knee_over_hip']:.2f} torso-lengths above the hips and "
+            "travelling further than the shoulders - the legs are doing the work",
+            f, runner_up="pull_up",
+        )
 
     if anchored and articulated and f["hands_overhead_frac"] >= 0.35:
         peak = f["shoulder_above_hands_p95"]
@@ -275,7 +385,7 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f, runner_up="muscle_up",
         )
 
-    if planted and not articulated and np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35:
+    if planted and rigid_arms and np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35:
         tr.decision("squat", "feet planted, hips travelling, arms rigid to the torso",
                     hip_travel=f["hip_travel"], hip_travel_min=0.35,
                     ankle_travel=f["ankle_travel"])
@@ -316,13 +426,16 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         )
 
     if not anchored and not planted:
-        hands = _why_not("hands", f["wrist_window_travel"], f["wrist_window_seen"])
-        feet = _why_not("feet", f["ankle_window_travel"], f["ankle_window_seen"])
+        hands = _why_not("hands", f["wrist_window_travel"], f["wrist_window_seen"],
+                         f["wrist_seen"])
+        feet = _why_not("feet", f["ankle_window_travel"], f["ankle_window_seen"],
+                        f["ankle_seen"])
         tr.reject("any movement", f"{hands}, and {feet}",
                   wrist_window_travel=f["wrist_window_travel"],
                   wrist_window_seen=f["wrist_window_seen"],
                   ankle_window_travel=f["ankle_window_travel"],
                   ankle_window_seen=f["ankle_window_seen"],
+                  wrist_seen_clip=f["wrist_seen"], ankle_seen_clip=f["ankle_seen"],
                   anchor_max=ANCHOR_FIXED, seen_min=MIN_SEEN,
                   window_s=ANCHOR_WINDOW_S)
         return Classification(
@@ -358,5 +471,6 @@ HUMAN = {
     "dip": "Dip",
     "push_up": "Push-up",
     "squat": "Squat",
+    "knee_raise": "Hanging knee raise",
     "unknown": "Not recognised",
 }

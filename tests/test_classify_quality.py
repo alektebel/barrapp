@@ -260,3 +260,98 @@ class TestQualityProxy(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOcclusionAndHolds(unittest.TestCase):
+    """The three failures found by watching the sample clips instead of
+    trusting the classifier's own confidence."""
+
+    def test_a_pair_seen_only_on_one_side_is_still_measurable(self):
+        """Side-on is the angle these movements are supposed to be filmed from,
+        and it hides the far arm and leg completely."""
+        import numpy as np
+
+        from barra.movements import midpoint, pair_confidence
+        from barra.schema import KP_INDEX
+
+        kp = bar_clip()
+        kp[:, KP_INDEX["right_wrist"], 2] = 0.05      # far arm behind the near one
+        pts = midpoint(kp, "left_wrist", "right_wrist")
+        conf = pair_confidence(kp, "left_wrist", "right_wrist")
+        self.assertGreater(float((conf >= 0.5).mean()), 0.5,
+                           "an occluded far side must not blind the near one")
+        self.assertTrue(np.allclose(pts, kp[:, KP_INDEX["left_wrist"], :2]),
+                        "the visible side should be used as-is")
+
+    def test_the_reference_point_does_not_jump_mid_clip(self):
+        """Switching between the midpoint and one side partway through moves
+        the reference by half the pair's separation, and every switch reads
+        downstream as motion that never happened."""
+        import numpy as np
+
+        from barra.movements import midpoint
+        from barra.schema import KP_INDEX
+
+        kp = bar_clip()
+        kp[:, KP_INDEX["right_wrist"], 0] += 60.0     # a wide, asymmetric grip
+        baseline = np.abs(np.diff(
+            midpoint(kp, "left_wrist", "right_wrist")[:, 0])).max()
+
+        occluded = kp.copy()
+        half = len(kp) // 2
+        occluded[half:, KP_INDEX["right_wrist"], 2] = 0.05   # far side lost halfway
+        step = np.abs(np.diff(
+            midpoint(occluded, "left_wrist", "right_wrist")[:, 0])).max()
+
+        # Losing the far side must not add a discontinuity of its own. Half the
+        # grip width is 30px here; the frame-to-frame jitter of the clip is a
+        # couple of px, so a mode switch would be unmissable.
+        self.assertLess(float(step), float(baseline) + 5.0,
+                        "the reference point jumped when the far side was lost")
+
+    def test_a_missing_measurement_never_satisfies_a_branch(self):
+        """`not articulated` must not be satisfiable by a NaN. This is how a
+        muscle-up filmed side-on came out as a squat."""
+        from barra.classify import classify
+        from barra.schema import KP_INDEX
+
+        kp = bar_clip()
+        for side in ("left", "right"):
+            kp[:, KP_INDEX[f"{side}_wrist"], 2] = 0.0
+            kp[:, KP_INDEX[f"{side}_elbow"], 2] = 0.0
+        self.assertEqual(classify(kp).exercise, "unknown",
+                         "with the arms unseen, no arm-based verdict is available")
+
+    def test_a_hold_is_not_a_set(self):
+        """A static hang has hands as fixed as any bar movement and drifts
+        just enough to look articulated."""
+        import numpy as np
+
+        from barra.classify import classify
+
+        kp = bar_clip(n_reps=1)
+        held = np.repeat(kp[len(kp) // 2:len(kp) // 2 + 1], 300, axis=0)
+        held[:, :, :2] += np.random.default_rng(0).normal(0, 0.004, held[:, :, :2].shape)
+        c = classify(held)
+        self.assertEqual(c.exercise, "unknown")
+        self.assertIn("hold", c.reason)
+
+    def test_hanging_knee_raise_is_not_a_pull_up(self):
+        """Every condition of the pull-up branch holds except the one that
+        defines it: the shoulders never rise to the hands, the knees do."""
+        import numpy as np
+
+        from barra.classify import classify
+        from barra.schema import KP_INDEX
+
+        from barra.movements import robust_torso
+
+        kp = bar_clip(clearance=-0.9, n_reps=3)
+        torso = robust_torso(kp)                      # the clip is in pixels
+        hip_y = kp[:, KP_INDEX["left_hip"], 1].copy()
+        t = np.linspace(0, 3 * 2 * np.pi, len(kp))
+        lift = 0.9 * torso * (0.5 + 0.5 * np.sin(t))  # knees curl up and back down
+        for side in ("left", "right"):
+            kp[:, KP_INDEX[f"{side}_knee"], 1] = hip_y - lift
+            kp[:, KP_INDEX[f"{side}_knee"], 2] = 0.95
+        self.assertEqual(classify(kp).exercise, "knee_raise")

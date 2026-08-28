@@ -53,6 +53,17 @@ PULL_UP = Movement(
     signal="shoulder_above_bar", min_rep_s=0.6, turn_label="top",
     aliases=("pullup", "pull-up", "chin_up", "chinup"),
 )
+# Hanging from the bar with the shoulders still and the legs coming up. It is
+# in here because it is what the athlete was actually doing on one of the
+# sample clips, and without it that clip was confidently reported as a pull-up
+# - a movement whose defining feature (the shoulders rising to the hands) it
+# does not contain at all.
+KNEE_RAISE = Movement(
+    name="knee_raise", origin="wrist", direction="ascending",
+    signal="knees_toward_bar", min_rep_s=0.7, turn_label="knees up",
+    aliases=("knee-raise", "kneeraise", "leg_raise", "leg-raise", "legraise",
+             "hanging_knee_raise", "toes_to_bar", "toes-to-bar", "ttb"),
+)
 DIP = Movement(
     name="dip", origin="wrist", direction="descending", signal="shoulder_above_bar",
     min_rep_s=0.6, turn_label="bottom", aliases=("dips",),
@@ -66,7 +77,7 @@ PUSH_UP = Movement(
     aliases=("pushup", "push-up", "press-up", "pressup"),
 )
 
-MOVEMENTS = {m.name: m for m in (SQUAT, MUSCLE_UP, PULL_UP, DIP, PUSH_UP)}
+MOVEMENTS = {m.name: m for m in (SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP)}
 _ALIASES = {a: m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
 
 DEFAULT = SQUAT
@@ -91,12 +102,74 @@ def resolve(name: str | None) -> Movement:
 # ---------------------------------------------------------------------------
 # Geometry helpers, all operating on (T, 17, 3) pixel keypoints
 # ---------------------------------------------------------------------------
+# A landmark is trusted from this confidence up. Below it the estimator is
+# guessing, and for an occluded limb it guesses somewhere plausible rather than
+# refusing, which is why the number has to be checked rather than the position.
+PAIR_CONF = 0.5
+# Both sides have to be confidently seen together in at least this fraction of
+# the clip for their midpoint to be the reference. Below it the far side is
+# effectively absent and the near one is used alone.
+#
+# The value sits in a gap that is geometric rather than arbitrary. A camera is
+# either roughly square to the athlete, in which case both sides are visible
+# almost always, or roughly side-on, in which case the far limb is behind the
+# near one and is rarely seen at all. Measured across the sample clips the two
+# regimes are 0.68-1.00 and 0.00-0.49, with nothing in between; 0.55 is the
+# middle of that gap. Choosing a low threshold is actively harmful: at 0.30 a
+# side-on clip kept a midpoint built from the 39% of frames where both wrists
+# happened to be seen, and threw away the 50% where the near wrist alone was.
+MIN_PAIRED_FRAC = 0.55
+
+
+def _pair(kp: np.ndarray, a: str, b: str) -> tuple[np.ndarray, np.ndarray]:
+    """The body point a left/right pair describes, and how well it is known.
+
+    Both sides seen -> their midpoint, which cancels the small asymmetry of a
+    body that is never perfectly square to the lens.
+
+    Only one side seen -> that side, alone. This matters more than it sounds.
+    Filmed from the side - the angle most of these movements are *supposed* to
+    be filmed from - the far arm and leg are behind the near ones, and the pose
+    estimator reports the far wrist at 0.06 confidence while the near one sits
+    at 0.42. Taking the minimum of the pair then declares the hands unseen for
+    the entire clip, and averaging their positions moves the "hands" halfway to
+    wherever the estimator guessed the hidden one was.
+
+    Both are wrong, and the first was wrong in a way that produced a confident
+    false answer rather than a refusal: with the wrists reported unseen, the
+    arm tests all returned NaN, the squat branch read "not articulated" off
+    that NaN, and a muscle-up filmed side-on was classified as a squat. In a
+    sagittal view both hands are on the same bar within a few pixels of each
+    other, so the visible one is not a compromise - it is the better estimate.
+    """
+    ia, ib = S.KP_INDEX[a], S.KP_INDEX[b]
+    ca, cb = kp[:, ia, 2], kp[:, ib, 2]
+    pa, pb = kp[:, ia, :2], kp[:, ib, :2]
+    both = (ca >= PAIR_CONF) & (cb >= PAIR_CONF)
+
+    # The choice is made ONCE for the clip, not per frame. Switching between
+    # the midpoint and a single side partway through moves the reference point
+    # by half the distance between the two landmarks, and every such switch
+    # reads downstream as the body having moved. On a real muscle-up that
+    # manufactured enough apparent hand travel (0.812 torso-lengths against a
+    # limit of 0.80) to reject the clip's only rep - a rep thrown away by a
+    # tenth of a percent, on motion that never happened.
+    if both.mean() >= MIN_PAIRED_FRAC:
+        return 0.5 * (pa + pb), np.minimum(ca, cb)
+
+    # Otherwise the pair is never reliably seen together - the far side is
+    # occluded, as it is in any side-on view - so the near side is used for the
+    # whole clip and reports its own confidence.
+    near_a = ca.mean() >= cb.mean()
+    return (pa, ca) if near_a else (pb, cb)
+
+
 def midpoint(kp: np.ndarray, a: str, b: str) -> np.ndarray:
-    return 0.5 * (kp[:, S.KP_INDEX[a], :2] + kp[:, S.KP_INDEX[b], :2])
+    return _pair(kp, a, b)[0]
 
 
 def pair_confidence(kp: np.ndarray, a: str, b: str) -> np.ndarray:
-    return np.minimum(kp[:, S.KP_INDEX[a], 2], kp[:, S.KP_INDEX[b], 2])
+    return _pair(kp, a, b)[1]
 
 
 def origin_of(kp: np.ndarray, movement: Movement) -> tuple[np.ndarray, np.ndarray]:
@@ -180,7 +253,17 @@ def tracking_signal(kp: np.ndarray, movement: Movement) -> tuple[np.ndarray, np.
     )
     scale = robust_torso(kp, torso)
 
-    if movement.signal == "shoulder_above_bar":
+    if movement.signal == "knees_toward_bar":
+        # A hanging knee raise is measured at the knees, not the shoulders:
+        # the whole point of the movement is that the shoulders stay where
+        # they are while the legs come up. Tracking the shoulders here would
+        # follow the swing and call it a rep.
+        bar = midpoint(kp, "left_wrist", "right_wrist")
+        knee = midpoint(kp, "left_knee", "right_knee")
+        raw = (bar[:, 1] - knee[:, 1]) / scale     # + when the knees rise
+        conf = np.minimum(pair_confidence(kp, "left_wrist", "right_wrist"),
+                          pair_confidence(kp, "left_knee", "right_knee"))
+    elif movement.signal == "shoulder_above_bar":
         bar = midpoint(kp, "left_wrist", "right_wrist")
         sh = midpoint(kp, "left_shoulder", "right_shoulder")
         raw = (bar[:, 1] - sh[:, 1]) / scale       # + when shoulders are above the bar
