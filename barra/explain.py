@@ -83,7 +83,7 @@ def explain(video: Path, exercise: str = "auto", show: str = "decisions",
             mean_confidence=float(conf.mean()),
             frames_above_0_6=int((conf.mean(axis=1) >= 0.6).sum()))
 
-    detection = classify(pose.keypoints, tr)
+    detection = classify(pose.keypoints, tr, fps=fps)
     chosen = detection.exercise if exercise in ("", "auto", None) else exercise
     if chosen == "unknown":
         tr.error("no movement recognised, so nothing downstream can run")

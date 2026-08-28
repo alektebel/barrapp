@@ -121,6 +121,40 @@ class TestNullTrace(unittest.TestCase):
         self.assertEqual(len(segment_reps_verbose(kp, 30.0, MUSCLE_UP)[0]), 2)
 
 
+class TestTrimmingToTheSet(unittest.TestCase):
+    """The clip people actually film: walk to the bar, do a set, walk away."""
+
+    def _clip(self):
+        import sys
+
+        import numpy as np
+        sys.path.insert(0, "tests")
+        from test_classify_quality import bar_clip
+
+        set_part = bar_clip(n_reps=3)
+        walk = bar_clip(n_reps=1, drift=3.5)
+        return np.concatenate([walk, set_part, walk], axis=0)
+
+    def test_reps_survive_an_approach_and_a_walk_away(self):
+        from barra.ingest import segment_reps_verbose
+        from barra.movements import MUSCLE_UP
+
+        kp = self._clip()
+        reps, _ = segment_reps_verbose(kp, 30.0, MUSCLE_UP)
+        self.assertEqual(len(reps), 3, "the walking must not hide the set")
+
+    def test_the_trim_is_recorded_with_its_spans(self):
+        from barra.ingest import segment_reps_verbose
+        from barra.movements import MUSCLE_UP
+
+        t = Trace("x", "walk, set, walk")
+        segment_reps_verbose(self._clip(), 30.0, MUSCLE_UP, trace=t)
+        step = next((e for e in t.entries if "active spans" in e.message), None)
+        self.assertIsNotNone(step, "a trim that is invisible cannot be debugged")
+        self.assertGreater(step.data["dropped_frames"], 0)
+        self.assertLess(step.data["active_frac"], 1.0)
+
+
 class TestPipelineTracing(unittest.TestCase):
     def test_a_rejected_rep_says_why_with_numbers(self):
         import sys
@@ -132,11 +166,17 @@ class TestPipelineTracing(unittest.TestCase):
         from barra.movements import MAX_BAR_TRAVEL, MUSCLE_UP
 
         t = Trace("x", "drifting bar")
-        segment_reps_verbose(bar_clip(n_reps=3, drift=3.5), 30.0, MUSCLE_UP, trace=t)
+        reps, reasons = segment_reps_verbose(
+            bar_clip(n_reps=3, drift=3.5), 30.0, MUSCLE_UP, trace=t)
+        self.assertEqual(reps, [], "a drifting anchor is not a set of reps")
         self.assertTrue(t.rejections, "a drifting anchor must be recorded, not silent")
+        # Caught by the trim, before any candidate exists: nowhere in this clip
+        # were the hands still, so there is no rep to reject one at a time.
         got = t.rejections[0].data
-        self.assertGreater(got["wrist_travel"], MAX_BAR_TRAVEL)
-        self.assertEqual(got["max_travel"], MAX_BAR_TRAVEL)
+        self.assertIn("active_frames", got)
+        self.assertEqual(got["active_frames"], 0)
+        self.assertTrue(any("fixed" in r for r in reasons), reasons)
+        self.assertGreater(MAX_BAR_TRAVEL, 0)  # the per-candidate gate still exists
 
     def test_the_classifier_records_the_evidence_for_its_choice(self):
         import sys

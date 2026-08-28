@@ -212,7 +212,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     # disagree - measuring a muscle-up with squat geometry produces numbers that
     # look fine and mean nothing.
     tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps))
-    detection = classify(pose.keypoints, tr)
+    detection = classify(pose.keypoints, tr, fps=fps)
     detected = {
         "exercise": detection.exercise,
         "label": HUMAN.get(detection.exercise, detection.exercise),

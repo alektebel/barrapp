@@ -163,6 +163,65 @@ def segment_reps(kp: np.ndarray, fps: float, movement=None,
                                 max_half_rep_s, trace)[0]
 
 
+def active_mask(kp: np.ndarray, fps: float, movement) -> np.ndarray:
+    """Which frames show the athlete actually ON the apparatus.
+
+    People walk to the bar, do a set, walk off, and film all of it. Every
+    statistic taken over the whole clip is then a statistic about the walking
+    too - and the walking is the loud part. On one real 40-second clip the
+    approach put the wrists 5 torso-lengths apart, which inflated the set's
+    apparent amplitude enough that the prominence threshold derived from it
+    (0.35 x amplitude) sat above every genuine turnaround. Three muscle-ups
+    became zero reps, and the reason was invisible: the rejections named the
+    candidates the walking produced, not the reps it had hidden.
+
+    So the clip is trimmed first. A frame is active when the movement's anchor
+    - the hands for a bar movement, the feet for a squat - holds still across a
+    window around it. Windows overlap, so the mask dilates naturally to the
+    edges of the set rather than clipping the first and last rep.
+    """
+    from .classify import ANCHOR_FIXED, ANCHOR_WINDOW_S, MIN_SEEN, MIN_CONF, _travel
+    from .movements import midpoint, pair_confidence, robust_torso
+
+    n = len(kp)
+    active = np.zeros(n, dtype=bool)
+    if n == 0:
+        return active
+    a, b = (("left_wrist", "right_wrist") if movement.origin == "wrist"
+            else ("left_ankle", "right_ankle"))
+    torso = robust_torso(kp)
+    pts = midpoint(kp, a, b)
+    ok = pair_confidence(kp, a, b) >= MIN_CONF
+
+    win = int(max(15, min(n, round(ANCHOR_WINDOW_S * (fps or 30.0)))))
+    if n <= win:
+        active[:] = (_travel(pts, ok, torso) <= ANCHOR_FIXED
+                     and float(ok.mean()) >= MIN_SEEN)
+        return active
+    step = max(1, win // 10)
+    for i in range(0, n - win + 1, step):
+        j = i + win
+        if float(ok[i:j].mean()) < MIN_SEEN:
+            continue
+        if _travel(pts[i:j], ok[i:j], torso) <= ANCHOR_FIXED:
+            active[i:j] = True
+    return active
+
+
+def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
+    """Contiguous True stretches as inclusive (start, end) frame pairs."""
+    out, start = [], None
+    for i, v in enumerate(mask):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            out.append((start, i - 1))
+            start = None
+    if start is not None:
+        out.append((start, len(mask) - 1))
+    return out
+
+
 def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                          max_invented_frac: float = 0.4,
                          max_half_rep_s: float = 4.0,
@@ -202,16 +261,39 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
         tr.reject("all reps", "no frame had a usable pose for this movement's landmarks")
         return [], ["no frame had a usable pose for this movement's landmarks"]
 
-    rest = float(np.percentile(sig[valid], 15))
-    apex = float(np.percentile(sig[valid], 97))
+    # Trim to the stretches where the athlete is actually on the apparatus,
+    # then take the amplitude from those frames only. The threshold every
+    # candidate is later judged against is derived from this number, so letting
+    # an approach walk into it does not merely add noise - it raises the bar
+    # that the real reps then fail to clear.
+    active = active_mask(kp, fps, movement)
+    spans = _runs(active)
+    measured = valid & active
+    if measured.sum() < 5:
+        tr.reject("all reps", "no stretch of this clip shows the athlete on the apparatus",
+                  active_frames=int(active.sum()), frames=int(len(sig)))
+        return [], ["no stretch of this clip shows the athlete on the apparatus - "
+                    "the hands were never still on anything fixed"]
+    tr.step("trimmed to the active spans", spans=len(spans),
+            at_seconds=[[round(a / fps, 2), round(b / fps, 2)] for a, b in spans],
+            active_frac=float(active.mean()),
+            dropped_frames=int(len(active) - active.sum()))
+
+    rest = float(np.percentile(sig[measured], 15))
+    apex = float(np.percentile(sig[measured], 97))
     amplitude = apex - rest
-    tr.step("amplitude", rest_p15=rest, apex_p97=apex, amplitude=amplitude)
+    tr.step("amplitude", rest_p15=rest, apex_p97=apex, amplitude=amplitude,
+            measured_over="active frames only")
     if amplitude <= 1e-6:
         tr.reject("all reps", "the tracked signal never moved")
         return [], ["the tracked signal never moved - no movement detected"]
 
     min_dist = max(1, int(movement.min_rep_s * fps))
     peaks, _ = find_peaks(sig, prominence=0.35 * amplitude, distance=min_dist)
+    outside = int((~active[peaks]).sum()) if len(peaks) else 0
+    if outside:
+        tr.step("turnarounds outside the active spans discarded", count=outside)
+    peaks = peaks[active[peaks]] if len(peaks) else peaks
     tr.step("candidate turnarounds", count=int(len(peaks)),
             at_seconds=[round(float(p) / fps, 2) for p in peaks],
             prominence_required=0.35 * amplitude, min_separation_frames=min_dist)
@@ -249,12 +331,17 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                       frame=int(pk))
             continue
 
+        # A rep cannot run out of the span that contains its turnaround: past
+        # that edge the athlete is off the apparatus, and the signal there is
+        # about walking.
+        lo, hi = next(((x, y) for x, y in spans if x <= pk <= y), (0, len(sig) - 1))
+
         def walk(i: int, step: int) -> int:
-            n, limit = 0, len(sig) - 1
-            while 0 <= i + step <= limit and sig[i + step] > gate and n < max_half:
+            n, limit = 0, hi
+            while lo <= i + step <= limit and sig[i + step] > gate and n < max_half:
                 i += step
                 n += 1
-            while 0 <= i + step <= limit and sig[i + step] < sig[i] and n < max_half:
+            while lo <= i + step <= limit and sig[i + step] < sig[i] and n < max_half:
                 i += step
                 n += 1
             return i

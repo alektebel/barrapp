@@ -47,6 +47,19 @@ OVER_BAR = 0.12
 # Wrist travel above this many torso-lengths means the hands were not on
 # anything fixed. Same constant the segmenter uses to reject walking.
 ANCHOR_FIXED = 0.80
+# ...but measured over a WINDOW, not the whole clip. People walk to the bar and
+# walk away again, and a percentile spread over the whole video charges that
+# approach against the set: one real 40-second clip put its wrists 2.99
+# torso-lengths apart end to end while the actual reps never moved them past
+# 0.02. The question a classifier can answer before trimming has happened is
+# not "were the hands fixed throughout" but "was there a stretch long enough to
+# hold a set in which they were", so that is the question asked. Whether any
+# particular candidate rep is anchored is still decided per rep, by the
+# segmenter, which is where walking is actually rejected.
+ANCHOR_WINDOW_S = 3.0
+# A landmark seen in fewer than this fraction of a window is not measured well
+# enough there to conclude anything from it.
+MIN_SEEN = 0.40
 # The shoulders must move at least this far relative to the hands for the hands
 # to count as a handhold rather than as arms hanging off a moving torso.
 ARTICULATION = 0.20
@@ -85,7 +98,32 @@ def _travel(points: np.ndarray, ok: np.ndarray, torso: float) -> float:
     return float(np.hypot(*span))
 
 
-def features(kp: np.ndarray) -> dict:
+def _best_window(points: np.ndarray, ok: np.ndarray, torso: float,
+                 win: int, step: int = 5) -> tuple[float, float, int, int]:
+    """The least-travelled window of `win` frames in which the landmark was
+    actually visible: (travel, seen fraction, first frame, last frame).
+
+    Returns the whole clip when it is shorter than a window, and infinite
+    travel when no window was seen well enough to measure - which is a
+    different failure from "it moved too much", and the caller reports it as
+    one.
+    """
+    n = len(points)
+    if n <= win:
+        return _travel(points, ok, torso), float(ok.mean()), 0, max(0, n - 1)
+    best = (float("inf"), 0.0, 0, win - 1)
+    for a in range(0, n - win + 1, step):
+        b = a + win
+        seen = float(ok[a:b].mean())
+        if seen < MIN_SEEN:
+            continue
+        t = _travel(points[a:b], ok[a:b], torso)
+        if t < best[0]:
+            best = (t, seen, a, b - 1)
+    return best
+
+
+def features(kp: np.ndarray, fps: float = 30.0) -> dict:
     """Geometric summary of a clip, in torso-lengths. Every value is scale-free
     so it means the same thing whatever the camera distance."""
     torso = robust_torso(kp)
@@ -128,12 +166,26 @@ def features(kp: np.ndarray) -> dict:
         a = a[np.isfinite(a)]
         return float(np.percentile(a, q)) if a.size else float("nan")
 
+    win = int(max(15, min(len(kp), round(ANCHOR_WINDOW_S * (fps or 30.0)))))
+    w_win = _best_window(wrist, w_ok, torso, win)
+    a_win = _best_window(ankle, a_ok, torso, win)
+
     return {
         "n_frames": int(len(kp)),
+        "fps": float(fps or 30.0),
+        "window_frames": win,
         "wrist_seen": float(w_ok.mean()),
         "ankle_seen": float(a_ok.mean()),
+        # Whole-clip spans, kept because they are what a human sees in the
+        # video; the windowed values below are what the gates actually use.
         "wrist_travel": _travel(wrist, w_ok, torso),
         "ankle_travel": _travel(ankle, a_ok, torso),
+        "wrist_window_travel": w_win[0],
+        "wrist_window_seen": w_win[1],
+        "wrist_window_s": [round(w_win[2] / (fps or 30.0), 2),
+                           round(w_win[3] / (fps or 30.0), 2)],
+        "ankle_window_travel": a_win[0],
+        "ankle_window_seen": a_win[1],
         # negative = hands above the shoulders, i.e. hanging
         "shoulder_above_hands_p05": pct(above, 5),
         "shoulder_above_hands_p95": pct(above, 95),
@@ -150,7 +202,22 @@ def features(kp: np.ndarray) -> dict:
     }
 
 
-def classify(kp: np.ndarray, trace: Trace | None = None) -> Classification:
+def _why_not(kind: str, travel: float, seen: float) -> str:
+    """Name the condition that actually failed.
+
+    Worth the few lines: the previous message said "hands not fixed" whatever
+    went wrong, and on a real clip it printed that verdict directly above a
+    wrist travel of 0.27 against a threshold of 0.80 - a trace contradicting
+    its own evidence, which is worse than no trace, because it sends you to
+    read the wrong code.
+    """
+    if not np.isfinite(travel) or seen < MIN_SEEN:
+        return f"the {kind} were never seen clearly enough for long enough"
+    return f"the {kind} moved {travel:.2f} torso-lengths, past {ANCHOR_FIXED}"
+
+
+def classify(kp: np.ndarray, trace: Trace | None = None,
+             fps: float = 30.0) -> Classification:
     """Decide the movement, or say the clip does not show one we know.
 
     Order matters. Hanging is checked first because it is the most specific
@@ -162,19 +229,26 @@ def classify(kp: np.ndarray, trace: Trace | None = None) -> Classification:
     """
     tr = trace or NullTrace()
     tr.stage("classify")
-    f = features(kp)
-    anchored = f["wrist_travel"] <= ANCHOR_FIXED and f["wrist_seen"] >= 0.4
+    f = features(kp, fps)
+    anchored = (f["wrist_window_travel"] <= ANCHOR_FIXED
+                and f["wrist_window_seen"] >= MIN_SEEN)
     articulated = np.isfinite(f["arm_articulation"]) and f["arm_articulation"] >= ARTICULATION
-    planted = f["ankle_travel"] <= ANCHOR_FIXED and f["ankle_seen"] >= 0.4
+    planted = (f["ankle_window_travel"] <= ANCHOR_FIXED
+               and f["ankle_window_seen"] >= MIN_SEEN)
     tr.step("geometry measured", **f)
     # The three tests every branch below is built from, each with the number and
-    # the threshold it was compared against.
+    # the threshold it was compared against - and, for the two windowed ones,
+    # the stretch of clip the number came from, so the frame can be found.
     tr.step(
         "gates",
-        anchored=anchored, wrist_travel=f["wrist_travel"], anchor_max=ANCHOR_FIXED,
+        anchored=anchored, wrist_window_travel=f["wrist_window_travel"],
+        wrist_window_seen=f["wrist_window_seen"], wrist_window_s=f["wrist_window_s"],
+        wrist_travel_whole_clip=f["wrist_travel"],
+        anchor_max=ANCHOR_FIXED, seen_min=MIN_SEEN,
         articulated=articulated, arm_articulation=f["arm_articulation"],
         articulation_min=ARTICULATION,
-        planted=planted, ankle_travel=f["ankle_travel"],
+        planted=planted, ankle_window_travel=f["ankle_window_travel"],
+        ankle_window_seen=f["ankle_window_seen"],
     )
 
     if anchored and articulated and f["hands_overhead_frac"] >= 0.35:
@@ -242,13 +316,20 @@ def classify(kp: np.ndarray, trace: Trace | None = None) -> Classification:
         )
 
     if not anchored and not planted:
-        tr.reject("any movement", "hands not fixed and feet not planted",
-                  wrist_travel=f["wrist_travel"], ankle_travel=f["ankle_travel"],
-                  anchor_max=ANCHOR_FIXED)
+        hands = _why_not("hands", f["wrist_window_travel"], f["wrist_window_seen"])
+        feet = _why_not("feet", f["ankle_window_travel"], f["ankle_window_seen"])
+        tr.reject("any movement", f"{hands}, and {feet}",
+                  wrist_window_travel=f["wrist_window_travel"],
+                  wrist_window_seen=f["wrist_window_seen"],
+                  ankle_window_travel=f["ankle_window_travel"],
+                  ankle_window_seen=f["ankle_window_seen"],
+                  anchor_max=ANCHOR_FIXED, seen_min=MIN_SEEN,
+                  window_s=ANCHOR_WINDOW_S)
         return Classification(
             "unknown", 0.0,
-            "the hands are not on anything fixed and the feet are not planted, so "
-            "this clip does not show a movement barra can measure",
+            f"no {ANCHOR_WINDOW_S:.0f}-second stretch of this clip shows hands on "
+            f"something fixed or feet planted ({hands}, and {feet}), so it does "
+            "not show a movement barra can measure",
             f,
         )
     tr.reject("any movement", "no branch matched",
