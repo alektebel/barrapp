@@ -70,14 +70,6 @@ get told so, along with the questions it can answer.
 The server's prose model still writes the per-clip read-out, where the payload it
 is handed bounds what it can say.
 
-## Weekly review
-
-WorkManager, Monday morning, weekly, and **only when there is something to
-report** — a notification that arrives whether or not you trained is one people
-turn off in a fortnight. Composed on the phone from local sessions, so it works
-offline and can only state what was measured. The in-app card shows the same
-text as the notification.
-
 ## Data on the phone
 
 | Where | What |
@@ -91,6 +83,63 @@ the local store so it works offline and instantly. Nothing is invented locally
 that the server did not measure.
 
 ---
+
+## What the session write-up says
+
+The numbers live on the rep cards. The write-up above them says what they
+amount to, because "how did that go?" is the question someone opens the app to
+ask and a list of timings in capital letters does not answer it.
+
+> **2 muscle-up reps, solid**
+> 2 muscle-up reps across a 13-second working set. Scored 78 out of 100 —
+> solid. Three reps is the floor before a session median means anything, so
+> treat this as a single observation rather than a session. The weakest part
+> was smoothness through the rep at 67% (31% of the ascent made no progress);
+> control of the descent was the strongest at 87%.
+
+Four rules it works under:
+
+- **Name the weakest part, with the measurement behind it.** That is the one
+  sentence of any report that gets acted on.
+- **Never compare against another session.** One clip cannot support a
+  comparison; that is the weekly review's job, and only when the evidence
+  clears the noise.
+- **Count what could not be scored.** A set of six must never quietly present
+  a number built from two.
+- **A clip that measured nothing is still a result** — the reason, then what to
+  change, never an apology:
+
+> **No movement barra can measure**
+> Barra could not tell what this clip shows. The hands were only tracked in
+> 31% of the clip — they are out of frame for most of it. Tilt the camera up or
+> step back so your hands stay in shot for the whole set — they are the
+> reference everything else is measured against.
+
+The advice comes from the *first* blocker the pipeline hit, not from whichever
+blocker happens to match a keyword first. A clip whose real problem was the
+athlete walking around the rig used to be told to keep the turnaround in frame.
+
+## The weekly review
+
+WorkManager, Monday morning, and **only when there is something to report** — a
+notification that arrives whether or not you trained is one people turn off in
+a fortnight. Composed on the phone from local sessions, so it works offline and
+can only state what was measured. The in-app card shows the same text as the
+notification.
+
+> **Diego — 3 sessions this week**
+> 28 reps measured across 3 days. Push-up (19 reps over 1 day) and muscle-up
+> (9 reps over 2 days). 3 sessions cleared the 3-rep floor. Scores held level
+> within their own spread. Best day was 26 Aug at 94 (strong). Volume is up
+> from 6 reps the week before. 1 session produced no measurable reps — worth
+> checking the framing on those clips.
+
+The volume comparison is a **count**, so it is sound in a way the score
+comparison is not — but it still stays silent when the previous week has
+nothing in it, because "up 100%" from a week you did not train is not
+information. The score line keeps its guard: under 8 points it reports level,
+and over it says plainly that the change has not been tested against your own
+rep-to-rep variation.
 
 ## When something goes wrong on a phone
 

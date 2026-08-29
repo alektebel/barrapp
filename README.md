@@ -46,7 +46,20 @@ design in [`docs/FINDINGS.md`](docs/FINDINGS.md) and
 ```bash
 uv venv --python 3.11 .venv && . .venv/bin/activate
 uv pip install -e ".[mediapipe]"
-python -m unittest discover -s tests      # 76 invariant tests
+python -m unittest discover -s tests      # 94 invariant tests
+```
+
+## Does it recognise the right movement?
+
+Seven of the eight sample clips, checked by watching each one and comparing
+against what the classifier says with no labels and no hints. The eighth is a
+real muscle-up that barra declines to name because the athlete's hands are
+above the top edge of the frame — it says so, and says to tilt the camera up,
+rather than guessing. Full table and the two findings behind it:
+[`docs/CORE.md`](docs/CORE.md).
+
+```bash
+python scripts/demo_sessions.py        # classify, describe and report, end to end
 ```
 
 ## When a number looks wrong

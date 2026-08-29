@@ -161,7 +161,18 @@ The decisions worth arguing about, and why they went the way they did:
 - **The null is leave-one-out.** Each held-out reference rep is scored against
   a template rebuilt without it. A rep that helped build its own template
   would score too well and the null would come out fraudulently tight.
-- **Movements are declared, never guessed.** A squat is measured about the hips;
+- **Movements are recognised geometrically, never learned.** There are no
+  labelled clips to train on, and a learned classifier would fail silently on
+  the first movement it had not seen; these rules fail loudly and every one can
+  be checked by hand against a still frame. The vocabulary is squat, pull-up,
+  muscle-up, hanging knee raise, dip and push-up, separated by where the hands
+  are, whether they stay there, and what moves relative to them. Anything else
+  is `unknown`, which is a result rather than a failure.
+- **A missing measurement never satisfies a condition.** "Measured and false"
+  and "never measured" are different facts. Collapsing them into one boolean
+  let a NaN satisfy `not articulated` and reported a muscle-up as a squat — see
+  finding 4 in [`FINDINGS.md`](FINDINGS.md).
+- **Movements are declared, never guessed** *for the offline pipeline*. A squat is measured about the hips;
   a muscle-up is measured about the bar, because the hands are what stays still
   and a hip-centred frame would cancel the very motion being measured. An
   unknown exercise name is an error rather than a silent fallback to squat
@@ -206,12 +217,13 @@ to report a detection rate without an FPR beside it.
 | `barra remember [DIR] [--note ...]` | fold this run into the persistent `profile/` |
 | `barra progress` | compare sessions against within-session variation |
 | `barra selftest [--seed N]` | synthetic data; validates nothing |
+| `python scripts/demo_sessions.py [CLIP...]` | classify, describe and report on real clips, end to end |
 | `barra all` | everything after `ingest` |
 
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v      # 76 invariant tests
+python -m unittest discover -s tests -v      # 94 invariant tests
 python scripts/viewpoint_sensitivity.py      # the finding in docs/FINDINGS.md
 ```
 
@@ -229,3 +241,45 @@ any claim about why a deviation occurred.
 - Detection rate per induced error: _______
 - Cross-session inflation ratio: _______
 - **Verdict:** _______
+
+## Does it recognise the right movement?
+
+Checked the only way it can be checked without labels: by watching all eight
+sample clips frame by frame and writing down what they show, then running the
+classifier blind and comparing.
+
+| clip | what it actually is | recognised as | reps |
+|---|---|---|---|
+| 0010 | muscle-up, filmed from behind | Muscle-up | 2 |
+| 0011 | hanging knee raise, side-on, camera rotating | Hanging knee raise | 0 |
+| 0012 | muscle-up at night | Muscle-up | 1 |
+| 0014 | walk to the rig, muscle-ups at 32 s, walk back | Muscle-up | 0 |
+| 0017 | static inverted hold, indoors | not recognised — *a hold, not a set* | — |
+| 0018 | muscle-up, side-on, hands above the frame edge | not recognised — *hands out of frame* | — |
+| 0019 | jump-to-bar attempts, no completed rep | not recognised — *resting between attempts* | — |
+| 0020 | push-ups, head-on | Push-up | 19 |
+
+**Seven of eight.** The eighth (0018) is a real muscle-up that barra declines
+to name, because the athlete's hands are above the top edge of the frame for
+almost the whole hang — tracked in 31% of the clip, and mostly in the frames
+where he is standing on the ground either side of the set. It declines rather
+than guessing, and says what to change: tilt the camera up.
+
+Three of the eight produce no reps *and should not*. A hold has no
+repetitions, failed attempts are not repetitions, and a clip whose anchor is
+invisible cannot be measured. Each says which of those it is.
+
+### Where the rep counts are short
+
+0010 shows three muscle-ups and two are counted; 0012 shows two and one is
+counted; 0014's reps are rejected because the hands travel 1.2 torso-lengths
+across the candidate, which is the anchor test doing its job on a clip where
+the athlete is also moving around the rig. 0011 is recognised but produces no
+countable rep: the camera rotates through the set, and no turnaround clears
+the noise.
+
+These are undercounts, and they are the safe direction to be wrong in — a
+missed rep costs a data point, an invented one corrupts the history that every
+later comparison is made against. They are also visible: `barra explain
+<clip>` prints the rejected candidate with the number and the threshold that
+rejected it.

@@ -102,3 +102,86 @@ Even with a green validation run:
   a difference; it does not explain it.
 - It is **self-referential by construction**. If your reference reps embed a
   technique fault, the fault becomes the standard and its absence gets flagged.
+
+## 4. One occluded limb blinds a paired landmark, and does it silently
+
+The most damaging class of bug in this project is not a wrong number. It is a
+**confident answer produced from a measurement nobody took**, and pose
+estimation manufactures those.
+
+Landmarks come in left/right pairs, and the obvious way to use a pair is the
+midpoint of the two with the minimum of their confidences. That is wrong in a
+specific and common case: **side-on**, which is the angle most of these
+movements are supposed to be filmed from. The far arm is behind the near one,
+so the estimator reports the far wrist at 0.06 confidence and the near one at
+0.42. Taking the minimum declares the hands unseen for the entire clip.
+
+Measured across the eight sample clips, the pair-visibility distribution is
+bimodal and the split is geometric rather than accidental:
+
+| camera | both sides seen | clips |
+|---|---|---|
+| square to the athlete | 0.68 – 1.00 | 4 |
+| side-on | 0.00 – 0.49 | 4 |
+
+Nothing lands in between. A camera is either roughly square or roughly
+side-on, and the far limb is either visible or it is not.
+
+### Why the failure was invisible
+
+The blindness itself is recoverable — the athlete just gets told the clip is
+unmeasurable. What made it dangerous is what happened downstream. With the
+wrists unseen, every arm-based feature evaluated to NaN, and the classifier
+asked `not articulated`, which a NaN satisfies. **A branch that should have
+required evidence that the arms stayed still was satisfied by the absence of
+any evidence about the arms at all** — and a muscle-up filmed side-on was
+reported as a squat, with a confidence of 0.78.
+
+Three rules came out of this, and all three are now enforced by tests:
+
+1. **Use the visible side.** In a sagittal view both hands are on the same bar
+   within a few pixels, so the near one is not a compromise — it is the better
+   estimate. The midpoint is used only when the pair is genuinely seen together.
+2. **Choose once per clip, never per frame.** Switching mid-clip moves the
+   reference point by half the pair's separation, and every switch reads
+   downstream as motion. This alone had rejected a real muscle-up rep on 0.812
+   torso-lengths of hand travel against a limit of 0.80 — thrown away by a
+   tenth of a percent, on movement that never happened.
+3. **Never let a missing measurement satisfy a condition.** "Measured and
+   false" and "never measured" are different facts and need different code
+   paths. Collapsing them into one boolean is what produced the squat.
+
+### The general lesson
+
+Keypoint confidence is per-landmark, but the *decisions* are about
+relationships between landmarks. A relationship is only as observable as its
+worst-observed end, and code that reduces a pair to one number throws away
+exactly the information needed to know whether the reduction was safe.
+
+## 5. Absence of movement is not a small amount of movement
+
+A 23-second inverted hold was classified as a pull-up with two reps, invented
+out of drift. The hold satisfies every condition a bar movement has: the hands
+are fixed (0.02 torso-lengths of travel — steadier than any real set), the
+body hangs below them, and the shoulders drift just enough to look articulated.
+
+The obvious defence — a minimum range of motion — does not work. The hold and
+a deliberately shallow pull-up both sweep about 0.65 torso-lengths, so no
+threshold on total range separates them without rejecting real partial reps.
+
+What separates them is **time spent parked**, not distance travelled. A hold
+stays within a fifth of a torso-length of one position for most of the clip; a
+set keeps leaving that band:
+
+| clip | parked fraction |
+|---|---|
+| inverted hold | 0.62 |
+| jump-to-bar attempts | 0.33 |
+| hanging knee raise | 0.49 |
+| shallow pull-up (synthetic) | 0.37 |
+| muscle-up sets | 0.04 – 0.16 |
+
+The threshold sits at 0.55, deliberately close to the hold rather than in the
+middle of the gap. The costs are not symmetric: a set wrongly called a hold
+reports "not measurable", while a hold wrongly accepted invents repetitions
+that then enter the athlete's history as data.
