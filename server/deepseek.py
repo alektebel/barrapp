@@ -6,6 +6,8 @@ import os
 import urllib.error
 import urllib.request
 
+from barra.summary import describe
+
 DEEPSEEK_API_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 DEEPSEEK_BASE_URL = os.environ.get("DEEPSEEK_BASE_URL", "https://api.deepseek.com").rstrip("/")
 DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-chat")
@@ -88,33 +90,10 @@ def _sentence(text: str) -> str:
 
 
 def _fallback(payload: dict) -> dict:
-    n = int(payload.get("n_reps") or 0)
-    exercise = (payload.get("exercise") or "muscle_up").replace("_", " ")
+    # The per-rep numbers stay on the rep cards, where anyone looking for them
+    # will find them. This is the part that says what they amount to.
+    headline, narrative = describe(payload)
     blockers = payload.get("blockers") or []
-    lines = [_rep_line(r) for r in payload.get("reps") or []]
-    numbers = ("\n" + "\n".join(lines)) if lines else ""
-    if n == 0:
-        headline = f"This {exercise} clip produced no measurable reps."
-        narrative = (
-            "Nothing was counted. That is a filming or tracking failure, not a training one. "
-            + (" ".join(_sentence(b) for b in blockers) if blockers
-               else "Trim to the working set and keep the lockout in frame.")
-            + numbers
-        )
-    elif n < 3:
-        headline = f"{n} measurable {exercise} rep{'s' if n != 1 else ''} — not enough for a session median."
-        narrative = (
-            f"Counted {n} usable {exercise} rep(s). Three per session is the floor before "
-            "a median means anything, so progress is not trackable yet."
-            + numbers
-        )
-    else:
-        headline = f"{n} usable {exercise} reps."
-        narrative = (
-            "Timing is comparable across cameras (INVARIANT). Lengths are SCALED by torso "
-            "and only comparable inside one viewpoint. Left/right numbers are PLANAR."
-            + numbers
-        )
     return {
         "headline": headline,
         "narrative": narrative,

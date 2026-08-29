@@ -29,8 +29,8 @@ object LogicTest {
         }
     }
 
-    private fun day(date: String, reps: Int, score: Int?) = DayEntry(
-        date = date, exercise = "muscle_up", exerciseLabel = "Muscle-up",
+    private fun day(date: String, reps: Int, score: Int?, label: String = "Muscle-up") = DayEntry(
+        date = date, exercise = label.lowercase().replace("-", "_"), exerciseLabel = label,
         reps = reps, score = score,
         band = when {
             score == null -> "unmeasured"
@@ -174,12 +174,61 @@ object LogicTest {
             partial.traceIds == listOf("260828-b"), partial.traceIds.toString())
     }
 
+    /** The weekly report has to say what the week consisted of, not just how
+     *  many reps it contained. */
+    private fun weeklyReportRules() {
+        val week = listOf(
+            day("2026-08-24", 5, 78, "Muscle-up"),
+            day("2026-08-26", 19, 94, "Push-up"),
+            day("2026-08-27", 4, 71, "Muscle-up"),
+        )
+        val prior = listOf(day("2026-08-18", 6, 70, "Muscle-up"))
+        val r = ReviewText.compose(profile, week + prior, since = "2026-08-22")!!
+
+        check("names the movements trained",
+            r.body.lowercase().contains("push-up"), r.body)
+        check("counts reps per movement", r.body.contains("19 reps over 1 day"), r.body)
+        check("orders by volume, heaviest first",
+            r.body.lowercase().indexOf("push-up") < r.body.lowercase().indexOf("muscle-up"),
+            r.body)
+        check("calls out the best day", r.body.contains("Best day was 26 Aug at 94"), r.body)
+        check("compares volume with the week before",
+            r.body.contains("up from 6 reps"), r.body)
+
+        // A week with nothing before it must not invent a comparison.
+        val alone = ReviewText.compose(profile, week, since = "2026-08-22")!!
+        check("no volume claim without a prior week",
+            !alone.body.contains("week before"), alone.body)
+
+        // Nor when the prior week exists but was blank.
+        val blankPrior = ReviewText.compose(
+            profile, week + listOf(day("2026-08-18", 0, null)), since = "2026-08-22")!!
+        check("no volume claim against a zero-rep week",
+            !blankPrior.body.contains("week before"), blankPrior.body)
+
+        val withBlank = ReviewText.compose(
+            profile, week + listOf(day("2026-08-25", 0, null)), since = "2026-08-22")!!
+        check("flags sessions that measured nothing",
+            withBlank.body.contains("1 session produced no measurable"), withBlank.body)
+
+        check("date formatting drops the leading zero",
+            ReviewText.pretty("2026-08-05") == "5 Aug", ReviewText.pretty("2026-08-05"))
+        check("date arithmetic crosses a month boundary",
+            ReviewText.shiftDays("2026-09-03", -7) == "2026-08-27",
+            ReviewText.shiftDays("2026-09-03", -7))
+        check("malformed dates are returned untouched",
+            ReviewText.pretty("not-a-date") == "not-a-date")
+
+        println("\n  --- weekly report ---\n  ${r.title}\n  ${r.body}\n")
+    }
+
     @JvmStatic
     fun main(args: Array<String>) {
         profileRules()
         coachRules()
         reviewRules()
         traceRules()
+        weeklyReportRules()
         println(if (failures == 0) "OK  $checks checks passed"
                 else "FAILED  $failures of $checks checks")
         if (failures > 0) kotlin.system.exitProcess(1)
