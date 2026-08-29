@@ -329,15 +329,15 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # movement and shoulders that drift just enough to look articulated, and
     # was duly reported as a pull-up with two reps invented out of the drift.
     if anchored and f["hands_overhead_frac"] >= 0.35 and parked >= HOLD_FRAC:
-        tr.reject("any movement", "the body stays parked - this is a hold, not a set",
+        tr.reject("any movement", "the body stays parked - a hold or a rest, not a set",
                   parked_frac=parked, parked_max=HOLD_FRAC, band=HOLD_BAND,
                   arm_articulation=f["arm_articulation"],
                   knee_excursion=f["knee_excursion"])
         return Classification(
             "unknown", 0.0,
             f"hanging from something fixed, but {parked:.0%} of the clip is spent "
-            "within a fifth of a torso-length of one position - this is a hold, "
-            "not a set of repetitions",
+            "within a fifth of a torso-length of one position - a hold, or "
+            "resting between attempts, rather than a set of repetitions",
             f,
         )
 

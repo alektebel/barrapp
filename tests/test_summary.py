@@ -91,3 +91,29 @@ class TestSessionDescription(unittest.TestCase):
         reps = [{**r, "total_s": "4.0"} for r in payload()["reps"]]
         _, text = describe(payload(reps=reps))
         self.assertIn("held steady", text)
+
+
+class TestFilmingAdvice(unittest.TestCase):
+    def test_the_primary_blocker_decides_the_advice(self):
+        """A clip usually fails for more than one reason, in the order the
+        pipeline hit them. Searching all of them at once let an incidental
+        later blocker win: a clip whose real problem was walking around the rig
+        was told to keep the turnaround in frame."""
+        _, text = describe(payload(
+            n_reps=0, n_candidates=2, reps=[], sessionScore=None,
+            sessionBand="unmeasured",
+            blockers=[
+                "candidate at 22.9s: the hands travelled 1.2 torso-lengths, so "
+                "they were not on a fixed bar - this is movement around the rig",
+                "turnaround at 32.8s was never actually tracked",
+            ]))
+        self.assertIn("already on the bar", text)
+        self.assertNotIn("top to bottom", text)
+
+    def test_a_hold_is_told_to_film_reps(self):
+        _, text = describe(payload(
+            n_reps=0, n_candidates=0, reps=[], sessionScore=None,
+            sessionBand="unmeasured", detected={"exercise": "unknown"},
+            blockers=["78% of the clip is spent within a fifth of a torso-length "
+                      "of one position - a hold, or resting between attempts"]))
+        self.assertIn("counts repetitions", text)

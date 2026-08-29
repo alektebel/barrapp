@@ -44,6 +44,12 @@ FILMING_ADVICE = [
     ("out of frame", "Tilt the camera up or step back so your hands stay in shot "
                      "for the whole set - they are the reference everything else "
                      "is measured against."),
+    ("fixed bar", "Start filming once you are already on the bar, and stop "
+                  "before you walk off. Moving around the rig is measured as "
+                  "part of the movement."),
+    ("around the rig", "Start filming once you are already on the bar, and stop "
+                       "before you walk off. Moving around the rig is measured "
+                       "as part of the movement."),
     ("not on anything fixed", "Start filming once you are already on the bar. "
                               "Walking to and from the rig is measured as part "
                               "of the movement."),
@@ -67,10 +73,19 @@ def _movement(payload: dict) -> str:
 
 
 def _advice(blockers: list[str]) -> str:
-    joined = " ".join(blockers).lower()
-    for needle, text in FILMING_ADVICE:
-        if needle in joined:
-            return text
+    """Advice for the FIRST blocker before any other.
+
+    A clip usually fails for more than one reason, and the pipeline reports
+    them in the order it hit them. Searching all of them at once lets a later,
+    incidental blocker win: one clip whose real problem was the athlete walking
+    around the rig was told to keep the turnaround in frame, because a
+    secondary blocker happened to contain the word.
+    """
+    ordered = [b.lower() for b in blockers if b] or [""]
+    for haystack in (ordered[0], " ".join(ordered)):
+        for needle, text in FILMING_ADVICE:
+            if needle in haystack:
+                return text
     return ("Film one set from a fixed spot, with the whole movement in frame "
             "from start to finish.")
 
