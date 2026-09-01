@@ -219,6 +219,100 @@ def cmd_explain(args) -> int:
     return 0
 
 
+def cmd_validate_quality(args) -> int:
+    """Is the quality score measuring anything? Run the four checks."""
+    import csv
+    from pathlib import Path
+
+    from .validate_quality import FAIL, NOT_RUN, PASS, PROTOCOL, run
+
+    if args.protocol:
+        print(PROTOCOL)
+        return 0
+
+    root = Path(__file__).resolve().parent.parent
+    sys.path.insert(0, str(root / "server"))
+    from process import process_job  # noqa: E402
+
+    # The manifest says which clips are repeats of one set and which were
+    # filmed with a deliberate fault. Without it only the ceiling check can
+    # run, which the report then says plainly rather than implying the rest
+    # passed.
+    manifest: dict[str, dict] = {}
+    mpath = PATHS.videos / "validation.csv"
+    if mpath.exists():
+        with mpath.open() as fh:
+            for row in csv.DictReader(fh):
+                if row.get("video"):
+                    manifest[row["video"].strip()] = row
+
+    clips = sorted({p.stem: p for d in (PATHS.videos, root)
+                    for p in d.glob("*.mp4")}.items())
+    if args.only:
+        clips = [(k, v) for k, v in clips if any(o in k for o in args.only)]
+    if not clips:
+        raise SystemExit("no clips found - put .mp4 files in data/videos/")
+
+    analysed: dict[str, list] = {}
+    for stem, path in clips:
+        out = process_job({"id": f"qv-{stem}", "exercise": "auto"}, path)
+        analysed[stem] = out.get("reps") or []
+        scored = sum(1 for r in analysed[stem] if r.get("score") is not None)
+        print(f"  {stem:<24} {scored:>3} scored reps")
+
+    sets = [(k, v) for k, v in analysed.items() if v]
+    pairs, degraded = [], {}
+    by_pair: dict[str, list[str]] = {}
+    for stem, row in manifest.items():
+        if stem not in analysed:
+            continue
+        role = (row.get("role") or "").strip().lower()
+        if role.startswith("degraded:"):
+            degraded[role.split(":", 1)[1] or "unspecified"] = analysed[stem]
+        elif row.get("pair"):
+            by_pair.setdefault(row["pair"].strip(), []).append(stem)
+    for name, members in by_pair.items():
+        if len(members) >= 2:
+            pairs.append((name, analysed[members[0]], analysed[members[1]]))
+
+    print()
+    _banner("does the quality score measure anything?")
+    worst = PASS
+    for check in run(sets, pairs, degraded):
+        mark = {"PASS": "ok ", "FAIL": " x ", "INCONCLUSIVE": " ? ",
+                "NOT RUN": " - "}[check.verdict]
+        print(f"{mark}{check.name.upper():<14}{check.verdict}")
+        for line in _wrap(check.detail, 68):
+            print(f"      {line}")
+        if check.advice:
+            for line in _wrap(check.advice, 68):
+                print(f"      -> {line}")
+        print()
+        if check.verdict == FAIL:
+            worst = FAIL
+        elif check.verdict != PASS and worst == PASS:
+            worst = check.verdict
+
+    if not pairs:
+        print("  No reliability pair on record, so there is no noise floor and "
+              "nothing below can be called real.\n  Run `barra validate-quality "
+              "--protocol` for what to film.")
+    return 1 if worst == FAIL else 0
+
+
+def _wrap(text: str, width: int) -> list[str]:
+    words, lines, cur = (text or "").split(), [], ""
+    for w in words:
+        if len(cur) + len(w) + 1 > width:
+            lines.append(cur)
+            cur = w
+        else:
+            cur = f"{cur} {w}".strip()
+    if cur:
+        lines.append(cur)
+    return lines or [""]
+
+
 def cmd_selftest(args) -> int:
     from .synthetic import generate
 
@@ -341,6 +435,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("progress", help="compare sessions against within-session variation")
     s.set_defaults(func=cmd_progress)
+
+    s = sub.add_parser("validate-quality",
+                       help="is the quality score measuring anything?")
+    s.add_argument("only", nargs="*", help="limit to clips matching these names")
+    s.add_argument("--protocol", action="store_true",
+                   help="print what to film, and why, then stop")
+    s.set_defaults(func=cmd_validate_quality)
 
     s = sub.add_parser("selftest", help="generate synthetic data and exercise the pipeline")
     s.add_argument("--seed", type=int, default=7)

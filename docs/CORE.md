@@ -19,7 +19,7 @@ measured against.**
 |---|---|
 | Pipeline | complete, 13 commands run end to end |
 | Movements | squat, muscle-up, pull-up, dip |
-| Verified on synthetic data | yes — `barra selftest`, 36 invariant tests |
+| Verified on synthetic data | yes — `barra selftest`, 128 invariant tests |
 | Run on real footage | yes — 4 muscle-up clips, 3 sessions, Aug 2026 |
 | Deviation verdict (section 8) | **not obtainable on that footage**: 3 usable reps, and a template needs 8 in one bin |
 | Progress verdict | **not yet trackable**: 1 and 2 usable reps per session, 3 is the minimum |
@@ -216,6 +216,7 @@ to report a detection rate without an FPR beside it.
 | `barra explain --replay ID` | re-print a trace written earlier, including one from the server |
 | `barra remember [DIR] [--note ...]` | fold this run into the persistent `profile/` |
 | `barra progress` | compare sessions against within-session variation |
+| `barra validate-quality [--protocol]` | is the quality score measuring anything? ([`docs/QUALITY.md`](QUALITY.md)) |
 | `barra selftest [--seed N]` | synthetic data; validates nothing |
 | `python scripts/demo_sessions.py [CLIP...]` | classify, describe and report on real clips, end to end |
 | `barra all` | everything after `ingest` |
@@ -223,7 +224,7 @@ to report a detection rate without an FPR beside it.
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v      # 94 invariant tests
+python -m unittest discover -s tests -v      # 128 invariant tests
 python scripts/viewpoint_sensitivity.py      # the finding in docs/FINDINGS.md
 ```
 

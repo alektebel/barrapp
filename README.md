@@ -46,7 +46,7 @@ design in [`docs/FINDINGS.md`](docs/FINDINGS.md) and
 ```bash
 uv venv --python 3.11 .venv && . .venv/bin/activate
 uv pip install -e ".[mediapipe]"
-python -m unittest discover -s tests      # 94 invariant tests
+python -m unittest discover -s tests      # 128 invariant tests
 ```
 
 ## Does it recognise the right movement?
@@ -61,6 +61,21 @@ rather than guessing. Full table and the two findings behind it:
 ```bash
 python scripts/demo_sessions.py        # classify, describe and report, end to end
 ```
+
+## Does the quality score measure anything?
+
+Movement quality has no ground truth, so "accuracy" is unfalsifiable — but
+*validity* is testable without a single label, because the experiments carry
+their own answers. A set taken to failure orders its own reps; two phones on
+one set give you a noise floor; a deliberate fault is a label you own.
+
+```bash
+barra validate-quality --protocol   # what to film, and why
+barra validate-quality              # the verdict on the clips you have
+```
+
+Currently it fails, for reasons worth reading before trusting any score:
+[`docs/QUALITY.md`](docs/QUALITY.md).
 
 ## When a number looks wrong
 
