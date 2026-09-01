@@ -44,6 +44,19 @@ object SessionStore {
                 traces = o.optJSONObject("traces")?.let { t ->
                     t.keys().asSequence().associateWith { k -> t.optString(k) }
                 } ?: emptyMap(),
+                byMovement = o.optJSONObject("byMovement")?.let { m ->
+                    m.keys().asSequence().mapNotNull { k ->
+                        m.optJSONObject(k)?.let { e ->
+                            k to MovementDay(
+                                exercise = k,
+                                label = e.optString("label", k),
+                                reps = e.optInt("reps"),
+                                verified = e.optInt("verified"),
+                                scoreSum = e.optInt("scoreSum"),
+                            )
+                        }
+                    }.toMap()
+                } ?: emptyMap(),
             )
         }.sortedByDescending { it.date }
     }
@@ -60,23 +73,40 @@ object SessionStore {
         val existing = days(context).associateBy { it.date }.toMutableMap()
         val prior = existing[date]
 
-        val measured = analysis.reps.count { it.score != null }
-        val sum = analysis.reps.sumOf { it.score ?: 0 }
+        // Only reps that were actually scored carry evidence. The rest were
+        // found and could not be measured, which is a different fact.
+        val verified = analysis.reps.filter { it.score != null }
+        val key = analysis.exercise.ifBlank { "unknown" }
+        val was = prior?.byMovement?.get(key)
+        val merged = MovementDay(
+            exercise = key,
+            label = analysis.detected?.label ?: was?.label ?: key,
+            reps = (was?.reps ?: 0) + analysis.repCount,
+            verified = (was?.verified ?: 0) + verified.size,
+            scoreSum = (was?.scoreSum ?: 0) + verified.sumOf { it.score ?: 0 },
+        )
+        val byMovement = (prior?.byMovement ?: emptyMap()) + (key to merged)
 
-        val priorMeasured = if (prior?.score != null) prior.reps else 0
-        val priorSum = (prior?.score ?: 0) * priorMeasured
-        val totalMeasured = priorMeasured + measured
-        val score = if (totalMeasured > 0) (priorSum + sum) / totalMeasured else null
+        // The day's score is the rep-weighted mean over every VERIFIED rep of
+        // the day, across movements. Weighting by total reps - as this did
+        // before the breakdown existed - let unscorable reps dilute a score
+        // they contributed nothing to.
+        val totalVerified = byMovement.values.sumOf { it.verified }
+        val totalSum = byMovement.values.sumOf { it.scoreSum }
+        val score = if (totalVerified > 0) totalSum / totalVerified else null
+        // The movement the day was mostly about, rather than whichever clip
+        // happened to be uploaded last.
+        val dominant = byMovement.values.maxByOrNull { it.reps }
 
         existing[date] = DayEntry(
             date = date,
-            exercise = analysis.exercise.ifBlank { prior?.exercise.orEmpty() },
-            exerciseLabel = analysis.detected?.label
-                ?: prior?.exerciseLabel.orEmpty().ifBlank { analysis.exercise },
-            reps = (prior?.reps ?: 0) + analysis.repCount,
+            exercise = dominant?.exercise ?: prior?.exercise.orEmpty(),
+            exerciseLabel = dominant?.label ?: prior?.exerciseLabel.orEmpty(),
+            reps = byMovement.values.sumOf { it.reps },
             score = score,
             band = bandFor(score),
             jobIds = ((prior?.jobIds ?: emptyList()) + jobId).distinct(),
+            byMovement = byMovement,
             // Kept so a day recorded weeks ago can still be replayed against
             // the exact run that produced its score, rather than a re-run that
             // may not reproduce it.
@@ -112,6 +142,15 @@ object SessionStore {
                     .put("band", d.band)
                     .put("jobIds", JSONArray(d.jobIds))
                     .put("traces", JSONObject(d.traces as Map<*, *>))
+                    .put("byMovement", JSONObject().also { m ->
+                        d.byMovement.forEach { (k, v) ->
+                            m.put(k, JSONObject()
+                                .put("label", v.label)
+                                .put("reps", v.reps)
+                                .put("verified", v.verified)
+                                .put("scoreSum", v.scoreSum))
+                        }
+                    })
             )
         }
         prefs(context).edit { putString(DAYS, arr.toString()) }

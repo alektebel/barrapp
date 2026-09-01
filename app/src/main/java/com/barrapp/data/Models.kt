@@ -117,6 +117,32 @@ data class RepRow(
     val trace: List<Float> = emptyList(),
 )
 
+/**
+ * One movement's share of one training day.
+ *
+ * Kept per movement because a day is not one exercise. Folding push-ups and
+ * pull-ups into a single row added their reps together and kept whichever
+ * movement was uploaded last, which is wrong for the calendar and useless to
+ * the progression referee - "12 reps" of two different movements earns neither.
+ *
+ * `verified` is the count that actually carries evidence: reps that were
+ * segmented, survived the plausibility checks and got a score. `reps` includes
+ * the ones barra found but could not score. The two are stored separately
+ * because a rep barra could not measure is not a rep the athlete did badly.
+ *
+ * scoreSum rather than a mean, so merging a second clip into the same day
+ * stays exact instead of averaging an average.
+ */
+data class MovementDay(
+    val exercise: String,
+    val label: String,
+    val reps: Int,
+    val verified: Int,
+    val scoreSum: Int,
+) {
+    val score: Int? get() = if (verified > 0) scoreSum / verified else null
+}
+
 /** One day in the calendar. Several clips on one day fold into one entry. */
 data class DayEntry(
     val date: String,
@@ -126,6 +152,8 @@ data class DayEntry(
     val score: Int?,
     val band: String,
     val jobIds: List<String>,
+    /** Per movement, so a mixed day is not silently merged into one number. */
+    val byMovement: Map<String, MovementDay> = emptyMap(),
     /**
      * jobId -> the server trace that produced it. Keyed rather than a parallel
      * list so deleting one clip cannot silently shift the rest by one and hand
@@ -134,6 +162,12 @@ data class DayEntry(
     val traces: Map<String, String> = emptyMap(),
 ) {
     val measured: Boolean get() = score != null
+
+    /** Reps carrying evidence. Falls back to the day total for entries stored
+     *  before the breakdown existed, which is the best available guess. */
+    val verifiedReps: Int
+        get() = if (byMovement.isEmpty()) (if (measured) reps else 0)
+                else byMovement.values.sumOf { it.verified }
 
     /** Newest first, matching the order clips were added to the day. */
     val traceIds: List<String> get() = jobIds.mapNotNull { traces[it] }.reversed()

@@ -196,7 +196,10 @@ def describe(payload: dict) -> tuple[str, str]:
     if trim.get("startS") is not None and trim.get("endS") is not None:
         working = float(trim["endS"]) - float(trim["startS"])
 
-    opening = f"{_plural(n, f'{move} rep')}"
+    # "verified", not just "reps": the count is what barra measured, and the
+    # distinction is the product. See docs/MARKET.md - a system that never
+    # refuses cannot certify anything, so the word has to be earned and used.
+    opening = f"{_plural(n, f'verified {move} rep')}"
     if working:
         opening += f" across a {working:.0f}-second working set"
         if duration and float(duration) - working > 2.0:
@@ -204,17 +207,17 @@ def describe(payload: dict) -> tuple[str, str]:
     parts.append(opening + ".")
 
     if score is None:
-        headline = f"{_plural(n, f'{move} rep')} - not scored"
+        headline = f"{_plural(n, f'{move} rep')} - none verified"
         parts.append("None of them could be scored, so there is no number for "
                      "this session.")
     elif n < 3:
-        headline = f"{_plural(n, f'{move} rep')}, {BAND_WORD.get(band, band)}"
+        headline = f"{_plural(n, f'verified {move} rep')}, {BAND_WORD.get(band, band)}"
         parts.append(f"Scored {int(score)} out of 100 - {BAND_WORD.get(band, band)}. "
                      "Three reps is the floor before a session median means "
                      "anything, so treat this as a single observation rather "
                      "than a session.")
     else:
-        headline = f"{_plural(n, f'{move} rep')}, {BAND_WORD.get(band, band)}"
+        headline = f"{_plural(n, f'verified {move} rep')}, {BAND_WORD.get(band, band)}"
         parts.append(f"Scored {int(score)} out of 100 - {BAND_WORD.get(band, band)}.")
 
     for extra in (_weakest(reps), _spread(reps), _unmeasured(reps)):

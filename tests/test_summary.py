@@ -27,7 +27,7 @@ def payload(**over):
 class TestSessionDescription(unittest.TestCase):
     def test_it_says_what_was_recorded(self):
         head, text = describe(payload())
-        self.assertIn("4 muscle-up reps", head)
+        self.assertIn("4 verified muscle-up reps", head)
         self.assertIn("solid", head)
         self.assertIn("74 out of 100", text)
         self.assertIn("14-second working set", text)

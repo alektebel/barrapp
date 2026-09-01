@@ -75,7 +75,7 @@ is handed bounds what it can say.
 | Where | What |
 |---|---|
 | `ProfileStore` | Name, age, activity. Never leaves the device. |
-| `SessionStore` | The calendar, per-rep metrics, chat history, last review time. |
+| `SessionStore` | The calendar, per-movement verified reps, chat history, last review time. |
 | `DeviceId` | A random id. No account, no email, no Google sign-in. |
 
 The server is the source of truth for measurements, but the calendar paints from
@@ -83,6 +83,49 @@ the local store so it works offline and instantly. Nothing is invented locally
 that the server did not measure.
 
 ---
+
+## The progression verdict
+
+The first thing on the progress pane, because it is the decision the athlete
+came for: *am I ready for the next progression, or do I just feel ready?* The
+reasoning for putting this at the centre of the product is in
+[`MARKET.md`](MARKET.md) — briefly, it is the decision calisthenics turns on,
+it is currently made by feel, and no app in the market referees it.
+
+> **Working towards** — **Muscle-up** · from pull-up
+> **5** of 8 verified reps
+> *Verified means barra measured the rep — not that you performed it. A rep it
+> could not measure is not counted either way.*
+>
+> **The standard** — 8 verified reps in one session at 60 or better, on 2
+> separate days. *A convention, not a measurement. It is written down so you
+> can disagree with it.*
+>
+> **Your evidence** — Best session: 5 verified reps at 78 (solid) on 14 Aug.
+> 0 of 2 days clear the standard.
+>
+> Still needed: 3 more verified reps in one session, and 2 more qualifying days.
+
+The card is laid out so the two halves cannot be confused, because that
+distinction *is* the product:
+
+- **Whether a rep counts is measured.** Segmented, survived the plausibility
+  checks, scored. Every one carries a trace id you can replay.
+- **How many reps earn the step is a convention.** The ladder in
+  `Progression.kt` is a published standard sitting close to the rule the sport
+  already uses. It is stated on the card so it can be argued with.
+
+The app never says "you are ready" on its own authority. It says what the
+standard is, what you have, and what is missing.
+
+Two consequences worth stating:
+
+- **The ladder says where it stops.** Barra cannot verify added load or tell a
+  pistol squat from a two-legged one, so those steps are marked unmeasurable
+  and the card says the refereeing ends there rather than implying it continues.
+- **Unverified reps never count.** A rep the segmenter proposed and the anchor
+  test rejected is not a rep you did badly — it is a rep barra did not measure,
+  and adding the two together would punish you for the camera.
 
 ## What the session write-up says
 

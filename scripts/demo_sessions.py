@@ -152,6 +152,7 @@ def main() -> int:
         return 1
     known = dates()
     days: dict = {}
+    sessions_by_movement: dict = {}
 
     for clip in clips:
         out = process_job({"id": f"demo-{clip.stem}", "exercise": "auto"}, clip)
@@ -168,6 +169,27 @@ def main() -> int:
         date = known.get(clip.stem)
         if date:
             fold(days, date, out)
+            movement = out.get("exercise") or ""
+            if movement and movement != "unknown":
+                sessions_by_movement.setdefault(movement, []).append(
+                    {"date": date, "reps": out.get("reps") or []})
+
+    if sessions_by_movement:
+        from barra.progression import from_sessions
+        print(f"\n{'=' * 74}\nPROGRESSION")
+        for movement, sess in sorted(sessions_by_movement.items()):
+            v = from_sessions(movement, sess)
+            print(f"\n  {v.headline}")
+            if v.step is None:
+                print(f"    {v.evidence}")
+                continue
+            print(f"    standard : {v.standard}")
+            print(f"    evidence : {v.evidence}")
+            if v.missing:
+                print(f"    missing  : {v.missing}")
+            if v.ready and not v.step.target_measurable:
+                for line in _wrap(v.step.note, 66):
+                    print(f"    note     : {line}")
 
     if days:
         print(f"\n{'=' * 74}\nWEEKLY REPORT")

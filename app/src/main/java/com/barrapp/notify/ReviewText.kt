@@ -1,5 +1,6 @@
 package com.barrapp.notify
 
+import com.barrapp.Progression
 import com.barrapp.data.DayEntry
 import com.barrapp.data.Profile
 import java.util.Calendar
@@ -56,6 +57,7 @@ object ReviewText {
                 }
             }
             bestDay(measured)?.let { append(" $it") }
+            progressionSentence(all)?.let { append(" $it") }
             volumeSentence(all, week, since)?.let { append(" $it") }
             unmeasuredSentence(week)?.let { append(" $it") }
         }
@@ -81,6 +83,25 @@ object ReviewText {
             else -> parts.dropLast(1).joinToString(", ")
                 .replaceFirstChar { it.uppercase() } + ", and ${parts.last()}."
         }
+    }
+
+    /**
+     * Where the week left the progression the athlete is actually working.
+     *
+     * This is the line the review exists for. Everything else in it is a
+     * summary of what happened; this is the one thing that says what it was
+     * for. It never asserts readiness on its own authority - it reports the
+     * standard and the evidence, and lets those speak.
+     */
+    fun progressionSentence(all: List<DayEntry>): String? {
+        val v = Progression.focus(all) ?: return null
+        val step = v.step ?: return null
+        return if (v.ready)
+            "You have cleared the standard for ${step.towardsLabel.lowercase()}: " +
+                "${v.standard.replaceFirstChar { it.lowercase() }} " +
+                "Earned on ${v.qualifyingDays.joinToString(" and ") { pretty(it) }}."
+        else
+            "Towards ${step.towardsLabel.lowercase()}: ${v.missing.replaceFirstChar { it.lowercase() }}"
     }
 
     /** The single best day, so the week has a high point to point at. */

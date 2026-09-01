@@ -32,6 +32,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.barrapp.Progression
 import com.barrapp.data.DayEntry
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Panel
@@ -63,12 +64,19 @@ fun InsightPane(
 ) {
     val measured = days.filter { it.measured }.sortedBy { it.date }
     val readySessions = days.count { it.reps >= MIN_REPS_FOR_COMPARISON }
+    val progression = Progression.focus(days)
 
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // The progression verdict goes first because it is the decision the
+        // athlete came for. Everything below it is supporting evidence.
+        if (progression?.step != null) {
+            item { ProgressionCard(progression) }
+        }
+
         item {
             Panel {
                 Eyebrow("Sessions you can compare")
@@ -297,6 +305,99 @@ private fun ScoreTrend(measured: List<DayEntry>) {
         drawPath(path, colour, style = Stroke(width = line, cap = StrokeCap.Round))
         scores.forEachIndexed { i, v ->
             drawCircle(colour, radius = dot, center = Offset(x(i), y(v)))
+        }
+    }
+}
+
+
+/**
+ * The progression verdict.
+ *
+ * Structured so the parts cannot be confused with each other, because that
+ * distinction is the product: the **standard** is a published convention, the
+ * **evidence** is measured, and only the evidence carries a trace. An app that
+ * blurs the two is asking to be believed rather than checked.
+ */
+@Composable
+private fun ProgressionCard(v: Progression.Verdict) {
+    val step = v.step ?: return
+    Panel {
+        Eyebrow(if (v.ready) "Earned" else "Working towards")
+        Spacer(Modifier.height(8.dp))
+        Text(
+            step.towardsLabel,
+            style = MaterialTheme.typography.headlineMedium,
+            color = if (v.ready) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface,
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "from ${v.label.lowercase()}",
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(
+                v.bestReps.toString(),
+                fontFamily = FontFamily.Monospace,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.displaySmall,
+                color = if (v.bestReps >= step.reps) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurface,
+            )
+            Spacer(Modifier.size(8.dp))
+            Text(
+                "of ${step.reps} verified reps",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(bottom = 5.dp),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "Verified means barra measured the rep - not that you performed it. " +
+                "A rep it could not measure is not counted either way.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        Spacer(Modifier.height(12.dp))
+
+        Eyebrow("The standard")
+        Spacer(Modifier.height(6.dp))
+        Text(v.standard, style = MaterialTheme.typography.bodyMedium)
+        Spacer(Modifier.height(4.dp))
+        Text(
+            "A convention, not a measurement. It is written down so you can " +
+                "disagree with it.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+
+        Spacer(Modifier.height(12.dp))
+        Eyebrow("Your evidence")
+        Spacer(Modifier.height(6.dp))
+        Text(v.evidence, style = MaterialTheme.typography.bodyMedium)
+
+        if (v.missing.isNotBlank()) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                v.missing,
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
+        if (v.ready && !step.targetMeasurable) {
+            Spacer(Modifier.height(10.dp))
+            Text(
+                step.note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
     }
 }

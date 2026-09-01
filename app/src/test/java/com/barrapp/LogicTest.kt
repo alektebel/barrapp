@@ -2,6 +2,7 @@ package com.barrapp
 
 import com.barrapp.data.ActivityLevel
 import com.barrapp.data.DayEntry
+import com.barrapp.data.MovementDay
 import com.barrapp.data.Profile
 import com.barrapp.notify.ReviewText
 
@@ -219,7 +220,106 @@ object LogicTest {
         check("malformed dates are returned untouched",
             ReviewText.pretty("not-a-date") == "not-a-date")
 
-        println("\n  --- weekly report ---\n  ${r.title}\n  ${r.body}\n")
+        // The review must carry the progression line - it is the one sentence
+        // that says what the week was for.
+        val withProg = ReviewText.compose(profile, listOf(
+            progDay("2026-08-24", "pull_up", 8, 70),
+            progDay("2026-08-26", "pull_up", 8, 70)), since = "2026-08-22")!!
+        check("weekly review reports the progression",
+            withProg.body.contains("muscle-up"), withProg.body)
+        check("and says it was earned",
+            withProg.body.contains("cleared the standard"), withProg.body)
+
+        val notYet = ReviewText.compose(profile, listOf(
+            progDay("2026-08-24", "pull_up", 4, 70)), since = "2026-08-22")!!
+        check("or what is still missing",
+            notYet.body.contains("Towards muscle-up"), notYet.body)
+
+        println("\n  --- weekly report ---\n  ${r.title}\n  ${r.body}\n" +
+            "\n  ${withProg.body}\n\n  ${notYet.body}\n")
+    }
+
+    private fun movementDay(ex: String, label: String, reps: Int, verified: Int, sum: Int) =
+        MovementDay(ex, label, reps, verified, sum)
+
+    private fun progDay(date: String, ex: String, verified: Int, quality: Int) = DayEntry(
+        date = date, exercise = ex, exerciseLabel = ex, reps = verified,
+        score = quality, band = "solid", jobIds = listOf("j-$date-$ex"),
+        byMovement = mapOf(ex to movementDay(ex, ex, verified, verified, quality * verified)),
+    )
+
+    /** The progression referee. What it must never do is say "ready" on
+     *  anything but measured evidence against a stated standard. */
+    private fun progressionRules() {
+        val step = Progression.LADDER["pull_up"]!!
+
+        val one = Progression.assess("pull_up",
+            listOf(progDay("2026-08-10", "pull_up", step.reps + 5, 90)))
+        check("one big session is not a progression", !one.ready, one.missing)
+        check("and it says a day is missing", one.missing.contains("qualifying day"), one.missing)
+
+        val two = Progression.assess("pull_up", listOf(
+            progDay("2026-08-10", "pull_up", step.reps, step.quality),
+            progDay("2026-08-14", "pull_up", step.reps, step.quality)))
+        check("two qualifying days earn it", two.ready, two.missing)
+        check("and nothing is outstanding", two.missing.isEmpty(), two.missing)
+        check("headline states the target", two.headline.contains("Ready to work"), two.headline)
+
+        val lowQuality = Progression.assess("pull_up", listOf(
+            progDay("2026-08-10", "pull_up", step.reps + 10, step.quality - 15),
+            progDay("2026-08-14", "pull_up", step.reps + 10, step.quality - 15)))
+        check("volume without quality does not qualify", !lowQuality.ready)
+        check("and it names the quality bar",
+            lowQuality.missing.contains("${step.quality}"), lowQuality.missing)
+
+        check("the standard is always stated",
+            two.standard.contains("${step.reps}") && two.standard.contains("${step.days}"),
+            two.standard)
+
+        val untracked = Progression.assess("handstand",
+            listOf(progDay("2026-08-10", "handstand", 20, 95)))
+        check("an untracked movement says so rather than guessing",
+            !untracked.ready && untracked.step == null, untracked.evidence)
+
+        val none = Progression.assess("pull_up", emptyList())
+        check("no reps is a starting point, not an error",
+            none.evidence.contains("No verified reps"), none.evidence)
+
+        // A mixed day must count each movement on its own merits.
+        val mixed = DayEntry(
+            date = "2026-08-20", exercise = "push_up", exerciseLabel = "Push-up",
+            reps = 20, score = 80, band = "strong", jobIds = listOf("j1", "j2"),
+            byMovement = mapOf(
+                "push_up" to movementDay("push_up", "Push-up", 15, 15, 15 * 85),
+                "pull_up" to movementDay("pull_up", "Pull-up", 5, 5, 5 * 70),
+            ),
+        )
+        val fromMixed = Progression.assess("pull_up", listOf(mixed))
+        check("a mixed day does not lend reps between movements",
+            fromMixed.bestReps == 5, "${fromMixed.bestReps}")
+        check("nor lend quality between movements",
+            fromMixed.bestQuality == 70, "${fromMixed.bestQuality}")
+
+        val focus = Progression.focus(listOf(mixed))
+        check("focus picks the most-trained movement",
+            focus?.movement == "push_up", focus?.movement ?: "null")
+
+        // Unverified reps must never count towards a progression.
+        val unverified = DayEntry(
+            date = "2026-08-21", exercise = "pull_up", exerciseLabel = "Pull-up",
+            reps = 20, score = 90, band = "strong", jobIds = listOf("j3"),
+            byMovement = mapOf("pull_up" to movementDay("pull_up", "Pull-up", 20, 3, 3 * 90)),
+        )
+        val v = Progression.assess("pull_up", listOf(unverified))
+        check("only verified reps count towards the standard",
+            v.bestReps == 3, "${v.bestReps}")
+
+        check("the ladder says where it stops refereeing",
+            Progression.LADDER["muscle_up"]!!.targetMeasurable.not() &&
+                Progression.LADDER["squat"]!!.targetMeasurable.not())
+
+        println("\n  --- progression ---\n  ${two.headline}\n  standard: ${two.standard}" +
+            "\n  evidence: ${two.evidence}\n  ${one.headline} / ${one.missing}\n")
     }
 
     @JvmStatic
@@ -229,6 +329,7 @@ object LogicTest {
         reviewRules()
         traceRules()
         weeklyReportRules()
+        progressionRules()
         println(if (failures == 0) "OK  $checks checks passed"
                 else "FAILED  $failures of $checks checks")
         if (failures > 0) kotlin.system.exitProcess(1)
