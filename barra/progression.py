@@ -67,38 +67,54 @@ class Step:
     note: str = ""
 
 
-# The published standard. Deliberately conservative: the cost of holding
-# someone back a session is a session, and the cost of waving them onto a
-# muscle-up they cannot hold is a shoulder.
+def _std(skill_id: str) -> "Standard":
+    """The rep/quality/day standard, taken from the skill graph.
+
+    One source. The graph knows what mastering a skill takes; this module
+    knows which milestone to point at next, which is a product decision and
+    genuinely separate. Keeping the numbers in two places would let the skill
+    tree and the progression card disagree about the same athlete.
+    """
+    from .skills import SKILLS
+    std = SKILLS[skill_id].standard
+    if std is None:                       # pragma: no cover - validate() catches it
+        raise KeyError(f"{skill_id} has no standard in the skill graph")
+    return std
+
+
+# Which milestone each measured movement points at. The numbers come from the
+# graph; only the choice of target lives here. Deliberately conservative: the
+# cost of holding someone back a session is a session, and the cost of waving
+# them onto a muscle-up they cannot hold is a shoulder.
 LADDER: dict[str, Step] = {
     "push_up": Step(
-        "dip", "Dip", reps=15, quality=SOLID, days=2,
+        "dip", "Dip", reps=_std("push_up").reps, quality=_std("push_up").quality, days=_std("push_up").days,
         note="Dips load the same push pattern through a longer range.",
     ),
     "dip": Step(
-        "muscle_up", "Muscle-up", reps=10, quality=SOLID, days=2,
+        "muscle_up", "Muscle-up", reps=_std("dip").reps, quality=_std("dip").quality, days=_std("dip").days,
         note="The dip is the second half of a muscle-up. The transition is the "
              "other half - a pull-up standard applies too.",
     ),
     "pull_up": Step(
-        "muscle_up", "Muscle-up", reps=8, quality=SOLID, days=2,
+        "muscle_up", "Muscle-up", reps=_std("pull_up").reps, quality=_std("pull_up").quality, days=_std("pull_up").days,
         note="The muscle-up transition needs the pull to finish high and under "
              "control, which is what the quality bar is for.",
     ),
     "muscle_up": Step(
         "weighted_muscle_up", "Weighted or strict muscle-up",
-        reps=5, quality=STRONG, days=2, target_measurable=False,
+        reps=_std("muscle_up").reps, quality=_std("muscle_up").quality, days=_std("muscle_up").days, target_measurable=False,
         note="Barra cannot verify added load from video, so it stops refereeing "
              "here and this becomes a training decision rather than a measured one.",
     ),
     "knee_raise": Step(
-        "toes_to_bar", "Toes to bar", reps=12, quality=SOLID, days=2,
+        "toes_to_bar", "Toes to bar", reps=_std("knee_raise").reps, quality=_std("knee_raise").quality, days=_std("knee_raise").days,
         target_measurable=False,
         note="Toes to bar is not in the measured vocabulary yet, so barra can "
              "confirm you have earned the attempt but not score the attempt.",
     ),
     "squat": Step(
-        "pistol_squat", "Pistol squat", reps=20, quality=SOLID, days=2,
+        "pistol_squat", "Pistol squat", reps=_std("squat").reps, quality=_std("squat").quality, days=_std("squat").days,
         target_measurable=False,
         note="A pistol is single-leg, and barra measures the hips as one point, "
              "so it cannot tell the two apart.",
