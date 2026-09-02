@@ -49,11 +49,26 @@ class TestCeiling(unittest.TestCase):
         self.assertIn("40% of the weight", c.detail.lower())
 
     def test_a_compressed_scale_is_a_failure(self):
-        reps = [rep(94 + (i % 3), range=0.5 + 0.04 * i, control=0.4 + 0.05 * i,
+        reps = [rep(94 + (i % 3), range=0.5 + 0.04 * i,
                     smoothness=0.3 + 0.06 * i) for i in range(10)]
         c = ceiling([("clip", reps)])
         self.assertEqual(c.verdict, FAIL)
         self.assertIn("spans", c.detail)
+
+    def test_span_is_not_judged_on_too_few_reps(self):
+        """Three reps four points apart is a statement about the sample."""
+        reps = [rep(55 + i, range=0.5 + 0.1 * i, smoothness=0.4 + 0.1 * i)
+                for i in range(3)]
+        self.assertNotIn("spans", ceiling([("clip", reps)]).detail)
+
+    def test_the_component_list_follows_the_score(self):
+        """A hardcoded list drifted once already: after control stopped being a
+        term in the mean, the check went on reporting it missing everywhere."""
+        from barra.quality import WEIGHTS
+        reps = [rep(50 + 5 * i, **{k: 0.3 + 0.05 * i for k in WEIGHTS})
+                for i in range(10)]
+        c = ceiling([("clip", reps)])
+        self.assertNotIn("measurable in no rep", c.detail.lower())
 
     def test_a_healthy_spread_passes(self):
         reps = [rep(40 + 5 * i, range=0.2 + 0.07 * i, control=0.3 + 0.06 * i,

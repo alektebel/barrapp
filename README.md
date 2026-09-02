@@ -46,7 +46,7 @@ design in [`docs/FINDINGS.md`](docs/FINDINGS.md) and
 ```bash
 uv venv --python 3.11 .venv && . .venv/bin/activate
 uv pip install -e ".[mediapipe]"
-python -m unittest discover -s tests      # 128 invariant tests
+python -m unittest discover -s tests      # 137 invariant tests
 ```
 
 ## Does it recognise the right movement?

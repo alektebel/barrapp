@@ -62,6 +62,16 @@ FILMING_ADVICE = [
 ]
 
 
+def _sentence(text: str) -> str:
+    """Notes are written as fragments so they can be listed under a heading;
+    dropped into running prose they need a capital and a full stop."""
+    text = (text or "").strip()
+    if not text:
+        return ""
+    text = text[0].upper() + text[1:]
+    return text if text[-1] in ".!?" else text + "."
+
+
 def _plural(n: int, word: str) -> str:
     return f"{n} {word}" if n == 1 else f"{n} {word}s"
 
@@ -199,7 +209,13 @@ def describe(payload: dict) -> tuple[str, str]:
     # "verified", not just "reps": the count is what barra measured, and the
     # distinction is the product. See docs/MARKET.md - a system that never
     # refuses cannot certify anything, so the word has to be earned and used.
-    opening = f"{_plural(n, f'verified {move} rep')}"
+    # "verified" is earned, not decorative: it means barra measured the rep.
+    # A set where nothing could be scored is a set of found reps, not verified
+    # ones - "19 verified push-up reps" above "none of them could be scored"
+    # was a contradiction inside one paragraph.
+    verified = sum(1 for r in reps if r.get("score") is not None)
+    opening = (f"{_plural(n, f'verified {move} rep')}" if verified
+               else f"{_plural(n, f'{move} rep')} found")
     if working:
         opening += f" across a {working:.0f}-second working set"
         if duration and float(duration) - working > 2.0:
@@ -208,8 +224,10 @@ def describe(payload: dict) -> tuple[str, str]:
 
     if score is None:
         headline = f"{_plural(n, f'{move} rep')} - none verified"
-        parts.append("None of them could be scored, so there is no number for "
-                     "this session.")
+        note = next((r.get("scoreNote") for r in reps if r.get("scoreNote")), "")
+        parts.append("None of them could be scored, so this session has no "
+                     "number and none of these reps count towards a progression."
+                     + (f" {_sentence(note)}" if note else ""))
     elif n < 3:
         headline = f"{_plural(n, f'verified {move} rep')}, {BAND_WORD.get(band, band)}"
         parts.append(f"Scored {int(score)} out of 100 - {BAND_WORD.get(band, band)}. "
@@ -220,7 +238,13 @@ def describe(payload: dict) -> tuple[str, str]:
         headline = f"{_plural(n, f'verified {move} rep')}, {BAND_WORD.get(band, band)}"
         parts.append(f"Scored {int(score)} out of 100 - {BAND_WORD.get(band, band)}.")
 
-    for extra in (_weakest(reps), _spread(reps), _unmeasured(reps)):
+    # _unmeasured is suppressed when nothing scored at all: the line above has
+    # already said so, and repeating it as "19 reps could not be scored and are
+    # left out of the number above" points at a number that does not exist.
+    extras = [_weakest(reps), _spread(reps)]
+    if verified:
+        extras.append(_unmeasured(reps))
+    for extra in extras:
         if extra:
             parts.append(extra)
 

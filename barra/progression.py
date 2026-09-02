@@ -29,8 +29,24 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 # Quality bands, matching the score the rest of the pipeline produces.
-SOLID = 60
-STRONG = 80
+#
+# Boundaries converted, not re-tuned, when control left the weighted mean.
+#
+# Control sat at its ceiling for 86% of reps, so the old score was
+# 0.25 + 0.75 x graded and no rep could score below 25. Removing that floor
+# changes what a given number means, so the boundaries were mapped back through
+# it to keep the SAME reps on the same side of each line:
+#
+#     old 80  ->  (80 - 25) / 75  ->  73
+#     old 60  ->  (60 - 25) / 75  ->  47
+#     old 40  ->  (40 - 25) / 75  ->  20
+#
+# This is a restatement of an existing convention in a changed unit, not a
+# recalibration to make scores look better - a muscle-up that read 78 (solid)
+# now reads 56, and is still solid. The boundaries remain conventions and are
+# still unvalidated: see docs/QUALITY.md.
+SOLID = 47
+STRONG = 73
 
 
 @dataclass(frozen=True)
@@ -137,15 +153,25 @@ class Verdict:
 
 
 def verified_reps(reps: list[dict]) -> list[dict]:
-    """The reps that count.
+    """The reps that count towards a progression.
 
     A rep counts when it was found in the footage, survived the plausibility
-    checks, and could be scored. A rep the segmenter proposed and the anchor
-    test then rejected is not a rep the athlete did badly - it is a rep barra
-    did not measure, and the two must not be added together.
+    checks, was scored, and was scored on ALL of its components. A rep the
+    segmenter proposed and the anchor test then rejected is not a rep the
+    athlete did badly - it is a rep barra did not measure, and the two must not
+    be added together.
+
+    `complete` is the strict part and it is deliberate. A standard phrased as
+    "15 verified reps" is a claim about full repetitions, so counting reps whose
+    range was never measured would be counting evidence that does not exist: on
+    a head-on push-up clip the torso ruler fails for the whole set, and those 19
+    reps say nothing about how deep they were. Older payloads have no
+    `complete` field, so their scored reps are accepted rather than silently
+    dropped from a history recorded before the distinction existed.
     """
     return [r for r in reps
-            if r.get("score") is not None and r.get("plausible", True)]
+            if r.get("score") is not None and r.get("plausible", True)
+            and r.get("complete", True)]
 
 
 def _band(q: int | None) -> str:

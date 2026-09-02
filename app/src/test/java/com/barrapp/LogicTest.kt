@@ -314,6 +314,20 @@ object LogicTest {
         check("only verified reps count towards the standard",
             v.bestReps == 3, "${v.bestReps}")
 
+        // A rep scored on part of its definition is weaker evidence, and the
+        // standard is phrased as full repetitions.
+        val partial = DayEntry(
+            date = "2026-08-22", exercise = "push_up", exerciseLabel = "Push-up",
+            reps = 19, score = 94, band = "strong", jobIds = listOf("j4"),
+            byMovement = mapOf("push_up" to movementDay("push_up", "Push-up",
+                19, 0, 0)),
+        )
+        val fromPartial = Progression.assess("push_up", listOf(partial))
+        check("reps that were not fully measured do not count",
+            fromPartial.bestReps == 0, "${fromPartial.bestReps}")
+        check("and it reads as no evidence, not a bad session",
+            fromPartial.evidence.contains("No verified reps"), fromPartial.evidence)
+
         check("the ladder says where it stops refereeing",
             Progression.LADDER["muscle_up"]!!.targetMeasurable.not() &&
                 Progression.LADDER["squat"]!!.targetMeasurable.not())

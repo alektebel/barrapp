@@ -49,13 +49,15 @@ MIN_REPS_FOR_TREND = 8
 # A component sitting at one value in this fraction of reps is saturated: it is
 # contributing a constant, and its weight is doing nothing.
 SATURATED_FRAC = 0.80
+# Below this many scored reps, the observed span says more about the sample
+# size than about the scale.
+MIN_REPS_FOR_SPAN = 8
 
 PASS, FAIL, INCONCLUSIVE, NOT_RUN = "PASS", "FAIL", "INCONCLUSIVE", "NOT RUN"
 
 # Only for the wording of the report - the authoritative weights live in
 # quality.py and this must never be used to compute anything.
-WEIGHT_HINT = {"range": "40% of the", "control": "25% of the",
-               "smoothness": "35% of the"}
+WEIGHT_HINT = {"range": "40% of the", "smoothness": "35% of the"}
 
 
 @dataclass
@@ -152,7 +154,13 @@ def ceiling(sets: list[tuple[str, list[dict]]]) -> Check:
     # A component no rep of a clip could measure is worse than a saturated one:
     # its weight silently vanishes and the score is renormalised without
     # saying so. Checked per clip, because that is where it happens.
-    for name in ("range", "control", "smoothness"):
+    #
+    # The names come from quality.WEIGHTS rather than a list here, so this
+    # cannot drift from what the score is actually made of. It already did:
+    # after control moved out of the mean and became a fault penalty, a
+    # hardcoded list went on reporting it "measurable in no rep" of every clip.
+    from .quality import WEIGHTS as _SCORE_WEIGHTS
+    for name in _SCORE_WEIGHTS:
         blind = []
         for set_name, rs in sets:
             scored = [r for r in rs if r.get("score") is not None]
@@ -169,9 +177,12 @@ def ceiling(sets: list[tuple[str, list[dict]]]) -> Check:
                             + f" - {WEIGHT_HINT.get(name, 'its')} weight "
                               "vanished from those scores")
 
-    if numbers["span"] < 20:
+    # Span needs enough reps to mean anything. Three reps spanning four points
+    # is a statement about the sample, not about the scale.
+    if s.size >= MIN_REPS_FOR_SPAN and numbers["span"] < 20:
         problems.append(f"the score only spans {numbers['span']:.0f} points "
-                        f"({numbers['min']:.0f}-{numbers['max']:.0f})")
+                        f"({numbers['min']:.0f}-{numbers['max']:.0f}) "
+                        f"across {s.size} reps")
 
     if not problems:
         return Check("ceiling", PASS,

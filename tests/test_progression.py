@@ -6,6 +6,8 @@ never comes from a single session.
 """
 import unittest
 
+from barra.progression import SOLID as SOLID_PY
+from barra.progression import STRONG as STRONG_PY
 from barra.progression import (LADDER, Day, Verdict, assess, from_sessions,
                                verified_reps)
 
@@ -139,7 +141,16 @@ class TestTheLaddersDoNotDrift(unittest.TestCase):
             r'"(\w+)"\s+to\s+Step\(\s*"(\w+)",\s*"[^"]*",\s*'
             r'reps\s*=\s*(\d+),\s*quality\s*=\s*(\w+),\s*days\s*=\s*(\d+)',
             re.S)
-        names = {"SOLID": 60, "STRONG": 80}
+        # Read the constants out of the Kotlin too, rather than restating
+        # them here - otherwise this test needs editing every time the scale
+        # changes, which is exactly when it most needs to be untouched.
+        names = {}
+        for const in ("SOLID", "STRONG"):
+            m = re.search(rf"const val {const}\s*=\s*(\d+)", text)
+            self.assertIsNotNone(m, f"could not find {const} in Progression.kt")
+            names[const] = int(m.group(1))
+        self.assertEqual(names["SOLID"], SOLID_PY, "SOLID differs")
+        self.assertEqual(names["STRONG"], STRONG_PY, "STRONG differs")
         found = {m.group(1): (m.group(2), int(m.group(3)),
                               names[m.group(4)], int(m.group(5)))
                  for m in pattern.finditer(text)}

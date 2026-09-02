@@ -151,6 +151,7 @@ class BarraApi(context: Context) {
                         score = if (row.isNull("score")) null else row.optInt("score"),
                         band = row.optString("band").ifBlank { "unmeasured" },
                         scoreNote = row.optString("scoreNote"),
+                        complete = row.optBoolean("complete", true),
                         components = row.optJSONArray("components").mapObjects { c ->
                             ScorePart(
                                 name = c.optString("name"),

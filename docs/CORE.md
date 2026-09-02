@@ -19,7 +19,7 @@ measured against.**
 |---|---|
 | Pipeline | complete, 13 commands run end to end |
 | Movements | squat, muscle-up, pull-up, dip |
-| Verified on synthetic data | yes — `barra selftest`, 128 invariant tests |
+| Verified on synthetic data | yes — `barra selftest`, 137 invariant tests |
 | Run on real footage | yes — 4 muscle-up clips, 3 sessions, Aug 2026 |
 | Deviation verdict (section 8) | **not obtainable on that footage**: 3 usable reps, and a template needs 8 in one bin |
 | Progress verdict | **not yet trackable**: 1 and 2 usable reps per session, 3 is the minimum |
@@ -224,7 +224,7 @@ to report a detection rate without an FPR beside it.
 ## Tests
 
 ```bash
-python -m unittest discover -s tests -v      # 128 invariant tests
+python -m unittest discover -s tests -v      # 137 invariant tests
 python scripts/viewpoint_sensitivity.py      # the finding in docs/FINDINGS.md
 ```
 

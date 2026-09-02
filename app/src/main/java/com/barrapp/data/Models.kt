@@ -111,6 +111,14 @@ data class RepRow(
     val score: Int? = null,
     val band: String = "unmeasured",
     val scoreNote: String = "",
+    /**
+     * Every graded component was measured, not just some of them.
+     *
+     * Defaults to true so clips analysed before the server sent this field
+     * keep counting - a history recorded before the distinction existed should
+     * not silently empty itself when the distinction arrives.
+     */
+    val complete: Boolean = true,
     val components: List<ScorePart> = emptyList(),
     val asides: List<Aside> = emptyList(),
     /** Small copy of the rep's own trace, for drawing. */

@@ -68,8 +68,9 @@ def fold(days: dict, date: str, out: dict) -> None:
 def band_for(score):
     if score is None:
         return "unmeasured"
-    return ("strong" if score >= 80 else "solid" if score >= 60
-            else "shaky" if score >= 40 else "broken down")
+    from barra.quality import SHAKY, SOLID, STRONG
+    return ("strong" if score >= STRONG else "solid" if score >= SOLID
+            else "shaky" if score >= SHAKY else "broken down")
 
 
 def weekly(days: dict, since: str, until: str) -> str:

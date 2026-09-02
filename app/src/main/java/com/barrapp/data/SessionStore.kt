@@ -1,6 +1,7 @@
 package com.barrapp.data
 
 import android.content.Context
+import com.barrapp.Progression
 import androidx.core.content.edit
 import org.json.JSONArray
 import org.json.JSONObject
@@ -73,9 +74,13 @@ object SessionStore {
         val existing = days(context).associateBy { it.date }.toMutableMap()
         val prior = existing[date]
 
-        // Only reps that were actually scored carry evidence. The rest were
-        // found and could not be measured, which is a different fact.
-        val verified = analysis.reps.filter { it.score != null }
+        // Only reps scored on ALL their components carry evidence towards a
+        // progression. A rep scored on part of its definition is a weaker fact:
+        // on a head-on push-up clip the torso ruler fails for the whole set, so
+        // those reps say nothing about how deep they were. Clips analysed
+        // before the flag existed default to complete rather than vanishing
+        // from a history recorded before the distinction did.
+        val verified = analysis.reps.filter { it.score != null && it.complete }
         val key = analysis.exercise.ifBlank { "unknown" }
         val was = prior?.byMovement?.get(key)
         val merged = MovementDay(
@@ -158,9 +163,9 @@ object SessionStore {
 
     private fun bandFor(score: Int?): String = when {
         score == null -> "unmeasured"
-        score >= 80 -> "strong"
-        score >= 60 -> "solid"
-        score >= 40 -> "shaky"
+        score >= Progression.STRONG -> "strong"
+        score >= Progression.SOLID -> "solid"
+        score >= Progression.SHAKY -> "shaky"
         else -> "broken down"
     }
 

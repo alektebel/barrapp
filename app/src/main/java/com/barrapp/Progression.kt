@@ -35,8 +35,26 @@ import com.barrapp.data.DayEntry
  */
 object Progression {
 
-    const val SOLID = 60
-    const val STRONG = 80
+    /**
+     * Boundaries converted, not re-tuned, when control left the weighted mean.
+     * 
+     * Control sat at its ceiling for 86% of reps, so the old score was
+     * 0.25 + 0.75 x graded and no rep could score below 25. Removing that floor
+     * changes what a given number means, so the boundaries were mapped back through
+     * it to keep the SAME reps on the same side of each line:
+     * 
+     *     old 80  ->  (80 - 25) / 75  ->  73
+     *     old 60  ->  (60 - 25) / 75  ->  47
+     *     old 40  ->  (40 - 25) / 75  ->  20
+     * 
+     * This is a restatement of an existing convention in a changed unit, not a
+     * recalibration to make scores look better - a muscle-up that read 78 (solid)
+     * now reads 56, and is still solid. The boundaries remain conventions and are
+     * still unvalidated: see docs/QUALITY.md.
+     */
+    const val SOLID = 47
+    const val STRONG = 73
+    const val SHAKY = 20
 
     data class Step(
         val towards: String,

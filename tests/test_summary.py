@@ -117,3 +117,30 @@ class TestFilmingAdvice(unittest.TestCase):
             blockers=["78% of the clip is spent within a fifth of a torso-length "
                       "of one position - a hold, or resting between attempts"]))
         self.assertIn("counts repetitions", text)
+
+
+class TestVerifiedIsEarned(unittest.TestCase):
+    def test_a_set_with_nothing_scored_is_not_called_verified(self):
+        """"19 verified push-up reps" above "none of them could be scored" is a
+        contradiction inside one paragraph."""
+        reps = [{"label": f"r{i}", "score": None, "total_s": "1.0",
+                 "scoreNote": "Range of motion could not be measured on this clip.",
+                 "components": []} for i in range(19)]
+        head, text = describe(payload(
+            n_reps=19, reps=reps, sessionScore=None, sessionBand="unmeasured",
+            exercise="push_up", detected={"exercise": "push_up", "label": "Push-up"}))
+        self.assertIn("none verified", head)
+        self.assertNotIn("verified", text.split(".")[0])
+        self.assertIn("19 push-up reps found", text)
+
+    def test_it_says_the_reps_do_not_count_towards_a_progression(self):
+        reps = [{"score": None, "total_s": "1.0", "components": []}] * 5
+        _, text = describe(payload(n_reps=5, reps=reps, sessionScore=None,
+                                   sessionBand="unmeasured"))
+        self.assertIn("count towards a progression", text)
+
+    def test_it_does_not_point_at_a_number_that_does_not_exist(self):
+        reps = [{"score": None, "total_s": "1.0", "components": []}] * 5
+        _, text = describe(payload(n_reps=5, reps=reps, sessionScore=None,
+                                   sessionBand="unmeasured"))
+        self.assertNotIn("left out of the number above", text)

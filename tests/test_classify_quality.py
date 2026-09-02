@@ -187,8 +187,18 @@ class TestQualityProxy(unittest.TestCase):
         return {"start_depth": 0.9, "peak_height": 0.9, "tempo_ratio": 0.8,
                 "swing": 0.2, "shoulder_asymmetry": 0.05}
 
-    def test_weights_sum_to_one(self):
-        self.assertAlmostEqual(sum(WEIGHTS.values()), 1.0, places=9)
+    def test_the_score_is_fully_accounted_for(self):
+        """The graded components plus the worst fault penalty must account for
+        the whole scale, so no part of the number is unexplained."""
+        from barra.quality import CONTROL_PENALTY
+        self.assertAlmostEqual(sum(WEIGHTS.values()) + CONTROL_PENALTY, 1.0,
+                               places=9)
+
+    def test_control_is_not_a_term_in_the_mean(self):
+        """It is a fault detector: it reads the same for every rep without the
+        fault, and a constant inside a weighted mean is a floor under every
+        score rather than a measurement."""
+        self.assertNotIn("control", WEIGHTS)
 
     def test_a_full_clean_rep_scores_high(self):
         smooth = np.linspace(-1, 1, 80)
@@ -202,10 +212,47 @@ class TestQualityProxy(unittest.TestCase):
         half = score_rep(v, 0.9, smooth, 0, 79).score
         self.assertLess(half, full)
 
-    def test_dropping_off_the_bar_costs_control(self):
-        v = self.base(); v["tempo_ratio"] = 0.15
-        q = score_rep(v, 0.9, np.linspace(-1, 1, 80), 0, 79)
-        self.assertLess(q.components["control"]["value"], 0.3)
+    def test_dropping_off_the_bar_is_penalised(self):
+        from barra.quality import CONTROL_PENALTY
+
+        smooth = np.linspace(-1, 1, 80)
+        clean = score_rep(self.base(), 0.9, smooth, 0, 79)
+        v = self.base(); v["tempo_ratio"] = 0.0          # straight off the bar
+        dropped = score_rep(v, 0.9, smooth, 0, 79)
+        self.assertLess(dropped.score, clean.score)
+        self.assertAlmostEqual(dropped.penalties["control"]["value"],
+                               CONTROL_PENALTY, places=3)
+
+    def test_a_controlled_descent_costs_nothing_at_all(self):
+        """The point of moving control out of the mean: no fault, no charge -
+        and no constant either."""
+        smooth = np.linspace(-1, 1, 80)
+        for tempo in (0.70, 0.90, 1.50, 3.00):
+            v = self.base(); v["tempo_ratio"] = tempo
+            q = score_rep(v, 0.9, smooth, 0, 79)
+            self.assertEqual(q.penalties["control"]["value"], 0.0, f"tempo {tempo}")
+
+    def test_smoothness_is_graded_not_counted(self):
+        """Counting stalled frames makes the frame count the denominator, so a
+        short rep can only take a handful of values. Grading how far below the
+        floor each frame fell is continuous."""
+        def ascent(depth, n=40):
+            """A rate profile that dips in the middle, integrated into a
+            monotone signal. Built this way on purpose: splicing a slow section
+            into a linear ramp leaves a step discontinuity at the join, and
+            that single large frame then defines the rep's "fast" rate and
+            swamps the thing under test."""
+            t = np.linspace(0, 1, n)
+            rate = 1.0 - depth * np.exp(-((t - 0.5) ** 2) / (2 * 0.12 ** 2))
+            sig = np.concatenate([[0.0], np.cumsum(rate)])[:n]
+            return 2 * sig / sig[-1] - 1
+
+        seen = [smoothness_component(ascent(d), 0, 39)[0]
+                for d in np.linspace(0.0, 0.95, 25)]
+        self.assertEqual(len(set(round(v, 4) for v in seen)), 25,
+                         "the component is quantised")
+        self.assertTrue(all(a >= b - 1e-9 for a, b in zip(seen, seen[1:])),
+                        "a deeper stall must never score higher")
 
     def test_a_stall_is_detected(self):
         stalled = np.concatenate([np.linspace(-1, 0, 20), np.zeros(40), np.linspace(0, 1, 20)])
@@ -236,20 +283,29 @@ class TestQualityProxy(unittest.TestCase):
         self.assertEqual(implausibilities(started_high, PUSH_UP, arm=1.2), [])
         self.assertTrue(implausibilities(started_high, MUSCLE_UP, arm=1.2))
 
-    def test_an_unusable_ruler_disables_range_rather_than_the_score(self):
+    def test_an_unusable_ruler_refuses_the_score_rather_than_faking_it(self):
         """Filmed head-on, a push-up's torso projects to almost nothing and the
-        arm:torso ratio came out at 2.7. Lengths are then meaningless, but
-        timing is not - so the rep is scored on what survives, with a note."""
+        arm:torso ratio came out at 2.7, so range is unmeasurable for the whole
+        clip. Scored on what survived, 19 such reps read 94 - a number saying
+        the movement was continuous and nothing about whether it happened."""
         from barra.metrics import usable_reference
 
         self.assertFalse(usable_reference(2.70))
         self.assertTrue(usable_reference(1.20))
         q = score_rep(self.base(), arm=2.70, signal=np.linspace(-1, 1, 80),
                       start=0, turn=79)
-        self.assertIsNotNone(q.score)
+        self.assertIsNone(q.score)
+        self.assertFalse(q.complete)
         self.assertIsNone(q.components["range"]["value"])
+        self.assertIn("from the side", q.note)
+
+    def test_a_missing_smoothness_still_scores_on_range(self):
+        """The refusal is specific to range, not to any missing component: a
+        rep whose depth is known is still partly measured."""
+        q = score_rep(self.base(), arm=0.9, signal=None)
+        self.assertIsNotNone(q.score)
+        self.assertFalse(q.complete)
         self.assertIn("partial", q.context)
-        self.assertIn("control", q.context["partial"])
 
     def test_score_is_bounded(self):
         wild = {"start_depth": 9.0, "peak_height": 9.0, "tempo_ratio": 9.0}

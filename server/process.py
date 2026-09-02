@@ -289,6 +289,14 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             "score": q.score,
             "band": qband(q.score),
             "scoreNote": q.note,
+            # Whether EVERY graded component was measured. A rep scored on part
+            # of its definition is weaker evidence than one scored on all of it,
+            # and the progression standard depends on the difference.
+            "complete": q.complete,
+            "penalties": [
+                {"name": name, "value": v["value"], "why": v["why"]}
+                for name, v in q.penalties.items()
+            ],
             "components": [
                 {"name": name, "value": c["value"], "weight": c["weight"],
                  "why": c["why"]}
