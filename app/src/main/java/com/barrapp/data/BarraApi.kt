@@ -7,7 +7,9 @@ import com.barrapp.DeviceId
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.RequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
+import okio.BufferedSink
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -36,13 +38,24 @@ class BarraApi(context: Context) {
     }
 
     fun uploadVideo(context: Context, uploadUrl: String, method: String, uri: Uri) {
-        val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
-            ?: error("Could not read video")
         val mime = context.contentResolver.getType(uri) ?: "video/mp4"
         val url = if (uploadUrl.startsWith("http")) uploadUrl else "$baseUrl$uploadUrl"
+        val cr = context.contentResolver
+        val length = try {
+            cr.openAssetFileDescriptor(uri, "r")?.use { it.length } ?: -1L
+        } catch (_: Exception) { -1L }
+        val body = object : RequestBody() {
+            override fun contentType() = mime.toMediaType()
+            override fun contentLength() = length
+            override fun writeTo(sink: BufferedSink) {
+                cr.openInputStream(uri)?.use { input ->
+                    sink.outputStream().use { out -> input.copyTo(out) }
+                } ?: error("Could not read video")
+            }
+        }
         val builder = Request.Builder()
             .url(url)
-            .method(method, bytes.toRequestBody(mime.toMediaType()))
+            .method(method, body)
         if (!isS3(url)) {
             builder.header("X-Device-Id", deviceId)
         }

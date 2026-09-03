@@ -185,7 +185,7 @@ fun DiagnosticsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.weight(1f))
-                    Pill(e.level.name, levelColour(e.level))
+                    Pill(e.level.name, color = levelColour(e.level))
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(e.line, style = MaterialTheme.typography.bodyMedium)

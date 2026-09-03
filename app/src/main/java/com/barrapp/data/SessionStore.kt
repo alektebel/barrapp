@@ -128,7 +128,17 @@ object SessionStore {
             else {
                 val ids = day.jobIds - jobId
                 if (ids.isEmpty()) null
-                else day.copy(jobIds = ids, traces = day.traces - jobId)
+                else day.copy(
+                    jobIds = ids,
+                    traces = day.traces - jobId,
+                    // We don't have per-job verified/scoreSum to subtract accurately,
+                    // so mark the day as stale rather than showing a ghost score.
+                    // Next refresh() from the server will rebuild aggregates.
+                    byMovement = emptyMap(),
+                    reps = ids.size,
+                    score = null,
+                    band = "unmeasured",
+                )
             }
         }
         write(context, kept)

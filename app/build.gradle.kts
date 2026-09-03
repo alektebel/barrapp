@@ -45,7 +45,7 @@ android {
         buildConfigField(
             "String",
             "API_BASE_URL",
-            "\"${project.findProperty("barrapp.apiUrlDebug") ?: "http://192.168.1.18:8080"}\"",
+            "\"${project.findProperty("barrapp.apiUrlDebug") ?: "http://192.168.1.120:8080"}\"",
         )
     }
 
@@ -65,7 +65,7 @@ android {
             buildConfigField(
                 "String",
                 "API_BASE_URL",
-                "\"${project.findProperty("barrapp.apiUrlDebug") ?: "http://192.168.1.18:8080"}\"",
+                "\"${project.findProperty("barrapp.apiUrlDebug") ?: "http://192.168.1.120:8080"}\"",
             )
         }
         release {
@@ -85,11 +85,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions {
-        jvmTarget = "1.8"
+        jvmTarget = "17"
     }
     buildFeatures {
         compose = true
