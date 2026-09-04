@@ -157,6 +157,12 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::openHome,
             )
 
+            Screen.Plan -> PlanScreen(
+                days = state.days,
+                goals = state.goals,
+                onBack = vm::openHome,
+            )
+
             Screen.Home -> HomeShell(
                 vm = vm,
                 onPick = { pickVideo.launch("video/*") },
@@ -181,7 +187,7 @@ private fun HomeShell(
         if (wide) {
             Row(Modifier.fillMaxSize()) {
                 Column(Modifier.width(CALENDAR_WIDTH).fillMaxHeight()) {
-                    ShellHeader(state.profile.firstName, vm::openPrivacy)
+                    ShellHeader(state.profile.firstName, vm::openPrivacy, vm::openPlan)
                     CalendarPane(
                         days = state.days,
                         selected = state.selectedDate,
@@ -205,7 +211,7 @@ private fun HomeShell(
         } else if (medium) {
             Row(Modifier.fillMaxSize()) {
                 Column(Modifier.width(CALENDAR_WIDTH).fillMaxHeight()) {
-                    ShellHeader(state.profile.firstName, vm::openPrivacy)
+                    ShellHeader(state.profile.firstName, vm::openPrivacy, vm::openPlan)
                     CalendarPane(
                         days = state.days,
                         selected = state.selectedDate,
@@ -235,7 +241,7 @@ private fun HomeShell(
             }
         } else {
             Column(Modifier.fillMaxSize()) {
-                ShellHeader(state.profile.firstName, vm::openPrivacy)
+                ShellHeader(state.profile.firstName, vm::openPrivacy, vm::openPlan)
                 Box(Modifier.weight(1f)) {
                     when (state.pane) {
                         Pane.Calendar -> CalendarPane(
@@ -410,7 +416,7 @@ private fun statusLine(profile: Profile): String {
 }
 
 @Composable
-private fun ShellHeader(name: String, onPrivacy: () -> Unit) {
+private fun ShellHeader(name: String, onPrivacy: () -> Unit, onPlan: (() -> Unit)? = null) {
     Row(
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -422,6 +428,9 @@ private fun ShellHeader(name: String, onPrivacy: () -> Unit) {
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+        }
+        if (onPlan != null) {
+            TextButton(onClick = onPlan) { Text("Plan") }
         }
         TextButton(onClick = onPrivacy) {
             Icon(Icons.Filled.Info, contentDescription = "Privacy", Modifier.size(18.dp))

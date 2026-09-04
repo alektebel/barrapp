@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics, Objectives, Replay }
+enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics, Objectives, Replay, Plan }
 
 /** Which pane the compact layout is showing. Wide layouts show all three. */
 enum class Pane { Calendar, Session, Progress }
@@ -136,6 +136,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     fun openReplay() {
         if (replayClip() != null) _state.update { it.copy(screen = Screen.Replay) }
     }
+
+    fun openPlan() = _state.update { it.copy(screen = Screen.Plan) }
 
     // ---- onboarding -------------------------------------------------------
     fun acceptPrivacy() {
@@ -337,11 +339,30 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         "score ${job.result?.sessionScore ?: "—"}",
                         traceId = job.result?.traceId.orEmpty(), jobId = job.id,
                     )
-                    ProcessingNotifier.done(
-                        app,
-                        "Measured ${job.result?.repCount ?: 0} rep${if (job.result?.repCount == 1) "" else "s"}",
-                        "Your ${job.result?.detected?.label ?: job.result?.exercise?.replace('_', ' ') ?: "clip"} is ready.",
-                    )
+                    // The referee speaks when a standard is cleared: this
+                    // session was the Nth qualifying day for its movement, so
+                    // the next progression is earned. Qualifying days are
+                    // distinct dates, so a second clip on the same day cannot
+                    // ring the bell twice.
+                    val movement = job.result?.exercise.orEmpty()
+                    val verdict = if (movement.isNotBlank())
+                        Progression.assess(movement, SessionStore.days(app)) else null
+                    if (verdict?.step != null &&
+                        verdict.qualifyingDays.size == verdict.step.days
+                    ) {
+                        ProcessingNotifier.done(
+                            app,
+                            "Standard cleared — ${verdict.step.towardsLabel} unlocked",
+                            "You have now met the ${verdict.label} standard on " +
+                                "${verdict.step.days} separate days. The Plan page has the call.",
+                        )
+                    } else {
+                        ProcessingNotifier.done(
+                            app,
+                            "Measured ${job.result?.repCount ?: 0} rep${if (job.result?.repCount == 1) "" else "s"}",
+                            "Your ${job.result?.detected?.label ?: job.result?.exercise?.replace('_', ' ') ?: "clip"} is ready.",
+                        )
+                    }
                     _state.update {
                         it.copy(
                             screen = Screen.Home,
