@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -38,6 +39,9 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +54,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.barrapp.data.Analysis
 import com.barrapp.data.RepRow
+import com.barrapp.improvementCues
 import com.barrapp.ui.parts.ComponentBar
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Panel
@@ -266,12 +271,14 @@ fun SessionDetail(
     modifier: Modifier = Modifier,
     onReplay: (() -> Unit)? = null,
 ) {
+    var repsExpanded by remember { mutableStateOf(false) }
     LazyColumn(
         modifier = modifier.fillMaxSize(),
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        item { SessionHeader(analysis) }
+        item { SessionHeader(analysis, repsExpanded, onToggleReps =
+            if (analysis.reps.isEmpty()) null else ({ repsExpanded = !repsExpanded })) }
 
         if (onReplay != null) {
             item {
@@ -281,19 +288,53 @@ fun SessionDetail(
             }
         }
 
-        if (analysis.reps.isNotEmpty()) {
-            item { Eyebrow("Reps") }
-            itemsIndexed(analysis.reps) { index, rep -> RepCard(rep, index + 1) }
-        }
-
-        if (analysis.narrative.isNotBlank()) {
-            item {
-                Panel {
-                    Eyebrow("Read-out")
+        // The whole verdict in one line, then at most three things to fix.
+        // Everything measured lives one tap away; what sits on the surface is
+        // what carries into the next set.
+        item {
+            Panel {
+                Eyebrow("Improve")
+                Spacer(Modifier.height(8.dp))
+                val cues = improvementCues(analysis)
+                if (cues.isEmpty()) {
+                    Text(
+                        "Nothing flagged — the set measured clean.",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                } else {
+                    cues.forEachIndexed { i, cue ->
+                        Text(
+                            "${i + 1}.  $cue",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(vertical = 4.dp),
+                        )
+                    }
+                }
+                if (analysis.headline.isNotBlank()) {
                     Spacer(Modifier.height(8.dp))
-                    Text(analysis.narrative, style = MaterialTheme.typography.bodyMedium)
+                    Text(
+                        analysis.headline,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                if (analysis.narrative.isNotBlank()) {
+                    var full by remember { mutableStateOf(false) }
+                    TextButton(onClick = { full = !full }, contentPadding = PaddingValues(0.dp)) {
+                        Text(if (full) "Show less" else "Read the full analysis")
+                    }
+                    if (full) {
+                        Text(analysis.narrative, style = MaterialTheme.typography.bodyMedium)
+                    }
                 }
             }
+        }
+
+        // Per-rep detail is opt-in: the surface stays short, the numbers stay
+        // one tap away on the rep count.
+        if (repsExpanded && analysis.reps.isNotEmpty()) {
+            item { Eyebrow("Each rep") }
+            itemsIndexed(analysis.reps) { index, rep -> RepCard(rep, index + 1) }
         }
 
         if (analysis.blockers.isNotEmpty()) {
@@ -356,7 +397,11 @@ fun SessionDetail(
 }
 
 @Composable
-private fun SessionHeader(analysis: Analysis) {
+private fun SessionHeader(
+    analysis: Analysis,
+    repsExpanded: Boolean = false,
+    onToggleReps: (() -> Unit)? = null,
+) {
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Column(Modifier.weight(1f)) {
@@ -368,12 +413,20 @@ private fun SessionHeader(analysis: Analysis) {
                     style = MaterialTheme.typography.headlineSmall,
                 )
                 Spacer(Modifier.height(6.dp))
+                // The rep count is the handle for the per-rep detail: the
+                // numbers stay off the surface until this is pressed.
+                val base = "${analysis.repCount} rep${if (analysis.repCount == 1) "" else "s"} measured" +
+                    if (analysis.candidateCount > analysis.repCount)
+                        " of ${analysis.candidateCount} found" else ""
+                val line = if (onToggleReps == null) base
+                else "$base · ${if (repsExpanded) "hide each rep" else "each rep"}"
                 Text(
-                    "${analysis.repCount} rep${if (analysis.repCount == 1) "" else "s"} measured" +
-                        if (analysis.candidateCount > analysis.repCount)
-                            " of ${analysis.candidateCount} found" else "",
+                    line,
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = if (onToggleReps == null) MaterialTheme.colorScheme.onSurfaceVariant
+                    else MaterialTheme.colorScheme.primary,
+                    modifier = if (onToggleReps == null) Modifier
+                    else Modifier.clickable(onClick = onToggleReps),
                 )
             }
             ScoreRing(

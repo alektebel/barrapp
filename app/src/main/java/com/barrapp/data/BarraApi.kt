@@ -215,6 +215,14 @@ class BarraApi(context: Context) {
                                 why = a.optString("why"),
                             )
                         },
+                        penalties = row.optJSONArray("penalties").mapObjects { p ->
+                            ScorePart(
+                                name = p.optString("name"),
+                                value = if (p.isNull("value")) null else p.optDouble("value").orZero(),
+                                weight = p.optDouble("weight", 0.0).orZero(),
+                                why = p.optString("why"),
+                            )
+                        },
                         trace = row.optJSONArray("trace").let { t ->
                             if (t == null) emptyList()
                             else (0 until t.length()).map { i -> t.optDouble(i, 0.0).toFloat() }

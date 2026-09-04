@@ -121,6 +121,10 @@ data class RepRow(
     val complete: Boolean = true,
     val components: List<ScorePart> = emptyList(),
     val asides: List<Aside> = emptyList(),
+    /** One-sided faults (a dropped descent), measured and penalised. Kept
+     *  beside the components rather than folded into them: a penalty absent
+     *  costs nothing, and its `why` is the plain-language description. */
+    val penalties: List<ScorePart> = emptyList(),
     /** Small copy of the rep's own trace, for drawing. */
     val trace: List<Float> = emptyList(),
 )

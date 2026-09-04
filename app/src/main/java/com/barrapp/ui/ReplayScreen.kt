@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +44,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.barrapp.data.Analysis
 import com.barrapp.data.RepRow
+import com.barrapp.improvementCues
+import com.barrapp.repFault
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Pill
 import com.barrapp.ui.parts.bandColor
@@ -150,10 +153,29 @@ private fun ReplayBody(analysis: Analysis, clip: java.io.File) {
     }
 
     Column(Modifier.fillMaxSize()) {
-        AndroidView(
-            factory = { videoView },
-            modifier = Modifier.fillMaxWidth().height(240.dp),
-        )
+        // The video, with the fault said over it while the faulting rep is on
+        // screen - "Momentum" while the swing happens, "Not locking out" as
+        // the top is shorted. Clean reps say nothing.
+        Box {
+            AndroidView(
+                factory = { videoView },
+                modifier = Modifier.fillMaxWidth().height(240.dp),
+            )
+            val fault = reps.getOrNull(activeRep)?.let { repFault(it) }
+            if (fault != null) {
+                Text(
+                    fault.uppercase(),
+                    style = MaterialTheme.typography.labelLarge,
+                    color = Color.White,
+                    modifier = Modifier
+                        .align(Alignment.TopCenter)
+                        .padding(top = 12.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Black.copy(alpha = 0.65f))
+                        .padding(horizontal = 14.dp, vertical = 6.dp),
+                )
+            }
+        }
 
         Timeline(
             reps = reps,
@@ -164,6 +186,19 @@ private fun ReplayBody(analysis: Analysis, clip: java.io.File) {
             onSeek = { t -> seek(t.toDouble()) },
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
         )
+
+        // What to take into the next set: at most three, because that is what
+        // carries. The per-rep comments below are for when one is wanted.
+        improvementCues(analysis).forEachIndexed { i, cue ->
+            Text(
+                "${i + 1}.  $cue",
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
+            )
+        }
+        if (improvementCues(analysis).isNotEmpty()) {
+            Spacer(Modifier.height(8.dp))
+        }
 
         Eyebrow(
             if (playing) "Playing · ${"%.1f".format(positionS)}s"
