@@ -58,6 +58,9 @@ def chat(messages: list[dict]) -> dict:
         headers={
             "Authorization": f"Bearer {NAN_API_KEY}",
             "Content-Type": "application/json",
+            # The provider's edge blocks requests whose client looks like a
+            # script; without this the model call comes back HTTP 403.
+            "User-Agent": "barrapp-objectives/1.0",
         },
         method="POST",
     )

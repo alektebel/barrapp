@@ -1,0 +1,17 @@
+# The build context is server/ and the worker image copies vendor/barra into
+# /opt/barra. Only the package, the pose models and the project definition
+# belong in the image; the rest of the vendor copy mirrors the repo root and
+# drags in 880MB of dataset footage, the sample clips, the Android app and
+# build caches that the Lambda will never read.
+vendor/barra/*
+!vendor/barra/barra/
+!vendor/barra/models/
+!vendor/barra/pyproject.toml
+
+# Same logic for the rest of the context.
+data/
+.aws-sam/
+.venv/
+.env
+__pycache__/
+*.pyc
