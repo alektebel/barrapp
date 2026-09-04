@@ -1,29 +1,45 @@
-# APK build + GitHub upload status
+# Releasing barrapp
 
-Snapshot: 2026-09-04. The debug APK is built and verified; the GitHub upload
-is **not yet done** because there is no GitHub credential on this machine.
+Updated 2026-09-04. The release flow is: commit the code, tag it, and publish a
+GitHub Release with the debug APK attached. `gh` is authenticated on this
+machine (as `alektebel`), so uploads and pushes work directly.
 
-## 1. The APK
+## 1. Release flow
 
-- **Path**: `app/build/outputs/apk/debug/app-debug.apk`
-- **Size**: 11 MB (debug-signed with the auto-generated debug keystore)
-- **Baked base URL** (from `app/build/generated/source/buildConfig/debug/com/barrapp/BuildConfig.java`):
+1. Build the APK (section 2 below).
+2. Copy it to `dist/` with the version in the name, e.g.
+   `dist/barrapp-1.0.5-debug.apk`.
+3. Tag and push:
 
-```java
-public static final String API_BASE_URL = "https://gogtzcttw6.execute-api.eu-west-1.amazonaws.com";
-```
+   ```bash
+   git tag v1.0.5 && git push origin v1.0.5
+   ```
 
-This points the phone at the live `sam-app` stack (`eu-west-1`), the custom API
-served by the Lambda functions (see `docs/AWS_RUNBOOK.md`).
+4. Create the GitHub Release with the APK attached:
 
-## 2. Rebuild it later
+   ```bash
+   gh release create v1.0.5 dist/barrapp-1.0.5-debug.apk \
+     --repo alektebel/barrapp --title 1.0.5 --notes "..."
+   ```
 
-This machine had no Java or Android SDK. I installed them user-local (no root):
+   If the release already exists and only the asset needs (re)attaching:
 
-- **JDK 17** (Temurin): `$HOME/.jdks/jdk-17.0.20.1+1`
-- **Android SDK**: `$HOME/Android/Sdk` (cmdline-tools `latest`, platform `android-35`,
-  build-tools `35.0.0`, platform-tools). `local.properties` was created with
-  `sdk.dir=/home/diego/Android/Sdk`.
+   ```bash
+   gh release upload v1.0.5 dist/barrapp-1.0.5-debug.apk --clobber --repo alektebel/barrapp
+   ```
+
+5. Verify: `gh release view v1.0.5 --repo alektebel/barrapp` - the `asset:` line
+   must list the APK.
+
+## 2. Rebuild the APK
+
+Machine-local toolchain (no root, installed under `$HOME`):
+
+- **JDK 17** (Temurin): `$HOME/.jdks/jdk-17.0.20.1+1` - java is **not** on PATH,
+  so `JAVA_HOME` must be exported in every new shell.
+- **Android SDK**: `$HOME/Android/Sdk` (cmdline-tools `latest`, platform
+  `android-35`, build-tools `35.0.0`, platform-tools). `local.properties` points
+  at it with `sdk.dir=/home/diego/Android/Sdk`.
 
 Build command:
 
@@ -35,43 +51,15 @@ export ANDROID_SDK_ROOT="$ANDROID_HOME"
 ./gradlew assembleDebug
 ```
 
-## 3. GitHub upload — blocked, needs your credential
+Output: `app/build/outputs/apk/debug/app-debug.apk` (debug-signed with the
+auto-generated debug keystore), ~11 MB.
 
-`gh` is logged out, there is no `GH_TOKEN`, no git credential helper, and no SSH
-key. The git remote is HTTPS, so push/release cannot succeed without auth.
+The APK bakes the API base URL at build time (from
+`app/build/generated/source/buildConfig/debug/com/barrapp/BuildConfig.java`):
 
-To enable the upload, run **one** of:
-
-```bash
-gh auth login              # browser / device flow
-# or
-export GH_TOKEN=<fine-grained PAT>   # scopes: repo, releases: write on alektebel/barrapp
+```java
+public static final String API_BASE_URL = "https://gogtzcttw6.execute-api.eu-west-1.amazonaws.com";
 ```
 
-After auth, create the GitHub Release and attach the APK:
-
-```bash
-gh release create v1.0.0 \
-  app/build/outputs/apk/debug/app-debug.apk \
-  --repo alektebel/barrapp \
-  --title "1.0.0" \
-  --notes "AWS-connected build of the new app (see docs/AWS_RUNBOOK.md and docs/RELEASE.md).
-Deploy: sam-app live in eu-west-1. Worker fixes: libGL.so.1 + pandas. App pointed at the live API."
-```
-
-## 4. Pending decisions (from the session)
-
-1. **Destination** — GitHub Release asset (recommended) vs. committing the code +
-   APK to the repo. Release was the plan.
-2. **Auth method** — `gh auth login`, or a `GH_TOKEN` read from the environment.
-3. Optional follow-up: the worker writes traces to the read-only `/opt/barra` layer,
-   so `barra explain --replay <traceId>` may not find server-side traces; the app
-   still works, only the replay is affected (see `docs/AWS_RUNBOOK.md` §6.1).
-
-## 5. Where the code changes live (uncommitted)
-
-- `gradle.properties` — debug + release now point at the live ApiUrl.
-- `server/Dockerfile` — installs OpenCV/MediaPipe runtime libs (fixes `libGL.so.1`).
-- `server/requirements-worker.txt` — `opencv-contrib-python` (not headless) + `pandas==2.2.3`.
-- `.gitignore` — `data/calisthenics/videos/**` scrape exclusion.
-- `docs/AWS_RUNBOOK.md`, `docs/RELEASE.md` — updated/added.
+This points the phone at the live `sam-app` stack (`eu-west-1`), the custom API
+served by the Lambda functions (see `docs/AWS_RUNBOOK.md`).
