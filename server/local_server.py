@@ -141,6 +141,11 @@ class Handler(BaseHTTPRequestHandler):
                 JOBS[job_id] = job
             return self._send(201, _dump(job))
 
+        if path == "/v1/chat":
+            from chat import chat
+
+            return self._send(200, chat(body.get("messages") or []))
+
         if path.endswith("/submit") and path.startswith("/v1/jobs/"):
             job_id = path.split("/")[3]
             with LOCK:

@@ -131,6 +131,13 @@ def api(event, _context):
         jobs = [_public(i) for i in resp.get("Items") or []]
         return _resp(200, {"jobs": jobs})
 
+    if method == "POST" and path.rstrip("/") == "/v1/chat":
+        # The objectives intake. The model call and the key stay server-side;
+        # the phone just passes the conversation and reads the reply.
+        from chat import chat
+
+        return _resp(200, chat(body.get("messages") or []))
+
     parts = [p for p in path.split("/") if p]
 
     if method == "GET" and len(parts) == 3 and parts[0] == "v1" and parts[1] == "jobs":

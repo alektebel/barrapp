@@ -6,15 +6,19 @@ import android.net.Uri
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.barrapp.data.ActivityLevel
 import com.barrapp.data.Analysis
 import com.barrapp.data.BarraApi
 import com.barrapp.data.ChatTurn
 import com.barrapp.data.DayEntry
 import com.barrapp.data.EventLog
+import com.barrapp.data.Goals
+import com.barrapp.data.GoalsStore
 import com.barrapp.data.Job
 import com.barrapp.data.Profile
 import com.barrapp.data.ProfileStore
 import com.barrapp.data.SessionStore
+import com.barrapp.notify.ProcessingNotifier
 import com.barrapp.notify.WeeklyReviewWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job as CoroutineJob
@@ -25,7 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics }
+enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics, Objectives }
 
 /** Which pane the compact layout is showing. Wide layouts show all three. */
 enum class Pane { Calendar, Session, Progress }
@@ -45,6 +49,9 @@ data class UiState(
     val error: String? = null,
     val chat: List<ChatTurn> = emptyList(),
     val coachThinking: Boolean = false,
+    val objectives: List<ChatTurn> = emptyList(),
+    val objectivesThinking: Boolean = false,
+    val goals: Goals? = null,
     val weeklyNote: String? = null,
     val events: List<EventLog.Event> = emptyList(),
 )
@@ -204,6 +211,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 analysis = null,
             )
         }
+        ProcessingNotifier.stage(app, STAGE_UPLOAD)
         viewModelScope.launch {
             runCatching {
                 withContext(Dispatchers.IO) {
@@ -211,14 +219,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     _state.update { it.copy(current = created.job) }
                     api.uploadVideo(app, created.uploadUrl, created.uploadMethod, video)
                     _state.update { it.copy(stage = STAGE_DETECT) }
+                    ProcessingNotifier.stage(app, STAGE_DETECT)
                     api.submit(created.job.id)
                 }
             }.onSuccess { job ->
                 _state.update { it.copy(current = job, stage = STAGE_TRIM) }
+                ProcessingNotifier.stage(app, STAGE_TRIM)
                 watch(job.id)
             }.onFailure { err ->
                 EventLog.error(app, "upload failed", err.message.orEmpty(),
                     jobId = _state.value.current?.id.orEmpty())
+                ProcessingNotifier.fail(app, err.message ?: "That clip could not be sent.")
                 _state.update {
                     it.copy(
                         busy = false,
@@ -233,6 +244,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
     fun cancelUpload() {
         poll?.cancel()
+        ProcessingNotifier.cancel(getApplication())
         _state.update { it.copy(screen = Screen.Home, busy = false, stage = "", error = null) }
     }
 
@@ -240,23 +252,26 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val app = getApplication<Application>()
         poll?.cancel()
         poll = viewModelScope.launch {
-            repeat(120) {
+            repeat(240) {
                 val job = runCatching {
                     withContext(Dispatchers.IO) { api.getJob(jobId) }
                 }.getOrElse { err ->
                     EventLog.error(app, "lost contact while measuring",
                         err.message.orEmpty(), jobId = jobId)
+                    ProcessingNotifier.fail(app, err.message ?: "Lost contact with the server.")
                     _state.update {
                         it.copy(error = err.message, busy = false, screen = Screen.Home)
                     }
                     return@launch
                 }
+                val stage = if (_state.value.stage == STAGE_TRIM) STAGE_MEASURE else _state.value.stage
                 _state.update {
                     it.copy(
                         current = job,
-                        stage = if (it.stage == STAGE_TRIM) STAGE_MEASURE else it.stage,
+                        stage = stage,
                     )
                 }
+                ProcessingNotifier.stage(app, stage)
                 if (job.status == "done") {
                     job.result?.let { SessionStore.record(app, job.id, it) }
                     // The trace id is the whole point of logging a success:
@@ -268,6 +283,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                             (job.result?.exercise ?: "unknown"),
                         "score ${job.result?.sessionScore ?: "—"}",
                         traceId = job.result?.traceId.orEmpty(), jobId = job.id,
+                    )
+                    ProcessingNotifier.done(
+                        app,
+                        "Measured ${job.result?.repCount ?: 0} rep${if (job.result?.repCount == 1) "" else "s"}",
+                        "Your ${job.result?.detected?.label ?: job.result?.exercise?.replace('_', ' ') ?: "clip"} is ready.",
                     )
                     _state.update {
                         it.copy(
@@ -287,6 +307,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     EventLog.error(app, "the server could not use that clip",
                         job.error.orEmpty(),
                         traceId = job.result?.traceId.orEmpty(), jobId = job.id)
+                    ProcessingNotifier.fail(app, job.error ?: "The server could not use that clip.")
                     _state.update {
                         it.copy(
                             screen = Screen.Home,
@@ -297,10 +318,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     }
                     return@launch
                 }
-                delay(2500)
+                delay(1000)
             }
             EventLog.warn(app, "measuring timed out on the phone",
                 "the job may still finish on the server", jobId = jobId)
+            ProcessingNotifier.fail(app, "Still measuring. It will appear in your calendar when it finishes.")
             _state.update {
                 it.copy(
                     busy = false,
@@ -369,6 +391,95 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val app = getApplication<Application>()
         SessionStore.clearChat(app)
         _state.update { it.copy(chat = emptyList()) }
+    }
+
+    // ---- objectives intake -------------------------------------------------
+    fun openObjectives() {
+        _state.update { it.copy(screen = Screen.Objectives) }
+        if (_state.value.objectives.isEmpty()) objectivesStart()
+    }
+
+    fun closeObjectives() {
+        val complete = _state.value.profile.complete
+        _state.update { it.copy(screen = if (complete) Screen.Home else Screen.Onboarding) }
+        if (complete) refresh()
+    }
+
+    private fun objectivesStart() {
+        val app = getApplication<Application>()
+        _state.update { it.copy(objectivesThinking = true) }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { api.chat(emptyList()) } }
+                .onSuccess { res ->
+                    applyGoals(app, res.goals)
+                    _state.update {
+                        it.copy(
+                            objectives = listOf(ChatTurn(fromUser = false, text = res.reply)),
+                            objectivesThinking = false,
+                            goals = it.goals ?: res.goals,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    EventLog.error(app, "objectives intake failed", err.message.orEmpty())
+                    _state.update {
+                        it.copy(
+                            objectivesThinking = false,
+                            objectives = listOf(
+                                ChatTurn(fromUser = false, text = "I could not reach the " +
+                                    "objectives service. Check your connection and try again.")
+                            ),
+                        )
+                    }
+                }
+        }
+    }
+
+    fun sendObjectives(text: String) {
+        val app = getApplication<Application>()
+        val userTurn = ChatTurn(fromUser = true, text = text)
+        val turns = _state.value.objectives + userTurn
+        _state.update { it.copy(objectives = turns, objectivesThinking = true) }
+        viewModelScope.launch {
+            val messages = turns.map { (if (it.fromUser) "user" else "assistant") to it.text }
+            runCatching { withContext(Dispatchers.IO) { api.chat(messages) } }
+                .onSuccess { res ->
+                    applyGoals(app, res.goals)
+                    _state.update {
+                        it.copy(
+                            objectives = turns + ChatTurn(fromUser = false, text = res.reply),
+                            objectivesThinking = false,
+                            goals = it.goals ?: res.goals,
+                        )
+                    }
+                }
+                .onFailure { err ->
+                    EventLog.error(app, "objectives intake failed", err.message.orEmpty())
+                    _state.update { it.copy(objectivesThinking = false, error = err.message) }
+                }
+        }
+    }
+
+    /** Fold the model's goals into the profile and the goals store. Blank parts
+     *  of the profile are left alone, so a partial answer never wipes a field
+     *  the user filled in during onboarding. */
+    private fun applyGoals(app: Application, goals: Goals?) {
+        if (goals == null) return
+        val profile = _state.value.profile
+        val activity = ActivityLevel.entries
+            .firstOrNull { it.name.equals(goals.activity, ignoreCase = true) }
+            ?: profile.activity
+        val updated = profile.copy(
+            name = goals.name.ifBlank { profile.name },
+            age = if (goals.age > 0) goals.age else profile.age,
+            activity = activity,
+        )
+        ProfileStore.save(app, updated)
+        GoalsStore.save(app, Goals(
+            goal = goals.goal.ifBlank { GoalsStore.load(app).goal },
+            focusExercise = goals.focusExercise.ifBlank { GoalsStore.load(app).focusExercise },
+        ))
+        _state.update { it.copy(profile = updated, goals = goals) }
     }
 
     companion object {

@@ -109,6 +109,16 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
             Screen.Onboarding -> Onboarding(
                 initial = state.profile,
                 onDone = vm::saveProfile,
+                onObjectives = vm::openObjectives,
+            )
+
+            Screen.Objectives -> ObjectivesChatScreen(
+                turns = state.objectives,
+                thinking = state.objectivesThinking,
+                goals = state.goals,
+                onSend = vm::sendObjectives,
+                onDone = vm::closeObjectives,
+                onBack = vm::closeObjectives,
             )
 
             Screen.Processing -> ProcessingState(

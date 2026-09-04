@@ -186,3 +186,31 @@ data class ChatTurn(
     val text: String,
     val at: Long = System.currentTimeMillis(),
 )
+
+/** What the objectives chat asked for and got back from the server.
+ *  `goals` is null until the model has enough to fill one in. */
+data class ChatResult(
+    val reply: String,
+    val goals: Goals? = null,
+)
+
+/**
+ * The training objectives the intake chat extracted. Blank fields mean "not
+ * captured yet"; [merge] fills only the gaps, so a partial JSON block that
+ * arrives mid-conversation never wipes an earlier value.
+ */
+data class Goals(
+    val name: String = "",
+    val age: Int = 0,
+    val activity: String = "",
+    val goal: String = "",
+    val focusExercise: String = "",
+) {
+    fun merge(other: Goals): Goals = Goals(
+        name = other.name.ifBlank { name },
+        age = if (other.age > 0) other.age else age,
+        activity = other.activity.ifBlank { activity },
+        goal = other.goal.ifBlank { goal },
+        focusExercise = other.focusExercise.ifBlank { focusExercise },
+    )
+}

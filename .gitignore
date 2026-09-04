@@ -23,6 +23,8 @@ build/
 # Local configuration file (sdk path, etc)
 local.properties
 *.hprof
+hs_err_pid*.log
+replay_pid*.log
 .cxx/
 captures/
 server/.env

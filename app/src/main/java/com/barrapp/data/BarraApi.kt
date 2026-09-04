@@ -86,6 +86,31 @@ class BarraApi(context: Context) {
         call(request)
     }
 
+    /** Send one conversation turn of the objectives intake. `messages` is the
+     *  running chat as role/content pairs, oldest first. */
+    fun chat(messages: List<Pair<String, String>>): ChatResult {
+        val arr = JSONArray()
+        messages.forEach { (role, content) ->
+            arr.put(JSONObject().put("role", role).put("content", content))
+        }
+        val body = JSONObject().put("messages", arr).toString().toRequestBody(JSON)
+        val request = authed(Request.Builder().url("$baseUrl/v1/chat").post(body)).build()
+        val json = call(request)
+        val goalsJson = json.optJSONObject("goals")
+        return ChatResult(
+            reply = json.optString("reply"),
+            goals = goalsJson?.let { g ->
+                Goals(
+                    name = g.optString("name"),
+                    age = g.optInt("age"),
+                    activity = g.optString("activity"),
+                    goal = g.optString("goal"),
+                    focusExercise = g.optString("focusExercise"),
+                )
+            },
+        )
+    }
+
     private fun authed(builder: Request.Builder): Request.Builder =
         builder.header("X-Device-Id", deviceId)
 

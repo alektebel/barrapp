@@ -59,6 +59,7 @@ fun Onboarding(
     initial: Profile,
     onDone: (Profile) -> Unit,
     modifier: Modifier = Modifier,
+    onObjectives: (() -> Unit)? = null,
 ) {
     var step by remember { mutableIntStateOf(0) }
     var name by remember { mutableStateOf(initial.name) }
@@ -193,6 +194,13 @@ fun Onboarding(
                     shape = RoundedCornerShape(12.dp),
                 ) {
                     Text(if (step < 2) "Continue" else "Start training")
+                }
+            }
+
+            if (onObjectives != null) {
+                Spacer(Modifier.height(14.dp))
+                TextButton(onClick = onObjectives, modifier = Modifier.fillMaxWidth()) {
+                    Text("Or set up your goals in a chat instead")
                 }
             }
         }

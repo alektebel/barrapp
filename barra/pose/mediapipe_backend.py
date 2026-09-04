@@ -36,6 +36,14 @@ COCO_FROM_BLAZE = {
     11: 23, 12: 24, 13: 25, 14: 26, 15: 27, 16: 28,
 }
 
+# BlazePose is scale-robust, so a clip does not need to be posed at its native
+# resolution. Resizing each frame to this width (aspect preserved) before
+# inference cuts the per-frame cost by roughly the pixel ratio, which is where
+# most of the "measuring the reps" wait goes. Landmarks are scaled back to the
+# original resolution afterwards, so every downstream metric sees the same
+# pixel coordinates it always has.
+PROCESS_WIDTH = 640
+
 
 def ensure_model(path: Path = DEFAULT_MODEL) -> Path:
     if path.exists():
@@ -85,6 +93,10 @@ class MediapipeBackend:
                 ok, frame = cap.read()
                 if not ok:
                     break
+                if w > PROCESS_WIDTH:
+                    scale = PROCESS_WIDTH / w
+                    frame = cv2.resize(frame, (PROCESS_WIDTH, max(1, int(h * scale))),
+                                       interpolation=cv2.INTER_AREA)
                 image = mp.Image(
                     image_format=mp.ImageFormat.SRGB,
                     data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
@@ -95,7 +107,10 @@ class MediapipeBackend:
                 if res.pose_landmarks:
                     for i, lm in enumerate(res.pose_landmarks[0]):
                         # visibility x presence: a landmark the model placed but
-                        # believes is out of frame is not a usable observation
+                        # believes is out of frame is not a usable observation.
+                        # lm.x/lm.y are normalised to the processed image, so
+                        # scaling back by the ORIGINAL dimensions keeps the
+                        # pixel coordinates downstream has always expected.
                         row[i] = (lm.x * w, lm.y * h,
                                   float(lm.visibility) * float(lm.presence))
                 frames.append(row)

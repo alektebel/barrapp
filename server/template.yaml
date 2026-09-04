@@ -8,6 +8,15 @@ Parameters:
     Default: ""
     NoEcho: true
     Description: Leave blank until you have a DeepSeek key.
+  NanApiKey:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: Key for the objectives intake chat (nan.builder). Leave blank to fall back.
+  NanBaseUrl:
+    Type: String
+    Default: ""
+    Description: Base URL of the OpenAI-compatible nan.builder endpoint (root that serves /chat/completions).
 
 Globals:
   Function:
@@ -20,6 +29,9 @@ Globals:
         DEEPSEEK_API_KEY: !Ref DeepSeekApiKey
         DEEPSEEK_BASE_URL: https://api.deepseek.com
         DEEPSEEK_MODEL: deepseek-chat
+        NAN_API_KEY: !Ref NanApiKey
+        NAN_BASE_URL: !Ref NanBaseUrl
+        NAN_MODEL: qwen3.8-flash
         BARRA_ROOT: /opt/barra
 
 Resources:
