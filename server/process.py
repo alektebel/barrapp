@@ -199,6 +199,20 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             "pip install -e ../barrapp[mediapipe]"
         ])
 
+    # A backend can fail in ways this process cannot survive (a native library
+    # that takes the interpreter down with it), so the order is decided BEFORE
+    # the first frame: BARRA_POSE_BACKEND pins one, and the rest are tried in
+    # registry order if the first estimate raises.
+    requested = os.environ.get("BARRA_POSE_BACKEND", "").strip()
+    if requested:
+        if requested not in backends:
+            return _empty(exercise, [
+                f"pose backend {requested!r} is not installed; have: {', '.join(backends)}"
+            ])
+        order = [requested] + [b for b in backends if b != requested]
+    else:
+        order = backends
+
     info = probe_video(video_path)
     tr.step("container", **{k: v for k, v in info.items() if k != "ok"})
     if not info.get("ok"):
@@ -207,10 +221,19 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                       [f"Could not open the clip: {info.get('reason', 'unknown')}"])
 
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
-    try:
-        pose = get_backend(backends[0]).estimate(video_path)
-    except Exception as exc:  # noqa: BLE001
-        return _empty(exercise, [f"Pose estimation failed: {exc}"])
+    pose = None
+    pose_error = None
+    for name in order:
+        try:
+            pose = get_backend(name).estimate(video_path)
+            tr.step("pose backend", backend=name)
+            break
+        except Exception as exc:  # noqa: BLE001 - the next backend may still work
+            pose_error = exc
+            tr.reject("pose backend failed", backend=name, reason=str(exc)[:200])
+    if pose is None:
+        reason = str(pose_error) if pose_error else "unknown"
+        return _empty(exercise, [f"Pose estimation failed: {reason}"])
     fps = pose.fps or info["fps"] or 30.0
 
     # Detect the movement from the clip itself. A movement the athlete named is

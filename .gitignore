@@ -76,3 +76,4 @@ data/calisthenics/videos/**
 out/**
 !out/.gitkeep
 models/
+*.pt
