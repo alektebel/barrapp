@@ -49,8 +49,12 @@ import com.barrapp.BuildConfig
 import com.barrapp.DeviceId
 import com.barrapp.Pane
 import com.barrapp.Screen
+import com.barrapp.data.ActivityLevel
+import com.barrapp.data.Goals
+import com.barrapp.data.Profile
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Panel
+import com.barrapp.ui.parts.Pill
 
 /**
  * The shell.
@@ -269,30 +273,49 @@ private fun MainPane(
                 onDelete = if (state.current != null) vm::deleteCurrent else null,
             )
 
-            state.days.isEmpty() -> EmptyState(
-                onAdd = onPick,
-                onSeeExample = vm::openExample,
-            )
+            state.days.isEmpty() -> Column(Modifier.fillMaxSize()) {
+                ObjectivesCard(
+                    profile = state.profile,
+                    goals = state.goals,
+                    onSetup = vm::openObjectives,
+                    onEditProfile = vm::openOnboarding,
+                )
+                EmptyState(
+                    onAdd = onPick,
+                    onSeeExample = vm::openExample,
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
-            else -> Column(
-                Modifier.fillMaxSize().padding(20.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Text(
-                    "Pick a day to see it",
-                    style = MaterialTheme.typography.titleMedium,
+            else -> Column(Modifier.fillMaxSize()) {
+                ObjectivesCard(
+                    profile = state.profile,
+                    goals = state.goals,
+                    onSetup = vm::openObjectives,
+                    onEditProfile = vm::openOnboarding,
                 )
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    "Or add another clip.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Spacer(Modifier.height(22.dp))
-                AddButton(onPick, large = true)
-                Spacer(Modifier.height(10.dp))
-                TextButton(onClick = onRecord) { Text("Record now instead") }
+                Box(Modifier.weight(1f).fillMaxSize()) {
+                    Column(
+                        Modifier.fillMaxSize(),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.Center,
+                    ) {
+                        Text(
+                            "Pick a day to see it",
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        Text(
+                            "Or add another clip.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        Spacer(Modifier.height(22.dp))
+                        AddButton(onPick, large = true)
+                        Spacer(Modifier.height(10.dp))
+                        TextButton(onClick = onRecord) { Text("Record now instead") }
+                    }
+                }
             }
         }
 
@@ -312,6 +335,67 @@ private fun MainPane(
             }
         }
     }
+}
+
+/**
+ * Who is training, and what for. Sits at the top of the initial screen, so the
+ * objectives captured in the intake chat are on the screen where training
+ * starts, and a profile onboarding never finished shows as unfinished instead
+ * of silently missing.
+ */
+@Composable
+private fun ObjectivesCard(
+    profile: Profile,
+    goals: Goals?,
+    onSetup: () -> Unit,
+    onEditProfile: () -> Unit,
+) {
+    Panel(Modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
+        Eyebrow("Objectives")
+        Spacer(Modifier.height(6.dp))
+        val goal = goals?.goal.orEmpty()
+        if (goal.isNotBlank()) {
+            Text(goal, style = MaterialTheme.typography.bodyMedium)
+        } else {
+            Text(
+                "No goal captured yet.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        goals?.focusExercise
+            ?.takeIf { it.isNotBlank() && it != "unknown" }
+            ?.let { focus ->
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    "Focus: ${focus.replace('_', ' ')}",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        Spacer(Modifier.height(10.dp))
+        Pill(statusLine(profile))
+        if (goal.isBlank() || !profile.complete) {
+            Spacer(Modifier.height(4.dp))
+            Row {
+                if (goal.isBlank()) {
+                    TextButton(onClick = onSetup) { Text("Set your goal in a chat") }
+                }
+                if (!profile.complete) {
+                    TextButton(onClick = onEditProfile) { Text("Finish setup") }
+                }
+            }
+        }
+    }
+}
+
+private fun statusLine(profile: Profile): String {
+    if (!profile.complete) return "profile unfinished"
+    return listOfNotNull(
+        profile.age.takeIf { it > 0 }?.toString(),
+        profile.activity.label.takeIf { profile.activity != ActivityLevel.Unset },
+        "aim ${profile.repTarget} reps",
+    ).joinToString(" · ")
 }
 
 @Composable

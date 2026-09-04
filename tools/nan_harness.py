@@ -76,12 +76,13 @@ def load_frames(frames_dir: Path) -> list[str]:
     return uris
 
 
-def call(model: str, key: str, frames: list[str]) -> dict:
-    content = [{"type": "text", "text": USER_TEXT}]
+def call(model: str, key: str, frames: list[str],
+         system: str = SYSTEM, user: str = USER_TEXT) -> dict:
+    content = [{"type": "text", "text": user}]
     content += [{"type": "image_url", "image_url": {"url": u}} for u in frames]
     body = json.dumps({
         "model": model,
-        "messages": [{"role": "system", "content": SYSTEM},
+        "messages": [{"role": "system", "content": system},
                      {"role": "user", "content": content}],
         "temperature": 0.4,
     }).encode()

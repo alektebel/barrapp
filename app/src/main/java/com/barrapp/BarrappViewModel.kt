@@ -74,6 +74,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             it.copy(
                 screen = screen,
                 profile = profile,
+                goals = GoalsStore.load(app),
                 days = SessionStore.days(app),
                 chat = SessionStore.chat(app),
                 weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
