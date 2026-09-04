@@ -77,6 +77,9 @@ fun InsightPane(
             item { ProgressionCard(progression) }
         }
 
+        item { DayByDayPanel(days) }
+        item { PromotionReadinessPanel(days) }
+
         item {
             Panel {
                 Eyebrow("Sessions you can compare")
@@ -318,6 +321,170 @@ private fun ScoreTrend(measured: List<DayEntry>) {
  * **evidence** is measured, and only the evidence carries a trace. An app that
  * blurs the two is asking to be believed rather than checked.
  */
+/**
+ * What each training day was expected to deliver, and whether it did.
+ *
+ * The expectation is not invented per day: it is the movement's published
+ * standard, and it does not move until the standard is cleared. A day either
+ * cleared it - enough verified reps at the quality bar - or it did not, and
+ * the gap is named. Days whose movement is not on the ladder are shown too,
+ * honestly unjudged: barra has nothing to referee them against.
+ */
+@Composable
+private fun DayByDayPanel(days: List<DayEntry>) {
+    val recent = days.sortedByDescending { it.date }.take(14)
+    Panel {
+        Eyebrow("Day by day")
+        Spacer(Modifier.height(8.dp))
+        if (recent.isEmpty()) {
+            Text(
+                "No sessions yet. The bar appears once something is measured.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            return@Panel
+        }
+        Text(
+            "A day clears the bar with enough verified reps at the quality the " +
+                "standard asks for. The bar does not move until the standard is cleared.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(12.dp))
+        recent.forEach { day ->
+            val judged = dayJudgements(day)
+            if (judged.isEmpty()) {
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        day.date,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.weight(1f),
+                    )
+                    Pill("not on the ladder", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                }
+            } else {
+                judged.forEach { j -> JudgedDayRow(day.date, j) }
+            }
+        }
+    }
+}
+
+private data class DayJudgement(
+    val movement: String,
+    val label: String,
+    val verified: Int,
+    val score: Int?,
+    val step: Progression.Step?,
+) {
+    val cleared: Boolean
+        get() = step != null && verified >= step.reps && (score ?: 0) >= step.quality
+    val shortfall: Int
+        get() = step?.let { (step.reps - verified).coerceAtLeast(0) } ?: 0
+}
+
+/** Per movement, what the day delivered against the standard. Days recorded
+ *  before the per-movement breakdown existed are judged at day level, which
+ *  is the best evidence they carry. */
+private fun dayJudgements(day: DayEntry): List<DayJudgement> {
+    if (day.byMovement.isEmpty()) {
+        val step = Progression.LADDER[day.exercise] ?: return emptyList()
+        return listOf(DayJudgement(day.exercise, day.exerciseLabel.ifBlank { day.exercise },
+            day.reps, day.score, step))
+    }
+    return day.byMovement.values.mapNotNull { m ->
+        val step = Progression.LADDER[m.exercise] ?: return@mapNotNull null
+        DayJudgement(m.exercise, m.label.ifBlank { m.exercise }, m.verified, m.score, step)
+    }
+}
+
+@Composable
+private fun JudgedDayRow(date: String, j: DayJudgement) {
+    Row(
+        Modifier.fillMaxWidth().padding(vertical = 5.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text(
+                j.label.replaceFirstChar { it.uppercase() },
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Text(
+                "$date · ${j.verified} verified at ${j.score ?: "—"}",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (j.cleared) {
+            Pill("bar cleared", color = MaterialTheme.colorScheme.primary)
+        } else if (j.step != null) {
+            Pill(
+                if (j.shortfall > 0) "short ${j.shortfall} rep${if (j.shortfall == 1) "" else "s"}"
+                else "below the bar",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/**
+ * Where each trained movement stands for promotion, at a glance.
+ *
+ * The full verdict for the movement you actually train sits above; these are
+ * the other ladders, so "ready or not" is never hidden behind a pane. A
+ * movement earns its step on the required number of separate qualifying days.
+ */
+@Composable
+private fun PromotionReadinessPanel(days: List<DayEntry>) {
+    val verdicts = Progression.LADDER.keys
+        .map { Progression.assess(it, days) }
+        .filter { it.bestReps > 0 }
+        .sortedByDescending { it.bestReps }
+    if (verdicts.isEmpty()) return
+    Panel {
+        Eyebrow("Ready for promotion?")
+        Spacer(Modifier.height(10.dp))
+        verdicts.forEachIndexed { i, v ->
+            val step = v.step ?: return@forEachIndexed
+            if (i > 0) {
+                Spacer(Modifier.height(10.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.3f))
+                Spacer(Modifier.height(10.dp))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        v.label.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    Text(
+                        v.headline,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Pill(
+                    if (v.ready) "ready — ${step.towardsLabel}"
+                    else "${v.qualifyingDays.size} of ${step.days} days",
+                    color = if (v.ready) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            if (!v.ready && v.missing.isNotBlank()) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    v.missing,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+        }
+    }
+}
+
 @Composable
 private fun ProgressionCard(v: Progression.Verdict) {
     val step = v.step ?: return
