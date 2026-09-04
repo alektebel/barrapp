@@ -1,6 +1,12 @@
 # mediapipe 0.10.x requires numpy<2. Use 1.26 wheels on Amazon Linux 2023 / cp312.
+# mediapipe already pulls opencv-contrib-python, so cv2 is non-headless and needs
+# libGL etc. (installed in the Dockerfile). Pin contrib ourselves so headless and
+# contrib are not silently competing for the `cv2` module.
 numpy==1.26.4
 scipy==1.14.1
-opencv-python-headless==4.10.0.84
+# barra's measurement core (ingest/metrics) runs on DataFrames. pandas must
+# stay compatible with the pinned numpy<2 that mediapipe requires.
+pandas==2.2.3
+opencv-contrib-python==4.10.0.84
 mediapipe==0.10.21
 boto3
