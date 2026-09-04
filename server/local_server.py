@@ -102,6 +102,19 @@ class Handler(BaseHTTPRequestHandler):
                     if j.get("owner") == owner
                 ]
             return self._send(200, {"jobs": jobs})
+        if path == "/v1/history":
+            with LOCK:
+                history = [
+                    {
+                        "id": j["id"],
+                        "createdAt": j["createdAt"],
+                        "exercise": j["exercise"],
+                        "result": j.get("result"),
+                    }
+                    for j in sorted(JOBS.values(), key=lambda x: x["createdAt"], reverse=True)
+                    if j.get("owner") == owner and j.get("status") == "done"
+                ]
+            return self._send(200, {"history": history})
         parts = [p for p in path.split("/") if p]
         if len(parts) == 3 and parts[0] == "v1" and parts[1] == "jobs":
             with LOCK:

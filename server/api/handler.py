@@ -9,7 +9,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 
 s3 = boto3.client("s3")
 ddb = boto3.resource("dynamodb")
@@ -130,6 +130,28 @@ def api(event, _context):
         )
         jobs = [_public(i) for i in resp.get("Items") or []]
         return _resp(200, {"jobs": jobs})
+
+    if method == "GET" and path.rstrip("/") == "/v1/history":
+        # The training history: the measurements of every finished job, keyed
+        # by the device id, held for as long as the table exists. The clip
+        # itself is not part of it - it expires from the bucket after 30 days,
+        # and the copy a replay plays stays on the phone.
+        resp = table.query(
+            IndexName="owner-index",
+            KeyConditionExpression=Key("owner").eq(owner),
+            FilterExpression=Attr("status").eq("done"),
+            ScanIndexForward=False,
+        )
+        history = [
+            {
+                "id": i["id"],
+                "createdAt": i.get("createdAt", ""),
+                "exercise": i.get("exercise", ""),
+                "result": i.get("result"),
+            }
+            for i in resp.get("Items") or []
+        ]
+        return _resp(200, {"history": history})
 
     if method == "POST" and path.rstrip("/") == "/v1/chat":
         # The objectives intake. The model call and the key stay server-side;

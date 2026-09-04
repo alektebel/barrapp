@@ -29,7 +29,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics, Objectives }
+enum class Screen { Privacy, Onboarding, Home, Processing, Coach, Diagnostics, Objectives, Replay }
 
 /** Which pane the compact layout is showing. Wide layouts show all three. */
 enum class Pane { Calendar, Session, Progress }
@@ -83,7 +83,58 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         if (screen == Screen.Home) {
             WeeklyReviewWorker.schedule(app)
             refresh()
+            syncHistory()
         }
+    }
+
+    /** Pull the device's history from the server and fold in whatever the
+     *  phone has never seen, so the calendar survives a cleared app. The
+     *  measurements travel; the clips never do - those stay wherever they
+     *  were filmed. A failed sync is quiet: the phone still shows what it
+     *  holds, and the next launch tries again. */
+    private fun syncHistory() {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { api.history() } }
+                .onSuccess { jobs ->
+                    val known = SessionStore.knownJobIds(app)
+                    val fresh = jobs.filter { it.id !in known && it.result != null }
+                    fresh.forEach { SessionStore.record(app, it.id, it.result!!) }
+                    if (fresh.isNotEmpty()) {
+                        _state.update { it.copy(days = SessionStore.days(app)) }
+                    }
+                }
+        }
+    }
+
+    /** A copy of the clip on this phone, keyed by job id. The server's copy
+     *  expires; this one is what the replay screen plays, and it never leaves
+     *  the device. */
+    private fun keepClip(app: Application, jobId: String, uri: Uri) {
+        runCatching {
+            clipFile(app, jobId).parentFile?.mkdirs()
+            app.contentResolver.openInputStream(uri)?.use { input ->
+                clipFile(app, jobId).outputStream().use { output -> input.copyTo(output) }
+            } ?: error("could not open the clip")
+        }.onFailure {
+            EventLog.warn(app, "the clip was not kept for replay", it.message.orEmpty())
+        }
+    }
+
+    private fun clipFile(app: Application, jobId: String): java.io.File =
+        java.io.File(java.io.File(app.filesDir, "clips"), "$jobId.mp4")
+
+    /** The locally kept copy of the current session's clip, when this phone
+     *  still has it. Drives whether the replay entry point is offered. */
+    fun replayClip(): java.io.File? {
+        val id = _state.value.current?.id ?: return null
+        val f = clipFile(getApplication(), id)
+        return if (f.exists() && f.length() > 0) f else null
+    }
+
+    // ---- replay ------------------------------------------------------------
+    fun openReplay() {
+        if (replayClip() != null) _state.update { it.copy(screen = Screen.Replay) }
     }
 
     // ---- onboarding -------------------------------------------------------
@@ -218,6 +269,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 withContext(Dispatchers.IO) {
                     val created = api.createJob("auto")
                     _state.update { it.copy(current = created.job) }
+                    keepClip(app, created.job.id, video)
                     api.uploadVideo(app, created.uploadUrl, created.uploadMethod, video)
                     _state.update { it.copy(stage = STAGE_DETECT) }
                     ProcessingNotifier.stage(app, STAGE_DETECT)
@@ -343,6 +395,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             runCatching { withContext(Dispatchers.IO) { api.deleteJob(job.id) } }
                 .onSuccess {
                     SessionStore.forget(app, job.id)
+                    // The phone's copy of the clip goes with the session.
+                    clipFile(app, job.id).delete()
                     _state.update {
                         it.copy(
                             current = null,

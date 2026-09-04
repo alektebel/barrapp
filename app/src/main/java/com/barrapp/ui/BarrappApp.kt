@@ -38,6 +38,7 @@ import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -147,6 +148,12 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 thinking = state.coachThinking,
                 suggestions = vm.suggestions(),
                 onSend = vm::ask,
+                onBack = vm::openHome,
+            )
+
+            Screen.Replay -> ReplayScreen(
+                analysis = state.analysis,
+                clip = remember(state.current?.id) { vm.replayClip() },
                 onBack = vm::openHome,
             )
 
@@ -267,11 +274,15 @@ private fun MainPane(
 
     Box(Modifier.fillMaxSize()) {
         when {
-            analysis != null -> SessionDetail(
-                analysis = analysis,
-                onAdd = onPick,
-                onDelete = if (state.current != null) vm::deleteCurrent else null,
-            )
+            analysis != null -> {
+                val clip = remember(state.current?.id) { vm.replayClip() }
+                SessionDetail(
+                    analysis = analysis,
+                    onAdd = onPick,
+                    onDelete = if (state.current != null) vm::deleteCurrent else null,
+                    onReplay = clip?.let { { vm.openReplay() } },
+                )
+            }
 
             state.days.isEmpty() -> Column(Modifier.fillMaxSize()) {
                 ObjectivesCard(

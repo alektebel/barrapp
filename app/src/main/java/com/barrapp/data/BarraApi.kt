@@ -81,6 +81,16 @@ class BarraApi(context: Context) {
         return (0 until items.length()).map { parseJob(items.getJSONObject(it)) }
     }
 
+    /** The device's stored history: every finished job with its result. This
+     *  is how the calendar survives a cleared app - the measurements live on
+     *  the server, the clips do not. */
+    fun history(): List<Job> {
+        val request = authed(Request.Builder().url("$baseUrl/v1/history").get()).build()
+        val json = call(request)
+        val items = json.optJSONArray("history") ?: JSONArray()
+        return (0 until items.length()).map { parseJob(items.getJSONObject(it)) }
+    }
+
     fun deleteJob(jobId: String) {
         val request = authed(Request.Builder().url("$baseUrl/v1/jobs/$jobId").delete()).build()
         call(request)

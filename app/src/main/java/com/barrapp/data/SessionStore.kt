@@ -29,6 +29,11 @@ object SessionStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
     // ---- days -------------------------------------------------------------
+    /** Every job id the calendar already holds, so a history sync can tell a
+     *  job the phone has never folded in from one it already has. */
+    fun knownJobIds(context: Context): Set<String> =
+        days(context).flatMap { it.jobIds }.toSet()
+
     fun days(context: Context): List<DayEntry> {
         val raw = prefs(context).getString(DAYS, "[]").orEmpty()
         val arr = runCatching { JSONArray(raw) }.getOrElse { JSONArray() }

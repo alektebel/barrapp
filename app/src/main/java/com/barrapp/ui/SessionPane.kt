@@ -264,6 +264,7 @@ fun SessionDetail(
     onAdd: () -> Unit,
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onReplay: (() -> Unit)? = null,
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
@@ -271,6 +272,14 @@ fun SessionDetail(
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         item { SessionHeader(analysis) }
+
+        if (onReplay != null) {
+            item {
+                OutlinedButton(onClick = onReplay, modifier = Modifier.fillMaxWidth()) {
+                    Text("Watch again, with the feedback on the timeline")
+                }
+            }
+        }
 
         if (analysis.reps.isNotEmpty()) {
             item { Eyebrow("Reps") }
