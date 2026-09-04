@@ -1,1 +1,4 @@
 file,trick,expected,forbidden,observed,reps,note
+videos/muscle_up/youtube_IvJtx3NaKew.mp4,muscle_up,,,control:3;dead hang:6;lockout:10;stall:11,12,
+videos/muscle_up/youtube_BHXSLUkIQkQ.mp4,muscle_up,,,,0,
+videos/dip/youtube_UQEVOSyEogE.mp4,dip,,,dead hang:5;stall:4,5,

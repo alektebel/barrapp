@@ -105,7 +105,7 @@ def emit_candidates(files: list[tuple[Path, str]], out: Path, limit: int | None,
         row["observed"] = ";".join(f"{k}:{v}" for k, v in sorted(counts.items()))
         row["reps"] = reps
         print(f"[{i + 1}/{len(todo)}] {rel}: {row['observed'] or 'clean'} ({reps} reps)")
-    save_manifest(out, rows)
+    save_manifest(out, list(by_file.values()))
     print(f"\nmanifest -> {out}\nNext: watch the clips, move what you agree with into "
           "`expected` (or `forbidden`), then re-run without --emit-candidates.")
 
