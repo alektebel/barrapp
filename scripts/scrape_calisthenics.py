@@ -90,6 +90,23 @@ TRICKS: dict[str, dict] = {
 
 VIDEO_EXTS = (".mp4", ".webm", ".ogv", ".ogg", ".mov", ".mkv")
 
+# Title keywords used to route one channel's uploads to tricks. A channel
+# (Chris Heria, THENX, ...) is not organised by movement, so the title is the
+# only signal; a video whose title names no trick is skipped rather than
+# guessed.
+CHANNEL_KEYWORDS: dict[str, list[str]] = {
+    "muscle_up": ["muscle up", "muscle-up"],
+    "pull_up": ["pull up", "pull-up"],
+    "push_up": ["push up", "push-up"],
+    "dip": ["dip"],
+    "squat": ["squat", "pistol"],
+    "handstand": ["handstand"],
+    "front_lever": ["front lever"],
+    "planche": ["planche"],
+    "back_lever": ["back lever"],
+    "human_flag": ["human flag", "full flag"],
+}
+
 
 def commons_get(params: dict, retries: int = 4) -> dict:
     url = COMMONS_API + "?" + urllib.parse.urlencode(params)
@@ -189,6 +206,44 @@ def yt_search_ids(query: str, n: int) -> list[str]:
         return []
     ids = [l.strip() for l in p.stdout.splitlines() if l.strip()]
     return ids[:n]
+
+
+def yt_channel_videos(channel_url: str, limit: int = 400) -> list[tuple[str, str]]:
+    """Walk a channel's uploads tab without downloading: (id, title) pairs.
+
+    Two --print flags rather than one with a separator: yt-dlp does not
+    interpret escapes, so a literal \\t would sit inside every line, and a
+    separator like | collides with video titles. Alternating lines cannot
+    collide, because an id is never a title.
+    """
+    url = channel_url.rstrip("/") + "/videos"
+    cmd = ["yt-dlp", "--flat-playlist", "--no-warnings", "--quiet",
+           "--print", "%(id)s", "--print", "%(title)s", url]
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+        print(f"  [yt] channel walk failed for {channel_url}: {e}", file=sys.stderr)
+        return []
+    out: list[tuple[str, str]] = []
+    lines = [l for l in p.stdout.splitlines() if l.strip()]
+    for i in range(0, len(lines) - 1, 2):
+        vid, title = lines[i].strip(), lines[i + 1].strip()
+        out.append((vid, title))
+        if len(out) >= limit:
+            break
+    return out
+
+
+def route_by_title(videos: list[tuple[str, str]]) -> dict[str, list[tuple[str, str]]]:
+    """Group channel videos by the trick their title names."""
+    routed: dict[str, list[tuple[str, str]]] = {}
+    for vid, title in videos:
+        low = title.lower()
+        for trick, keywords in CHANNEL_KEYWORDS.items():
+            if any(k in low for k in keywords):
+                routed.setdefault(trick, []).append((vid, title))
+                break
+    return routed
 
 
 def yt_info(video_id: str) -> dict | None:
@@ -327,6 +382,14 @@ def main() -> int:
     ap.add_argument("--no-youtube", dest="youtube", action="store_false")
     ap.add_argument("--include-commons", dest="commons", action="store_true", default=True)
     ap.add_argument("--no-commons", dest="commons", action="store_false")
+    ap.add_argument("--channel", default="",
+                    help="walk one channel's uploads (e.g. https://www.youtube.com/@ChrisHeria) "
+                         "and route videos to tricks by title keywords")
+    ap.add_argument("--allow-standard-license", action="store_true",
+                    help="also keep 'Standard YouTube License' clips. They are NOT open: "
+                         "fine for a local research set that is never redistributed, "
+                         "which is the rule here anyway - footage is never committed. "
+                         "The license is recorded per row either way.")
     a = ap.parse_args()
 
     tricks = [t.strip() for t in a.tricks.split(",") if t.strip() in TRICKS]
@@ -349,13 +412,28 @@ def main() -> int:
         rows.append(row)
         return True
 
+    # One walk of the channel, then every trick draws from the same pool.
+    channel_pool: dict[str, list[tuple[str, str]]] = {}
+    if a.channel:
+        print(f"== channel {a.channel} ==")
+        videos = yt_channel_videos(a.channel)
+        print(f"  {len(videos)} uploads walked")
+        channel_pool = route_by_title(videos)
+        for trick in tricks:
+            print(f"  {trick}: {len(channel_pool.get(trick, []))} by title")
+        if a.allow_standard_license:
+            print("  standard-license clips INCLUDED (local research set; "
+                  "footage never leaves this machine)")
+        else:
+            print("  keeping Creative Commons clips only")
+
     for trick in tricks:
         print(f"== {trick} ==")
         got = sum(1 for r in rows if r.get("trick") == trick)
         cfg = TRICKS[trick]
 
-        # --- Wikimedia Commons ---
-        if a.commons and got < a.per_trick:
+        # --- Wikimedia Commons (skipped in channel mode: the channel is the brief) ---
+        if a.commons and not a.channel and got < a.per_trick:
             titles: list[str] = []
             for cat in cfg["commons"]:
                 try:
@@ -386,48 +464,52 @@ def main() -> int:
                              "title": info["title"]}):
                         got += 1
 
-        # --- YouTube Creative Commons ---
+        # --- YouTube: the channel pool first, then CC search ---
         if a.youtube and got < a.per_trick:
-            for q in cfg["yt"]:
+            pool = channel_pool.get(trick, [])
+            candidates: list[str] = [vid for vid, _ in pool[: a.per_trick * 4]]
+            if not pool:
+                for q in cfg["yt"]:
+                    if len(candidates) >= a.per_trick:
+                        break
+                    candidates.extend(yt_search_ids(q, a.per_trick - len(candidates) + 2))
+                    print(f"  [yt] {q!r}: searching")
+            for vid in candidates:
                 if got >= a.per_trick:
                     break
-                ids = yt_search_ids(q, a.per_trick - got + 2)
-                print(f"  [yt] {q!r}: {len(ids)} CC-search hits")
-                for vid in ids:
-                    if got >= a.per_trick:
-                        break
-                    info = yt_info(vid)
-                    if not info:
-                        continue
-                    if not is_cc_license(info):
-                        print(f"  [yt] skip non-CC ({info.get('license')}): {vid}")
-                        continue
-                    if (info.get("duration") or 0) > a.max_duration:
-                        print(f"  [yt] skip long ({info.get('duration')}s): {vid}")
-                        continue
-                    page = info.get("webpage_url") or f"https://www.youtube.com/watch?v={vid}"
-                    if page in existing:
-                        print(f"  [yt] skip duplicate: {vid}")
-                        continue
-                    dest = vdir / trick / f"youtube_{vid}.mp4"
-                    if dest.exists():
+                info = yt_info(vid)
+                if not info:
+                    continue
+                cc = is_cc_license(info)
+                if not cc and not (a.channel and a.allow_standard_license):
+                    print(f"  [yt] skip non-CC ({info.get('license')}): {vid}")
+                    continue
+                if (info.get("duration") or 0) > a.max_duration:
+                    print(f"  [yt] skip long ({info.get('duration')}s): {vid}")
+                    continue
+                page = info.get("webpage_url") or f"https://www.youtube.com/watch?v={vid}"
+                if page in existing:
+                    print(f"  [yt] skip duplicate: {vid}")
+                    continue
+                dest = vdir / trick / f"youtube_{vid}.mp4"
+                if dest.exists():
+                    got += 1
+                    continue
+                print(f"  [yt] dl {vid} {(info.get('title') or '')[:60]}")
+                if download(page, dest, a.max_duration):
+                    pr = probe(dest)
+                    if add_row({"file": str(dest.relative_to(out)), "trick": trick,
+                             "source": "youtube_cc" if cc else "youtube_channel",
+                             "source_url": page,
+                             "page_url": page,
+                             "license": info.get("license", ""),
+                             "author": info.get("uploader", "") or info.get("channel", ""),
+                             **{k: pr.get(k) if pr.get(k, '') != '' else info.get(
+                                 {'width': 'width', 'height': 'height',
+                                  'duration': 'duration', 'fps': 'fps'}[k], '')
+                                 for k in ("width", "height", "duration", "fps")},
+                             "title": info.get("title", "")}):
                         got += 1
-                        continue
-                    print(f"  [yt] dl {vid} {(info.get('title') or '')[:60]}")
-                    if download(page, dest, a.max_duration):
-                        pr = probe(dest)
-                        if add_row({"file": str(dest.relative_to(out)), "trick": trick,
-                                 "source": "youtube_cc",
-                                 "source_url": page,
-                                 "page_url": page,
-                                 "license": info.get("license", ""),
-                                 "author": info.get("uploader", "") or info.get("channel", ""),
-                                 **{k: pr.get(k) if pr.get(k, '') != '' else info.get(
-                                     {'width': 'width', 'height': 'height',
-                                      'duration': 'duration', 'fps': 'fps'}[k], '')
-                                     for k in ("width", "height", "duration", "fps")},
-                                 "title": info.get("title", "")}):
-                            got += 1
         print(f"  -> {trick}: {got} clips total")
 
     with open(meta_path, "w", newline="") as f:
