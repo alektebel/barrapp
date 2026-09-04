@@ -77,3 +77,6 @@ out/**
 !out/.gitkeep
 models/
 *.pt
+
+# Kotlin build residue
+.kotlin/
