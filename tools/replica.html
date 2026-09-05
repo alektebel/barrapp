@@ -110,112 +110,202 @@ body { margin:0; background:#8a929a; font-family:"Liberation Sans", "DejaVu Sans
 <script>
 // ---------------------------------------------------------------------------
 // BarraFigure — a line-for-line port of app/src/main/java/com/barrapp/ui/parts/Figure.kt
+// (drawV2 below is that port: pose, elbow, taper, body, then the trace lane)
 // ---------------------------------------------------------------------------
-function traceHistory(phase, n, arm = 0.24, clearance = 0.10) {
-  if (n <= 0) return [];
-  return Array.from({length: n}, (_, i) => {
-    const p = phase - (n - 1 - i) * 0.05;
-    const r = Math.pow(Math.sin(Math.PI * p), 2);
-    return -arm + r * (arm + clearance);
-  });
-}
-function countPeaks(h) {
-  let n = 0;
-  for (let i = 1; i < h.length - 1; i++) if (h[i] > h[i-1] && h[i] >= h[i+1] && h[i] > 0) n++;
-  return n;
-}
-function drawFigure(ctx, w, h, phase, stage, history, c) {
-  ctx.clearRect(0, 0, w, h);
-  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  const hair = 1, thin = 1.5, line = 2, limb = 2.5, heavy = 3;   // dp == px at 1x
-
-  const barY = 0.22*h, cx = 0.5*w, grip = 0.10*w;
-  const arm = 0.24*h, torso = 0.22*h, clearance = 0.10*h;
+function pose(w, h, phase) {
+  // A PULL-UP: the shoulders rise to the bar and never above it, so the
+  // figure can never make the T-pose a support position produces.
+  const barY = 0.20*h, cx = 0.5*w, grip = 0.086*w;
+  const armLong = 0.155*h, armShort = 0.052*h;
+  const torso = 0.135*h;
   const r = Math.pow(Math.sin(Math.PI*phase), 2);
-  const sway = 0.02*w*Math.sin(2*Math.PI*phase);
-  const shY = barY + arm - r*(arm + clearance), shX = cx + sway;
-  const hipX = shX + 0.5*sway, hipY = shY + torso;
-  const kneeX = hipX + 0.01*w + 0.03*w*r, kneeY = hipY + 0.14*h;
-  const ankX = kneeX + 0.005*w, ankY = kneeY + 0.13*h - 0.02*h*r;
-  const headR = 0.045*h, headY = shY - 0.075*h;
-  const handL = [cx-grip, barY], handR = [cx+grip, barY];
-  const shL = [shX-0.035*w, shY], shR = [shX+0.035*w, shY];
-  const elbow = (hand, sh, side) => {
-    const len = Math.hypot(sh[0]-hand[0], sh[1]-hand[1]);
-    const flex = Math.max(0, 1 - len/arm);
-    return [(hand[0]+sh[0])/2 + side*0.07*w*flex, (hand[1]+sh[1])/2 + 0.02*h*flex];
+  const sway = 0.012*w*Math.sin(2*Math.PI*phase);
+  const reach = armLong - r*(armLong - armShort);
+  const shY = barY + reach, shX = cx + sway;
+  const hipX = shX + 0.7*sway, hipY = shY + torso;
+  // Legs hang, close together, knees a little bent, drifting forward as the
+  // body rises. Shorter than the first pass, which had a spider's legs.
+  // Legs hang: near vertical, converging slightly, with only a small forward
+  // drift as the body rises. The previous knee travel made it march in mid-air.
+  const kSpread = 0.022*w, aSpread = 0.015*w;
+  const kneeY = hipY + 0.088*h, ankY = kneeY + 0.078*h;
+  const kneeX = hipX + 0.018*w*r, ankX = kneeX + 0.012*w*r;
+  return {
+    barY, cx, grip, reach, armLong, armShort, r, shX, shY, hipX, hipY,
+    handL:[cx-grip,barY], handR:[cx+grip,barY],
+    shL:[shX-0.050*w,shY], shR:[shX+0.050*w,shY],
+    hipL:[hipX-0.030*w,hipY], hipR:[hipX+0.030*w,hipY],
+    kneeL:[kneeX-kSpread,kneeY], kneeR:[kneeX+kSpread,kneeY],
+    ankL:[ankX-aSpread,ankY], ankR:[ankX+aSpread,ankY],
+    headR:0.040*h, headY: shY - 0.080*h, neck:[shX, shY-0.020*h],
   };
-  const eL = elbow(handL, shL, -1), eR = elbow(handR, shR, +1);
-  const seg = (a, b, col, wd) => { ctx.strokeStyle = col; ctx.lineWidth = wd;
-    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+}
+function elbowOf(p, hand, sh, side, w, h) {
+  // The elbow travels from "almost on the line" at the hang to "below the
+  // hand, tucked at the ribs" at the top. Interpolating the *position* rather
+  // than pushing the midpoint sideways is what stops the arms and the bar
+  // closing into a trapezoid at the top - which is what a coat hanger is.
+  const flex = (p.armLong - p.reach) / (p.armLong - p.armShort);
+  const straight = [(hand[0]+sh[0])/2 + side*0.012*w, (hand[1]+sh[1])/2];
+  const tucked   = [hand[0] + side*0.016*w, sh[1] + 0.072*h];
+  return [straight[0] + (tucked[0]-straight[0])*flex,
+          straight[1] + (tucked[1]-straight[1])*flex];
+}
 
-  seg([0.12*w, barY], [0.88*w, barY], c.ink, heavy);
-  for (const x of [0.16, 0.84]) seg([x*w, barY], [x*w, barY+0.05*h], c.rule, line);
+// a stroke that tapers from `w0` at a to `w1` at b - limbs read as limbs
+function taper(ctx, a, b, w0, w1, col) {
+  const dx = b[0]-a[0], dy = b[1]-a[1], L = Math.hypot(dx,dy) || 1;
+  const nx = -dy/L, ny = dx/L;
+  ctx.fillStyle = col;
+  ctx.beginPath();
+  ctx.moveTo(a[0]+nx*w0/2, a[1]+ny*w0/2);
+  ctx.lineTo(b[0]+nx*w1/2, b[1]+ny*w1/2);
+  ctx.lineTo(b[0]-nx*w1/2, b[1]-ny*w1/2);
+  ctx.lineTo(a[0]-nx*w0/2, a[1]-ny*w0/2);
+  ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.arc(a[0],a[1],w0/2,0,7); ctx.fill();
+  ctx.beginPath(); ctx.arc(b[0],b[1],w1/2,0,7); ctx.fill();
+}
 
-  for (const [a,b] of [[handL,eL],[eL,shL],[handR,eR],[eR,shR],[shL,shR],
-                       [[shX,shY],[hipX,hipY]],[[hipX,hipY],[kneeX,kneeY]],
-                       [[kneeX,kneeY],[ankX,ankY]]]) seg(a, b, c.primary, limb);
-  ctx.fillStyle = c.primary;
-  ctx.beginPath(); ctx.arc(shX, headY, headR, 0, 2*Math.PI); ctx.fill();
+function drawBody(ctx, w, h, phase, col, alpha) {
+  const p = pose(w, h, phase);
+  const eL = elbowOf(p, p.handL, p.shL, -1, w, h), eR = elbowOf(p, p.handR, p.shR, +1, w, h);
+  ctx.globalAlpha = alpha;
+  const U = 0.016*h;
+  taper(ctx, p.handR, eR, U*0.65, U*0.82, col);
+  taper(ctx, eR, p.shR, U*0.82, U*0.92, col);
+  taper(ctx, p.hipR, p.kneeR, U*0.92, U*0.78, col);
+  taper(ctx, p.kneeR, p.ankR, U*0.78, U*0.52, col);
+  taper(ctx, [p.shX,p.shY], [p.hipX,p.hipY], U*1.40, U*1.02, col);
+  taper(ctx, p.shL, p.shR, U*0.92, U*0.92, col);
+  taper(ctx, p.hipL, p.hipR, U*0.95, U*0.95, col);
+  taper(ctx, p.handL, eL, U*0.75, U*0.95, col);
+  taper(ctx, eL, p.shL, U*0.95, U*1.05, col);
+  taper(ctx, p.hipL, p.kneeL, U*1.02, U*0.86, col);
+  taper(ctx, p.kneeL, p.ankL, U*0.86, U*0.58, col);
+  taper(ctx, [p.shX,p.shY], p.neck, U*0.82, U*0.72, col);
+  ctx.beginPath(); ctx.arc(p.shX, p.headY, p.headR, 0, 7); ctx.fill();
+  ctx.globalAlpha = 1;
+  return p;
+}
 
-  if (stage === 1) {
-    const b = 0.035*w;
-    const a = Math.min(1, Math.max(0.2, 0.6 + 0.4*Math.sin(4*Math.PI*phase)));
-    ctx.globalAlpha = a; ctx.strokeStyle = c.primary; ctx.lineWidth = thin;
-    for (const hand of [handL, handR]) ctx.strokeRect(hand[0]-b, hand[1]-b, 2*b, 2*b);
+function drawV2(ctx, w, h, phase, stage, c, opt = {}) {
+  ctx.clearRect(0,0,w,h);
+  ctx.lineCap='round'; ctx.lineJoin='round';
+  // the body is laid out against a reference height, not the box - see Figure.kt
+  const fh = stage < 0 ? h / 0.66 : h;
+
+  // ---- instrument ground: a faint grid, like the launcher icon ----------
+  if (opt.grid === true) {
+    ctx.strokeStyle = c.rule; ctx.globalAlpha = 0.5; ctx.lineWidth = 1;
+    const step = h/14;
+    for (let y = step; y < h; y += step) { ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke(); }
+    for (let x = step; x < w; x += step) { ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,h); ctx.stroke(); }
     ctx.globalAlpha = 1;
   }
 
-  const tTop = 0.66*h, tBot = 0.94*h, x0 = 0.12*w, x1 = 0.88*w;
-  const zero = tTop + (tBot-tTop)*(clearance/(arm+clearance));
-  if (stage >= 2) {
-    ctx.setLineDash([4,3]); ctx.strokeStyle = c.rule; ctx.lineWidth = hair;
-    ctx.beginPath(); ctx.moveTo(x0, zero); ctx.lineTo(x1, zero); ctx.stroke(); ctx.setLineDash([]);
+  // ---- the bar goes BEHIND the body. Drawn over it, it crossed the head
+  //      at the top of every rep, where the chin is by definition above it.
+  const p0 = pose(w, fh, phase);
+  ctx.strokeStyle = c.ink; ctx.lineWidth = 3.5; ctx.lineCap='round';
+  ctx.beginPath(); ctx.moveTo(0.09*w, p0.barY); ctx.lineTo(0.91*w, p0.barY); ctx.stroke();
+  ctx.strokeStyle = c.rule; ctx.lineWidth = 2.5;
+  for (const x of [0.12,0.88]) { ctx.beginPath(); ctx.moveTo(x*w,p0.barY); ctx.lineTo(x*w,p0.barY+0.042*fh); ctx.stroke(); }
+
+  // ---- motion ghosts ----------------------------------------------------
+  if (opt.ghosts !== false && stage >= 0) {
+    for (const [back, a] of [[0.045,0.18]]) {
+      drawBody(ctx, w, fh, phase-back, c.primary, a);
+    }
   }
-  if (stage >= 2 && history.length > 2) {
-    ctx.strokeStyle = stage >= 3 ? c.primary : c.rule; ctx.lineWidth = line;
+  const p = drawBody(ctx, w, fh, phase, c.primary, 1);
+
+  // a short cap of bar over each hand, so the hands read as gripping it
+  ctx.strokeStyle = c.ink; ctx.lineWidth = 3.5;
+  for (const hand of [p.handL, p.handR]) {
     ctx.beginPath();
-    history.forEach((v, i) => {
-      const x = x0 + (x1-x0)*i/(history.length-1);
-      const y = zero - v/(0.24+0.10)*(tBot-tTop);
-      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
-    });
+    ctx.moveTo(hand[0]-0.022*w, p.barY); ctx.lineTo(hand[0]+0.022*w, p.barY); ctx.stroke();
+  }
+
+  // ---- the hands are the reference. Always marked, loud in stage 1. ----
+  const strong = stage === 1;
+  const pulse = strong ? 0.55 + 0.45*Math.sin(4*Math.PI*phase) : 0.32;
+  ctx.strokeStyle = c.primary; ctx.globalAlpha = Math.min(1, Math.max(0.2, pulse));
+  ctx.lineWidth = strong ? 1.8 : 1.2;
+  const b = strong ? 0.030*w : 0.024*w;
+  for (const hand of [p.handL, p.handR]) {
+    const [x,y] = hand, k = b*0.55;
+    // corner brackets, not a full box: it frames without boxing in
+    for (const [sx,sy] of [[-1,-1],[1,-1],[-1,1],[1,1]]) {
+      ctx.beginPath();
+      ctx.moveTo(x+sx*b, y+sy*b-sy*k); ctx.lineTo(x+sx*b, y+sy*b);
+      ctx.lineTo(x+sx*b-sx*k, y+sy*b); ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
+
+  // ---- the trace, in the same frame -------------------------------------
+  const tTop = 0.70*h, tBot = 0.955*h, x0 = 0.10*w, x1 = 0.90*w;
+  const zero = tTop + (tBot-tTop)*0.16;   // the bar, near the top of the lane
+  if (stage >= 2) {
+    ctx.strokeStyle = c.rule; ctx.lineWidth = 1; ctx.setLineDash([3,3]);
+    ctx.beginPath(); ctx.moveTo(x0,zero); ctx.lineTo(x1,zero); ctx.stroke(); ctx.setLineDash([]);
+    const hist = [], N = 64;
+    for (let i = 0; i < N; i++) {
+      const ph = phase - (N-1-i)*0.042;
+      const r = Math.pow(Math.sin(Math.PI*ph),2);
+      hist.push(-1 + 1.19*r);        // -1 at the hang, +0.19 over the bar
+    }
+    const X = i => x0 + (x1-x0)*i/(N-1);
+    const Y = v => zero - v*0.84*(tBot-tTop);
+    if (stage >= 3) {
+      // a soft fill under the curve: the trace reads as a measurement, not a doodle
+      const g = ctx.createLinearGradient(0, tTop, 0, tBot);
+      g.addColorStop(0, c.primary + '4d'); g.addColorStop(1, c.primary + '00');
+      ctx.fillStyle = g;
+      ctx.beginPath(); ctx.moveTo(X(0), tBot);
+      hist.forEach((v,i) => ctx.lineTo(X(i), Y(v)));
+      ctx.lineTo(X(N-1), tBot); ctx.closePath(); ctx.fill();
+    }
+    ctx.strokeStyle = stage >= 3 ? c.primary : c.rule;
+    ctx.lineWidth = 2; ctx.beginPath();
+    hist.forEach((v,i) => i ? ctx.lineTo(X(i),Y(v)) : ctx.moveTo(X(i),Y(v)));
     ctx.stroke();
-  }
-  if (stage === 2) {
-    const t = 0.5 - 0.5*Math.cos(2*Math.PI*phase);
-    const inset = 0.14*(x1-x0)*t;
-    for (const x of [x0+inset, x1-inset]) seg([x, tTop-4], [x, tBot+4], c.primary, thin);
-  }
-  if (stage >= 3 && history.length > 2) {
-    ctx.fillStyle = c.primary;
-    for (let i = 1; i < history.length-1; i++) {
-      const v = history[i];
-      if (v > history[i-1] && v >= history[i+1] && v > 0) {
-        const x = x0 + (x1-x0)*i/(history.length-1);
-        const y = zero - v/(0.24+0.10)*(tBot-tTop);
-        ctx.beginPath(); ctx.arc(x, y, 3, 0, 2*Math.PI); ctx.fill();
+    if (stage === 2) {
+      const t = 0.5 - 0.5*Math.cos(2*Math.PI*phase);
+      const inset = 0.16*(x1-x0)*t;
+      ctx.strokeStyle = c.primary; ctx.lineWidth = 1.5;
+      for (const x of [x0+inset, x1-inset]) {
+        ctx.beginPath(); ctx.moveTo(x, tTop-3); ctx.lineTo(x, tBot+3); ctx.stroke();
+        ctx.beginPath(); ctx.arc(x, tTop-6, 2.2, 0, 7); ctx.fillStyle = c.primary; ctx.fill();
       }
+    }
+    if (stage >= 3) {
+      let n = 0;
+      for (let i = 1; i < N-1; i++) {
+        if (hist[i] > hist[i-1] && hist[i] >= hist[i+1] && hist[i] > 0) {
+          n++;
+          const x = X(i), y = Y(hist[i]);
+          ctx.strokeStyle = c.primary; ctx.globalAlpha = 0.35; ctx.lineWidth = 1;
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, zero); ctx.stroke();
+          ctx.globalAlpha = 1;
+          ctx.fillStyle = c.surface; ctx.beginPath(); ctx.arc(x,y,3.6,0,7); ctx.fill();
+          ctx.strokeStyle = c.primary; ctx.lineWidth = 2;
+          ctx.beginPath(); ctx.arc(x,y,3.6,0,7); ctx.stroke();
+        }
+      }
+      ctx.fillStyle = c.ink;
+      ctx.font = '600 13px "Liberation Mono", monospace';
+      ctx.textAlign = 'right';
+      ctx.fillText(n + (n === 1 ? ' REP' : ' REPS'), x1, tTop - 8);
     }
   }
 }
-function figure(stage, w, h0, phase, c) {
-  const h = stage < 0 ? h0 * 0.72 : h0;
+
+function figure(stage, w, h, phase, c) {
   const el = document.createElement('canvas');
   el.width = w; el.height = h; el.style.width = w+'px'; el.style.height = h+'px';
-  const hist = traceHistory(phase, stage < 0 ? 0 : 60);
-  drawFigure(el.getContext('2d'), w, h, phase, stage, hist, c);
-  if (stage >= 3) {
-    const box = document.createElement('div');
-    box.style.cssText = `position:relative;width:${w}px;height:${h}px`;
-    box.appendChild(el);
-    const n = document.createElement('div');
-    n.className = 'labelMedium';
-    n.textContent = countPeaks(hist);
-    n.style.cssText = `position:absolute;right:${w*0.12}px;bottom:${h*0.36}px;color:${c.ink}`;
-    box.appendChild(n);
-    return box;
-  }
+  drawV2(el.getContext('2d'), w, h, phase, stage, c, {});
   return el;
 }
 
@@ -370,7 +460,7 @@ function screenEmpty(c) {
 
   const ctr = h('div','center');
   ctr.style.height = 'calc(100% - 230px)';
-  ctr.appendChild(figure(-1, 160, 150, 0.62, c));
+  ctr.appendChild(figure(-1, 230, 150, 0.30, c));
   ctr.appendChild(gap(18));
   ctr.appendChild(h('div','headlineMedium','Nothing measured yet'));
   ctr.appendChild(gap(10));
@@ -515,7 +605,9 @@ function screenSessionSet(c, opts = {}) {
     rr.appendChild(ring(61, c.solid, 56, null, c));
     rep.appendChild(rr);
     rep.appendChild(gap(12));
-    const pts = traceHistory(0.5, 40).map(v => v*3);
+    // one rep's own trace, for the rep card
+    const pts = Array.from({length: 40}, (_, i) =>
+      3 * (-1 + 1.19 * Math.pow(Math.sin(Math.PI * (i / 39)), 2)));
     rep.appendChild(repTrace(pts, c.solid, c));
     rep.appendChild(gap(14));
     const comps = h('div');

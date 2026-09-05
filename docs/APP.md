@@ -36,18 +36,30 @@ percentage, and a bar that sits at 90% is worse than a list you can read.
 
 ### The figure
 
-Above the stage list a stick athlete does the movement the app is named after,
-over a bar, with its own shoulder trace scrolling underneath - drawn on a
-`Canvas` in `ui/parts/Figure.kt`, no image assets. It is the loading animation
-and it is not decoration: each stage changes what the drawing does, in the
-terms the pipeline works in.
+Above the stage list an athlete does a pull-up over a bar, with the shoulder
+trace scrolling underneath in the same frame - drawn on a `Canvas` in
+`ui/parts/Figure.kt`, no image assets. It is the loading animation and it is
+not decoration: each stage changes what the drawing does, in the terms the
+pipeline works in.
+
+It is a **pull-up** rather than the muscle-up the project cares most about,
+because a muscle-up cannot be drawn this way: with the hands fixed on the bar
+and the shoulders finishing above them, the arms splay outward and the figure
+reads as a scarecrow standing on a wire. A pull-up keeps the shoulders under
+the bar for the whole cycle, so every frame reads as a person hanging. Limbs
+taper and joints are round, so the body has weight; the elbow interpolates
+between two positions (almost straight at the hang, tucked below the hand at
+the top) rather than being pushed off the midpoint, which is what stopped the
+arms and the bar closing into a coat hanger; and the bar is drawn behind the
+body with a cap over each hand, because a bar in front crosses the head at the
+top of every rep, where the chin is above it by definition.
 
 | stage | what the figure does |
 |---|---|
 | Uploading | works the bar; nothing measured yet |
 | Finding the exercise | the hands are bracketed - they are the reference everything else is measured against |
 | Trimming | the trace appears, faint, with trim markers sliding in from either edge |
-| Counting and measuring | the trace turns live and each lockout is marked and counted |
+| Counting and measuring | the trace fills and each lockout is ringed and counted |
 
 Under the active stage a line rotates every four seconds, and a seconds counter
 sits in the corner, because "still working" at two minutes is a different fact

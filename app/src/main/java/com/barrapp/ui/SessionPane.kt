@@ -89,7 +89,7 @@ fun EmptyState(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.widthIn(max = 380.dp).padding(32.dp),
         ) {
-            BarraFigure(stage = -1, width = 160.dp, height = 150.dp)
+            BarraFigure(stage = -1, width = 230.dp, height = 150.dp)
             Spacer(Modifier.height(18.dp))
             Text(
                 Voice.EMPTY_TITLE,
