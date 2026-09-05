@@ -1,0 +1,612 @@
+{
+ "note": "Cues and faults are mined from the source text by sentence shape. They are quotations with a licence, not measurements and not barra's opinion.",
+ "generated": "2026-09-05T00:18:38+00:00",
+ "skills": {
+  "australian_row": {
+   "name": "Australian row",
+   "cues": [
+    "Pause at the top of the motion, and return yourself to the start position.",
+    "Hang a rope or suspension straps from a rack or other stable object."
+   ],
+   "faults": [],
+   "muscles": [
+    "middle back",
+    "lats",
+    "biceps"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Inverted Row",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Inverted_Row.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Inverted Row with Straps",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Inverted_Row_with_Straps.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "bench_dip": {
+   "name": "Bench dip",
+   "cues": [
+    "Slowly lower your body as you inhale by bending at the elbows until you lower yourself far enough to where there is an angle slightly smaller than 90 degrees between the upper arm and the forearm.",
+    "Keep the elbows as close as possible throughout the movement."
+   ],
+   "faults": [],
+   "muscles": [
+    "triceps",
+    "chest",
+    "shoulders"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Bench Dips",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Bench_Dips.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "chin_up": {
+   "name": "Chin-up",
+   "cues": [
+    "Grab the pull-up bar with the palms facing your torso and a grip closer than the shoulder width.",
+    "Keeping the torso as straight as possible maximizes biceps stimulation while minimizing back involvement.",
+    "As you breathe out, pull your torso up until your head is around the level of the pull-up bar.",
+    "Concentrate on using the biceps muscles in order to perform the movement."
+   ],
+   "faults": [],
+   "muscles": [
+    "lats",
+    "biceps",
+    "forearms",
+    "middle back"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Chin-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Chin-Up.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "One Arm Chin-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/One_Arm_Chin-Up.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "decline_push_up": {
+   "name": "Decline push-up",
+   "cues": [
+    "Next, lower yourself downward until your chest almost touches the floor as you inhale.",
+    "Now breathe out and press your upper body back up to the starting position while squeezing your chest.",
+    "Lower yourself until your chest almost touches the floor as you inhale.",
+    "Breathe out as you perform this step."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Decline Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Decline_Push-Up.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Push-Ups With Feet Elevated",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push-Ups_With_Feet_Elevated.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "diamond_push_up": {
+   "name": "Diamond push-up",
+   "cues": [
+    "Make sure that you are holding your torso up at arms' length.",
+    "Lower yourself until your chest almost touches the floor as you inhale.",
+    "Breathe out as you perform this step."
+   ],
+   "faults": [],
+   "muscles": [
+    "triceps",
+    "chest",
+    "shoulders"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Push-Ups - Close Triceps Position",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push-Ups_-_Close_Triceps_Position.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "dip": {
+   "name": "Dip",
+   "cues": [
+    "Remember to squeeze the chest at the top of the movement for a second.",
+    "Now, inhale and slowly lower yourself downward.",
+    "Lower yourself until there is a 90 degree angle formed between the upper arm and forearm.",
+    "Then, exhale and push your torso back up using your triceps to bring your body back to the starting position."
+   ],
+   "faults": [
+    "Avoid swinging, and maintain good posture throughout the descent."
+   ],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Dips - Chest Version",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Dips_-_Chest_Version.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Dips - Triceps Version",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Dips_-_Triceps_Version.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Parallel Bar Dip",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Parallel_Bar_Dip.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "incline_push_up": {
+   "name": "Incline push-up",
+   "cues": [
+    "Push body up until arms are extended."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps",
+    "abdominals"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Close-Grip",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Close-Grip.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Depth Jump",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Depth_Jump.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Medium",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Medium.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Reverse Grip",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Reverse_Grip.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Wide",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Wide.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "jump_squat": {
+   "name": "Jump squat",
+   "cues": [
+    "Exhale during this portion of the movement."
+   ],
+   "faults": [],
+   "muscles": [
+    "quadriceps",
+    "calves",
+    "glutes",
+    "hamstrings"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Freehand Jump Squat",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Freehand_Jump_Squat.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "kipping_muscle_up": {
+   "name": "Kipping muscle-up",
+   "cues": [
+    "Grip the rings using a false grip, with the base of your palms on top of the rings.",
+    "As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward, allowing your elbows to move straight back behind you."
+   ],
+   "faults": [
+    "Begin with a movement swinging your legs backward slightly.",
+    "Counter that movement by swinging your legs forward and up, jerking your chin and chest back, pulling yourself up with both arms as you do so."
+   ],
+   "muscles": [
+    "lats",
+    "abdominals",
+    "biceps",
+    "forearms",
+    "middle back",
+    "shoulders"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Kipping Muscle Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Kipping_Muscle_Up.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "leg_raise": {
+   "name": "Hanging leg raise",
+   "cues": [
+    "Hang from a chin-up bar with both arms extended at arms length in top of you using either a wide grip or a medium grip.",
+    "Raise your legs until the torso makes a 90-degree angle with the legs.",
+    "Exhale as you perform this movement and hold the contraction for a second or so."
+   ],
+   "faults": [],
+   "muscles": [
+    "abdominals"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Hanging Leg Raise",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Hanging_Leg_Raise.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "muscle_up": {
+   "name": "Muscle-up",
+   "cues": [
+    "Grip the rings using a false grip, with the base of your palms on top of the rings.",
+    "Initiate a pull up by pulling the elbows down to your side, flexing the elbows.",
+    "As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward, allowing your elbows to move straight back behind you."
+   ],
+   "faults": [],
+   "muscles": [
+    "lats",
+    "abdominals",
+    "biceps",
+    "forearms",
+    "middle back",
+    "shoulders"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Muscle Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Muscle_Up.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "nordic_curl": {
+   "name": "Nordic curl",
+   "cues": [
+    "Lower yourself under control until your knees are almost completely straight."
+   ],
+   "faults": [],
+   "muscles": [
+    "hamstrings",
+    "calves",
+    "glutes",
+    "lower back"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Natural Glute Ham Raise",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Natural_Glute_Ham_Raise.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "one_arm_push_up": {
+   "name": "One-arm push-up",
+   "cues": [
+    "Maintain good posture, and place your free hand behind your back.",
+    "Lower yourself by allowing the elbow to flex until you touch the ground."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Single-Arm Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Single-Arm_Push-Up.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "plank": {
+   "name": "Plank",
+   "cues": [
+    "Keep your body straight at all times, and hold this position as long as possible."
+   ],
+   "faults": [],
+   "muscles": [
+    "abdominals"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Plank",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Plank.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "pull_up": {
+   "name": "Pull-up",
+   "cues": [
+    "Grab the pull-up bar with the palms facing forward using the prescribed grip.",
+    "Pull your torso up until the bar touches your upper chest by drawing the shoulders and the upper arms down and back.",
+    "Exhale as you perform this portion of the movement.",
+    "Concentrate on squeezing the back muscles once you reach the full contracted position."
+   ],
+   "faults": [],
+   "muscles": [
+    "lats",
+    "biceps",
+    "middle back"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Pullups",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Pullups.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "push_up": {
+   "name": "Push-up",
+   "cues": [
+    "Keep your body straight throughout the movement.",
+    "At the bottom, reverse the motion by pushing yourself up through elbow extension as quickly as possible until you are air borne.",
+    "Aim to \"jump\" 12-18 inches to one side.",
+    "At the bottom, reverse the motion by pushing yourself up through elbow extension as quickly as possible."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps",
+    "abdominals"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Clock Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Clock_Push-Up.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Plyo Push-up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Plyo_Push-up.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Push Up to Side Plank",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push_Up_to_Side_Plank.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Pushups",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Pushups.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Pushups (Close and Wide Hand Positions)",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Pushups_Close_and_Wide_Hand_Positions.json",
+     "license": "Unlicense (public domain)"
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Suspended Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Suspended_Push-Up.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "ring_dip": {
+   "name": "Ring dip",
+   "cues": [
+    "Grip a ring in each hand, and then take a small jump to help you get into the starting position with your arms locked out.",
+    "Reverse the motion by extending the elbow, pushing yourself back up into the starting position."
+   ],
+   "faults": [
+    "Avoid swinging, and maintain good posture throughout the descent."
+   ],
+   "muscles": [
+    "triceps",
+    "chest",
+    "shoulders"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Ring Dips",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Ring_Dips.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "scapular_pull": {
+   "name": "Scapular pull",
+   "cues": [
+    "Pause at the completion of the movement, and then slowly return to the starting position before performing more repetitions."
+   ],
+   "faults": [
+    "Do this by depressing your shoulder girdle in a reverse shrugging motion."
+   ],
+   "muscles": [
+    "traps",
+    "lats",
+    "middle back"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Scapular Pull-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Scapular_Pull-Up.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "split_squat": {
+   "name": "Split squat",
+   "cues": [
+    "Keep your head looking forward and your chest up, with your knee slightly bent.",
+    "Keep your weight on the heel of your foot and maintain your posture throughout the exercise."
+   ],
+   "faults": [],
+   "muscles": [
+    "quadriceps",
+    "abductors",
+    "adductors",
+    "calves",
+    "glutes",
+    "hamstrings"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Suspended Split Squat",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Suspended_Split_Squat.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "squat": {
+   "name": "Bodyweight squat",
+   "cues": [
+    "As you squat, keep your head and chest up and push your knees out."
+   ],
+   "faults": [],
+   "muscles": [
+    "quadriceps",
+    "glutes",
+    "hamstrings"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Bodyweight Squat",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Bodyweight_Squat.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "toes_to_bar": {
+   "name": "Toes to bar",
+   "cues": [
+    "Hang from a chin-up bar with your legs and feet together using an overhand grip (palms facing away from you) that is slightly wider than shoulder width.",
+    "You may use wrist wraps in order to facilitate holding on to the bar.",
+    "Now bend your knees at a 90 degree angle and bring the upper legs forward so that the calves are perpendicular to the floor while the thighs remain parallel to it.",
+    "Pull your legs up as you exhale until you almost touch your shins with the bar above you."
+   ],
+   "faults": [
+    "Avoid swinging and using momentum at all times."
+   ],
+   "muscles": [
+    "abdominals"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Hanging Pike",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Hanging_Pike.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "wall_hspu": {
+   "name": "Wall handstand push-up",
+   "cues": [
+    "Keep your whole body as straight as possible.",
+    "If doing this for the first time, have a spotter help you.",
+    "Slowly lower yourself to the ground as you inhale until your head almost touches the floor.",
+    "Push yourself back up slowly as you exhale until your elbows are nearly locked."
+   ],
+   "faults": [
+    "It is of utmost importance that you come down slow in order to avoid head injury."
+   ],
+   "muscles": [
+    "shoulders",
+    "triceps"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Handstand Push-Ups",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Handstand_Push-Ups.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  },
+  "wide_push_up": {
+   "name": "Wide push-up",
+   "cues": [
+    "Exhale as you perform this step."
+   ],
+   "faults": [
+    "Do not allow your hips to sag."
+   ],
+   "muscles": [
+    "chest",
+    "abdominals",
+    "shoulders",
+    "triceps"
+   ],
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Push-Up Wide",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push-Up_Wide.json",
+     "license": "Unlicense (public domain)"
+    }
+   ]
+  }
+ }
+}

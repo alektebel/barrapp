@@ -2,6 +2,11 @@ package com.barrapp.ui
 
 import android.app.Activity
 import android.os.Build
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -23,8 +28,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.DateRange
-import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material3.Button
 import androidx.compose.material3.HorizontalDivider
@@ -41,8 +44,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
+import kotlinx.coroutines.delay
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.barrapp.BarrappViewModel
@@ -50,10 +57,13 @@ import com.barrapp.BuildConfig
 import com.barrapp.DeviceId
 import com.barrapp.Pane
 import com.barrapp.Screen
+import com.barrapp.Voice
 import com.barrapp.data.ActivityLevel
 import com.barrapp.data.Goals
 import com.barrapp.data.Profile
+import com.barrapp.data.Techniques
 import com.barrapp.ui.parts.Eyebrow
+import com.barrapp.ui.parts.NavGlyph
 import com.barrapp.ui.parts.Panel
 import com.barrapp.ui.parts.Pill
 
@@ -69,6 +79,9 @@ import com.barrapp.ui.parts.Pill
 private val WIDE = 840.dp
 private val CALENDAR_WIDTH = 300.dp
 private val INSIGHT_WIDTH = 340.dp
+
+/** The banner has to paint over the panes, which are composed after it. */
+private fun Modifier.zIndexTop(): Modifier = this.zIndex(1f)
 
 @Composable
 fun BarrappApp(vm: BarrappViewModel = viewModel()) {
@@ -131,6 +144,9 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 exerciseGuess = state.current?.result?.detected?.label,
                 error = state.error,
                 onCancel = vm::cancelUpload,
+                // Seeded from the job, so the lines are stable while you look
+                // at them and different on the next upload.
+                seed = state.current?.id?.hashCode() ?: 0,
             )
 
             Screen.Diagnostics -> DiagnosticsScreen(
@@ -180,9 +196,35 @@ private fun HomeShell(
 ) {
     val state by vm.state.collectAsStateWithLifecycle()
 
+    // A result landing gets one buzz and one line, then gets out of the way.
+    // The line only says what the payload proves - a count, and whether
+    // anything scored - so it can never congratulate a bad set.
+    val haptic = LocalHapticFeedback.current
+    LaunchedEffect(state.note) {
+        if (state.note != null) {
+            haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+            delay(6000)
+            vm.dismissNote()
+        }
+    }
+
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= WIDE
         val medium = maxWidth >= 600.dp && !wide
+
+        AnimatedVisibility(
+            visible = state.note != null,
+            enter = fadeIn() + slideInVertically { -it / 2 },
+            exit = fadeOut() + slideOutVertically { -it / 2 },
+            modifier = Modifier.align(Alignment.TopCenter).padding(top = 8.dp).zIndexTop(),
+        ) {
+            Panel(Modifier.padding(horizontal = 16.dp)) {
+                Text(
+                    state.note.orEmpty(),
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+            }
+        }
 
         if (wide) {
             Row(Modifier.fillMaxSize()) {
@@ -282,11 +324,18 @@ private fun MainPane(
         when {
             analysis != null -> {
                 val clip = remember(state.current?.id) { vm.replayClip() }
+                val context = LocalContext.current
+                // The technique card for what was measured: the hold's skill
+                // when it was a hold, the movement otherwise.
+                val technique = remember(analysis.exercise, analysis.hold?.skill) {
+                    Techniques.forExercise(context, analysis.hold?.skill ?: analysis.exercise)
+                }
                 SessionDetail(
                     analysis = analysis,
                     onAdd = onPick,
                     onDelete = if (state.current != null) vm::deleteCurrent else null,
                     onReplay = clip?.let { { vm.openReplay() } },
+                    technique = technique,
                 )
             }
 
@@ -424,7 +473,7 @@ private fun ShellHeader(name: String, onPrivacy: () -> Unit, onPlan: (() -> Unit
         Column(Modifier.weight(1f)) {
             Text("barrapp", style = MaterialTheme.typography.titleMedium)
             Text(
-                greeting(name),
+                greetingNow(name),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -450,14 +499,14 @@ private fun CompactBar(
             NavigationBarItem(
                 selected = pane == Pane.Calendar,
                 onClick = { onSelect(Pane.Calendar) },
-                icon = { Icon(Icons.Filled.DateRange, contentDescription = null) },
+                icon = { NavGlyph("calendar", pane == Pane.Calendar) },
                 label = { Text("Calendar") },
             )
         }
         NavigationBarItem(
             selected = pane == Pane.Session,
             onClick = { onSelect(Pane.Session) },
-            icon = { Icon(Icons.Filled.Home, contentDescription = null) },
+            icon = { NavGlyph("session", pane == Pane.Session) },
             label = { Text("Session") },
         )
         NavigationBarItem(
@@ -469,20 +518,19 @@ private fun CompactBar(
         NavigationBarItem(
             selected = pane == Pane.Progress,
             onClick = { onSelect(Pane.Progress) },
-            icon = { Icon(Icons.Filled.Info, contentDescription = null) },
+            icon = { NavGlyph("progress", pane == Pane.Progress) },
             label = { Text("Progress") },
         )
     }
 }
 
-private fun greeting(name: String): String {
-    val hour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-    val part = when (hour) {
-        in 5..11 -> "Morning"
-        in 12..17 -> "Afternoon"
-        else -> "Evening"
-    }
-    return "$part, $name"
+private fun greetingNow(name: String): String {
+    val cal = java.util.Calendar.getInstance()
+    return Voice.greeting(
+        name,
+        cal.get(java.util.Calendar.HOUR_OF_DAY),
+        cal.get(java.util.Calendar.DAY_OF_YEAR),
+    )
 }
 
 @Composable

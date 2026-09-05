@@ -50,6 +50,8 @@ object SessionStore {
                 traces = o.optJSONObject("traces")?.let { t ->
                     t.keys().asSequence().associateWith { k -> t.optString(k) }
                 } ?: emptyMap(),
+                holdS = o.optDouble("holdS", 0.0).let { if (it.isNaN()) 0.0 else it },
+                holdLabel = o.optString("holdLabel"),
                 byMovement = o.optJSONObject("byMovement")?.let { m ->
                     m.keys().asSequence().mapNotNull { k ->
                         m.optJSONObject(k)?.let { e ->
@@ -123,6 +125,10 @@ object SessionStore {
             traces = (prior?.traces ?: emptyMap()) +
                 if (analysis.traceId.isBlank()) emptyMap()
                 else mapOf(jobId to analysis.traceId),
+            // A hold is kept as its longest duration that day. Two clips of the
+            // same hold are two attempts, not one longer one.
+            holdS = maxOf(prior?.holdS ?: 0.0, analysis.hold?.seconds ?: 0.0),
+            holdLabel = analysis.hold?.label ?: prior?.holdLabel.orEmpty(),
         )
         write(context, existing.values.sortedByDescending { it.date })
     }
@@ -162,6 +168,8 @@ object SessionStore {
                     .put("band", d.band)
                     .put("jobIds", JSONArray(d.jobIds))
                     .put("traces", JSONObject(d.traces as Map<*, *>))
+                    .put("holdS", d.holdS)
+                    .put("holdLabel", d.holdLabel)
                     .put("byMovement", JSONObject().also { m ->
                         d.byMovement.forEach { (k, v) ->
                             m.put(k, JSONObject()

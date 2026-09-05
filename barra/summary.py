@@ -167,6 +167,33 @@ def _unmeasured(reps: list[dict]) -> str:
     return line + (f": {notes[0].lower()}." if notes else ".")
 
 
+def _describe_hold(hold: dict, payload: dict) -> tuple[str, str]:
+    """A held position: what it was, for how long, and what that does and does
+    not say. Duration is the only thing a single camera measures honestly
+    about a hold, so it is the only number here."""
+    label = str(hold.get("label") or "Static hold")
+    seconds = float(hold.get("seconds") or 0.0)
+    conf = float(hold.get("confidence") or 0.0)
+    headline = f"{label} held for {seconds:.0f} s"
+    parts = [f"{label} held still for {seconds:.0f} seconds"]
+    duration = payload.get("duration_s")
+    if duration and float(duration) - seconds > 2.0:
+        parts[-1] += f" of a {float(duration):.0f}-second clip"
+    parts[-1] += "."
+    reason = str(hold.get("reason") or "")
+    if reason:
+        parts.append(f"Read as a {label.lower()} because " + reason.rstrip(".") + ".")
+    runner = hold.get("runnerUp")
+    if conf < 0.65 and runner:
+        parts.append(f"Not certain - it could also be a "
+                     f"{str(runner).replace('_', ' ')}.")
+    parts.append("Time held is the measurement. How straight the line was is "
+                 "an angle in the image, and a few degrees of camera position "
+                 "move that more than technique does, so barra does not score "
+                 "it.")
+    return headline, " ".join(parts)
+
+
 def describe(payload: dict) -> tuple[str, str]:
     """(headline, narrative) for one analysed clip."""
     reps = payload.get("reps") or []
@@ -175,6 +202,11 @@ def describe(payload: dict) -> tuple[str, str]:
     blockers = [str(b) for b in (payload.get("blockers") or [])]
     score = payload.get("sessionScore")
     band = str(payload.get("sessionBand") or "unmeasured")
+
+    # ---- a hold ------------------------------------------------------------
+    hold = payload.get("hold") or {}
+    if n == 0 and hold.get("seconds"):
+        return _describe_hold(hold, payload)
 
     # ---- nothing countable -------------------------------------------------
     if n == 0:

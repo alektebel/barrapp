@@ -207,6 +207,12 @@ private fun DayCell(
                 entry.measured -> Box(
                     Modifier.size(6.dp).clip(CircleShape).background(colour!!)
                 )
+                // A timed hold: measured, by duration, with no score. A filled
+                // dot in the unscored colour - not an outline, because
+                // something did come out of that day.
+                entry.heldOnly -> Box(
+                    Modifier.size(6.dp).clip(CircleShape).background(colour!!)
+                )
                 // Filmed, but nothing came out of it. An outline, not a blank:
                 // "you trained and it did not record" is actionable, "nothing
                 // here" is not.
@@ -244,13 +250,15 @@ private fun DayRow(entry: DayEntry, selected: Boolean, onClick: () -> Unit) {
                 style = MaterialTheme.typography.titleSmall,
             )
             Text(
-                "${entry.reps} rep${if (entry.reps == 1) "" else "s"} · ${entry.date.takeLast(5)}",
+                (if (entry.heldOnly) "held ${entry.holdS.toInt()} s"
+                else "${entry.reps} rep${if (entry.reps == 1) "" else "s"}") +
+                    " · ${entry.date.takeLast(5)}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         Text(
-            entry.score?.toString() ?: "—",
+            entry.score?.toString() ?: if (entry.heldOnly) "${entry.holdS.toInt()}s" else "—",
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.titleMedium,

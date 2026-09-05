@@ -32,12 +32,7 @@ object ProcessingNotifier {
 
     // Mirrors BarrappViewModel.STAGE_* in order, so the notification's progress
     // bar can show where in the pipeline the job is.
-    private val STAGES = listOf(
-        "Uploading the clip",
-        "Finding the exercise",
-        "Trimming to the working set",
-        "Counting and measuring the reps",
-    )
+    private val STAGES = com.barrapp.Voice.STAGES.map { it.name }
 
     fun ensureChannel(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
@@ -60,7 +55,7 @@ object ProcessingNotifier {
         if (!canPost(context)) return
         val index = STAGES.indexOfFirst { it.equals(stage, ignoreCase = true) }
             .let { if (it < 0) 0 else it }
-        val notification = builder(context, "Analyzing your clip")
+        val notification = builder(context, "Measuring your clip")
             .setContentText(stage)
             .setOngoing(true)
             .setProgress(STAGES.size, index, false)

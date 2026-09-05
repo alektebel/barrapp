@@ -73,6 +73,16 @@ def explain(video: Path, exercise: str = "auto", show: str = "decisions",
         pose = backend.estimate(video)
         keypoints = pose.keypoints
         fps = pose.fps or info["fps"] or 30.0
+        # Cache what was just paid for, so the next explain of this clip is a
+        # second rather than a minute. The same file `barra ingest` writes.
+        try:
+            from .ingest import keypoints_to_frame
+            from .io_utils import write_parquet
+            cached.parent.mkdir(parents=True, exist_ok=True)
+            write_parquet(keypoints_to_frame(keypoints), cached)
+            tr.step("keypoints cached", path=str(cached))
+        except Exception as exc:  # noqa: BLE001 - a cache miss is not a failure
+            tr.note("keypoints not cached", reason=str(exc)[:120])
 
     class _P:
         pass
@@ -85,6 +95,12 @@ def explain(video: Path, exercise: str = "auto", show: str = "decisions",
 
     detection = classify(pose.keypoints, tr, fps=fps)
     chosen = detection.exercise if exercise in ("", "auto", None) else exercise
+    if detection.is_hold and exercise in ("", "auto", None):
+        hold = detection.hold
+        tr.note(f"a hold, not a set: {hold.label} held {hold.seconds:.0f} s - "
+                "there are no repetitions to segment",
+                hold=hold.as_dict())
+        return _finish(tr, video, show, write, None)
     if chosen == "unknown":
         tr.error("no movement recognised, so nothing downstream can run")
         return _finish(tr, video, show, write, None)

@@ -1,0 +1,1097 @@
+{
+ "generated": "2026-09-05T00:18:38+00:00",
+ "note": "Cues and faults are mined from the source text by sentence shape. They are quotations with a licence, not measurements and not barra's opinion.",
+ "sources": {
+  "free_exercise_db": {
+   "license": "Unlicense (public domain)",
+   "url": "https://github.com/yuhonas/free-exercise-db",
+   "status": "ok, 38 records"
+  },
+  "wger": {
+   "license": "CC BY-SA 4.0",
+   "url": "https://wger.de/en/software/api",
+   "status": "not run"
+  },
+  "wikipedia": {
+   "license": "CC BY-SA 4.0",
+   "url": "https://en.wikipedia.org/wiki/Wikipedia:Copyrights",
+   "status": "not run"
+  },
+  "youtube_cc": {
+   "license": "CC BY 3.0 (YouTube Creative Commons)",
+   "url": "https://support.google.com/youtube/answer/2797468",
+   "status": "not run"
+  }
+ },
+ "skills": {
+  "australian_row": {
+   "id": "australian_row",
+   "name": "Australian row",
+   "family": "pull",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Position a bar in a rack to about waist height. You can also use a smith machine.",
+    "Take a wider than shoulder width grip on the bar and position yourself hanging underneath the bar. Your body should be straight with your heels on the ground with your arms fully extended. This will be your starting position.",
+    "Begin by flexing the elbow, pulling your chest towards the bar. Retract your shoulder blades as you perform the movement.",
+    "Pause at the top of the motion, and return yourself to the start position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "cues": [
+    "Pause at the top of the motion, and return yourself to the start position.",
+    "Hang a rope or suspension straps from a rack or other stable object."
+   ],
+   "faults": [],
+   "muscles": [
+    "middle back",
+    "lats",
+    "biceps"
+   ],
+   "equipment": [
+    "other"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Inverted Row",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Inverted_Row.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Inverted Row with Straps",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Inverted_Row_with_Straps.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    }
+   ]
+  },
+  "bench_dip": {
+   "id": "bench_dip",
+   "name": "Bench dip",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "For this exercise you will need to place a bench behind your back. With the bench perpendicular to your body, and while looking away from it, hold on to the bench on its edge with the hands fully extended, separated at shoulder width. The legs will be extended forward, bent at the waist and perpendicular to your torso. This will be your starting position.",
+    "Slowly lower your body as you inhale by bending at the elbows until you lower yourself far enough to where there is an angle slightly smaller than 90 degrees between the upper arm and the forearm. Tip: Keep the elbows as close as possible throughout the movement. Forearms should always be pointing down.",
+    "Using your triceps to bring your torso up again, lift yourself back to the starting position.",
+    "Repeat for the recommended amount of repetitions."
+   ],
+   "cues": [
+    "Slowly lower your body as you inhale by bending at the elbows until you lower yourself far enough to where there is an angle slightly smaller than 90 degrees between the upper arm and the forearm.",
+    "Keep the elbows as close as possible throughout the movement."
+   ],
+   "faults": [],
+   "muscles": [
+    "triceps",
+    "chest",
+    "shoulders"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Bench Dips",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Bench_Dips.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    }
+   ]
+  },
+  "chin_up": {
+   "id": "chin_up",
+   "name": "Chin-up",
+   "family": "pull",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Grab the pull-up bar with the palms facing your torso and a grip closer than the shoulder width.",
+    "As you have both arms extended in front of you holding the bar at the chosen grip width, keep your torso as straight as possible while creating a curvature on your lower back and sticking your chest out. This is your starting position. Tip: Keeping the torso as straight as possible maximizes biceps stimulation while minimizing back involvement.",
+    "As you breathe out, pull your torso up until your head is around the level of the pull-up bar. Concentrate on using the biceps muscles in order to perform the movement. Keep the elbows close to your body. Tip: The upper torso should remain stationary as it moves through space and only the arms should move. The forearms should do no other work other than hold the bar.",
+    "After a second of squeezing the biceps in the contracted position, slowly lower your torso back to the starting position; when your arms are fully extended. Breathe in as you perform this portion of the movement.",
+    "Repeat this motion for the prescribed amount of repetitions."
+   ],
+   "cues": [
+    "Grab the pull-up bar with the palms facing your torso and a grip closer than the shoulder width.",
+    "Keeping the torso as straight as possible maximizes biceps stimulation while minimizing back involvement.",
+    "As you breathe out, pull your torso up until your head is around the level of the pull-up bar.",
+    "Concentrate on using the biceps muscles in order to perform the movement.",
+    "Keep the elbows close to your body.",
+    "The upper torso should remain stationary as it moves through space and only the arms should move.",
+    "Breathe in as you perform this portion of the movement.",
+    "Grab the chin-up bar with your palm facing you.",
+    "Exhale as you perform this portion of the movement.",
+    "Concentrate on squeezing the back muscles once you reach the full contracted position."
+   ],
+   "faults": [],
+   "muscles": [
+    "lats",
+    "biceps",
+    "forearms",
+    "middle back"
+   ],
+   "equipment": [
+    "body only",
+    "other"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Chin-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Chin-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 7,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "One Arm Chin-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/One_Arm_Chin-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    }
+   ]
+  },
+  "decline_push_up": {
+   "id": "decline_push_up",
+   "name": "Decline push-up",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Lie on the floor face down and place your hands about 36 inches apart while holding your torso up at arms length. Move your feet up to a box or bench. This will be your starting position.",
+    "Next, lower yourself downward until your chest almost touches the floor as you inhale.",
+    "Now breathe out and press your upper body back up to the starting position while squeezing your chest.",
+    "After a brief pause at the top contracted position, you can begin to lower yourself downward again for as many repetitions as needed."
+   ],
+   "cues": [
+    "Next, lower yourself downward until your chest almost touches the floor as you inhale.",
+    "Now breathe out and press your upper body back up to the starting position while squeezing your chest.",
+    "Lower yourself until your chest almost touches the floor as you inhale.",
+    "Breathe out as you perform this step."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Decline Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Decline_Push-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Push-Ups With Feet Elevated",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push-Ups_With_Feet_Elevated.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    }
+   ]
+  },
+  "diamond_push_up": {
+   "id": "diamond_push_up",
+   "name": "Diamond push-up",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Lie on the floor face down and place your hands closer than shoulder width for a close hand position. Make sure that you are holding your torso up at arms' length.",
+    "Lower yourself until your chest almost touches the floor as you inhale.",
+    "Using your triceps and some of your pectoral muscles, press your upper body back up to the starting position and squeeze your chest. Breathe out as you perform this step.",
+    "After a second pause at the contracted position, repeat the movement for the prescribed amount of repetitions."
+   ],
+   "cues": [
+    "Make sure that you are holding your torso up at arms' length.",
+    "Lower yourself until your chest almost touches the floor as you inhale.",
+    "Breathe out as you perform this step."
+   ],
+   "faults": [],
+   "muscles": [
+    "triceps",
+    "chest",
+    "shoulders"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Push-Ups - Close Triceps Position",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push-Ups_-_Close_Triceps_Position.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    }
+   ]
+  },
+  "dip": {
+   "id": "dip",
+   "name": "Dip",
+   "family": "push",
+   "measurable": true,
+   "summary": "",
+   "instructions": [
+    "For this exercise you will need access to parallel bars. To get yourself into the starting position, hold your body at arms length (arms locked) above the bars.",
+    "While breathing in, lower yourself slowly with your torso leaning forward around 30 degrees or so and your elbows flared out slightly until you feel a slight stretch in the chest.",
+    "Once you feel the stretch, use your chest to bring your body back to the starting position as you breathe out. Tip: Remember to squeeze the chest at the top of the movement for a second.",
+    "Repeat the movement for the prescribed amount of repetitions."
+   ],
+   "cues": [
+    "Remember to squeeze the chest at the top of the movement for a second.",
+    "Now, inhale and slowly lower yourself downward.",
+    "Lower yourself until there is a 90 degree angle formed between the upper arm and forearm.",
+    "Then, exhale and push your torso back up using your triceps to bring your body back to the starting position.",
+    "Reverse the motion by extending the elbow, pushing yourself back up into the starting position."
+   ],
+   "faults": [
+    "Avoid swinging, and maintain good posture throughout the descent."
+   ],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": [
+    "other",
+    "body only"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Dips - Chest Version",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Dips_-_Chest_Version.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Dips - Triceps Version",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Dips_-_Triceps_Version.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Parallel Bar Dip",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Parallel_Bar_Dip.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 1
+    }
+   ]
+  },
+  "incline_push_up": {
+   "id": "incline_push_up",
+   "name": "Incline push-up",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Stand facing bench or sturdy elevated platform. Place hands on edge of bench or platform, slightly wider than shoulder width.",
+    "Position forefoot back from bench or platform with arms and body straight. Arms should be perpendicular to body. Keeping body straight, lower chest to edge of box or platform by bending arms.",
+    "Push body up until arms are extended. Repeat."
+   ],
+   "cues": [
+    "Push body up until arms are extended."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps",
+    "abdominals"
+   ],
+   "equipment": [
+    "body only",
+    "other"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Close-Grip",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Close-Grip.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 0,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Depth Jump",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Depth_Jump.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 0,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Medium",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Medium.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 0,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Reverse Grip",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Reverse_Grip.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 0,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Incline Push-Up Wide",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Incline_Push-Up_Wide.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 0,
+     "faults": 0
+    }
+   ]
+  },
+  "jump_squat": {
+   "id": "jump_squat",
+   "name": "Jump squat",
+   "family": "legs",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Cross your arms over your chest.",
+    "With your head up and your back straight, position your feet at shoulder width.",
+    "Keeping your back straight and chest up, squat down as you inhale until your upper thighs are parallel, or lower, to the floor.",
+    "Now pressing mainly with the ball of your feet, jump straight up in the air as high as possible, using the thighs like springs. Exhale during this portion of the movement.",
+    "When you touch the floor again, immediately squat down and jump again.",
+    "Repeat for the recommended amount of repetitions."
+   ],
+   "cues": [
+    "Exhale during this portion of the movement."
+   ],
+   "faults": [],
+   "muscles": [
+    "quadriceps",
+    "calves",
+    "glutes",
+    "hamstrings"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Freehand Jump Squat",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Freehand_Jump_Squat.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    }
+   ]
+  },
+  "kipping_muscle_up": {
+   "id": "kipping_muscle_up",
+   "name": "Kipping muscle-up",
+   "family": "bar",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Grip the rings using a false grip, with the base of your palms on top of the rings.",
+    "Begin with a movement swinging your legs backward slightly.",
+    "Counter that movement by swinging your legs forward and up, jerking your chin and chest back, pulling yourself up with both arms as you do so. As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward, allowing your elbows to move straight back behind you. This puts you into the proper position to continue into the dip portion of the movement.",
+    "Maintaining control and stability, extend through the elbow to complete the motion.",
+    "Use care when lowering yourself to the ground."
+   ],
+   "cues": [
+    "Grip the rings using a false grip, with the base of your palms on top of the rings.",
+    "As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward, allowing your elbows to move straight back behind you."
+   ],
+   "faults": [
+    "Begin with a movement swinging your legs backward slightly.",
+    "Counter that movement by swinging your legs forward and up, jerking your chin and chest back, pulling yourself up with both arms as you do so."
+   ],
+   "muscles": [
+    "lats",
+    "abdominals",
+    "biceps",
+    "forearms",
+    "middle back",
+    "shoulders",
+    "traps",
+    "triceps"
+   ],
+   "equipment": [
+    "other"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Kipping Muscle Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Kipping_Muscle_Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 2
+    }
+   ]
+  },
+  "leg_raise": {
+   "id": "leg_raise",
+   "name": "Hanging leg raise",
+   "family": "core",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Hang from a chin-up bar with both arms extended at arms length in top of you using either a wide grip or a medium grip. The legs should be straight down with the pelvis rolled slightly backwards. This will be your starting position.",
+    "Raise your legs until the torso makes a 90-degree angle with the legs. Exhale as you perform this movement and hold the contraction for a second or so.",
+    "Go back slowly to the starting position as you breathe in.",
+    "Repeat for the recommended amount of repetitions."
+   ],
+   "cues": [
+    "Hang from a chin-up bar with both arms extended at arms length in top of you using either a wide grip or a medium grip.",
+    "Raise your legs until the torso makes a 90-degree angle with the legs.",
+    "Exhale as you perform this movement and hold the contraction for a second or so."
+   ],
+   "faults": [],
+   "muscles": [
+    "abdominals"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "expert",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Hanging Leg Raise",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Hanging_Leg_Raise.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    }
+   ]
+  },
+  "muscle_up": {
+   "id": "muscle_up",
+   "name": "Muscle-up",
+   "family": "bar",
+   "measurable": true,
+   "summary": "",
+   "instructions": [
+    "Grip the rings using a false grip, with the base of your palms on top of the rings. Initiate a pull up by pulling the elbows down to your side, flexing the elbows.",
+    "As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward, allowing your elbows to move straight back behind you. This puts you into the proper position to continue into the dip portion of the movement.",
+    "Maintaining control and stability, extend through the elbow to complete the motion.",
+    "Use care when lowering yourself to the ground."
+   ],
+   "cues": [
+    "Grip the rings using a false grip, with the base of your palms on top of the rings.",
+    "Initiate a pull up by pulling the elbows down to your side, flexing the elbows.",
+    "As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward, allowing your elbows to move straight back behind you."
+   ],
+   "faults": [],
+   "muscles": [
+    "lats",
+    "abdominals",
+    "biceps",
+    "forearms",
+    "middle back",
+    "shoulders",
+    "traps",
+    "triceps"
+   ],
+   "equipment": [
+    "other"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Muscle Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Muscle_Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    }
+   ]
+  },
+  "nordic_curl": {
+   "id": "nordic_curl",
+   "name": "Nordic curl",
+   "family": "legs",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Using the leg pad of a lat pulldown machine or a preacher bench, position yourself so that your ankles are under the pads, knees on the seat, and you are facing away from the machine. You should be upright and maintaining good posture.",
+    "This will be your starting position. Lower yourself under control until your knees are almost completely straight.",
+    "Remaining in control, raise yourself back up to the starting position.",
+    "If you are unable to complete a rep, use a band, a partner, or push off of a box to aid in completing a repetition."
+   ],
+   "cues": [
+    "Lower yourself under control until your knees are almost completely straight."
+   ],
+   "faults": [],
+   "muscles": [
+    "hamstrings",
+    "calves",
+    "glutes",
+    "lower back"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Natural Glute Ham Raise",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Natural_Glute_Ham_Raise.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    }
+   ]
+  },
+  "one_arm_push_up": {
+   "id": "one_arm_push_up",
+   "name": "One-arm push-up",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Begin laying prone on the ground. Move yourself into a position supporting your weight on your toes and one arm. Your working arm should be placed directly under the shoulder, fully extended. Your legs should be extended, and for this movement you may need a wider base, placing your feet further apart than in a normal push-up.",
+    "Maintain good posture, and place your free hand behind your back. This will be your starting position.",
+    "Lower yourself by allowing the elbow to flex until you touch the ground.",
+    "Descend slowly, and reverse direction be extending the arm to return to the starting position."
+   ],
+   "cues": [
+    "Maintain good posture, and place your free hand behind your back.",
+    "Lower yourself by allowing the elbow to flex until you touch the ground."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Single-Arm Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Single-Arm_Push-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    }
+   ]
+  },
+  "plank": {
+   "id": "plank",
+   "name": "Plank",
+   "family": "core",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Get into a prone position on the floor, supporting your weight on your toes and your forearms. Your arms are bent and directly below the shoulder.",
+    "Keep your body straight at all times, and hold this position as long as possible. To increase difficulty, an arm or leg can be raised."
+   ],
+   "cues": [
+    "Keep your body straight at all times, and hold this position as long as possible."
+   ],
+   "faults": [],
+   "muscles": [
+    "abdominals"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Plank",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Plank.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    }
+   ]
+  },
+  "pull_up": {
+   "id": "pull_up",
+   "name": "Pull-up",
+   "family": "pull",
+   "measurable": true,
+   "summary": "",
+   "instructions": [
+    "Grab the pull-up bar with the palms facing forward using the prescribed grip. Note on grips: For a wide grip, your hands need to be spaced out at a distance wider than your shoulder width. For a medium grip, your hands need to be spaced out at a distance equal to your shoulder width and for a close grip at a distance smaller than your shoulder width.",
+    "As you have both arms extended in front of you holding the bar at the chosen grip width, bring your torso back around 30 degrees or so while creating a curvature on your lower back and sticking your chest out. This is your starting position.",
+    "Pull your torso up until the bar touches your upper chest by drawing the shoulders and the upper arms down and back. Exhale as you perform this portion of the movement. Tip: Concentrate on squeezing the back muscles once you reach the full contracted position. The upper torso should remain stationary as it moves through space and only the arms should move. The forearms should do no other work other than hold the bar.",
+    "After a second on the contracted position, start to inhale and slowly lower your torso back to the starting position when your arms are fully extended and the lats are fully stretched.",
+    "Repeat this motion for the prescribed amount of repetitions."
+   ],
+   "cues": [
+    "Grab the pull-up bar with the palms facing forward using the prescribed grip.",
+    "Pull your torso up until the bar touches your upper chest by drawing the shoulders and the upper arms down and back.",
+    "Exhale as you perform this portion of the movement.",
+    "Concentrate on squeezing the back muscles once you reach the full contracted position."
+   ],
+   "faults": [],
+   "muscles": [
+    "lats",
+    "biceps",
+    "middle back"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Pullups",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Pullups.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 4,
+     "faults": 0
+    }
+   ]
+  },
+  "push_up": {
+   "id": "push_up",
+   "name": "Push-up",
+   "family": "push",
+   "measurable": true,
+   "summary": "",
+   "instructions": [
+    "Move into a prone position on the floor, supporting your weight on your hands and toes.",
+    "Your arms should be fully extended with the hands around shoulder width. Keep your body straight throughout the movement. This will be your starting position.",
+    "Descend by flexing at the elbow, lowering your chest toward the ground.",
+    "At the bottom, reverse the motion by pushing yourself up through elbow extension as quickly as possible until you are air borne. Aim to \"jump\" 12-18 inches to one side.",
+    "As you accelerate up, move your outside foot away from your direction of travel. Leaving the ground, shift your body about 30 degrees for the next repetition.",
+    "Return to the starting position and repeat the exercise, working all the way around until you are back where you started."
+   ],
+   "cues": [
+    "Keep your body straight throughout the movement.",
+    "At the bottom, reverse the motion by pushing yourself up through elbow extension as quickly as possible until you are air borne.",
+    "Aim to \"jump\" 12-18 inches to one side.",
+    "At the bottom, reverse the motion by pushing yourself up through elbow extension as quickly as possible.",
+    "As you descend, keep your body straight.",
+    "Lower the arm back to the floor for another pushup and then twist to the other side.",
+    "Next, lower yourself downward until your chest almost touches the floor as you inhale.",
+    "Now breathe out and press your upper body back up to the starting position while squeezing your chest.",
+    "Make sure you are holding your torso up at arms length.",
+    "Lower yourself until your chest almost touches the floor as you inhale.",
+    "Breathe out as you perform this step."
+   ],
+   "faults": [],
+   "muscles": [
+    "chest",
+    "shoulders",
+    "triceps",
+    "abdominals"
+   ],
+   "equipment": [
+    "body only",
+    "other"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Clock Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Clock_Push-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Plyo Push-up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Plyo_Push-up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Push Up to Side Plank",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push_Up_to_Side_Plank.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Pushups",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Pushups.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Pushups (Close and Wide Hand Positions)",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Pushups_Close_and_Wide_Hand_Positions.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 3,
+     "faults": 0
+    },
+    {
+     "source": "free_exercise_db",
+     "title": "Suspended Push-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Suspended_Push-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 0,
+     "faults": 0
+    }
+   ]
+  },
+  "ring_dip": {
+   "id": "ring_dip",
+   "name": "Ring dip",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Grip a ring in each hand, and then take a small jump to help you get into the starting position with your arms locked out.",
+    "Begin by flexing the elbow, lowering your body until your arms break 90 degrees. Avoid swinging, and maintain good posture throughout the descent.",
+    "Reverse the motion by extending the elbow, pushing yourself back up into the starting position.",
+    "Repeat for the desired number of repetitions."
+   ],
+   "cues": [
+    "Grip a ring in each hand, and then take a small jump to help you get into the starting position with your arms locked out.",
+    "Reverse the motion by extending the elbow, pushing yourself back up into the starting position."
+   ],
+   "faults": [
+    "Avoid swinging, and maintain good posture throughout the descent."
+   ],
+   "muscles": [
+    "triceps",
+    "chest",
+    "shoulders"
+   ],
+   "equipment": [
+    "other"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Ring Dips",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Ring_Dips.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 1
+    }
+   ]
+  },
+  "scapular_pull": {
+   "id": "scapular_pull",
+   "name": "Scapular pull",
+   "family": "pull",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Take a pronated grip on a pull-up bar.",
+    "From a hanging position, raise yourself a few inches without using your arms. Do this by depressing your shoulder girdle in a reverse shrugging motion.",
+    "Pause at the completion of the movement, and then slowly return to the starting position before performing more repetitions."
+   ],
+   "cues": [
+    "Pause at the completion of the movement, and then slowly return to the starting position before performing more repetitions."
+   ],
+   "faults": [
+    "Do this by depressing your shoulder girdle in a reverse shrugging motion."
+   ],
+   "muscles": [
+    "traps",
+    "lats",
+    "middle back"
+   ],
+   "equipment": [],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Scapular Pull-Up",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Scapular_Pull-Up.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 1
+    }
+   ]
+  },
+  "split_squat": {
+   "id": "split_squat",
+   "name": "Split squat",
+   "family": "legs",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Suspend your straps so the handles are 18-30 inches from the floor.",
+    "Facing away from the setup, place your rear foot into the handle behind you. Keep your head looking forward and your chest up, with your knee slightly bent. This will be your starting position.",
+    "Descend by flexing the knee and hips, lowering yourself to the ground. Keep your weight on the heel of your foot and maintain your posture throughout the exercise.",
+    "At the bottom of the movement, reverse the motion, extending through the hip and knee to return to the starting position."
+   ],
+   "cues": [
+    "Keep your head looking forward and your chest up, with your knee slightly bent.",
+    "Keep your weight on the heel of your foot and maintain your posture throughout the exercise."
+   ],
+   "faults": [],
+   "muscles": [
+    "quadriceps",
+    "abductors",
+    "adductors",
+    "calves",
+    "glutes",
+    "hamstrings"
+   ],
+   "equipment": [
+    "other"
+   ],
+   "level": "intermediate",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Suspended Split Squat",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Suspended_Split_Squat.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 2,
+     "faults": 0
+    }
+   ]
+  },
+  "squat": {
+   "id": "squat",
+   "name": "Bodyweight squat",
+   "family": "legs",
+   "measurable": true,
+   "summary": "",
+   "instructions": [
+    "Stand with your feet shoulder width apart. You can place your hands behind your head. This will be your starting position.",
+    "Begin the movement by flexing your knees and hips, sitting back with your hips.",
+    "Continue down to full depth if you are able,and quickly reverse the motion until you return to the starting position. As you squat, keep your head and chest up and push your knees out."
+   ],
+   "cues": [
+    "As you squat, keep your head and chest up and push your knees out."
+   ],
+   "faults": [],
+   "muscles": [
+    "quadriceps",
+    "glutes",
+    "hamstrings"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Bodyweight Squat",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Bodyweight_Squat.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 0
+    }
+   ]
+  },
+  "toes_to_bar": {
+   "id": "toes_to_bar",
+   "name": "Toes to bar",
+   "family": "core",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "Hang from a chin-up bar with your legs and feet together using an overhand grip (palms facing away from you) that is slightly wider than shoulder width. Tip: You may use wrist wraps in order to facilitate holding on to the bar.",
+    "Now bend your knees at a 90 degree angle and bring the upper legs forward so that the calves are perpendicular to the floor while the thighs remain parallel to it. This will be your starting position.",
+    "Pull your legs up as you exhale until you almost touch your shins with the bar above you. Tip: Try to straighten your legs as much as possible while at the top.",
+    "Lower your legs as slowly as possible until you reach the starting position. Tip: Avoid swinging and using momentum at all times.",
+    "Repeat for the recommended amount of repetitions."
+   ],
+   "cues": [
+    "Hang from a chin-up bar with your legs and feet together using an overhand grip (palms facing away from you) that is slightly wider than shoulder width.",
+    "You may use wrist wraps in order to facilitate holding on to the bar.",
+    "Now bend your knees at a 90 degree angle and bring the upper legs forward so that the calves are perpendicular to the floor while the thighs remain parallel to it.",
+    "Pull your legs up as you exhale until you almost touch your shins with the bar above you.",
+    "Try to straighten your legs as much as possible while at the top.",
+    "Lower your legs as slowly as possible until you reach the starting position."
+   ],
+   "faults": [
+    "Avoid swinging and using momentum at all times."
+   ],
+   "muscles": [
+    "abdominals"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "expert",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Hanging Pike",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Hanging_Pike.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 6,
+     "faults": 1
+    }
+   ]
+  },
+  "wall_hspu": {
+   "id": "wall_hspu",
+   "name": "Wall handstand push-up",
+   "family": "balance",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "With your back to the wall bend at the waist and place both hands on the floor at shoulder width.",
+    "Kick yourself up against the wall with your arms straight. Your body should be upside down with the arms and legs fully extended. Keep your whole body as straight as possible. Tip: If doing this for the first time, have a spotter help you. Also, make sure that you keep facing the wall with your head, rather than looking down.",
+    "Slowly lower yourself to the ground as you inhale until your head almost touches the floor. Tip: It is of utmost importance that you come down slow in order to avoid head injury.",
+    "Push yourself back up slowly as you exhale until your elbows are nearly locked.",
+    "Repeat for the recommended amount of repetitions."
+   ],
+   "cues": [
+    "Keep your whole body as straight as possible.",
+    "If doing this for the first time, have a spotter help you.",
+    "Slowly lower yourself to the ground as you inhale until your head almost touches the floor.",
+    "Push yourself back up slowly as you exhale until your elbows are nearly locked."
+   ],
+   "faults": [
+    "It is of utmost importance that you come down slow in order to avoid head injury."
+   ],
+   "muscles": [
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "expert",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Handstand Push-Ups",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Handstand_Push-Ups.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 4,
+     "faults": 1
+    }
+   ]
+  },
+  "wide_push_up": {
+   "id": "wide_push_up",
+   "name": "Wide push-up",
+   "family": "push",
+   "measurable": false,
+   "summary": "",
+   "instructions": [
+    "With your hands wide apart, support your body on your toes and hands in a plank position. Your elbows should be extended and your body straight. Do not allow your hips to sag. This will be your starting position.",
+    "To begin, allow the elbows to flex, lowering your chest to the floor as you inhale.",
+    "Using your pectoral muscles, press your upper body back up to the starting position by extending the elbows. Exhale as you perform this step.",
+    "After pausing at the contracted position, repeat the movement for the prescribed amount of repetitions."
+   ],
+   "cues": [
+    "Exhale as you perform this step."
+   ],
+   "faults": [
+    "Do not allow your hips to sag."
+   ],
+   "muscles": [
+    "chest",
+    "abdominals",
+    "shoulders",
+    "triceps"
+   ],
+   "equipment": [
+    "body only"
+   ],
+   "level": "beginner",
+   "sources": [
+    {
+     "source": "free_exercise_db",
+     "title": "Push-Up Wide",
+     "url": "https://github.com/yuhonas/free-exercise-db/blob/main/exercises/Push-Up_Wide.json",
+     "license": "Unlicense (public domain)",
+     "attribution": "free-exercise-db contributors",
+     "cues": 1,
+     "faults": 1
+    }
+   ]
+  }
+ }
+}

@@ -90,6 +90,40 @@ TRICKS: dict[str, dict] = {
 
 VIDEO_EXTS = (".mp4", ".webm", ".ogv", ".ogg", ".mov", ".mkv")
 
+# What a file's title has to mention before it is filed under a trick. A
+# Commons full-text search for "muscle-up exercise" returns anything whose
+# description mentions exercise, and on a first run that filed two explicit
+# sexual videos under muscle_up, a Wikimedia software demo called "DIP Search"
+# under dip, and a hand-release push-up under dip. The search is a candidate
+# generator; the title is the evidence, and a title that names no trick is
+# skipped rather than trusted.
+TRICK_KEYWORDS: dict[str, list[str]] = {
+    "muscle_up": ["muscle up", "muscle-up", "muscleup"],
+    "pull_up": ["pull up", "pull-up", "pullup", "chin up", "chin-up"],
+    "dip": ["dips", "dip exercise", "bar dip", "parallel bar", "ring dip",
+            "tricep dip", "triceps dip"],
+    "push_up": ["push up", "push-up", "pushup", "press up", "press-up"],
+    "squat": ["squat", "pistol"],
+    "handstand": ["handstand"],
+    "front_lever": ["front lever"],
+    "planche": ["planche"],
+    "back_lever": ["back lever"],
+    # "flag" alone is enough here: a calisthenics channel's "Capture the Flag"
+    # and a Russian "Флаги на пилоне" (flags on a pole) are both human flags.
+    "human_flag": ["human flag", "full flag", "flag", "флаг"],
+}
+# Anything carrying one of these is not a training clip whatever else it says.
+OFF_TOPIC = ("penis", "masturbat", "ejaculat", "sex", "nude", "naked", "kegel",
+             "porn", "erotic")
+
+
+def relevant(trick: str, title: str) -> bool:
+    """Does the title name the trick, and nothing that rules it out?"""
+    low = (title or "").lower()
+    if any(bad in low for bad in OFF_TOPIC):
+        return False
+    return any(k in low for k in TRICK_KEYWORDS.get(trick, [trick.replace("_", " ")]))
+
 # Title keywords used to route one channel's uploads to tricks. A channel
 # (Chris Heria, THENX, ...) is not organised by movement, so the title is the
 # only signal; a video whose title names no trick is skipped rather than
@@ -390,6 +424,9 @@ def main() -> int:
                          "fine for a local research set that is never redistributed, "
                          "which is the rule here anyway - footage is never committed. "
                          "The license is recorded per row either way.")
+    ap.add_argument("--prune", action="store_true",
+                    help="drop ledger rows (and their files) whose title does not name "
+                         "their trick, then stop")
     a = ap.parse_args()
 
     tricks = [t.strip() for t in a.tricks.split(",") if t.strip() in TRICKS]
@@ -403,6 +440,22 @@ def main() -> int:
             for r in csv.DictReader(f):
                 existing.add(r.get("source_url", ""))
                 rows.append(r)
+
+    if a.prune:
+        keep, dropped = [], []
+        for r in rows:
+            (keep if relevant(r.get("trick", ""), r.get("title", "")) else dropped).append(r)
+        for r in dropped:
+            print(f"  drop {r.get('trick')}: {r.get('title', '')[:70]}")
+            (out / r["file"]).unlink(missing_ok=True)
+        with open(meta_path, "w", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=["file", "trick", "source", "source_url",
+                                              "page_url", "license", "author",
+                                              "width", "height", "duration", "fps", "title"])
+            w.writeheader()
+            w.writerows(keep)
+        print(f"pruned {len(dropped)} of {len(rows)} rows -> {meta_path}")
+        return 0
 
     def add_row(row: dict) -> bool:
         if row["source_url"] in existing:
@@ -446,6 +499,9 @@ def main() -> int:
             for info in commons_file_info(list(dict.fromkeys(titles))):
                 if got >= a.per_trick:
                     break
+                if not relevant(trick, info["title"]):
+                    print(f"  [commons] skip off-topic title: {info['title'][:70]}")
+                    continue
                 fid = slug(info["title"].removeprefix("File:").rsplit(".", 1)[0])
                 dest = vdir / trick / f"commons_{fid}.mp4"
                 if dest.exists():
@@ -486,6 +542,9 @@ def main() -> int:
                     continue
                 if (info.get("duration") or 0) > a.max_duration:
                     print(f"  [yt] skip long ({info.get('duration')}s): {vid}")
+                    continue
+                if not relevant(trick, info.get("title") or ""):
+                    print(f"  [yt] skip off-topic title: {(info.get('title') or '')[:60]}")
                     continue
                 page = info.get("webpage_url") or f"https://www.youtube.com/watch?v={vid}"
                 if page in existing:

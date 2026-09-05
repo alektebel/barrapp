@@ -77,6 +77,24 @@ barra validate-quality              # the verdict on the clips you have
 Currently it fails, for reasons worth reading before trusting any score:
 [`docs/QUALITY.md`](docs/QUALITY.md).
 
+## What a movement is for
+
+The measurement core says what a rep did. `scripts/scrape_techniques.py`
+collects what a rep is *for* - cues, common faults, muscles - from openly
+licensed sources, with the licence and the record kept on every line, and
+`barra technique muscle_up` prints it. The app shows the same card under a
+session and under the next step on the Plan page, labelled as quoted rather
+than measured. Attribution: [`data/techniques/ATTRIBUTION.md`](data/techniques/ATTRIBUTION.md).
+
+```bash
+python scripts/scrape_techniques.py        # free-exercise-db, wger, Wikipedia
+barra technique                            # what is documented
+```
+
+A clip that holds still is a result now, not a refusal: a dead hang, a lever,
+a handstand, a plank get named and timed. What was and was not verified on
+real footage, and what to do next: [`docs/NEXT.md`](docs/NEXT.md).
+
 ## When a number looks wrong
 
 Every stage records what it measured, what it required, and where in the clip

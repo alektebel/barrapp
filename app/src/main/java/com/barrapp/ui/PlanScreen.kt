@@ -19,12 +19,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barrapp.Progression
 import com.barrapp.data.DayEntry
 import com.barrapp.data.Goals
+import com.barrapp.data.Techniques
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Panel
 import com.barrapp.ui.parts.Pill
@@ -46,6 +48,7 @@ fun PlanScreen(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val context = LocalContext.current
     Column(modifier.fillMaxSize()) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -101,6 +104,14 @@ fun PlanScreen(
 
             items(verdicts, key = { it.movement }) { v ->
                 VerdictCard(v)
+            }
+
+            // What the next step is for, quoted from open sources - so the
+            // page that says "work the dip" can also say what a dip is.
+            val next = verdicts.firstOrNull()?.step?.towards
+            val technique = next?.let { Techniques.forExercise(context, it) }
+            if (technique != null) {
+                item { TechniqueCard(technique) }
             }
 
             item {

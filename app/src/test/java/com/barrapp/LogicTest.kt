@@ -336,6 +336,73 @@ object LogicTest {
             "\n  evidence: ${two.evidence}\n  ${one.headline} / ${one.missing}\n")
     }
 
+    // ---- holds on the calendar -------------------------------------------
+    private fun holdRules() {
+        val held = DayEntry(
+            date = "2026-08-27", exercise = "inverted_hang", exerciseLabel = "Inverted hang",
+            reps = 0, score = null, band = "unmeasured", jobIds = listOf("j9"),
+            holdS = 10.9, holdLabel = "Inverted hang",
+        )
+        check("a timed hold is a held day", held.heldOnly)
+        check("a held day is not a measured day", !held.measured)
+        check("a held day is not a filming failure",
+            ReviewText.unmeasuredSentence(listOf(held)) == null)
+        val blank = held.copy(holdS = 0.0, holdLabel = "")
+        check("a blank day still is", ReviewText.unmeasuredSentence(listOf(blank)) != null)
+    }
+
+    // ---- the voice --------------------------------------------------------
+    private fun voiceRules() {
+        // Every line the app can say on its own initiative, in one list.
+        val everything = Voice.STAGES.flatMap { it.lines } + Voice.EMPTY_LINES +
+            Voice.COACH_THINKING + Voice.PROCESSING_TITLES + Voice.EMPTY_TITLE +
+            (0..23).map { Voice.greeting("Diego", it, 3) } +
+            (0..5).flatMap { r -> listOf(true, false).map { Voice.arrival(r, it, "muscle-up") } } +
+            listOf(Voice.holdArrival("Inverted hang", 11.0), Voice.failure(null),
+                Voice.failure("timed out"), Voice.failure("Failed to connect to host"))
+        everything.forEach { line ->
+            Voice.FORBIDDEN.forEach { bad ->
+                check("never claims what it has not measured: '$bad'",
+                    !line.lowercase().contains(bad), line)
+            }
+            check("no line is empty", line.isNotBlank())
+        }
+
+        check("every stage has more than one line to rotate through",
+            Voice.STAGES.all { it.lines.size >= 2 })
+        check("stage names match the pipeline's four stages",
+            Voice.STAGES.map { it.name } == listOf(
+                "Uploading the clip", "Finding the exercise",
+                "Trimming to the working set", "Counting and measuring the reps"))
+
+        val a = Voice.stageLine("Finding the exercise", 0, seed = 7)
+        val b = Voice.stageLine("Finding the exercise", 1, seed = 7)
+        check("a tick moves the stage line on", a != b, "$a / $b")
+        check("the line is stable for the same tick and seed",
+            a == Voice.stageLine("Finding the exercise", 0, seed = 7))
+        check("an unknown stage says nothing", Voice.stageLine("Frobnicating", 0) == "")
+        check("the seed survives a negative index", Voice.stageLine("Uploading the clip", -5, 0).isNotBlank())
+
+        check("morning is morning", Voice.greeting("Diego", 8).startsWith("Morning, Diego"))
+        check("evening is evening", Voice.greeting("Diego", 21).startsWith("Evening, Diego"))
+        check("three in the morning is not morning", Voice.greeting("Diego", 3).startsWith("Late, Diego"))
+        check("the greeting rotates by day", Voice.greeting("D", 8, 1) != Voice.greeting("D", 8, 2))
+
+        check("zero reps says nothing counted", Voice.arrival(0, false, "Push-up").contains("Nothing counted"))
+        check("one rep is an observation", Voice.arrival(1, true, "Push-up").contains("observation"))
+        check("two reps name the floor", Voice.arrival(2, true, null).contains("floor"))
+        check("found but unscored says so", Voice.arrival(5, false, "Push-up").contains("None could be scored"))
+        check("a scored set is stated plainly", Voice.arrival(5, true, "Push-up") == "5 reps of push-up measured and scored.")
+        check("a hold reports seconds", Voice.holdArrival("inverted hang", 11.4).startsWith("Inverted hang held for 11 s"))
+
+        check("a timeout is explained", Voice.failure("The server is taking longer than usual").contains("queued"))
+        check("a connection failure says nothing was lost", Voice.failure("Failed to connect to /10.0.0.1").contains("nothing was lost"))
+        check("an unknown message passes through", Voice.failure("Clip too large") == "Clip too large")
+        check("titles rotate", Voice.processingTitle(0) != Voice.processingTitle(1))
+
+        println("\n  --- voice ---\n  ${Voice.greeting("Diego", 8, 1)}\n  ${Voice.stageLine("Counting and measuring the reps", 0)}\n")
+    }
+
     @JvmStatic
     fun main(args: Array<String>) {
         profileRules()
@@ -344,6 +411,8 @@ object LogicTest {
         traceRules()
         weeklyReportRules()
         progressionRules()
+        holdRules()
+        voiceRules()
         println(if (failures == 0) "OK  $checks checks passed"
                 else "FAILED  $failures of $checks checks")
         if (failures > 0) kotlin.system.exitProcess(1)

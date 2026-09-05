@@ -119,6 +119,30 @@ class TestFilmingAdvice(unittest.TestCase):
         self.assertIn("counts repetitions", text)
 
 
+class TestHoldDescription(unittest.TestCase):
+    def test_a_hold_is_described_by_its_seconds(self):
+        head, text = describe(payload(
+            n_reps=0, n_candidates=0, reps=[], sessionScore=None,
+            sessionBand="unmeasured", exercise="inverted_hang",
+            detected={"exercise": "inverted_hang", "label": "Inverted hang"},
+            hold={"exercise": "inverted_hang", "label": "Inverted hang", "seconds": 10.9,
+                  "confidence": 0.75, "reason": "hanging with the hips above the shoulders",
+                  "runnerUp": "tuck_front_lever"},
+            duration_s=23.1, blockers=[]))
+        self.assertEqual(head, "Inverted hang held for 11 s")
+        self.assertIn("11 seconds of a 23-second clip", text)
+        self.assertIn("hips above the shoulders", text)
+        self.assertIn("not score", text)
+        self.assertNotIn("nothing countable", text.lower())
+
+    def test_an_uncertain_hold_names_its_runner_up(self):
+        _, text = describe(payload(
+            n_reps=0, reps=[], sessionScore=None, sessionBand="unmeasured",
+            hold={"exercise": "lever", "label": "Lever", "seconds": 6.0,
+                  "confidence": 0.5, "reason": "body level", "runnerUp": "front_lever"}))
+        self.assertIn("could also be a front lever", text)
+
+
 class TestVerifiedIsEarned(unittest.TestCase):
     def test_a_set_with_nothing_scored_is_not_called_verified(self):
         """"19 verified push-up reps" above "none of them could be scored" is a

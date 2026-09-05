@@ -28,6 +28,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from . import schema as S
+from .holds import Hold, classify_hold
 from .movements import (MOVEMENTS, midpoint, pair_confidence, robust_torso)
 from .trace import NullTrace, Trace
 
@@ -101,10 +102,20 @@ class Classification:
     reason: str
     features: dict = field(default_factory=dict)
     runner_up: str | None = None
+    # What sort of thing the clip shows. A "set" has repetitions to count; a
+    # "hold" has a duration and nothing to count; "none" is neither. The rep
+    # pipeline only ever runs on a set, and the app says which of the three
+    # it got instead of reporting a hold as a failure to find a set.
+    kind: str = "set"
+    hold: Hold | None = None
 
     @property
     def certain(self) -> bool:
         return self.confidence >= 0.65
+
+    @property
+    def is_hold(self) -> bool:
+        return self.kind == "hold" and self.hold is not None
 
 
 def _travel(points: np.ndarray, ok: np.ndarray, torso: float) -> float:
@@ -278,6 +289,20 @@ def _why_not(kind: str, travel: float, seen: float, seen_clip: float = 1.0) -> s
     return f"the {kind} moved {travel:.2f} torso-lengths, past {ANCHOR_FIXED}"
 
 
+def _held(kp: np.ndarray, fps: float, f: dict, tr, why_not_a_set: str,
+          family: str) -> Classification:
+    """A parked clip is either a named hold or nothing. Never a set."""
+    hold = classify_hold(kp, fps, tr, family=family)
+    if hold is None:
+        return Classification("unknown", 0.0, why_not_a_set, f, kind="none")
+    return Classification(
+        hold.exercise, hold.confidence,
+        f"a hold, not a set: {hold.label.lower()} for {hold.seconds:.0f} s - {hold.reason}",
+        {**f, **{f"hold_{k}": v for k, v in hold.features.items()}},
+        runner_up=hold.runner_up, kind="hold", hold=hold,
+    )
+
+
 def classify(kp: np.ndarray, trace: Trace | None = None,
              fps: float = 30.0) -> Classification:
     """Decide the movement, or say the clip does not show one we know.
@@ -333,13 +358,12 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                   parked_frac=parked, parked_max=HOLD_FRAC, band=HOLD_BAND,
                   arm_articulation=f["arm_articulation"],
                   knee_excursion=f["knee_excursion"])
-        return Classification(
-            "unknown", 0.0,
-            f"hanging from something fixed, but {parked:.0%} of the clip is spent "
-            "within a fifth of a torso-length of one position - a hold, or "
-            "resting between attempts, rather than a set of repetitions",
-            f,
-        )
+        return _held(kp, fps, f, tr,
+                     f"hanging from something fixed, but {parked:.0%} of the clip "
+                     "is spent within a fifth of a torso-length of one position "
+                     "- a hold, or resting between attempts, rather than a set "
+                     "of repetitions", family="hanging")
+
 
     # Hanging, but with the legs coming up rather than the body. Checked before
     # the pull-up split because a knee raise satisfies every condition of that
@@ -396,6 +420,24 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f, runner_up=None,
         )
 
+    # A hold on the hands rather than under them: a plank, a handstand, an
+    # L-sit. Checked after the squat because a squat with the arms hanging at
+    # the sides also reads as "hands fixed, arms rigid" - what separates the
+    # two is that a squat's hips travel and a hold's do not. The arms have to
+    # read as rigid as well as the body parked, so a slow set of push-ups with
+    # long pauses at the top still reaches the dip/push-up split below.
+    hips_still = not (np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35)
+    if (anchored and f["hands_below_frac"] >= 0.80 and rigid_arms
+            and hips_still and parked >= HOLD_FRAC):
+        tr.reject("any movement", "the body stays parked on the hands - a hold, not a set",
+                  parked_frac=parked, parked_max=HOLD_FRAC, band=HOLD_BAND,
+                  arm_articulation=f["arm_articulation"],
+                  articulation_min=ARTICULATION, hip_travel=f["hip_travel"])
+        return _held(kp, fps, f, tr,
+                     f"supported on the hands, but {parked:.0%} of the clip is "
+                     "spent within a fifth of a torso-length of one position and "
+                     "the arms never move - a hold rather than a set", family="support")
+
     if anchored and articulated and f["hands_below_frac"] >= 0.80:
         below = f["body_below_hands"]
         if not np.isfinite(below):
@@ -405,7 +447,7 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 "unknown", 0.0,
                 "hands fixed below the shoulders, but too little of the body was "
                 "seen to tell a dip from a push-up",
-                f,
+                f, kind="none",
             )
         if below >= BELOW_HANDS_DIP:
             tr.decision("dip", "the legs hang below the hands",
@@ -443,7 +485,7 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f"no {ANCHOR_WINDOW_S:.0f}-second stretch of this clip shows hands on "
             f"something fixed or feet planted ({hands}, and {feet}), so it does "
             "not show a movement barra can measure",
-            f,
+            f, kind="none",
         )
     tr.reject("any movement", "no branch matched",
               anchored=anchored, articulated=articulated, planted=planted,
@@ -454,7 +496,7 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         "the clip does not match any movement barra knows: the hands are "
         f"{'fixed' if anchored else 'moving'} and the shoulders move "
         f"{f['arm_articulation']:.2f} torso-lengths relative to them",
-        f,
+        f, kind="none",
     )
 
 
@@ -465,6 +507,8 @@ def label(exercise: str) -> str:
     return "Unknown"
 
 
+from .holds import HUMAN as _HOLD_HUMAN  # noqa: E402
+
 HUMAN = {
     "muscle_up": "Muscle-up",
     "pull_up": "Pull-up",
@@ -473,4 +517,5 @@ HUMAN = {
     "squat": "Squat",
     "knee_raise": "Hanging knee raise",
     "unknown": "Not recognised",
+    **_HOLD_HUMAN,
 }

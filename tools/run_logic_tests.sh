@@ -18,6 +18,7 @@ SRC=(
   app/src/main/java/com/barrapp/notify/ReviewText.kt
   app/src/main/java/com/barrapp/Coach.kt
   app/src/main/java/com/barrapp/Progression.kt
+  app/src/main/java/com/barrapp/Voice.kt
   app/src/test/java/com/barrapp/LogicTest.kt
 )
 OUT=$(mktemp -d)

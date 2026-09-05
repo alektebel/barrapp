@@ -23,6 +23,7 @@ REQUIRED = [
     "sessionScore", "sessionBand",
     "n_reps", "n_candidates", "fps", "duration_s",
     "reps", "sessions", "blockers",
+    "hold",
 ]
 
 REP_REQUIRED = [
@@ -50,6 +51,22 @@ class TestPayloadShape(unittest.TestCase):
         self.assertIsNone(payload["sessionScore"])
         self.assertEqual(payload["sessionBand"], "unmeasured")
         self.assertEqual(payload["n_reps"], 0)
+
+    def test_a_hold_is_a_complete_result(self):
+        """A held position ships as its own block, with no reps and no score,
+        and every other key still present."""
+        from barra.holds import Hold
+        h = Hold("inverted_hang", 0.75, "why", 10.9, 9.9, 20.8, {}, "tuck_front_lever")
+        payload = self._empty(h.exercise, [], hold=h.as_dict(),
+                              trim={"startS": h.start_s, "endS": h.end_s})
+        self.assertEqual(payload["n_reps"], 0)
+        self.assertIsNone(payload["sessionScore"])
+        self.assertEqual(payload["hold"]["label"], "Inverted hang")
+        self.assertEqual(payload["hold"]["skill"], "skin_the_cat")
+        self.assertEqual(payload["hold"]["seconds"], 10.9)
+        for k in REQUIRED:
+            if k not in ("headline", "narrative", "nextSession"):
+                self.assertIn(k, payload, k)
 
     def test_extra_fields_override_defaults(self):
         payload = self._empty("auto", ["x"], detected={"label": "Pull-up"})

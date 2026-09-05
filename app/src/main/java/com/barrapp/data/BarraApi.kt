@@ -251,6 +251,19 @@ class BarraApi(context: Context) {
                 candidateCount = json.optInt("n_candidates"),
                 durationS = json.optDouble("duration_s", 0.0).orZero(),
                 traceId = json.optString("traceId"),
+                hold = json.optJSONObject("hold")?.let { h ->
+                    Hold(
+                        exercise = h.optString("exercise"),
+                        label = h.optString("label").ifBlank { "Static hold" },
+                        skill = h.optString("skill").ifBlank { null },
+                        confidence = h.optDouble("confidence", 0.0).orZero(),
+                        reason = h.optString("reason"),
+                        seconds = h.optDouble("seconds", 0.0).orZero(),
+                        startS = h.optDouble("startS", 0.0).orZero(),
+                        endS = h.optDouble("endS", 0.0).orZero(),
+                        runnerUp = h.optString("runnerUp").ifBlank { null },
+                    )
+                },
                 provenance = json.optJSONObject("provenance")?.let { p ->
                     Provenance(
                         barra = p.optString("barra"),

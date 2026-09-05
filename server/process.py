@@ -162,6 +162,10 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
         "sessions": [],
         "reps": [],
         "blockers": blockers,
+        # A static position, when the clip was one. None on every other path,
+        # so the phone reads its absence as "this was not a hold" rather than
+        # as a field that may or may not exist.
+        "hold": None,
     }
     base.update(extra)
     return base
@@ -251,6 +255,25 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     }
     chosen = exercise
     if exercise in ("", "auto", None):
+        if detection.is_hold:
+            # A hold is a result, not a failure to find a set. It carries its
+            # own block: the position, how long it was held, and where in the
+            # clip - so the phone can show the seconds and trim the replay to
+            # the stretch that was actually held.
+            hold = detection.hold
+            return _empty(
+                hold.exercise, [], detected=detected,
+                hold=hold.as_dict(),
+                trim={"startS": hold.start_s, "endS": hold.end_s},
+                duration_s=round(float(info.get("duration_s") or 0), 2),
+                sessions=[{"date": session or date.today().isoformat(),
+                           "reps": 0, "note": f"{hold.label} held {hold.seconds:.0f} s"}],
+                nextSession=(
+                    "Barra measures a hold by how long it stayed still. Film it "
+                    "from the side, whole body in frame, and start recording "
+                    "before you get into position so the entry is not cut off."
+                ),
+            )
         if detection.exercise == "unknown":
             return _empty("auto", [detection.reason], detected=detected,
                           duration_s=round(float(info.get("duration_s") or 0), 2))
@@ -354,6 +377,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     return {
         "exercise": movement.name,
         "detected": detected,
+        "hold": None,
         "n_reps": usable,
         "n_candidates": len(found),
         "fps": round(float(fps), 3),

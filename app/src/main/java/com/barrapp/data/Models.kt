@@ -40,7 +40,60 @@ data class Analysis(
     /** What produced these numbers. A score that moved because the build moved
      *  is not a score that moved because the athlete did. */
     val provenance: Provenance? = null,
+    /** A held position, when the clip was one instead of a set. Then there
+     *  are no reps and the measurement is the seconds. */
+    val hold: Hold? = null,
 )
+
+/**
+ * A static position the server recognised and timed. Duration is the only
+ * thing a single camera measures honestly about a hold - how straight the
+ * line was is an angle in the image, and a few degrees of camera azimuth move
+ * that more than technique does - so seconds is the number, and there is no
+ * score.
+ */
+data class Hold(
+    val exercise: String,
+    val label: String,
+    /** The skill-graph id this position maps to, or null when barra will not
+     *  pick one (a handstand is chest-to-wall or freestanding, and the camera
+     *  cannot tell). */
+    val skill: String?,
+    val confidence: Double,
+    val reason: String,
+    val seconds: Double,
+    val startS: Double,
+    val endS: Double,
+    val runnerUp: String? = null,
+) {
+    val certain: Boolean get() = confidence >= 0.65
+}
+
+/** One openly licensed source a technique record was built from. */
+data class TechniqueSource(
+    val source: String,
+    val title: String,
+    val url: String,
+    val license: String,
+)
+
+/**
+ * What a movement is for, quoted. Cues and faults are mined from openly
+ * licensed instruction text by sentence shape - they are quotations with a
+ * licence, not measurements and not the app's opinion, and the card that
+ * shows them says so.
+ */
+data class Technique(
+    val id: String,
+    val name: String,
+    val cues: List<String>,
+    val faults: List<String>,
+    val muscles: List<String>,
+    val sources: List<TechniqueSource>,
+) {
+    val attribution: String
+        get() = sources.map { "${it.source} (${it.license})" }.distinct().joinToString("; ")
+}
 
 data class Provenance(
     val barra: String = "",
@@ -172,8 +225,15 @@ data class DayEntry(
      * a debugger the wrong run.
      */
     val traces: Map<String, String> = emptyMap(),
+    /** Longest hold measured that day, in seconds, and what it was. Zero and
+     *  blank when the day was sets. */
+    val holdS: Double = 0.0,
+    val holdLabel: String = "",
 ) {
     val measured: Boolean get() = score != null
+
+    /** A day that produced a timed hold and no scored reps. */
+    val heldOnly: Boolean get() = !measured && holdS > 0.0
 
     /** Reps carrying evidence. Falls back to the day total for entries stored
      *  before the breakdown existed, which is the best available guess. */

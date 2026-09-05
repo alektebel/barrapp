@@ -54,6 +54,9 @@ data class UiState(
     val goals: Goals? = null,
     val weeklyNote: String? = null,
     val events: List<EventLog.Event> = emptyList(),
+    /** One line when a result lands, in the app's voice. Cleared by the UI
+     *  after it has been seen. */
+    val note: String? = null,
 )
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
@@ -171,6 +174,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     }
 
     fun openCoach() = _state.update { it.copy(screen = Screen.Coach) }
+
+    fun dismissNote() = _state.update { it.copy(note = null) }
 
     fun openDiagnostics() = _state.update {
         it.copy(screen = Screen.Diagnostics, events = EventLog.all(getApplication()))
@@ -345,9 +350,16 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     // distinct dates, so a second clip on the same day cannot
                     // ring the bell twice.
                     val movement = job.result?.exercise.orEmpty()
-                    val verdict = if (movement.isNotBlank())
+                    val hold = job.result?.hold
+                    val verdict = if (movement.isNotBlank() && hold == null)
                         Progression.assess(movement, SessionStore.days(app)) else null
-                    if (verdict?.step != null &&
+                    if (hold != null) {
+                        ProcessingNotifier.done(
+                            app,
+                            "${hold.label} held ${hold.seconds.toInt()} s",
+                            "Time held is the measurement. It is on your calendar.",
+                        )
+                    } else if (verdict?.step != null &&
                         verdict.qualifyingDays.size == verdict.step.days
                     ) {
                         ProcessingNotifier.done(
@@ -373,6 +385,12 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                             selectedDate = job.result?.sessionDate ?: SessionStore.today(),
                             days = SessionStore.days(app),
                             weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
+                            note = if (hold != null) Voice.holdArrival(hold.label, hold.seconds)
+                            else Voice.arrival(
+                                job.result?.repCount ?: 0,
+                                job.result?.sessionScore != null,
+                                job.result?.detected?.label,
+                            ),
                         )
                     }
                     return@launch
@@ -559,9 +577,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     }
 
     companion object {
-        const val STAGE_UPLOAD = "Uploading the clip"
-        const val STAGE_DETECT = "Finding the exercise"
-        const val STAGE_TRIM = "Trimming to the working set"
-        const val STAGE_MEASURE = "Counting and measuring the reps"
+        // The stage names live in Voice.STAGES, so the processing screen, the
+        // notification and this class cannot drift apart on a string.
+        val STAGE_UPLOAD = Voice.STAGES[0].name
+        val STAGE_DETECT = Voice.STAGES[1].name
+        val STAGE_TRIM = Voice.STAGES[2].name
+        val STAGE_MEASURE = Voice.STAGES[3].name
     }
 }

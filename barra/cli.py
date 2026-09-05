@@ -313,6 +313,31 @@ def _wrap(text: str, width: int) -> list[str]:
     return lines or [""]
 
 
+def cmd_technique(args) -> int:
+    from .holds import SKILL as HOLD_SKILL
+    from .techniques import all_techniques, render, technique
+
+    docs = all_techniques()
+    if not args.skill:
+        if not docs:
+            print("nothing documented yet: run scripts/scrape_techniques.py")
+            return 1
+        _banner("documented skills")
+        for sid, t in docs.items():
+            flag = "measured" if t.measurable else "map only"
+            print(f"  {sid:28s} {t.name:32s} {len(t.cues):2d} cues "
+                  f"{len(t.faults):2d} faults  [{flag}]")
+        return 0
+    sid = HOLD_SKILL.get(args.skill, args.skill)
+    t = technique(sid)
+    if t is None:
+        print(f"nothing documented for {args.skill!r}. Documented: "
+              f"{', '.join(sorted(docs)) or 'nothing'}")
+        return 1
+    print(render(t))
+    return 0
+
+
 def cmd_selftest(args) -> int:
     from .synthetic import generate
 
@@ -442,6 +467,12 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--protocol", action="store_true",
                    help="print what to film, and why, then stop")
     s.set_defaults(func=cmd_validate_quality)
+
+    s = sub.add_parser("technique",
+                       help="what a movement is for: cues, faults and sources, quoted")
+    s.add_argument("skill", nargs="?", help="a skill id (muscle_up, front_lever, ...) "
+                                            "or a hold id; omit to list what is documented")
+    s.set_defaults(func=cmd_technique)
 
     s = sub.add_parser("selftest", help="generate synthetic data and exercise the pipeline")
     s.add_argument("--seed", type=int, default=7)

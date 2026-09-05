@@ -1,6 +1,6 @@
 # Calisthenics trick dataset
 
-40 clips, 4 per trick: `muscle_up pull_up dip push_up squat handstand
+36 clips, up to 4 per trick: `muscle_up pull_up dip push_up squat handstand
 front_lever planche back_lever human_flag` (see `metadata.csv`).
 
 Regenerate / extend (no API keys needed):

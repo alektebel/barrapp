@@ -138,7 +138,10 @@ object ReviewText {
     /** Sessions that produced nothing. These are a filming problem, and saying
      *  so is the only way they stop happening. */
     fun unmeasuredSentence(week: List<DayEntry>): String? {
-        val blank = week.count { !it.measured }
+        // A timed hold is not a blank day: nothing scored, but something was
+        // measured, and telling someone to check the framing on their
+        // dead hang is wrong twice.
+        val blank = week.count { !it.measured && !it.heldOnly }
         if (blank == 0) return null
         return "$blank session${if (blank == 1) "" else "s"} produced no measurable " +
             "reps \u2014 worth checking the framing on those clips."

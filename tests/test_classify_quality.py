@@ -389,8 +389,12 @@ class TestOcclusionAndHolds(unittest.TestCase):
         held = np.repeat(kp[len(kp) // 2:len(kp) // 2 + 1], 300, axis=0)
         held[:, :, :2] += np.random.default_rng(0).normal(0, 0.004, held[:, :, :2].shape)
         c = classify(held)
-        self.assertEqual(c.exercise, "unknown")
+        # A hold is named as a hold - never as a movement with reps in it.
+        self.assertEqual(c.kind, "hold")
+        self.assertNotIn(c.exercise, ("muscle_up", "pull_up", "dip", "push_up",
+                                      "squat", "knee_raise"))
         self.assertIn("hold", c.reason)
+        self.assertGreater(c.hold.seconds, 5.0)
 
     def test_hanging_knee_raise_is_not_a_pull_up(self):
         """Every condition of the pull-up branch holds except the one that

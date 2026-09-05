@@ -18,7 +18,7 @@ measured against.**
 | | |
 |---|---|
 | Pipeline | complete, 13 commands run end to end |
-| Movements | squat, muscle-up, pull-up, dip |
+| Movements | squat, muscle-up, pull-up, dip, push-up, hanging knee raise; plus nine named holds, timed |
 | Verified on synthetic data | yes — `barra selftest`, 137 invariant tests |
 | Run on real footage | yes — 4 muscle-up clips, 3 sessions, Aug 2026 |
 | Deviation verdict (section 8) | **not obtainable on that footage**: 3 usable reps, and a template needs 8 in one bin |
@@ -217,6 +217,7 @@ to report a detection rate without an FPR beside it.
 | `barra remember [DIR] [--note ...]` | fold this run into the persistent `profile/` |
 | `barra progress` | compare sessions against within-session variation |
 | `barra validate-quality [--protocol]` | is the quality score measuring anything? ([`docs/QUALITY.md`](QUALITY.md)) |
+| `barra technique [SKILL]` | what a movement is for - cues, faults, sources - quoted from the ledger `scripts/scrape_techniques.py` builds |
 | `barra selftest [--seed N]` | synthetic data; validates nothing |
 | `python scripts/demo_sessions.py [CLIP...]` | classify, describe and report on real clips, end to end |
 | `barra all` | everything after `ingest` |
@@ -255,7 +256,7 @@ classifier blind and comparing.
 | 0011 | hanging knee raise, side-on, camera rotating | Hanging knee raise | 0 |
 | 0012 | muscle-up at night | Muscle-up | 1 |
 | 0014 | walk to the rig, muscle-ups at 32 s, walk back | Muscle-up | 0 |
-| 0017 | static inverted hold, indoors | not recognised — *a hold, not a set* | — |
+| 0017 | static inverted hold, indoors | **Inverted hang, held 11 s** — a hold, not a set | — |
 | 0018 | muscle-up, side-on, hands above the frame edge | not recognised — *hands out of frame* | — |
 | 0019 | jump-to-bar attempts, no completed rep | not recognised — *resting between attempts* | — |
 | 0020 | push-ups, head-on | Push-up | 19 |
@@ -268,7 +269,43 @@ than guessing, and says what to change: tilt the camera up.
 
 Three of the eight produce no reps *and should not*. A hold has no
 repetitions, failed attempts are not repetitions, and a clip whose anchor is
-invisible cannot be measured. Each says which of those it is.
+invisible cannot be measured. Each says which of those it is - and the hold
+now says which hold.
+
+### Holds are named and timed
+
+A parked clip is routed to `barra/holds.py`, which names the position from the
+same kind of geometry the movements use and measures the one thing a single
+camera can measure honestly about a hold: how long it stayed still.
+
+```
+hanging (hands above the shoulders)         supporting (hands below them)
+  dead_hang      body vertical, arms long      handstand    hips above shoulders, vertical
+  flexed_hang    body vertical, arms bent      plank        body level over the hands
+  inverted_hang  hips above the shoulders,     l_sit        torso upright, legs out level
+                 or legs at the ceiling        support_hold torso upright, legs hanging
+  front_lever    body level, face up
+  back_lever     body level, face down
+  lever          body level, face not seen
+```
+
+Two guards keep it from inventing holds. The held stretch has to be at least
+three seconds and at least 40% of the time spent in that family of position,
+judged only over frames whose hands are where the hold needs them - so the
+walk to the bar does not dilute a real hold, and a set of jump-to-bar attempts
+around a 2.6-second hang is still refused. On the sample clips: 0017 is named
+an inverted hang held 10.9 s (the estimator flattened the torso to 6 degrees
+but put the ankles 1.75 torso-lengths above the hips, which is the rule that
+caught it); 0019 is still "resting between attempts".
+
+Front versus back lever hangs on where the nose is relative to the shoulders,
+which is one landmark and, side-on, a small signal; the confidence says so and
+the runner-up is the other lever. A handstand is deliberately not mapped to
+the skill graph's chest-to-wall or freestanding entry: the camera cannot tell
+them apart unless the wall is in shot, and it is not asked to.
+
+Everything except the inverted hang is verified on synthetic bodies only.
+`docs/NEXT.md` says what to film.
 
 ### Where the rep counts are short
 

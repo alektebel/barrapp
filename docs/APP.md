@@ -34,6 +34,41 @@ The four stages are named on screen instead of a percentage. Upload progress to
 an S3 pre-signed URL followed by server-side pose estimation has no honest
 percentage, and a bar that sits at 90% is worse than a list you can read.
 
+### The figure
+
+Above the stage list a stick athlete does the movement the app is named after,
+over a bar, with its own shoulder trace scrolling underneath - drawn on a
+`Canvas` in `ui/parts/Figure.kt`, no image assets. It is the loading animation
+and it is not decoration: each stage changes what the drawing does, in the
+terms the pipeline works in.
+
+| stage | what the figure does |
+|---|---|
+| Uploading | works the bar; nothing measured yet |
+| Finding the exercise | the hands are bracketed - they are the reference everything else is measured against |
+| Trimming | the trace appears, faint, with trim markers sliding in from either edge |
+| Counting and measuring | the trace turns live and each lockout is marked and counted |
+
+Under the active stage a line rotates every four seconds, and a seconds counter
+sits in the corner, because "still working" at two minutes is a different fact
+from "still working" at ten. The same figure, idle and slower, is the empty
+state's illustration.
+
+### The voice
+
+Every line the app says on its own initiative lives in `Voice.kt`, which is
+Android-free so the logic tests can execute it. One rule governs all of it: a
+line must be true whatever the clip turns out to show. "Counting reps.
+Counting them honestly, which sometimes means fewer" is safe; "looking good" is
+not, because it may not be. The test enumerates every table and every
+generated line and asserts none contains a claim word (`great`, `improving`,
+`you're ready`, ...). Lines rotate by a seed - the job id, the day of the
+year - so a screen does not change its mind while you look at it.
+
+When a result lands the home screen gets one buzz and one line, then the line
+leaves after six seconds. It only says what the payload proves: a count, and
+whether anything scored.
+
 ## The score, and what it is not
 
 Each rep gets a **baseline proxy** out of 100, from three components fixed in
@@ -59,6 +94,35 @@ the most misleading thing the app could do.
 The proxy has no null distribution behind it. It cannot say whether a change
 exceeds your own rep-to-rep variation — that is `barra progress`, and the app
 says so wherever it shows a difference.
+
+## A hold is a result
+
+A clip that sits still used to reach the athlete as "not a set", which is true
+and useless. The server now names the position and times it - dead hang,
+flexed hang, inverted hang, front or back lever, handstand, plank, L-sit,
+support hold - and the session shows the seconds where the score ring would
+be. Time held is the measurement; how straight the line was is an angle in the
+image, and `FINDINGS.md` shows a few degrees of camera position move that more
+than technique does, so there is no score. The calendar paints a held day as a
+filled dot in the unscored colour: something came out of it, and it was not a
+score. How the geometry decides, and what has and has not been checked on
+real footage, is in `CORE.md`.
+
+## Techniques, quoted
+
+Below the Improve panel, and on the Plan page under the next step, a card
+says what the movement is *for*: cues, common faults, the muscles it works.
+None of it is the app's opinion. `scripts/scrape_techniques.py` collects it
+from openly licensed sources (free-exercise-db, wger, Wikipedia, CC-licensed
+YouTube captions), keeps the licence and the record on every line, and mines
+cues from the text by sentence shape. The card says "quoted, not measured" and
+names the source, because the measured faults - the ones in the Improve panel
+- are a different kind of fact and the two must never blur.
+
+The app reads `assets/techniques.json`, a compact copy of
+`data/techniques/techniques.json` (name, up to four cues, three faults,
+muscles, sources). It is bundled so the card works offline and cannot be
+changed by the server.
 
 ## The coach
 
@@ -226,11 +290,12 @@ source scripts/env.sh
 
 Verification runs in three tiers, strongest first.
 
-**Tier 1 — RUN.** `tools/run_logic_tests.sh` compiles the coach's answers and the
-weekly review's arithmetic and **executes** them on a plain JVM. 40 checks. This
-is why `Coach.answer` takes measurements rather than the UI state, why
-`ReviewText` is split out of the Worker, and why `ProfileStore` is split out of
-`Profile` — the logic was made Android-free so it could be run.
+**Tier 1 — RUN.** `tools/run_logic_tests.sh` compiles the coach's answers, the
+weekly review's arithmetic, the progression referee and the app's voice and
+**executes** them on a plain JVM. 875 checks. This is why `Coach.answer` takes
+measurements rather than the UI state, why `ReviewText` is split out of the
+Worker, why `ProfileStore` is split out of `Profile`, and why `Voice` is a
+plain object — the logic was made Android-free so it could be run.
 
 **Tier 2 — TYPE-CHECK.** The data layer against a real `android.jar` (API 35,
 from a GitHub mirror): `SharedPreferences`, `JSONObject`, `Uri`, okhttp. This
