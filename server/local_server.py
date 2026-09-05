@@ -236,7 +236,15 @@ def _run(job_id: str) -> None:
 def main() -> None:
     _load_env()
     port = int(os.environ.get("PORT", "8080"))
-    server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    try:
+        server = ThreadingHTTPServer(("0.0.0.0", port), Handler)
+    except OSError as exc:
+        # The usual cause is another dev server squatting the port (a frontend
+        # on 8080, for instance), which read as "the backend is broken".
+        raise SystemExit(
+            f"barrapp api cannot bind port {port} ({exc}). Something else is "
+            f"listening on it - stop that process, or run me with: PORT={port + 1} "
+            f"python server/local_server.py")
     print(f"barrapp api on http://0.0.0.0:{port}", flush=True)
     server.serve_forever()
 

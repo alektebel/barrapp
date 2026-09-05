@@ -8,6 +8,9 @@ from datetime import date
 from pathlib import Path
 
 from deepseek import write_report
+from vision import technique_note
+
+from barra.frames import technique_artifacts
 
 # This file lives at <repo>/server/process.py, so the repo is two parents up.
 # It used to default to an absolute path from one developer's laptop, which
@@ -88,6 +91,23 @@ def process_job(job: dict, video_path: Path) -> dict:
     for key, value in metrics.items():
         if key not in prose:
             report[key] = value
+
+    # The raw take is not the technique. Cut the working set out of the clip
+    # and still every rep's turning point, then let a vision model - when one
+    # is configured - study those artifacts and say what the geometry missed.
+    # Both steps are best-effort; without a vision key nothing changes.
+    artifacts_root = Path(os.environ.get(
+        "BARRA_TRACE_DIR", str(BARRA_ROOT / "out" / "traces")))
+    artifacts = technique_artifacts(video_path, report, artifacts_root,
+                                    str(report.get("traceId") or job.get("id") or "job"))
+    if trace is not None and (artifacts.clip or artifacts.stills):
+        trace.step("technique artifacts", **artifacts.as_trace_data())
+    note = technique_note(artifacts)
+    if note is not None:
+        report.update(note)
+        report["proseSource"] = "vision"
+    elif trace is not None and artifacts.stills:
+        trace.step("vision pass skipped", reason="no vision endpoint configured")
 
     if trace is not None:
         report["traceId"] = trace.id
