@@ -55,6 +55,8 @@ def _dump(job: dict) -> dict:
         "uploadUrl": f"/v1/jobs/{job['id']}/video",
         "uploadMethod": "PUT",
     }
+    if job.get("stage"):
+        body["stage"] = job["stage"]
     if job.get("result") is not None:
         body["result"] = job["result"]
     if job.get("error"):
@@ -221,8 +223,13 @@ def _run(job_id: str) -> None:
     video = DATA / f"{job_id}.mp4"
     with LOCK:
         job = dict(JOBS[job_id])
+
+    def stage(name: str) -> None:
+        with LOCK:
+            JOBS[job_id]["stage"] = name
+
     try:
-        result = process_job(job, video)
+        result = process_job(job, video, on_stage=stage)
         with LOCK:
             JOBS[job_id]["result"] = result
             JOBS[job_id]["exercise"] = result.get("exercise") or job.get("exercise")

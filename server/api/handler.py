@@ -207,6 +207,16 @@ def worker(event, _context):
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
     dest = Path("/tmp") / f"{job_id}.mp4"
+
+    def _stage(name: str) -> None:
+        table.update_item(
+            Key={"id": job_id},
+            UpdateExpression="SET #st = :st",
+            ExpressionAttributeNames={"#st": "stage"},
+            ExpressionAttributeValues={":st": name},
+        )
+
+    _stage("receiving the clip")
     s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))
     item = _item(job_id) or {"id": job_id, "exercise": "muscle_up"}
     table.update_item(
@@ -216,7 +226,7 @@ def worker(event, _context):
         ExpressionAttributeValues={":s": "processing"},
     )
     try:
-        result = process_job(item, dest)
+        result = process_job(item, dest, on_stage=_stage)
         table.update_item(
             Key={"id": job_id},
             UpdateExpression="SET #s = :s, #r = :r",

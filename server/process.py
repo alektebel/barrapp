@@ -64,7 +64,7 @@ def _num(value) -> str:
     return f"{x:.2f}"
 
 
-def process_job(job: dict, video_path: Path) -> dict:
+def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     """Measure one clip and return the payload the phone renders.
 
     `exercise` may be omitted or "auto": the clip is then classified from its
@@ -75,10 +75,21 @@ def process_job(job: dict, video_path: Path) -> dict:
     with `barra explain --replay <id>`; and into the log line, so a user report
     maps to a specific run of a specific build.
     """
+    def _stage(name: str) -> None:
+        """A named heartbeat for the phone: the work list shows where the clip
+        actually is, instead of a single undifferentiated 'processing'."""
+        if on_stage is None:
+            return
+        try:
+            on_stage(name)
+        except Exception:  # noqa: BLE001 - a heartbeat never fails a job
+            pass
+
+    _stage("opening the clip")
     requested = (job.get("exercise") or "auto").strip() or "auto"
     trace = _new_trace(job, video_path, requested)
     metrics = analyze_clip(video_path, requested, session=job.get("session"),
-                           trace=trace)
+                           trace=trace, on_stage=_stage)
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -188,7 +199,18 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
 
 
 def analyze_clip(video_path: Path, exercise: str = "auto",
-                 session: str | None = None, trace=None) -> dict:
+                 session: str | None = None, trace=None, on_stage=None) -> dict:
+    """Measure one clip. `on_stage`, when given, is called with a short human
+    phrase at each step that can take real time, so a waiting phone can say
+    where the work is."""
+    def _stage(name: str) -> None:
+        if on_stage is None:
+            return
+        try:
+            on_stage(name)
+        except Exception:  # noqa: BLE001
+            pass
+
     from barra.trace import NullTrace
 
     tr = trace if trace is not None else NullTrace()
@@ -233,6 +255,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     else:
         order = backends
 
+    _stage("estimating the pose")
     info = probe_video(video_path)
     tr.step("container", **{k: v for k, v in info.items() if k != "ok"})
     if not info.get("ok"):
@@ -261,6 +284,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     # disagree - measuring a muscle-up with squat geometry produces numbers that
     # look fine and mean nothing.
     tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps))
+    _stage("recognising the movement")
     detection = classify(pose.keypoints, tr, fps=fps)
     detected = {
         "exercise": detection.exercise,
@@ -281,6 +305,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     except SystemExit as exc:
         return _empty(chosen, [str(exc)], detected=detected)
 
+    _stage("finding the reps")
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
 
     session = session or date.today().isoformat()
@@ -291,6 +316,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     usable = 0
     extra_blockers: list[str] = []
     scores: list[int] = []
+    _stage("scoring the reps")
     for i, (start, turn, end) in enumerate(found):
         measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement,
                                trace=tr, label=f"r{i + 1}")
