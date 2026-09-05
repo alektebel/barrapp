@@ -5,12 +5,15 @@ import math
 import os
 import sys
 from datetime import date
+
+import numpy as np
 from pathlib import Path
 
 from deepseek import write_report
-from vision import technique_note
+from vision import technique_note, technique_second_opinion, count_from_clip
 
 from barra.frames import technique_artifacts
+from barra.tracestore import put_trace
 
 # This file lives at <repo>/server/process.py, so the repo is two parents up.
 # It used to default to an absolute path from one developer's laptop, which
@@ -67,6 +70,10 @@ def _num(value) -> str:
 def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     """Measure one clip and return the payload the phone renders.
 
+    `on_stage`, when given, receives a short human phrase at each step that
+    can take time, for the phone's work list."""
+    """Measure one clip and return the payload the phone renders.
+
     `exercise` may be omitted or "auto": the clip is then classified from its
     own geometry rather than from what the athlete remembered to tap.
 
@@ -88,8 +95,14 @@ def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     _stage("opening the clip")
     requested = (job.get("exercise") or "auto").strip() or "auto"
     trace = _new_trace(job, video_path, requested)
+    def _visual_count():
+        from pathlib import Path as _P
+        root = _P(os.environ.get("BARRA_TRACE_DIR", str(BARRA_ROOT / "out" / "traces")))
+        return count_from_clip(video_path, root / str(job.get("id") or "vision"))
+
     metrics = analyze_clip(video_path, requested, session=job.get("session"),
-                           trace=trace, on_stage=_stage)
+                           trace=trace, on_stage=_stage,
+                           visual_count=_visual_count)
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -117,13 +130,21 @@ def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     if note is not None:
         report.update(note)
         report["proseSource"] = "vision"
+        # Key moment 2, second opinion: the same stills, a different model,
+        # one word. A disagreement is worth more than either agreement.
+        second = technique_second_opinion(artifacts)
+        if second is not None:
+            report["visionVerdict"] = second
+            report["proseSource"] = "vision"
+            if trace is not None:
+                trace.step("vision second opinion", verdict=second)
     elif trace is not None and artifacts.stills:
         trace.step("vision pass skipped", reason="no vision endpoint configured")
 
     if trace is not None:
         report["traceId"] = trace.id
         report["provenance"] = _provenance()
-        _write_trace(trace)
+        _write_trace(trace, str(job.get("id") or ""))
         print(f"[barra] job={job.get('id')} trace={trace.id} "
               f"exercise={report.get('exercise')} reps={report.get('n_reps')} "
               f"score={report.get('sessionScore')} "
@@ -159,8 +180,10 @@ def _provenance() -> dict:
         return {"error": f"provenance unavailable: {exc}"}
 
 
-def _write_trace(trace) -> None:
-    """Traces live under BARRA_TRACE_DIR, or out/traces beside the code.
+def _write_trace(trace, job_id: str = "") -> None:
+    """Traces live under BARRA_TRACE_DIR, or out/traces beside the code - and,
+    when TRACES_TABLE is set, in DynamoDB, one row per video analysis, so the
+    decision chain survives the worker's ephemeral disk.
 
     Failing to write one must never fail the job: a debugging aid that can take
     down a measurement is worse than no debugging aid.
@@ -170,6 +193,12 @@ def _write_trace(trace) -> None:
         trace.write(root / f"{trace.id}.json")
     except Exception as exc:  # noqa: BLE001
         print(f"[barra] could not write trace {trace.id}: {exc}", flush=True)
+    try:
+        store = put_trace(trace.as_dict(), trace.id, job_id)
+        if store:
+            print(f"[barra] trace {trace.id} stored in {store}", flush=True)
+    except Exception as exc:  # noqa: BLE001
+        print(f"[barra] could not store trace {trace.id}: {exc}", flush=True)
 
 
 def _empty(exercise: str, blockers: list[str], **extra) -> dict:
@@ -199,10 +228,13 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
 
 
 def analyze_clip(video_path: Path, exercise: str = "auto",
-                 session: str | None = None, trace=None, on_stage=None) -> dict:
+                 session: str | None = None, trace=None, on_stage=None,
+                 visual_count=None) -> dict:
     """Measure one clip. `on_stage`, when given, is called with a short human
     phrase at each step that can take real time, so a waiting phone can say
-    where the work is."""
+    where the work is. `visual_count`, when given, is the last resort for a
+    count: a callable(list[Path]) -> int | None, asked only when every
+    geometric pass found nothing."""
     def _stage(name: str) -> None:
         if on_stage is None:
             return
@@ -307,6 +339,36 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     _stage("finding the reps")
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
+    rescued = False
+    if not found:
+        from barra.ingest import rescue_reps
+        _stage("trying the relaxed pass")
+        found, rescue_note = rescue_reps(pose.keypoints, fps, movement, trace=tr)
+        if found:
+            rescued = True
+            reasons = [
+                f"the standard pass found nothing ({'; '.join(reasons[:2])}) — {rescue_note}"
+            ]
+            tr.note("rescue pass produced the count", standard_blockers=reasons)
+
+    # The last resort for a count: when every geometric pass found nothing,
+    # ask the configured vision models to count from stills of the clip. A
+    # count from watching is weaker than one from measurement, and the report
+    # says so - but it is an answer, where before there was only a blocker.
+    # `visual_count` cuts its own stills, so barra stays free of server paths.
+    vision_count = None
+    if not found and visual_count is not None and detected.get("exercise") not in (
+            None, "", "unknown"):
+        _stage("counting from the frames")
+        try:
+            vision_count = visual_count()
+        except Exception as exc:  # noqa: BLE001 - a fallback never fails a job
+            tr.error("the vision count fell over", reason=str(exc)[:200])
+            vision_count = None
+        if vision_count is not None:
+            tr.decision("vision count", "used the models' count",
+                        reps=int(vision_count["reps"]),
+                        models=vision_count["models"])
 
     session = session or date.today().isoformat()
     raw_signal, sig_conf = tracking_signal(pose.keypoints, movement)
@@ -316,8 +378,39 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     usable = 0
     extra_blockers: list[str] = []
     scores: list[int] = []
+    # The joints, as timesteps: the tracked signal plus the wrist and hip
+    # positions frame by frame, downsampled to a size a trace row can hold.
+    # This is the raw evidence every later pass - a better segmenter, a vision
+    # model, a replay - would need, stored beside the decisions that used it.
+    def _series(idx_a: int, idx_b: int) -> dict:
+        xa = pose.keypoints[:, idx_a, 0] + pose.keypoints[:, idx_b, 0]
+        ya = pose.keypoints[:, idx_a, 1] + pose.keypoints[:, idx_b, 1]
+        va = pose.keypoints[:, idx_a, 2] * pose.keypoints[:, idx_b, 2]
+        step = max(1, len(xa) // 240)
+        return {
+            "t": [round(i / fps, 3) for i in range(0, len(xa), step)],
+            "x": [round(float(v) / 2, 4) for v in xa[::step]],
+            "y": [round(float(v) / 2, 4) for v in ya[::step]],
+            "vis": [round(float(v), 3) for v in va[::step]],
+        }
+
+    try:
+        coco = {"wrist_a": 9, "wrist_b": 10, "hip_a": 11, "hip_b": 12}
+        tr.step("keypoint timesteps",
+                fps=round(float(fps), 3),
+                signal=[round(float(v), 4) for v in signal[::max(1, len(signal) // 240)]],
+                wrist=_series(coco["wrist_a"], coco["wrist_b"]),
+                hip=_series(coco["hip_a"], coco["hip_b"]))
+    except Exception as exc:  # noqa: BLE001 - evidence must not fail the job
+        tr.error("could not record the keypoint timesteps", reason=str(exc)[:200])
+
     _stage("scoring the reps")
+    rep_amplitudes: list[float] = []
+    rep_durations: list[float] = []
     for i, (start, turn, end) in enumerate(found):
+        if 0 <= start < len(signal) and 0 <= turn < len(signal):
+            rep_amplitudes.append(float(signal[turn] - min(signal[start], signal[end])))
+        rep_durations.append((end - start) / fps)
         measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement,
                                trace=tr, label=f"r{i + 1}")
         lines = []
@@ -346,6 +439,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         reps.append({
             "session": session,
             "label": f"r{i + 1}",
+            "rescued": rescued,
             "transition_s": transition.replace(" s", ""),
             "total_s": total.replace(" s", ""),
             "class": "INVARIANT",
@@ -397,11 +491,39 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         }
 
     session_score = int(round(sum(scores) / len(scores))) if scores else None
+
+    # Deterministic quality of the SET, not the reps: how even were the
+    # amplitudes and the tempos across it. A coefficient of variation needs
+    # no units and no model - it is the plainest honest measure of control
+    # there is, and the prose models are told to quote it when it is poor.
+    consistency: dict = {}
+    if len(rep_amplitudes) >= 2:
+        amp = np.asarray(rep_amplitudes)
+        consistency["amplitudeCV"] = round(float(amp.std() / max(amp.mean(), 1e-9)), 3)
+    if len(rep_durations) >= 2:
+        dur = np.asarray(rep_durations)
+        consistency["tempoCV"] = round(float(dur.std() / max(dur.mean(), 1e-9)), 3)
+    if consistency:
+        tr.step("set consistency", **consistency)
+
+    blockers_out = list(blockers)
+    counted_by = None
+    if vision_count is not None and not found:
+        counted_by = "vision"
+        blockers_out.append(
+            f"the geometry could not time the reps, so two vision models "
+            f"counted {vision_count['reps']} from stills of the clip "
+            f"({vision_count['agreement']})")
+
     return {
         "exercise": movement.name,
         "detected": detected,
-        "n_reps": usable,
+        "n_reps": usable if found else (vision_count["reps"] if vision_count else 0),
         "n_candidates": len(found),
+        "rescued": rescued,
+        "countedBy": counted_by,
+        "consistency": consistency or None,
+        "blockers": blockers_out,
         "fps": round(float(fps), 3),
         "duration_s": round(float(info.get("duration_s") or 0), 2),
         "trim": trim,

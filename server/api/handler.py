@@ -240,4 +240,9 @@ def worker(event, _context):
             ExpressionAttributeNames={"#s": "status", "#e": "error"},
             ExpressionAttributeValues={":s": "failed", ":e": str(exc)},
         )
+        try:
+            from barra.tracestore import put_failure
+            put_failure(job_id, "worker", str(exc))
+        except Exception:  # noqa: BLE001
+            pass
     return {"ok": True}

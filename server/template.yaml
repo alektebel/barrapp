@@ -33,6 +33,7 @@ Globals:
         NAN_BASE_URL: !Ref NanBaseUrl
         NAN_MODEL: qwen3.8-flash
         BARRA_ROOT: /opt/barra
+        TRACES_TABLE: !Ref TracesTable
 
 Resources:
   VideoBucket:
@@ -82,6 +83,23 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
+  # One row per video analysis: the whole decision chain, the keypoint
+  # timesteps and the artifacts' names. This is the log a user report is
+  # answered from - what the pipeline saw, stage by stage, per clip.
+  TracesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: traceId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: traceId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
 
   Api:
     Type: AWS::Serverless::HttpApi
@@ -144,9 +162,12 @@ Resources:
       Environment:
         Variables:
           BARRA_POSE_MODEL: /opt/barra/models/pose_landmarker_heavy.task
+          BARRA_VISION_MODEL: glm5.3-flash
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TracesTable
         - S3ReadPolicy:
             BucketName: !Ref VideoBucket
     Metadata:

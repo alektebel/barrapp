@@ -491,3 +491,142 @@ def ingest(backend_name: str, force: bool = False, from_part_a: Path | None = No
 
 def load_reps() -> pd.DataFrame:
     return read_csv(PATHS.o(S.P_REPS), "ingest")
+
+
+def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
+                       movement, tr=None) -> list[tuple[int, int, int]]:
+    """The relaxed fallback segmenter, validated by the signal's own gradients.
+
+    The standard pass asks a lot: prominence above a third of the amplitude,
+    a turnaround at 60% of it, the athlete on the apparatus throughout. When a
+    clip fails every one of those, it usually still shows reps - just noisier
+    ones. This pass asks less and checks differently: a candidate counts only
+    if the movement into and out of its turnaround is FASTER than the noise
+    floor of the clip's own velocity, and the displacement is a real fraction
+    of the amplitude. Drift, a sway, or one interpolated spike do not survive
+    that, which is what makes relaxing the thresholds safe.
+    """
+    from .movements import DEFAULT
+    from .trace import NullTrace
+
+    tr = tr or NullTrace()
+    movement = movement or DEFAULT
+    n = len(sig)
+    if n < 5 or not valid.any():
+        return []
+    measured = valid
+    rest = float(np.percentile(sig[measured], 15))
+    apex = float(np.percentile(sig[measured], 97))
+    amplitude = apex - rest
+    if amplitude <= 1e-6:
+        return []
+
+    vel = np.gradient(sig)
+    # A robust noise floor from the velocity itself: the median absolute
+    # deviation is the gradient's own "how much does nothing move" answer.
+    scale = float(1.4826 * np.median(np.abs(vel - np.median(vel)))) + 1e-9
+    # 2.5x, not 3x: the MAD is taken over the whole clip, so the walk to and
+    # from the apparatus inflates it. A real rep's turn is well clear of that
+    # floor anyway; noise-only and drift signals still fail it by a distance.
+    climb_floor = 2.5 * scale
+
+    min_dist = max(1, int(0.7 * movement.min_rep_s * fps))
+    gate = rest + 0.15 * amplitude
+    min_half_frames = max(2, int(0.5 * movement.min_rep_s * fps))
+
+    peaks, props = find_peaks(sig, prominence=0.15 * amplitude, distance=min_dist)
+    # The scale a candidate is judged against is its peers' prominence, not
+    # the clip-wide amplitude: one violent mount or dismount would otherwise
+    # set a bar the actual reps in the rest of the clip can never clear.
+    med_prom = float(np.median(props["prominences"])) if len(peaks) else amplitude
+    kept: list[tuple[int, int, int]] = []
+    for pk in peaks:
+        at = round(float(pk) / fps, 2)
+        if sig[pk] < rest + 0.45 * amplitude:
+            tr.reject(f"rescue candidate at {at}s", "too shallow",
+                      peak=float(sig[pk]), floor=rest + 0.45 * amplitude)
+            continue
+        if not valid[pk]:
+            tr.reject(f"rescue candidate at {at}s", "turnaround never tracked")
+            continue
+        # Walk out to where the rep actually rests, as the standard pass does.
+        def walk(i: int, step: int) -> int:
+            cur = i
+            m = 0
+            while 0 <= cur + step < n and sig[cur + step] > gate and m < 4 * min_dist:
+                cur += step
+                m += 1
+            while 0 <= cur + step < n and sig[cur + step] < sig[cur] and m < 4 * min_dist:
+                cur += step
+                m += 1
+            return cur
+        a, b = walk(int(pk), -1), walk(int(pk), +1)
+        if b - a < min_half_frames:
+            tr.reject(f"rescue candidate at {at}s", "too brief",
+                      frames=int(b - a), min=min_half_frames)
+            continue
+        # The gradient test: real reps accelerate into the turnaround and out
+        # of it. A wiggle that only exists because of noise has velocities
+        # inside the noise floor; a rep does not.
+        climb = float(np.max(vel[a:pk + 1])) if pk > a else 0.0
+        drop = float(-np.min(vel[pk:b + 1])) if b > pk else 0.0
+        if climb < climb_floor or drop < climb_floor:
+            tr.reject(f"rescue candidate at {at}s", "no real dynamics either side "
+                      "of the turnaround",
+                      climb=round(climb, 4), drop=round(drop, 4),
+                      required=round(climb_floor, 4))
+            continue
+        # And the displacement must be a real fraction of the set's amplitude
+        # on BOTH legs of the rep - one-sided movement is a sway.
+        up = min(float(sig[pk] - sig[a]), float(sig[pk] - sig[b]))
+        if up < 0.5 * med_prom:
+            tr.reject(f"rescue candidate at {at}s", "one leg of the rep is missing",
+                      smallest_leg=round(up, 4), required=round(0.5 * med_prom, 4))
+            continue
+        # And a rep is evidence only where the pose was actually seen. The
+        # standard pass refuses reps that are mostly interpolated; relaxed
+        # thresholds are not a licence to count footage nobody watched.
+        observed = float(valid[a:b + 1].mean())
+        if observed < 0.6:
+            tr.reject(f"rescue candidate at {at}s", "mostly interpolated frames",
+                      observed_frac=round(observed, 2), min_observed=0.6)
+            continue
+        if kept:
+            pa, _, pb = kept[-1]
+            overlap = min(b, pb) - max(a, pa)
+            if overlap > 0.5 * min(b - a, pb - pa):
+                tr.reject(f"rescue candidate at {at}s", "overlaps a stronger rep")
+                continue
+        kept.append((int(a), int(pk), int(b)))
+        tr.decision(f"rescue rep {len(kept)}", "accepted",
+                    window_s=[round(a / fps, 2), round(b / fps, 2)], turnaround_s=at,
+                    climb=round(climb, 4), drop=round(drop, 4))
+    return kept
+
+
+def rescue_reps(kp: np.ndarray, fps: float, movement=None,
+                trace=None) -> tuple[list[tuple[int, int, int]], str]:
+    """A last pass so a visible set is never reported as nothing.
+
+    Runs only when the standard segmenter found nothing. Everything it
+    accepts is gradient-validated (see _rescue_candidates), and the caller is
+    expected to say in the report that this pass produced the count.
+    """
+    from .movements import tracking_signal
+    from .trace import NullTrace
+
+    from .movements import DEFAULT
+
+    tr = trace or NullTrace()
+    movement = movement or DEFAULT
+    tr.stage("rescue")
+    raw, conf = tracking_signal(kp, movement)
+    sig, valid = _clean_signal(raw, conf)
+    if not valid.any():
+        tr.reject("rescue", "no frame had a usable pose")
+        return [], "no frame had a usable pose for this movement's landmarks"
+    reps = _rescue_candidates(sig, valid, fps, movement, tr)
+    note = (f"the relaxed pass validated by the movement's own gradients "
+            f"counted {len(reps)} rep(s) the standard pass missed") if reps else            "even the gradient-validated relaxed pass found no rep"
+    tr.step("rescue complete", accepted=len(reps), note=note)
+    return reps, note
