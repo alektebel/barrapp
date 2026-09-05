@@ -70,6 +70,10 @@ object Voice {
         return pick(s.lines, tick + seed)
     }
 
+    /** How long a greeting may be before the shell header wraps. Measured
+     *  from the replica at 390dp with the Plan and info buttons beside it. */
+    const val TAIL_MAX = 24
+
     /** Greeting, keyed by hour. One line per part of the day, plus a few
      *  that rotate by day so the header is not identical every morning. */
     fun greeting(name: String, hour: Int, dayOfYear: Int = 0): String {
@@ -79,12 +83,16 @@ object Voice {
             in 18..23 -> "Evening"
             else -> "Late"
         }
+        // Short on purpose. This sits in a header beside two buttons on a
+        // 390dp phone, and anything longer wraps onto a second line and pushes
+        // the header down - which the replica screenshots showed it doing.
+        // TAIL_MAX is enforced by the logic tests.
         val tails = listOf(
             "",
-            " · the bar has not moved since yesterday",
-            " · one set, filmed properly, beats three filmed badly",
-            " · the tripod spot on the floor is still the best upgrade there is",
-            " · nothing here is a chart of other people",
+            " · same bar as yesterday",
+            " · one good set will do",
+            " · mark the tripod spot",
+            " · no leaderboards here",
         )
         return "$part, $name" + pick(tails, dayOfYear)
     }

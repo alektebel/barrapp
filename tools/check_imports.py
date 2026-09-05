@@ -55,6 +55,7 @@ SYMBOLS = {
     "FontFamily.": "androidx.compose.ui.text.font.FontFamily",
     "FontWeight.": "androidx.compose.ui.text.font.FontWeight",
     "TextAlign.": "androidx.compose.ui.text.style.TextAlign",
+    "TextOverflow.": "androidx.compose.ui.text.style.TextOverflow",
     "Alignment.": "androidx.compose.ui.Alignment",
     ".dp": "androidx.compose.ui.unit.dp",
     ".sp": "androidx.compose.ui.unit.sp",

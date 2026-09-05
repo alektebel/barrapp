@@ -455,16 +455,25 @@ private fun SessionHeader(
                     val base = "${analysis.repCount} rep${if (analysis.repCount == 1) "" else "s"} measured" +
                         if (analysis.candidateCount > analysis.repCount)
                             " of ${analysis.candidateCount} found" else ""
-                    val line = if (onToggleReps == null) base
-                    else "$base · ${if (repsExpanded) "hide each rep" else "each rep"}"
                     Text(
-                        line,
+                        base,
                         style = MaterialTheme.typography.bodyMedium,
-                        color = if (onToggleReps == null) MaterialTheme.colorScheme.onSurfaceVariant
-                        else MaterialTheme.colorScheme.primary,
-                        modifier = if (onToggleReps == null) Modifier
-                        else Modifier.clickable(onClick = onToggleReps),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
+                    // The toggle is its own line. Appended to the count it
+                    // wrapped on a 390dp phone and left the tappable half
+                    // orphaned on a second line, which read as a typo rather
+                    // than as a control.
+                    if (onToggleReps != null) {
+                        Text(
+                            if (repsExpanded) "Hide each rep" else "Show each rep",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier
+                                .clickable(onClick = onToggleReps)
+                                .padding(top = 4.dp),
+                        )
+                    }
                 }
             }
             if (hold != null) {

@@ -81,3 +81,7 @@ models/
 # Kotlin build residue
 .kotlin/
 data/techniques/raw/
+
+# The replica's screenshot script (tools/replica_shots.mjs) needs playwright.
+node_modules/
+package-lock.json

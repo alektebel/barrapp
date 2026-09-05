@@ -64,6 +64,9 @@ fun BarraFigure(
     height: Dp = 260.dp,
     periodMs: Int = 1800,
 ) {
+    // The bottom third of the box is the trace lane. Idle, there is no trace,
+    // so the figure gets the whole box instead of hanging above an empty one.
+    val boxHeight = if (stage < 0) height * 0.72f else height
     val transition = rememberInfiniteTransition(label = "figure")
     val phase by transition.animateFloat(
         initialValue = 0f,
@@ -80,7 +83,7 @@ fun BarraFigure(
     val history = remember(phase, stage) { traceHistory(phase, if (stage < 0) 0 else 60) }
     val peaks = remember(history) { countPeaks(history) }
 
-    Box(modifier.width(width).height(height)) {
+    Box(modifier.width(width).height(boxHeight)) {
         Canvas(Modifier.fillMaxSize()) {
             drawFigure(phase, stage, history, primary, ink, rule)
         }
@@ -91,7 +94,7 @@ fun BarraFigure(
                 color = ink,
                 modifier = Modifier
                     .align(Alignment.BottomEnd)
-                    .padding(end = width * 0.12f, bottom = height * 0.36f),
+                    .padding(end = width * 0.12f, bottom = boxHeight * 0.36f),
             )
         }
     }
@@ -202,10 +205,16 @@ private fun DrawScope.drawFigure(
     val x0 = 0.12f * w
     val x1 = 0.88f * w
     val zero = tTop + (tBot - tTop) * (clearance / (arm + clearance))   // bar level
-    drawLine(
-        rule, Offset(x0, zero), Offset(x1, zero), hair, StrokeCap.Round,
-        pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
-    )
+    // The dashed line is the bar, *as a reference for the trace*. Drawn before
+    // the trace exists it is a rule under nothing - which is what the empty
+    // state and the first two stages showed: a dashed line floating in space,
+    // measuring air. It arrives with the thing it measures.
+    if (stage >= 2) {
+        drawLine(
+            rule, Offset(x0, zero), Offset(x1, zero), hair, StrokeCap.Round,
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+        )
+    }
     if (stage >= 2 && history.size > 2) {
         val path = Path()
         history.forEachIndexed { i, v ->

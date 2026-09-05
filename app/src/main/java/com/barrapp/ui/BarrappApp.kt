@@ -47,6 +47,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import kotlinx.coroutines.delay
@@ -476,6 +477,13 @@ private fun ShellHeader(name: String, onPrivacy: () -> Unit, onPlan: (() -> Unit
                 greetingNow(name),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
+                // The name comes from the user, so no copy budget can keep
+                // this on one line on its own - "Morning, Bartholomew" plus a
+                // tail wraps whatever the tail says, and a two-line header
+                // pushes the whole pane down. TAIL_MAX keeps the copy honest;
+                // this keeps the layout honest.
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
         if (onPlan != null) {

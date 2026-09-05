@@ -171,7 +171,14 @@ private fun DayCell(
     isToday: Boolean,
     onClick: () -> Unit,
 ) {
-    val colour = entry?.let { bandColor(it.band) }
+    // A held day has no score, so its band is "unmeasured" - but it is not
+    // unmeasured, it is measured in seconds. Painted in the grey the bands use
+    // for "nothing came out of this" it read exactly like a failed clip, which
+    // is the one thing the hold work exists to stop. The accent says
+    // "measured, not scored"; no score band can say that.
+    val colour = entry?.let {
+        if (it.heldOnly) MaterialTheme.colorScheme.primary else bandColor(it.band)
+    }
     Box(
         Modifier
             .aspectRatio(1f)
@@ -229,7 +236,8 @@ private fun DayCell(
 
 @Composable
 private fun DayRow(entry: DayEntry, selected: Boolean, onClick: () -> Unit) {
-    val colour = bandColor(entry.band)
+    val colour = if (entry.heldOnly) MaterialTheme.colorScheme.primary
+    else bandColor(entry.band)
     Row(
         Modifier
             .fillMaxWidth()
@@ -262,7 +270,8 @@ private fun DayRow(entry: DayEntry, selected: Boolean, onClick: () -> Unit) {
             fontFamily = FontFamily.Monospace,
             fontWeight = FontWeight.SemiBold,
             style = MaterialTheme.typography.titleMedium,
-            color = if (entry.measured) colour else MaterialTheme.colorScheme.onSurfaceVariant,
+            color = if (entry.measured || entry.heldOnly) colour
+            else MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }

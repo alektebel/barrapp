@@ -337,6 +337,27 @@ every key the Kotlin client reads is present on every path.
 python -m unittest discover -s tests
 ```
 
+## Looking at a screen without a build
+
+[`tools/replica.html`](../tools/replica.html) draws every screen in a browser,
+at 390dp, in both themes, from the same tokens and the same copy - and with
+`BarraFigure` and `NavGlyph` ported line for line from the drawing code, so the
+animation and the glyphs are the real geometry rather than an impression of it.
+
+```bash
+npm i playwright && node tools/replica_shots.mjs out/replica
+```
+
+It is a layout check, not a build. It found four things a reading of the code
+had not:
+
+| what the screenshot showed | the fix |
+|---|---|
+| a dashed baseline under the idle figure and the first two stages, ruling nothing | the bar line arrives with the trace it measures |
+| `Morning, Diego · the bar has not moved since yesterday` wrapping the header onto two lines | shorter tails, a `TAIL_MAX` the logic tests enforce, and `maxLines = 1` because a name is user input |
+| a held day painted in the same grey as a day that produced nothing | a held day takes the accent: measured, not scored |
+| `3 reps measured of 4 found · each rep` wrapping, orphaning the tap target | the toggle is its own line, and reads as a control |
+
 ## How close is the web replica to the real thing?
 
 The replica shares the colour tokens (copied hex for hex from `Color.kt`), the

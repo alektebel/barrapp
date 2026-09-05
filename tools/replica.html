@@ -1,0 +1,795 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>barrapp — screen replica</title>
+<!--
+  The screens, in a browser, so a layout can be looked at without an Android
+  build. The Compose toolchain cannot be fetched in every environment, and a
+  screen nobody has seen is a screen nobody has checked.
+
+  What is real here: the colour tokens (copied hex for hex from
+  ui/theme/Color.kt), the type scale (Type.kt), the 390dp phone width, the
+  copy (Voice.kt and the panes), and BarraFigure and NavGlyph, which are
+  line-for-line ports of the drawing code in ui/parts/Figure.kt.
+
+  What is not: the face is whatever sans the machine has rather than the
+  device's system font; Material 3 chrome (ripples, state layers, the real
+  NavigationBar pill, OutlinedTextField's notch) is hand-drawn and will look
+  more finished on a device; there are no window insets; and nothing animates -
+  each figure is one frame of the loop.
+
+  So it catches layout, hierarchy, colour and copy. It cannot catch a Compose
+  API that moved, a modifier on the wrong scope, or a runtime constraint.
+
+      node tools/replica_shots.mjs      # writes a PNG per screen, both themes
+
+  It has already earned its keep: it caught a dashed baseline drawn under an
+  empty trace, a greeting that wrapped the header onto two lines, a held day
+  painted in the "nothing came out of this" grey, and a rep-count line whose
+  tap target wrapped onto a second line on its own.
+-->
+<style>
+/* Tokens copied hex-for-hex from app/src/main/java/com/barrapp/ui/theme/Color.kt */
+.t-light {
+  --bg:#F3F6F8; --surface:#FFFFFF; --surfaceVariant:#E7ECF1; --primary:#14618E;
+  --onPrimary:#FFFFFF; --secondary:#4A6274; --outline:#C4CDD6; --onBackground:#121B23;
+  --onSurfaceVariant:#4C5B69; --error:#8E3A38;
+  --strong:#2E7D5B; --solid:#2A6C9C; --shaky:#97671D; --broken:#97413F; --unmeasured:#8494A1;
+}
+.t-dark {
+  --bg:#0C1218; --surface:#141D25; --surfaceVariant:#1D2933; --primary:#74B7E0;
+  --onPrimary:#04202D; --secondary:#9EB3C3; --outline:#2B3945; --onBackground:#DEE6ED;
+  --onSurfaceVariant:#9AACBB; --error:#DE8A87;
+  --strong:#62C097; --solid:#74B4DE; --shaky:#D4A257; --broken:#DE8A87; --unmeasured:#6F808E;
+}
+* { box-sizing: border-box; }
+body { margin:0; background:#8a929a; font-family:"Liberation Sans", "DejaVu Sans", sans-serif; }
+.wrap { display:flex; flex-wrap:wrap; gap:26px; padding:26px; align-items:flex-start; }
+.frame { width:390px; height:844px; overflow:hidden; position:relative;
+         background:var(--bg); color:var(--onBackground); border-radius:28px;
+         box-shadow:0 6px 24px rgba(0,0,0,.35); }
+.caption { font:600 12px "Liberation Sans", sans-serif; color:#fff; letter-spacing:.4px; margin:0 0 6px 4px; }
+.col { display:flex; flex-direction:column; }
+
+/* type scale, from Type.kt */
+.displaySmall   { font:600 34px/38px "Liberation Sans", sans-serif; letter-spacing:-0.8px; }
+.headlineMedium { font:600 26px/31px "Liberation Sans", sans-serif; letter-spacing:-0.5px; }
+.headlineSmall  { font:600 21px/26px "Liberation Sans", sans-serif; letter-spacing:-0.3px; }
+.titleMedium    { font:600 16px/21px "Liberation Sans", sans-serif; }
+.titleSmall     { font:500 14px/19px "Liberation Sans", sans-serif; letter-spacing:.1px; }
+.bodyLarge      { font:400 16px/24px "Liberation Sans", sans-serif; letter-spacing:.1px; }
+.bodyMedium     { font:400 14px/20px "Liberation Sans", sans-serif; letter-spacing:.1px; }
+.bodySmall      { font:400 12px/17px "Liberation Sans", sans-serif; letter-spacing:.2px; }
+.labelLarge     { font:500 14px/18px "Liberation Sans", sans-serif; letter-spacing:.1px; }
+.labelMedium    { font:500 11px/15px "Liberation Mono", "DejaVu Sans Mono", monospace; letter-spacing:.9px; }
+.labelSmall     { font:500 10px/14px "Liberation Mono", "DejaVu Sans Mono", monospace; letter-spacing:.8px; }
+.dim { color:var(--onSurfaceVariant); }
+.mono { font-family:"Liberation Mono", "DejaVu Sans Mono", monospace; }
+
+/* components */
+.panel { background:var(--surface); border:1px solid color-mix(in srgb, var(--outline) 55%, transparent);
+         border-radius:16px; padding:18px; }
+.eyebrow { text-transform:uppercase; color:var(--onSurfaceVariant); }
+.pill { display:inline-block; border-radius:50px; padding:3px 9px; }
+.header { display:flex; align-items:center; padding:12px 8px 6px 20px; gap:4px; }
+.textbtn { color:var(--primary); font:500 14px/18px "Liberation Sans", sans-serif; letter-spacing:.1px;
+           padding:10px 12px; border-radius:20px; }
+.navbar { position:absolute; left:0; right:0; bottom:0; height:80px; background:var(--surface);
+          display:flex; align-items:center; padding-top:12px; }
+.navitem { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; }
+.navpill { width:64px; height:32px; border-radius:16px; display:flex; align-items:center;
+           justify-content:center; }
+.navpill.on { background:color-mix(in srgb, var(--primary) 22%, transparent); }
+.navlabel { font:500 12px/16px "Liberation Sans", sans-serif; color:var(--onSurfaceVariant); }
+.navlabel.on { color:var(--onBackground); font-weight:600; }
+.body { position:absolute; top:0; bottom:80px; left:0; right:0; overflow:hidden; }
+.scroll { padding:20px; display:flex; flex-direction:column; gap:14px; }
+.center { height:100%; display:flex; flex-direction:column; align-items:center;
+          justify-content:center; text-align:center; padding:0 32px; }
+.fab { width:68px; height:68px; border-radius:50%; background:var(--primary);
+       display:flex; align-items:center; justify-content:center; }
+.fab.small { width:52px; height:52px; }
+.fab svg { stroke:var(--onPrimary); }
+.divider { height:1px; background:color-mix(in srgb, var(--outline) 50%, transparent); }
+.row { display:flex; align-items:center; }
+.grow { flex:1; }
+.btn-tonal { flex:1; height:40px; border-radius:20px; background:var(--surfaceVariant);
+             color:var(--primary); display:flex; align-items:center; justify-content:center;
+             font:500 14px "Liberation Sans", sans-serif; }
+.btn-outline { height:40px; border-radius:20px; border:1px solid var(--outline);
+               color:var(--primary); display:flex; align-items:center; justify-content:center;
+               font:500 14px "Liberation Sans", sans-serif; padding:0 20px; }
+.banner { position:absolute; top:8px; left:16px; right:16px; z-index:5; }
+.compbar { height:5px; border-radius:3px; background:color-mix(in srgb, var(--outline) 40%, transparent);
+           overflow:hidden; }
+.compbar > i { display:block; height:100%; background:var(--primary); border-radius:3px; }
+.cell { flex:1; aspect-ratio:1; display:flex; flex-direction:column; align-items:center;
+        justify-content:center; gap:3px; border-radius:10px; }
+.dot { width:6px; height:6px; border-radius:50%; }
+</style>
+<div class="wrap" id="wrap"></div>
+<script>
+// ---------------------------------------------------------------------------
+// BarraFigure — a line-for-line port of app/src/main/java/com/barrapp/ui/parts/Figure.kt
+// ---------------------------------------------------------------------------
+function traceHistory(phase, n, arm = 0.24, clearance = 0.10) {
+  if (n <= 0) return [];
+  return Array.from({length: n}, (_, i) => {
+    const p = phase - (n - 1 - i) * 0.05;
+    const r = Math.pow(Math.sin(Math.PI * p), 2);
+    return -arm + r * (arm + clearance);
+  });
+}
+function countPeaks(h) {
+  let n = 0;
+  for (let i = 1; i < h.length - 1; i++) if (h[i] > h[i-1] && h[i] >= h[i+1] && h[i] > 0) n++;
+  return n;
+}
+function drawFigure(ctx, w, h, phase, stage, history, c) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  const hair = 1, thin = 1.5, line = 2, limb = 2.5, heavy = 3;   // dp == px at 1x
+
+  const barY = 0.22*h, cx = 0.5*w, grip = 0.10*w;
+  const arm = 0.24*h, torso = 0.22*h, clearance = 0.10*h;
+  const r = Math.pow(Math.sin(Math.PI*phase), 2);
+  const sway = 0.02*w*Math.sin(2*Math.PI*phase);
+  const shY = barY + arm - r*(arm + clearance), shX = cx + sway;
+  const hipX = shX + 0.5*sway, hipY = shY + torso;
+  const kneeX = hipX + 0.01*w + 0.03*w*r, kneeY = hipY + 0.14*h;
+  const ankX = kneeX + 0.005*w, ankY = kneeY + 0.13*h - 0.02*h*r;
+  const headR = 0.045*h, headY = shY - 0.075*h;
+  const handL = [cx-grip, barY], handR = [cx+grip, barY];
+  const shL = [shX-0.035*w, shY], shR = [shX+0.035*w, shY];
+  const elbow = (hand, sh, side) => {
+    const len = Math.hypot(sh[0]-hand[0], sh[1]-hand[1]);
+    const flex = Math.max(0, 1 - len/arm);
+    return [(hand[0]+sh[0])/2 + side*0.07*w*flex, (hand[1]+sh[1])/2 + 0.02*h*flex];
+  };
+  const eL = elbow(handL, shL, -1), eR = elbow(handR, shR, +1);
+  const seg = (a, b, col, wd) => { ctx.strokeStyle = col; ctx.lineWidth = wd;
+    ctx.beginPath(); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); ctx.stroke(); };
+
+  seg([0.12*w, barY], [0.88*w, barY], c.ink, heavy);
+  for (const x of [0.16, 0.84]) seg([x*w, barY], [x*w, barY+0.05*h], c.rule, line);
+
+  for (const [a,b] of [[handL,eL],[eL,shL],[handR,eR],[eR,shR],[shL,shR],
+                       [[shX,shY],[hipX,hipY]],[[hipX,hipY],[kneeX,kneeY]],
+                       [[kneeX,kneeY],[ankX,ankY]]]) seg(a, b, c.primary, limb);
+  ctx.fillStyle = c.primary;
+  ctx.beginPath(); ctx.arc(shX, headY, headR, 0, 2*Math.PI); ctx.fill();
+
+  if (stage === 1) {
+    const b = 0.035*w;
+    const a = Math.min(1, Math.max(0.2, 0.6 + 0.4*Math.sin(4*Math.PI*phase)));
+    ctx.globalAlpha = a; ctx.strokeStyle = c.primary; ctx.lineWidth = thin;
+    for (const hand of [handL, handR]) ctx.strokeRect(hand[0]-b, hand[1]-b, 2*b, 2*b);
+    ctx.globalAlpha = 1;
+  }
+
+  const tTop = 0.66*h, tBot = 0.94*h, x0 = 0.12*w, x1 = 0.88*w;
+  const zero = tTop + (tBot-tTop)*(clearance/(arm+clearance));
+  if (stage >= 2) {
+    ctx.setLineDash([4,3]); ctx.strokeStyle = c.rule; ctx.lineWidth = hair;
+    ctx.beginPath(); ctx.moveTo(x0, zero); ctx.lineTo(x1, zero); ctx.stroke(); ctx.setLineDash([]);
+  }
+  if (stage >= 2 && history.length > 2) {
+    ctx.strokeStyle = stage >= 3 ? c.primary : c.rule; ctx.lineWidth = line;
+    ctx.beginPath();
+    history.forEach((v, i) => {
+      const x = x0 + (x1-x0)*i/(history.length-1);
+      const y = zero - v/(0.24+0.10)*(tBot-tTop);
+      i ? ctx.lineTo(x, y) : ctx.moveTo(x, y);
+    });
+    ctx.stroke();
+  }
+  if (stage === 2) {
+    const t = 0.5 - 0.5*Math.cos(2*Math.PI*phase);
+    const inset = 0.14*(x1-x0)*t;
+    for (const x of [x0+inset, x1-inset]) seg([x, tTop-4], [x, tBot+4], c.primary, thin);
+  }
+  if (stage >= 3 && history.length > 2) {
+    ctx.fillStyle = c.primary;
+    for (let i = 1; i < history.length-1; i++) {
+      const v = history[i];
+      if (v > history[i-1] && v >= history[i+1] && v > 0) {
+        const x = x0 + (x1-x0)*i/(history.length-1);
+        const y = zero - v/(0.24+0.10)*(tBot-tTop);
+        ctx.beginPath(); ctx.arc(x, y, 3, 0, 2*Math.PI); ctx.fill();
+      }
+    }
+  }
+}
+function figure(stage, w, h0, phase, c) {
+  const h = stage < 0 ? h0 * 0.72 : h0;
+  const el = document.createElement('canvas');
+  el.width = w; el.height = h; el.style.width = w+'px'; el.style.height = h+'px';
+  const hist = traceHistory(phase, stage < 0 ? 0 : 60);
+  drawFigure(el.getContext('2d'), w, h, phase, stage, hist, c);
+  if (stage >= 3) {
+    const box = document.createElement('div');
+    box.style.cssText = `position:relative;width:${w}px;height:${h}px`;
+    box.appendChild(el);
+    const n = document.createElement('div');
+    n.className = 'labelMedium';
+    n.textContent = countPeaks(hist);
+    n.style.cssText = `position:absolute;right:${w*0.12}px;bottom:${h*0.36}px;color:${c.ink}`;
+    box.appendChild(n);
+    return box;
+  }
+  return el;
+}
+
+// NavGlyph — ported from the same file
+function glyph(kind, on, c) {
+  const s = 22, el = document.createElement('canvas');
+  el.width = s; el.height = s; el.style.width = el.style.height = s+'px';
+  const ctx = el.getContext('2d'), col = on ? c.ink : c.dim;
+  ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.lineWidth = 1.8;
+  ctx.strokeStyle = col; ctx.fillStyle = col;
+  if (kind === 'calendar') {
+    for (let row = 0; row < 3; row++) for (let col2 = 0; col2 < 4; col2++) {
+      const x = s*(0.18 + col2*0.213), y = s*(0.28 + row*0.24);
+      const filled = (row===1&&col2===2) || (row===2&&col2===0);
+      ctx.globalAlpha = filled ? 1 : 0.55;
+      ctx.beginPath(); ctx.arc(x, y, s*(filled?0.075:0.05), 0, 2*Math.PI); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+  } else if (kind === 'session') {
+    const L = (a,b,cc,d) => { ctx.beginPath(); ctx.moveTo(a,b); ctx.lineTo(cc,d); ctx.stroke(); };
+    L(s*0.1, s*0.42, s*0.9, s*0.42);
+    ctx.beginPath(); ctx.arc(s*0.5, s*0.24, s*0.11, 0, 2*Math.PI); ctx.fill();
+    L(s*0.5, s*0.42, s*0.5, s*0.86);
+    L(s*0.33, s*0.42, s*0.4, s*0.58);
+    L(s*0.67, s*0.42, s*0.6, s*0.58);
+  } else {
+    ctx.beginPath();
+    ctx.moveTo(s*0.12, s*0.78); ctx.lineTo(s*0.36, s*0.6);
+    ctx.lineTo(s*0.55, s*0.68); ctx.lineTo(s*0.88, s*0.26);
+    ctx.stroke();
+    ctx.beginPath(); ctx.arc(s*0.88, s*0.26, s*0.07, 0, 2*Math.PI); ctx.fill();
+  }
+  return el;
+}
+
+// ScoreRing — ported from parts/Parts.kt
+function ring(score, bandCol, d, caption, c) {
+  const box = document.createElement('div');
+  box.style.cssText = 'display:flex;flex-direction:column;align-items:center';
+  const el = document.createElement('canvas');
+  el.width = d; el.height = d; el.style.width = el.style.height = d+'px';
+  const ctx = el.getContext('2d');
+  const stroke = d*0.10, rr = (d-stroke)/2;
+  ctx.lineWidth = stroke; ctx.lineCap = 'round';
+  ctx.strokeStyle = c.rule + '73';
+  ctx.beginPath(); ctx.arc(d/2, d/2, rr, 0, 2*Math.PI); ctx.stroke();
+  if (score !== null) {
+    ctx.strokeStyle = bandCol;
+    ctx.beginPath(); ctx.arc(d/2, d/2, rr, -Math.PI/2, -Math.PI/2 + 2*Math.PI*score/100); ctx.stroke();
+  }
+  const holder = document.createElement('div');
+  holder.style.cssText = `position:relative;width:${d}px;height:${d}px`;
+  holder.appendChild(el);
+  const t = document.createElement('div');
+  t.textContent = score === null ? '—' : score;
+  t.style.cssText = `position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    font:600 ${d*0.30}px "Roboto Mono",monospace;color:${score===null?c.dim:bandCol}`;
+  holder.appendChild(t);
+  box.appendChild(holder);
+  if (caption) {
+    const cp = document.createElement('div');
+    cp.className = 'labelMedium'; cp.textContent = caption.toUpperCase();
+    cp.style.cssText = `color:${c.dim};margin-top:6px`;
+    box.appendChild(cp);
+  }
+  return box;
+}
+
+// RepTrace
+function repTrace(points, col, c, w = 300, h = 56) {
+  const el = document.createElement('canvas');
+  el.width = w; el.height = h; el.style.width='100%'; el.style.height = h+'px';
+  const ctx = el.getContext('2d');
+  const lo = Math.min(...points), hi = Math.max(...points);
+  const span = (hi-lo) > 1e-4 ? (hi-lo) : 1, pad = h*0.12;
+  const y = v => h - pad - (v-lo)/span*(h-2*pad);
+  const x = i => i/(points.length-1)*w;
+  if (lo < 0 && hi > 0) {
+    ctx.strokeStyle = c.rule; ctx.lineWidth = 1; ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(0, y(0)); ctx.lineTo(w, y(0)); ctx.stroke(); ctx.setLineDash([]);
+  }
+  ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.beginPath();
+  points.forEach((v,i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+  ctx.stroke();
+  return el;
+}
+
+// ---------------------------------------------------------------------------
+// markup helpers
+// ---------------------------------------------------------------------------
+const h = (tag, cls, html) => {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (html !== undefined) e.innerHTML = html;
+  return e;
+};
+const panel = (...kids) => { const p = h('div','panel'); kids.forEach(k => p.appendChild(typeof k === 'string' ? h('div',null,k) : k)); return p; };
+const eyebrow = t => h('div','labelMedium eyebrow', t.toUpperCase());
+const pill = (t, col) => { const p = h('div','pill labelSmall', t);
+  p.style.cssText = `color:${col};background:color-mix(in srgb, ${col} 10%, transparent)`; return p; };
+const gap = n => { const s = h('div'); s.style.height = n+'px'; return s; };
+
+const PLUS = `<svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke-width="2.2"
+  stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+
+// ---------------------------------------------------------------------------
+// screens
+// ---------------------------------------------------------------------------
+function header(name, c) {
+  const r = h('div','header');
+  const col = h('div','grow');
+  col.appendChild(h('div','titleMedium','barrapp'));
+  col.appendChild(h('div','bodySmall dim','Morning, ' + name + ' · same bar as yesterday'));
+  r.appendChild(col);
+  r.appendChild(h('div','textbtn','Plan'));
+  const i = h('div','textbtn','ⓘ'); i.style.fontSize = '18px'; r.appendChild(i);
+  return r;
+}
+function navbar(active, c) {
+  const n = h('div','navbar');
+  const items = [['calendar','Calendar'],['session','Session'],['add','Add'],['progress','Progress']];
+  for (const [kind, label] of items) {
+    const it = h('div','navitem');
+    const p = h('div','navpill' + (kind === active ? ' on' : ''));
+    if (kind === 'add') {
+      const svg = h('div', null, PLUS.replace('32','24').replace('32','24'));
+      svg.querySelector('svg').style.stroke = c.dim;
+      p.appendChild(svg);
+    } else p.appendChild(glyph(kind, kind === active, c));
+    it.appendChild(p);
+    it.appendChild(h('div','navlabel' + (kind === active ? ' on' : ''), label));
+    n.appendChild(it);
+  }
+  return n;
+}
+
+function screenEmpty(c) {
+  const body = h('div','body');
+  body.appendChild(header('Diego', c));
+  const obj = panel();
+  obj.style.margin = '10px 20px';
+  obj.appendChild(eyebrow('Objectives'));
+  obj.appendChild(gap(6));
+  obj.appendChild(h('div','bodyMedium dim','No goal captured yet.'));
+  obj.appendChild(gap(10));
+  obj.appendChild(pill('profile unfinished', c.dim));
+  obj.appendChild(gap(4));
+  const rowb = h('div','row'); rowb.appendChild(h('div','textbtn','Set your goal in a chat'));
+  obj.appendChild(rowb);
+  body.appendChild(obj);
+
+  const ctr = h('div','center');
+  ctr.style.height = 'calc(100% - 230px)';
+  ctr.appendChild(figure(-1, 160, 150, 0.62, c));
+  ctr.appendChild(gap(18));
+  ctr.appendChild(h('div','headlineMedium','Nothing measured yet'));
+  ctr.appendChild(gap(10));
+  for (const line of ['That is not a judgement. It is an empty calendar.',
+    'Add a clip of one set. It works out what you did, counts the reps it can see, and says which ones it could not.',
+    'It compares you with you. There is no leaderboard in here, on purpose.']) {
+    const d = h('div','bodyMedium dim', line); d.style.padding = '3px 0'; ctr.appendChild(d);
+  }
+  ctr.appendChild(gap(26));
+  const fab = h('div','fab', PLUS); ctr.appendChild(fab);
+  ctr.appendChild(gap(12));
+  ctr.appendChild(h('div','textbtn','See an example first'));
+  body.appendChild(ctr);
+  return [body, navbar('session', c)];
+}
+
+function screenProcessing(stage, phase, elapsed, guess, c) {
+  const body = h('div','body');
+  const wrap = h('div');
+  wrap.style.cssText = 'height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px 32px';
+  const top = h('div','row'); top.style.width = '100%';
+  top.appendChild(h('div','headlineSmall','Measuring'));
+  const sp = h('div','grow'); top.appendChild(sp);
+  top.appendChild(h('div','labelMedium dim', elapsed + 's'));
+  wrap.appendChild(top);
+  wrap.appendChild(gap(8));
+  wrap.appendChild(figure(stage, 220, 240, phase, c));
+  wrap.appendChild(gap(10));
+
+  const stages = [
+    ['Uploading the clip', 'Sending the footage. This is the only part that depends on your Wi-Fi.'],
+    ['Finding the exercise', 'Checking whether the shoulders ever finish above the hands. That one line is the whole pull-up / muscle-up split.'],
+    ['Trimming to the working set', 'Cutting the walk to the bar and the walk away. They are not the exercise.'],
+    ['Counting and measuring the reps', 'A rep it cannot measure gets a dash, not a low score. That is on purpose.'],
+  ];
+  stages.forEach(([name, line], i) => {
+    const done = i < stage, active = i === stage;
+    const col = h('div'); col.style.cssText = 'width:100%;padding:5px 0';
+    const r = h('div','row'); r.style.gap = '12px';
+    const dot = h('div','dot');
+    dot.style.background = done ? c.primary + '80' : active ? c.primary : c.rule;
+    r.appendChild(dot);
+    const t = h('div', active ? 'titleSmall' : 'bodyMedium', name);
+    t.style.color = active ? c.ink : done ? c.dim : c.dim + '80';
+    r.appendChild(t);
+    col.appendChild(r);
+    if (active) {
+      const l = h('div','bodySmall dim', line);
+      l.style.cssText = 'padding:4px 0 0 20px'; col.appendChild(l);
+    }
+    wrap.appendChild(col);
+  });
+  if (guess) {
+    wrap.appendChild(gap(12));
+    wrap.appendChild(pill('Looks like ' + guess, c.primary));
+  }
+  wrap.appendChild(gap(18));
+  wrap.appendChild(h('div','textbtn','Cancel'));
+  body.appendChild(wrap);
+  return [body];
+}
+
+function componentBar(name, value, why, weight, c) {
+  const col = h('div');
+  col.style.cssText = 'display:flex;flex-direction:column;gap:4px';
+  const r = h('div','row');
+  r.appendChild(h('div','titleSmall', name[0].toUpperCase()+name.slice(1)));
+  r.appendChild(h('div','grow'));
+  r.appendChild(h('div','labelMedium dim', Math.round(value*100)+'%'));
+  col.appendChild(r);
+  const bar = h('div','compbar'); const fill = h('i'); fill.style.width = (value*100)+'%';
+  bar.appendChild(fill); col.appendChild(bar);
+  col.appendChild(h('div','bodySmall dim', why));
+  const w = h('div','labelSmall dim','weight ' + Math.round(weight*100) + '%');
+  w.style.opacity = '.7'; col.appendChild(w);
+  return col;
+}
+
+function screenSessionSet(c, opts = {}) {
+  const body = h('div','body');
+  const sc = h('div','scroll'); sc.style.height = '100%';
+
+  const head = panel();
+  const r = h('div','row');
+  const left = h('div','grow');
+  left.appendChild(eyebrow('2026-08-27'));
+  left.appendChild(gap(6));
+  left.appendChild(h('div','headlineSmall','Muscle-up'));
+  left.appendChild(gap(6));
+  left.appendChild(h('div','bodyMedium dim','3 reps measured of 4 found'));
+  const cnt = h('div','labelLarge', opts.reps ? 'Hide each rep' : 'Show each rep');
+  cnt.style.cssText = `color:${c.primary};padding-top:4px`;
+  left.appendChild(cnt);
+  r.appendChild(left);
+  r.appendChild(ring(56, c.solid, 76, 'session', c));
+  head.appendChild(r);
+  head.appendChild(gap(14));
+  head.appendChild(h('div','divider'));
+  head.appendChild(gap(12));
+  const det = h('div','row'); det.style.gap = '8px';
+  det.appendChild(pill('recognised', c.primary));
+  det.appendChild(h('div','labelMedium dim','92% confident'));
+  head.appendChild(det);
+  head.appendChild(gap(8));
+  head.appendChild(h('div','bodySmall dim','Hanging from a fixed bar, and the shoulders finish 0.51 torso-lengths above the hands.'));
+  head.appendChild(gap(10));
+  head.appendChild(h('div','labelMedium dim','Trimmed to 8.4s–21.6s of a 34.0s clip.'));
+  sc.appendChild(head);
+
+  const replay = h('div','btn-outline','Watch again, with the feedback on the timeline');
+  sc.appendChild(replay);
+
+  const imp = panel();
+  imp.appendChild(eyebrow('Improve'));
+  imp.appendChild(gap(8));
+  ['Lock out fully at the top of every rep',
+   'Drive through the sticking point in one arc',
+   'Start every rep from a full dead hang'].forEach((t,i) => {
+    const l = h('div','bodyLarge', (i+1) + '.  ' + t);
+    l.style.padding = '4px 0'; imp.appendChild(l);
+  });
+  imp.appendChild(gap(8));
+  imp.appendChild(h('div','bodyMedium dim','3 verified muscle-up reps, solid'));
+  imp.appendChild(h('div','textbtn','Read the full analysis'));
+  sc.appendChild(imp);
+
+  sc.appendChild(techniqueCard(c, opts.techniqueOpen));
+
+  if (opts.reps) {
+    sc.appendChild(eyebrow('Each rep'));
+    const rep = panel();
+    rep.style.padding = '16px';
+    const rr = h('div','row');
+    const rl = h('div','grow');
+    const t = h('div','row'); t.style.gap = '8px';
+    t.appendChild(h('div','titleMedium','Rep 2'));
+    t.appendChild(pill('solid', c.solid));
+    rl.appendChild(t);
+    rl.appendChild(gap(4));
+    rl.appendChild(h('div','labelMedium dim','12.9s–17.1s'));
+    rr.appendChild(rl);
+    rr.appendChild(ring(61, c.solid, 56, null, c));
+    rep.appendChild(rr);
+    rep.appendChild(gap(12));
+    const pts = traceHistory(0.5, 40).map(v => v*3);
+    rep.appendChild(repTrace(pts, c.solid, c));
+    rep.appendChild(gap(14));
+    const comps = h('div');
+    comps.style.cssText = 'display:flex;flex-direction:column;gap:12px';
+    comps.appendChild(componentBar('range', 0.71, 'hang 82% of full, lockout 74% of full', 0.40, c));
+    comps.appendChild(componentBar('smoothness', 0.55, '31% of the ascent made no progress', 0.35, c));
+    rep.appendChild(comps);
+    sc.appendChild(rep);
+  }
+
+  const trace = h('div','labelSmall dim','run 260905-001618-7edbf7 · 0.1.0 · edf3852');
+  sc.appendChild(trace);
+  const acts = h('div','row'); acts.style.gap = '10px';
+  acts.appendChild(h('div','btn-tonal','Add another clip'));
+  acts.appendChild(h('div','btn-outline','Delete'));
+  sc.appendChild(acts);
+  body.appendChild(sc);
+  return [body, navbar('session', c)];
+}
+
+function techniqueCard(c, open) {
+  const p = panel();
+  const r = h('div','row');
+  const l = h('div','grow');
+  l.appendChild(eyebrow('About the muscle-up'));
+  l.appendChild(gap(4));
+  l.appendChild(h('div','bodySmall dim','Cues and common faults, quoted from open sources. Not measured here.'));
+  r.appendChild(l);
+  r.appendChild(h('div','textbtn', open ? 'Less' : 'Read'));
+  p.appendChild(r);
+  if (open) {
+    p.appendChild(gap(8));
+    p.appendChild(eyebrow('Cues'));
+    ['Grip the rings using a false grip, with the base of your palms on top of the rings.',
+     'Initiate a pull up by pulling the elbows down to your side, flexing the elbows.',
+     'As you reach the top position of the pull-up, pull the rings to your armpits as you roll your shoulders forward.'
+    ].forEach(t => { const d = h('div','bodyMedium','· ' + t); d.style.padding='3px 0'; p.appendChild(d); });
+    p.appendChild(gap(8));
+    p.appendChild(h('div','bodySmall dim','Works: lats, abdominals, biceps, forearms, middle back, shoulders'));
+    p.appendChild(gap(8));
+    p.appendChild(h('div','labelSmall dim','Source: free_exercise_db (Unlicense (public domain)) · Muscle Up'));
+  }
+  return p;
+}
+
+function screenSessionHold(c) {
+  const body = h('div','body');
+  const sc = h('div','scroll'); sc.style.height = '100%';
+
+  const head = panel();
+  const r = h('div','row');
+  const left = h('div','grow');
+  left.appendChild(eyebrow('2026-08-27'));
+  left.appendChild(gap(6));
+  left.appendChild(h('div','headlineSmall','Inverted hang'));
+  left.appendChild(gap(6));
+  left.appendChild(h('div','bodyMedium dim','held still · time is the measurement'));
+  r.appendChild(left);
+  const clock = h('div');
+  clock.style.cssText = 'display:flex;flex-direction:column;align-items:center';
+  const num = h('div');
+  num.style.cssText = 'display:flex;align-items:flex-end';
+  const n = h('div','displaySmall mono','11'); n.style.color = c.primary; n.style.fontWeight = '600';
+  const s = h('div','titleMedium mono','s'); s.style.cssText = `color:${c.primary};padding:0 0 4px 2px`;
+  num.appendChild(n); num.appendChild(s);
+  clock.appendChild(num);
+  clock.appendChild(h('div','labelMedium dim','HELD'));
+  r.appendChild(clock);
+  head.appendChild(r);
+  head.appendChild(gap(10));
+  head.appendChild(h('div','labelMedium dim','Held 9.9s–20.8s of a 23.1s clip.'));
+  sc.appendChild(head);
+
+  sc.appendChild(h('div','btn-outline','Watch the hold again'));
+
+  const card = panel();
+  card.appendChild(eyebrow('What it saw'));
+  card.appendChild(gap(8));
+  const rr = h('div','row'); rr.style.gap = '8px';
+  rr.appendChild(pill('recognised', c.primary));
+  rr.appendChild(h('div','labelMedium dim','75% confident'));
+  card.appendChild(rr);
+  card.appendChild(gap(8));
+  card.appendChild(h('div','bodyMedium','Hanging with the torso 84 degrees from vertical but the ankles 1.75 torso-lengths above the hips - the body is folded and upside down, not laid out level.'));
+  card.appendChild(gap(10));
+  card.appendChild(h('div','bodySmall dim','Time held is the measurement. How straight the line was is an angle in the image, and a few degrees of camera position move that more than technique does - so it is not scored.'));
+  sc.appendChild(card);
+
+  const next = panel();
+  next.appendChild(eyebrow('Next session'));
+  next.appendChild(gap(8));
+  next.appendChild(h('div','bodyMedium','Barra measures a hold by how long it stayed still. Film it from the side, whole body in frame, and start recording before you get into position so the entry is not cut off.'));
+  sc.appendChild(next);
+
+  sc.appendChild(h('div','labelSmall dim','run 260905-001618-7edbf7 · 0.1.0 · edf3852'));
+  const acts = h('div','row'); acts.style.gap = '10px';
+  acts.appendChild(h('div','btn-tonal','Add another clip'));
+  acts.appendChild(h('div','btn-outline','Delete'));
+  sc.appendChild(acts);
+  body.appendChild(sc);
+  return [body, navbar('session', c)];
+}
+
+function screenCalendar(c) {
+  const body = h('div','body');
+  body.appendChild(header('Diego', c));
+  const wrap = h('div'); wrap.style.padding = '0 16px';
+  const nav = h('div','row');
+  nav.style.cssText = 'padding:8px 0;justify-content:space-between';
+  nav.appendChild(h('div','textbtn','‹'));
+  nav.appendChild(h('div','titleMedium','August 2026'));
+  nav.appendChild(h('div','textbtn','›'));
+  wrap.appendChild(nav);
+  const dows = h('div','row');
+  ['M','T','W','T','F','S','S'].forEach(d => {
+    const e = h('div','labelSmall dim', d);
+    e.style.cssText = 'flex:1;text-align:center'; dows.appendChild(e);
+  });
+  wrap.appendChild(dows);
+  // August 2026 starts on a Saturday
+  const marks = {10:'solid', 14:'strong', 19:null, 26:'strong', 27:'held', 28:'solid'};
+  const cells = [null,null,null,null,null].concat(Array.from({length:31},(_,i)=>i+1));
+  for (let wk = 0; wk < 6; wk++) {
+    const row = h('div','row');
+    for (let d = 0; d < 7; d++) {
+      const day = cells[wk*7+d];
+      const cell = h('div','cell');
+      if (day) {
+        const band = marks[day];
+        const sel = day === 27;
+        if (sel) cell.style.cssText += `background:color-mix(in srgb, ${c.primary} 12%, transparent);border:1px solid ${c.primary}`;
+        const n = h('div','bodySmall mono', day);
+        n.style.color = band ? c.ink : (day===31 ? c.primary : c.dim + '8c');
+        cell.appendChild(n);
+        const dot = h('div','dot');
+        if (band === 'held') dot.style.background = c.primary;
+        else if (band) dot.style.background = c[band];
+        else if (band === null && day in marks) dot.style.cssText += `border:1px solid ${c.dim}`;
+        else dot.style.background = 'transparent';
+        cell.appendChild(dot);
+      }
+      row.appendChild(cell);
+    }
+    wrap.appendChild(row);
+  }
+  wrap.appendChild(gap(18));
+  wrap.appendChild(h('div','divider'));
+  wrap.appendChild(gap(14));
+  wrap.appendChild(eyebrow('This month'));
+  wrap.appendChild(gap(8));
+  const rows = [
+    ['Inverted hang','held 11 s · 08-27','11s', c.primary, true],
+    ['Muscle-up','3 reps · 08-26','74', c.strong],
+    ['Push-up','19 reps · 08-19','—', c.unmeasured],
+    ['Muscle-up','2 reps · 08-14','78', c.strong],
+  ];
+  rows.forEach(([label, sub, score, col, sel]) => {
+    const r = h('div','row');
+    r.style.cssText = 'gap:12px;padding:10px;border-radius:10px' +
+      (sel ? `;background:color-mix(in srgb, ${c.primary} 8%, transparent)` : '');
+    const d = h('div'); d.style.cssText = `width:8px;height:8px;border-radius:50%;background:${col}`;
+    r.appendChild(d);
+    const cl = h('div','grow');
+    cl.appendChild(h('div','titleSmall', label));
+    cl.appendChild(h('div','bodySmall dim', sub));
+    r.appendChild(cl);
+    const sc2 = h('div','titleMedium mono', score);
+    sc2.style.color = col; sc2.style.fontWeight = '600';
+    r.appendChild(sc2);
+    wrap.appendChild(r);
+  });
+  body.appendChild(wrap);
+  return [body, navbar('calendar', c)];
+}
+
+function screenBanner(c) {
+  const [body, nav] = screenSessionSet(c);
+  const b = h('div','banner');
+  const p = panel();
+  p.appendChild(h('div','bodyMedium','3 reps of muscle-up measured and scored.'));
+  b.appendChild(p);
+  return [body, b, nav];
+}
+
+function screenPlan(c) {
+  const body = h('div','body');
+  const head = h('div','row');
+  head.style.cssText = 'padding:12px 16px';
+  head.appendChild(h('div','textbtn','Back'));
+  const col = h('div','grow'); col.style.marginLeft = '6px';
+  col.appendChild(h('div','titleMedium','Plan'));
+  col.appendChild(h('div','bodySmall dim','What to work, and what earns the next step.'));
+  head.appendChild(col);
+  body.appendChild(head);
+  body.appendChild(h('div','divider'));
+  const sc = h('div','scroll');
+  const p1 = panel();
+  p1.appendChild(eyebrow('The plan'));
+  p1.appendChild(gap(8));
+  p1.appendChild(h('div','bodyLarge','A strict muscle-up by the end of the year'));
+  p1.appendChild(gap(4));
+  p1.appendChild(h('div','bodyMedium','Next session: work muscle-up — aim for 5 verified reps in one set, on 1 more day'));
+  sc.appendChild(p1);
+
+  const v = panel();
+  const r = h('div','row');
+  const l = h('div','grow');
+  l.appendChild(eyebrow('Muscle-up'));
+  l.appendChild(gap(2));
+  l.appendChild(h('div','titleMedium','Working towards Weighted or strict muscle-up'));
+  r.appendChild(l);
+  r.appendChild(pill('3/5', c.dim));
+  v.appendChild(r);
+  v.appendChild(gap(10));
+  const num = h('div','row'); num.style.alignItems = 'flex-end';
+  const n = h('div','headlineSmall mono','3'); n.style.fontWeight='600';
+  num.appendChild(n);
+  const sub = h('div','bodySmall dim','best session · 5 reps at 73+ on 2 days');
+  sub.style.cssText += ';padding:0 0 3px 6px';
+  num.appendChild(sub);
+  v.appendChild(num);
+  v.appendChild(gap(8));
+  v.appendChild(h('div','bodySmall','Best session: 3 verified reps at 74 (strong) on 2026-08-26. 0 of 2 days clear the standard.'));
+  v.appendChild(gap(6));
+  const miss = h('div','bodySmall','Still needed: 2 more verified reps in one session.');
+  miss.style.color = c.primary;
+  v.appendChild(miss);
+  sc.appendChild(v);
+  sc.appendChild(techniqueCard(c, false));
+  sc.appendChild(h('div','bodySmall dim','Every standard here is a published convention, not a measurement. The reps are measured; the bar they have to clear is written down so you can argue with it.'));
+  body.appendChild(sc);
+  return [body];
+}
+
+// ---------------------------------------------------------------------------
+// render
+// ---------------------------------------------------------------------------
+const SCREENS = [
+  ['Empty state', screenEmpty],
+  ['Processing · finding the exercise', c => screenProcessing(1, 0.42, 6, null, c)],
+  ['Processing · counting the reps', c => screenProcessing(3, 0.5, 34, 'Muscle-up', c)],
+  ['Session · a measured set', c => screenSessionSet(c)],
+  ['Session · technique card open', c => screenSessionSet(c, {techniqueOpen:true})],
+  ['Session · per-rep detail', c => screenSessionSet(c, {reps:true})],
+  ['Session · a hold', screenSessionHold],
+  ['Calendar', screenCalendar],
+  ['Home · a result lands', screenBanner],
+  ['Plan', screenPlan],
+];
+
+function tokens(theme) {
+  const probe = document.createElement('div');
+  probe.className = 't-' + theme;
+  document.body.appendChild(probe);
+  const cs = getComputedStyle(probe);
+  const get = n => cs.getPropertyValue('--' + n).trim();
+  const t = {primary:get('primary'), ink:get('onBackground'), dim:get('onSurfaceVariant'),
+    rule:get('outline'), strong:get('strong'), solid:get('solid'), shaky:get('shaky'),
+    broken:get('broken'), unmeasured:get('unmeasured')};
+  probe.remove();
+  return t;
+}
+
+const wrap = document.getElementById('wrap');
+for (const theme of ['light','dark']) {
+  const c = tokens(theme);
+  for (const [name, build] of SCREENS) {
+    const col = h('div','col');
+    col.appendChild(h('div','caption', name + ' — ' + theme));
+    const f = h('div','frame t-' + theme);
+    build(c).forEach(part => f.appendChild(part));
+    col.appendChild(f);
+    wrap.appendChild(col);
+  }
+}
+document.body.dataset.ready = '1';
+</script>

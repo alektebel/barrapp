@@ -387,6 +387,13 @@ object LogicTest {
         check("evening is evening", Voice.greeting("Diego", 21).startsWith("Evening, Diego"))
         check("three in the morning is not morning", Voice.greeting("Diego", 3).startsWith("Late, Diego"))
         check("the greeting rotates by day", Voice.greeting("D", 8, 1) != Voice.greeting("D", 8, 2))
+        // The header is a Row with two buttons beside it on a 390dp phone. A
+        // longer tail wraps it onto a second line, which the replica caught.
+        (0..366).forEach { d ->
+            val tail = Voice.greeting("D", 8, d).substringAfter("D")
+            check("greeting tail fits the header on day $d",
+                tail.length <= Voice.TAIL_MAX, "${tail.length}: '$tail'")
+        }
 
         check("zero reps says nothing counted", Voice.arrival(0, false, "Push-up").contains("Nothing counted"))
         check("one rep is an observation", Voice.arrival(1, true, "Push-up").contains("observation"))
