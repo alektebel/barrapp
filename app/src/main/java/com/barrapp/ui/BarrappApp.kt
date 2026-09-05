@@ -92,7 +92,8 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
     }
 
     androidx.activity.compose.BackHandler(
-        enabled = state.screen in setOf(Screen.Replay, Screen.Plan, Screen.Coach, Screen.Diagnostics),
+        enabled = state.screen in setOf(Screen.Replay, Screen.Plan, Screen.Coach,
+            Screen.Diagnostics, Screen.WorkLog),
     ) { vm.openHome() }
 
     val pickVideo = rememberLauncherForActivityResult(
@@ -134,11 +135,11 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::closeObjectives,
             )
 
-            Screen.Processing -> ProcessingState(
-                stage = state.stage,
-                exerciseGuess = state.current?.result?.detected?.label,
-                error = state.error,
-                onCancel = vm::cancelUpload,
+            Screen.WorkLog -> WorkLogScreen(
+                work = vm.workLog(),
+                onBack = vm::closeWorkLog,
+                onRetry = { vm.retryWork(it); vm.closeWorkLog() },
+                onDismiss = { vm.dismissWork(it); vm.closeWorkLog() },
             )
 
             Screen.Diagnostics -> DiagnosticsScreen(
@@ -286,9 +287,16 @@ private fun MainPane(
     val state by vm.state.collectAsStateWithLifecycle()
     val analysis = state.analysis
 
-    Box(Modifier.fillMaxSize()) {
-        when {
-            analysis != null -> {
+    Column(Modifier.fillMaxSize()) {
+        WorksSection(
+            works = state.works,
+            onOpenLog = vm::openWorkLog,
+            onRetry = vm::retryWork,
+            onDismiss = vm::dismissWork,
+        )
+        Box(Modifier.weight(1f).fillMaxSize()) {
+            when {
+                analysis != null -> {
                 val clip = remember(state.current?.id) { vm.replayClip() }
                 SessionDetail(
                     analysis = analysis,
@@ -344,18 +352,19 @@ private fun MainPane(
             }
         }
 
-        state.error?.let { message ->
-            Box(
-                Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(16.dp)
-            ) {
-                Panel {
-                    Text(
-                        message,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.error,
-                    )
+            state.error?.let { message ->
+                Box(
+                    Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(16.dp)
+                ) {
+                    Panel {
+                        Text(
+                            message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
                 }
             }
         }

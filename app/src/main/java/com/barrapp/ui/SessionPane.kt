@@ -1,15 +1,8 @@
 package com.barrapp.ui
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,7 +22,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -47,10 +39,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -138,102 +126,6 @@ fun AddButton(onClick: () -> Unit, large: Boolean = false, modifier: Modifier = 
  * the named stages instead of a fake percentage. People tolerate a wait they
  * can see the shape of; they do not tolerate a bar that sits at 90%.
  */
-@Composable
-fun ProcessingState(
-    stage: String,
-    exerciseGuess: String?,
-    error: String?,
-    onCancel: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val stages = listOf(
-        "Uploading the clip",
-        "Finding the exercise",
-        "Trimming to the working set",
-        "Counting and measuring the reps",
-    )
-    val activeIndex = stages.indexOfFirst { it.equals(stage, ignoreCase = true) }
-        .let { if (it < 0) 0 else it }
-
-    Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-        Column(
-            Modifier.widthIn(max = 420.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(28.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Box(Modifier.size(128.dp), contentAlignment = Alignment.Center) {
-                if (error == null) CircularProgressIndicator(Modifier.size(120.dp), strokeWidth = 2.dp)
-                androidx.compose.foundation.Image(
-                    painter = androidx.compose.ui.res.painterResource(com.barrapp.R.drawable.ic_launcher_foreground),
-                    contentDescription = null,
-                    modifier = Modifier.size(104.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
-                        .background(androidx.compose.ui.graphics.Color(0xFF102421)),
-                )
-            }
-            Spacer(Modifier.height(24.dp))
-            Eyebrow("YOUR NEXT STEP STARTS HERE")
-            Spacer(Modifier.height(8.dp))
-            Text(if (error == null) "Making every rep count" else "Analysis interrupted",
-                style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(12.dp))
-            Text("Your clip becomes a rep-by-rep review, with clear feedback for your next set.",
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
-            Spacer(Modifier.height(26.dp))
-            stages.forEachIndexed { index, label ->
-                Row(
-                    Modifier.fillMaxWidth().padding(vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    val done = index < activeIndex
-                    val active = index == activeIndex
-                    Box(
-                        Modifier
-                            .size(8.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    done -> MaterialTheme.colorScheme.primary.copy(alpha = 0.5f)
-                                    active -> MaterialTheme.colorScheme.primary
-                                    else -> MaterialTheme.colorScheme.outline
-                                }
-                            )
-                    )
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = when {
-                            active -> MaterialTheme.colorScheme.onSurface
-                            done -> MaterialTheme.colorScheme.onSurfaceVariant
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant
-                        },
-                    )
-                    if (active && error == null) {
-                        Spacer(Modifier.weight(1f))
-                        CircularProgressIndicator(
-                            Modifier.size(14.dp),
-                            strokeWidth = 2.dp,
-                        )
-                    }
-                }
-            }
-            AnimatedVisibility(exerciseGuess != null) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(Modifier.height(16.dp))
-                    Pill("Looks like ${exerciseGuess.orEmpty()}", color = MaterialTheme.colorScheme.primary)
-                }
-            }
-            if (error != null) {
-                Spacer(Modifier.height(20.dp))
-                Text(error, color = MaterialTheme.colorScheme.error,
-                    style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-            }
-            Spacer(Modifier.height(26.dp))
-            TextButton(onClick = onCancel) { Text("Cancel") }
-        }
-    }
-}
-
 /** A measured session: what it was, how many reps, and every rep in order. */
 @Composable
 fun SessionDetail(

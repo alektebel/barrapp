@@ -62,6 +62,24 @@ class BarraApi(context: Context) {
         call(builder.build())
     }
 
+    /** Upload a clip the phone already holds - the queue's own copy. The
+     *  camera uri a work started from can expire mid-queue; a file cannot. */
+    fun uploadClip(clip: java.io.File, uploadUrl: String, method: String) {
+        val url = if (uploadUrl.startsWith("http")) uploadUrl else "$baseUrl$uploadUrl"
+        val body = object : RequestBody() {
+            override fun contentType() = "video/mp4".toMediaType()
+            override fun contentLength() = clip.length()
+            override fun writeTo(sink: BufferedSink) {
+                clip.inputStream().use { input ->
+                    sink.outputStream().use { out -> input.copyTo(out) }
+                }
+            }
+        }
+        val builder = Request.Builder().url(url).method(method, body)
+        if (!isS3(url)) builder.header("X-Device-Id", deviceId)
+        call(builder.build())
+    }
+
     fun submit(jobId: String): Job {
         val request = authed(
             Request.Builder().url("$baseUrl/v1/jobs/$jobId/submit").post("{}".toRequestBody(JSON))
@@ -152,6 +170,7 @@ class BarraApi(context: Context) {
                 exercise = json.optString("exercise"),
                 createdAt = json.optString("createdAt"),
                 error = json.optString("error").ifBlank { null },
+                stage = json.optString("stage"),
                 result = resultJson?.let { parseAnalysis(it) },
             )
         }

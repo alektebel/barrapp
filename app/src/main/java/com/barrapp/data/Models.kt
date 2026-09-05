@@ -13,6 +13,8 @@ data class Job(
     val createdAt: String,
     val result: Analysis? = null,
     val error: String? = null,
+    /** Where the server's worker is, in words. Absent when idle or done. */
+    val stage: String = "",
 )
 
 /** What the server made of one clip. */
