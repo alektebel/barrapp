@@ -64,6 +64,12 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
 
+    /** The work queue. Declared before the init block below on purpose: the
+     *  consumer it launches runs on Main.immediate, which is still inside
+     *  this constructor, and a property read before its own initialiser is
+     *  the kind of crash that takes the app down on open. */
+    private val queue = Channel<String>(Channel.UNLIMITED)
+
     init {
         val app = getApplication<Application>()
         val profile = ProfileStore.load(app)
@@ -273,8 +279,6 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     // than parallel uploads the server cannot measure any faster, and a
     // single worker means the log of each work reads top to bottom as what
     // actually happened, when.
-
-    private val queue = Channel<String>(Channel.UNLIMITED)
 
     /** A clip picked anywhere lands here. The clip is copied onto the phone
      *  FIRST, because a camera's content uri can expire before the upload
