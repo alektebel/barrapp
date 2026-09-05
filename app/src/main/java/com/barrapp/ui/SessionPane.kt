@@ -7,6 +7,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -86,20 +88,19 @@ fun EmptyState(
             // the app saying hello twice on the one screen where it has least
             // to say.
             Text(
-                "You have no training recordings",
+                "Every rep tells a story.",
                 style = MaterialTheme.typography.headlineMedium,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(10.dp))
             Text(
-                "Add a clip of a set. It gets trimmed to the exercise, the movement " +
-                    "is recognised, and every rep is counted and measured.",
+                "Upload a set to count your reps, review your technique, and track your next progression.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(30.dp))
-            AddButton(onAdd, large = true)
+            androidx.compose.material3.Button(onClick = onAdd) { Text("Upload a training video") }
             if (onSeeExample != null) {
                 Spacer(Modifier.height(12.dp))
                 TextButton(onClick = onSeeExample) {
@@ -156,10 +157,27 @@ fun ProcessingState(
 
     Box(modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(
-            Modifier.widthIn(max = 420.dp).padding(32.dp),
+            Modifier.widthIn(max = 420.dp).fillMaxWidth().verticalScroll(rememberScrollState()).padding(28.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            PulsingBar()
+            Box(Modifier.size(128.dp), contentAlignment = Alignment.Center) {
+                if (error == null) CircularProgressIndicator(Modifier.size(120.dp), strokeWidth = 2.dp)
+                androidx.compose.foundation.Image(
+                    painter = androidx.compose.ui.res.painterResource(com.barrapp.R.drawable.ic_launcher_foreground),
+                    contentDescription = null,
+                    modifier = Modifier.size(104.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(28.dp))
+                        .background(androidx.compose.ui.graphics.Color(0xFF102421)),
+                )
+            }
+            Spacer(Modifier.height(24.dp))
+            Eyebrow("YOUR NEXT STEP STARTS HERE")
+            Spacer(Modifier.height(8.dp))
+            Text(if (error == null) "Making every rep count" else "Analysis interrupted",
+                style = MaterialTheme.typography.headlineMedium, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
+            Text("Your clip becomes a rep-by-rep review, with clear feedback for your next set.",
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
             Spacer(Modifier.height(26.dp))
             stages.forEachIndexed { index, label ->
                 Row(
@@ -187,10 +205,10 @@ fun ProcessingState(
                         color = when {
                             active -> MaterialTheme.colorScheme.onSurface
                             done -> MaterialTheme.colorScheme.onSurfaceVariant
-                            else -> MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
+                            else -> MaterialTheme.colorScheme.onSurfaceVariant
                         },
                     )
-                    if (active) {
+                    if (active && error == null) {
                         Spacer(Modifier.weight(1f))
                         CircularProgressIndicator(
                             Modifier.size(14.dp),
@@ -216,52 +234,6 @@ fun ProcessingState(
     }
 }
 
-@Composable
-private fun PulsingBar() {
-    val transition = rememberInfiniteTransition(label = "pulse")
-    val phase by transition.animateFloat(
-        initialValue = 0f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart,
-        ),
-        label = "phase",
-    )
-    val colour = MaterialTheme.colorScheme.primary
-    val track = MaterialTheme.colorScheme.outline
-    Canvas(Modifier.fillMaxWidth().height(34.dp)) {
-        // Pixels, not dp - see RepTrace in parts/Parts.kt.
-        val hair = 1.dp.toPx()
-        val line = 2.5.dp.toPx()
-        val half = 45.dp.toPx()          // half-width of the travelling arc
-        val step = 3.dp.toPx()
-        val mid = size.height / 2
-        drawLine(
-            color = track.copy(alpha = 0.4f),
-            start = Offset(0f, mid),
-            end = Offset(size.width, mid),
-            strokeWidth = hair, cap = StrokeCap.Round,
-        )
-        // A rep-shaped pulse travelling left to right: the same arc the app is
-        // looking for in the clip.
-        val w = size.width
-        val head = phase * (w + 2 * half) - half
-        val path = Path()
-        var first = true
-        var t = -half
-        while (t <= half) {
-            val x = head + t
-            val y = mid - (kotlin.math.cos(t / half * Math.PI.toFloat() / 2f) * mid * 0.75f)
-            if (x in 0f..w) {
-                if (first) { path.moveTo(x, y); first = false } else path.lineTo(x, y)
-            }
-            t += step
-        }
-        if (!first) drawPath(path, colour, style = Stroke(width = line, cap = StrokeCap.Round))
-    }
-}
-
 /** A measured session: what it was, how many reps, and every rep in order. */
 @Composable
 fun SessionDetail(
@@ -283,7 +255,7 @@ fun SessionDetail(
         if (onReplay != null) {
             item {
                 OutlinedButton(onClick = onReplay, modifier = Modifier.fillMaxWidth()) {
-                    Text("Watch again, with the feedback on the timeline")
+                    Text("Review video & technique")
                 }
             }
         }
@@ -454,12 +426,12 @@ private fun SessionHeader(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(8.dp))
-            Text(
-                d.reason.replaceFirstChar { it.uppercase() } + ".",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            if (d.reason.isNotBlank()) {
+                Spacer(Modifier.height(8.dp))
+                Text(d.reason.replaceFirstChar { it.uppercase() }.trimEnd('.') + ".",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             if (!d.certain && d.runnerUp != null) {
                 Spacer(Modifier.height(6.dp))
                 Text(

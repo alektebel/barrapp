@@ -82,10 +82,18 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
         ActivityResultContracts.RequestPermission()
     ) { }
     LaunchedEffect(state.screen) {
-        if (state.screen == Screen.Home && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        if (state.screen == Screen.Home && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            !context.getSharedPreferences("barrapp", android.content.Context.MODE_PRIVATE)
+                .getBoolean("notification_prompt_shown", false)) {
+            context.getSharedPreferences("barrapp", android.content.Context.MODE_PRIVATE)
+                .edit().putBoolean("notification_prompt_shown", true).apply()
             notificationPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
         }
     }
+
+    androidx.activity.compose.BackHandler(
+        enabled = state.screen in setOf(Screen.Replay, Screen.Plan, Screen.Coach, Screen.Diagnostics),
+    ) { vm.openHome() }
 
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -421,6 +429,11 @@ private fun ShellHeader(name: String, onPrivacy: () -> Unit, onPlan: (() -> Unit
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 12.dp, bottom = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        androidx.compose.foundation.Image(
+            painter = androidx.compose.ui.res.painterResource(com.barrapp.R.drawable.ic_launcher_foreground),
+            contentDescription = null, modifier = Modifier.size(44.dp).background(androidx.compose.ui.graphics.Color(0xFF102421), androidx.compose.foundation.shape.RoundedCornerShape(14.dp)),
+        )
+        Spacer(Modifier.size(10.dp))
         Column(Modifier.weight(1f)) {
             Text("barrapp", style = MaterialTheme.typography.titleMedium)
             Text(
@@ -464,7 +477,7 @@ private fun CompactBar(
             selected = false,
             onClick = onAdd,
             icon = { Icon(Icons.Filled.Add, contentDescription = null) },
-            label = { Text("Add") },
+            label = { Text("Upload") },
         )
         NavigationBarItem(
             selected = pane == Pane.Progress,

@@ -79,3 +79,6 @@ private val CUES = mapOf(
     "control" to "Lower under control — don't drop from the top",
     "stall" to "Drive through the sticking point in one arc",
 )
+
+/** Advice is tied to the selected rep's measured fault. */
+fun repAdvice(rep: RepRow): String? = repFaults(rep).firstOrNull()?.let { CUES[it] }

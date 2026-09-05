@@ -46,23 +46,23 @@ val BarrappTypography = Typography(
     ),
     bodyMedium = TextStyle(
         fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,
-        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.1.sp,
+        fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.1.sp,
     ),
     bodySmall = TextStyle(
         fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,
-        fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.2.sp,
+        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.2.sp,
     ),
     labelLarge = TextStyle(
         fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
         fontSize = 14.sp, lineHeight = 18.sp, letterSpacing = 0.1.sp,
     ),
     labelMedium = TextStyle(
-        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium,
-        fontSize = 11.sp, lineHeight = 15.sp, letterSpacing = 0.9.sp,
+        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
+        fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.5.sp,
     ),
     labelSmall = TextStyle(
-        fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium,
-        fontSize = 10.sp, lineHeight = 14.sp, letterSpacing = 0.8.sp,
+        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
+        fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.1.sp,
         textAlign = TextAlign.Start,
     ),
 )

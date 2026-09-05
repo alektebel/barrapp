@@ -50,6 +50,7 @@ import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Pill
 import com.barrapp.ui.parts.bandColor
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /**
  * The clip, again, with the measurement over it.
@@ -80,7 +81,7 @@ fun ReplayScreen(
             TextButton(onClick = onBack) { Text("Back") }
             Spacer(Modifier.size(6.dp))
             Column(Modifier.weight(1f)) {
-                Text("Replay", style = MaterialTheme.typography.titleMedium)
+                Text("Video review", style = MaterialTheme.typography.titleMedium)
                 Text(
                     analysis?.detected?.label?.replace('_', ' ')
                         ?: analysis?.exercise?.replace('_', ' ')
@@ -118,182 +119,154 @@ private fun Missing(message: String, onBack: () -> Unit) {
 @Composable
 private fun ReplayBody(analysis: Analysis, clip: java.io.File) {
     val context = LocalContext.current
-    val reps = analysis.reps.filter { it.endS > 0 }
-
-    var durationS by remember { mutableFloatStateOf(0f) }
-    var positionS by remember { mutableFloatStateOf(0f) }
-    var playing by remember { mutableStateOf(false) }
-    var activeRep by remember { mutableIntStateOf(-1) }
-
-    val videoView = remember {
+    val listState = rememberLazyListState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val screenHeight = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp
+    val videoHeight = (screenHeight * 0.34f).coerceIn(160f, 360f).dp
+    val reps = remember(analysis) { analysis.reps.filter { it.endS > it.startS }.sortedBy { it.startS } }
+    // The server measured the working set between trim.startS and trim.endS;
+    // everything outside it is the walk to the bar. Playback stays inside.
+    var durationS by remember(clip) { mutableFloatStateOf(1f) }
+    val windowStart = analysis.trim?.startS?.toFloat()?.coerceAtLeast(0f) ?: 0f
+    val windowEnd = analysis.trim?.endS?.toFloat()?.takeIf { it > windowStart } ?: durationS
+    var positionS by remember(clip) { mutableFloatStateOf(windowStart) }
+    var playing by remember(clip) { mutableStateOf(false) }
+    var activeRep by remember(clip) { mutableIntStateOf(-1) }
+    var guided by remember { mutableStateOf(true) }
+    var reviewed by remember(clip) { mutableStateOf(setOf<Int>()) }
+    var mediaPlayer by remember(clip) { mutableStateOf<android.media.MediaPlayer?>(null) }
+    var playbackError by remember(clip) { mutableStateOf(false) }
+    val videoView = remember(clip) {
         VideoView(context).apply {
             setVideoPath(clip.absolutePath)
             setOnPreparedListener { mp ->
-                durationS = mp.duration / 1000f
-                start()
+                mediaPlayer = mp
+                durationS = (mp.duration / 1000f).coerceAtLeast(1f)
+                seekTo((windowStart * 1000).toInt().coerceAtLeast(1))
             }
+            setOnErrorListener { _, _, _ -> playbackError = true; true }
         }
     }
-    DisposableEffect(Unit) { onDispose { videoView.stopPlayback() } }
-
-    // Playback position is polled rather than observed: VideoView offers no
-    // callback per frame, and 200ms is finer than the eye follows here.
-    LaunchedEffect(videoView) {
+    DisposableEffect(videoView) { onDispose { videoView.stopPlayback() } }
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, videoView) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_PAUSE) videoView.pause()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    fun moment(rep: RepRow) = rep.turnS.takeIf { it in rep.startS..rep.endS } ?: rep.startS
+    fun seek(raw: Double, index: Int = -1) {
+        val t = raw.coerceIn(windowStart.toDouble(), windowEnd.toDouble())
+        videoView.pause()
+        if (android.os.Build.VERSION.SDK_INT >= 26 && mediaPlayer != null) {
+            mediaPlayer?.seekTo((t * 1000).toLong(), android.media.MediaPlayer.SEEK_CLOSEST)
+        } else {
+            videoView.seekTo((t * 1000).toInt())
+        }
+        positionS = t.toFloat()
+        activeRep = index
+        reviewed = reps.indices.filter { moment(reps[it]) <= t + 0.15 }.toSet()
+    }
+    LaunchedEffect(videoView, guided, windowStart, windowEnd) {
         while (true) {
-            positionS = videoView.currentPosition / 1000f
-            playing = videoView.isPlaying
-            activeRep = reps.indexOfFirst { positionS >= it.startS && positionS <= it.endS }
-            delay(200)
-        }
-    }
-
-    fun seek(t: Double) {
-        videoView.seekTo((t * 1000).toInt())
-        if (!videoView.isPlaying) videoView.start()
-    }
-
-    Column(Modifier.fillMaxSize()) {
-        // The video, with the fault said over it while the faulting rep is on
-        // screen - "Momentum" while the swing happens, "Not locking out" as
-        // the top is shorted. Clean reps say nothing.
-        Box {
-            AndroidView(
-                factory = { videoView },
-                modifier = Modifier.fillMaxWidth().height(240.dp),
-            )
-            val fault = reps.getOrNull(activeRep)?.let { repFault(it) }
-            if (fault != null) {
-                Text(
-                    fault.uppercase(),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = Color.White,
-                    modifier = Modifier
-                        .align(Alignment.TopCenter)
-                        .padding(top = 12.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.65f))
-                        .padding(horizontal = 14.dp, vertical = 6.dp),
-                )
+            val current = videoView.currentPosition / 1000f
+            if (videoView.isPlaying && current >= windowEnd) {
+                seek(windowEnd.toDouble())
             }
-        }
-
-        Timeline(
-            reps = reps,
-            durationS = if (durationS > 0) durationS
-                else analysis.durationS.toFloat().takeIf { it > 0 } ?: 1f,
-            positionS = positionS,
-            activeRep = activeRep,
-            onSeek = { t -> seek(t.toDouble()) },
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        )
-
-        // What to take into the next set: at most three, because that is what
-        // carries. The per-rep comments below are for when one is wanted.
-        improvementCues(analysis).forEachIndexed { i, cue ->
-            Text(
-                "${i + 1}.  $cue",
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(horizontal = 20.dp, vertical = 2.dp),
-            )
-        }
-        if (improvementCues(analysis).isNotEmpty()) {
-            Spacer(Modifier.height(8.dp))
-        }
-
-        Eyebrow(
-            if (playing) "Playing · ${"%.1f".format(positionS)}s"
-            else "Paused · ${"%.1f".format(positionS)}s",
-            modifier = Modifier.padding(horizontal = 20.dp),
-        )
-
-        val listState = rememberLazyListState()
-        LaunchedEffect(activeRep) {
-            if (activeRep >= 0) listState.animateScrollToItem(activeRep)
-        }
-        LazyColumn(
-            state = listState,
-            modifier = Modifier.weight(1f).fillMaxWidth(),
-            contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp),
-        ) {
-            itemsIndexed(reps) { i, rep ->
-                RepComment(
-                    rep = rep,
-                    index = i,
-                    active = i == activeRep,
-                    onClick = { seek(rep.turnS.takeIf { it > 0 } ?: rep.startS) },
-                )
-            }
-        }
-    }
-}
-
-/** The measured set, drawn on one line: a span per rep, a dot at each turning
- *  point, and the playhead over the moment being watched. Tap to seek. */
-@Composable
-private fun Timeline(
-    reps: List<RepRow>,
-    durationS: Float,
-    positionS: Float,
-    activeRep: Int,
-    onSeek: (Float) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    // Colours are composable reads, so they are captured before the draw
-    // lambda - which runs on every frame and is not a composable context.
-    val spanColors = reps.map { bandColor(it.band) }
-    val playhead = MaterialTheme.colorScheme.primary
-    Canvas(
-        modifier
-            .height(46.dp)
-            .pointerInput(durationS) {
-                detectTapGestures { offset ->
-                    onSeek((offset.x / size.width).coerceIn(0f, 1f) * durationS)
+            if (videoView.isPlaying) {
+                val stop = reps.indices.firstOrNull {
+                    guided && it !in reviewed && repFault(reps[it]) != null &&
+                        current >= moment(reps[it]) && current <= reps[it].endS
                 }
-            },
+                if (stop != null) {
+                    seek(moment(reps[stop]), stop)
+                } else {
+                    positionS = current
+                    activeRep = reps.indexOfFirst { current >= it.startS && current <= it.endS }
+                }
+            }
+            playing = videoView.isPlaying
+            delay(80)
+        }
+    }
+    LazyColumn(
+        Modifier.fillMaxSize(),
+        state = listState,
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = 24.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        val h = size.height
-        val spanTop = h * 0.30f
-        val spanBottom = h * 0.62f
-
-        // the unmeasured rest of the clip, so a rep is visibly a part of it
-        drawRoundRect(
-            color = Color.Gray.copy(alpha = 0.25f),
-            topLeft = androidx.compose.ui.geometry.Offset(0f, spanTop),
-            size = androidx.compose.ui.geometry.Size(size.width, spanBottom - spanTop),
-            cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f),
-        )
-
-        reps.forEachIndexed { i, rep ->
-            val x0 = (rep.startS / durationS).toFloat() * size.width
-            val x1 = (rep.endS / durationS).toFloat() * size.width
-            val color = spanColors[i]
-            drawRoundRect(
-                color = color.copy(alpha = if (i == activeRep) 0.95f else 0.55f),
-                topLeft = androidx.compose.ui.geometry.Offset(x0, spanTop),
-                size = androidx.compose.ui.geometry.Size(
-                    (x1 - x0).coerceAtLeast(4f), spanBottom - spanTop),
-                cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f, 6f),
+        item {
+            Box(Modifier.fillMaxWidth().height(videoHeight).background(Color.Black), contentAlignment = Alignment.Center) {
+                AndroidView(factory = { videoView }, modifier = Modifier.fillMaxSize())
+                reps.getOrNull(activeRep)?.let { rep ->
+                    repFault(rep)?.let { fault ->
+                        Text("Rep ${activeRep + 1} · $fault", color = Color.White,
+                            style = MaterialTheme.typography.labelLarge,
+                            modifier = Modifier.align(Alignment.TopCenter).padding(16.dp)
+                                .background(Color(0xFF803B21), RoundedCornerShape(16.dp)).padding(12.dp))
+                    }
+                }
+                if (playbackError) Text("This video cannot be played on this device.", color = Color.White,
+                    modifier = Modifier.padding(24.dp))
+            }
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.FilledTonalButton(onClick = {
+                    if (videoView.isPlaying) videoView.pause() else {
+                        if (positionS >= windowEnd - 0.3f) { seek(windowStart.toDouble()); reviewed = emptySet() }
+                        videoView.start()
+                    }
+                }, enabled = !playbackError) { Text(if (playing) "Pause" else "Play") }
+                Spacer(Modifier.weight(1f))
+                Text("${"%.1f".format(positionS)} / ${"%.1f".format(windowEnd)} s", style = MaterialTheme.typography.bodySmall)
+            }
+            androidx.compose.material3.Slider(
+                value = positionS.coerceIn(windowStart, windowEnd),
+                onValueChange = { seek(it.toDouble()) },
+                valueRange = windowStart..windowEnd,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             )
-            // the turning point: where the movement changed direction
-            if (rep.turnS > 0) {
-                val cx = (rep.turnS / durationS).toFloat() * size.width
-                drawCircle(
-                    color = color,
-                    radius = if (i == activeRep) 7f else 5f,
-                    center = androidx.compose.ui.geometry.Offset(
-                        cx.coerceIn(x0, x1), (spanTop + spanBottom) / 2f),
+            if (analysis.trim != null && durationS > windowEnd + 0.5f) {
+                Text(
+                    "Playing the working set, %.1fs\u2013%.1fs of the %.0fs clip."
+                        .format(windowStart, windowEnd, durationS),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 20.dp),
                 )
             }
+            Row(Modifier.padding(horizontal = 20.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text("Guided review", style = MaterialTheme.typography.titleMedium)
+                    if (screenHeight >= 700) Text("Pause at reps with feedback", style = MaterialTheme.typography.bodySmall)
+                }
+                androidx.compose.material3.Switch(checked = guided, onCheckedChange = { guided = it })
+            }
         }
-
-        val px = (positionS / durationS).toFloat().coerceIn(0f, 1f) * size.width
-        drawLine(
-            color = playhead,
-            start = androidx.compose.ui.geometry.Offset(px, 0f),
-            end = androidx.compose.ui.geometry.Offset(px, h),
-            strokeWidth = 3f,
-        )
+        item {
+            val rep = reps.getOrNull(activeRep)
+            com.barrapp.ui.parts.Panel(Modifier.padding(horizontal = 16.dp)) {
+                Eyebrow(if (rep == null) "Your technique, in focus" else "Rep ${activeRep + 1} · Review moment")
+                Spacer(Modifier.height(8.dp))
+                Text(rep?.let { repFault(it) } ?: if (rep == null) "Watch. Pause. Improve." else "No technique issue flagged",
+                    style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(8.dp))
+                Text(rep?.let { com.barrapp.repAdvice(it) }
+                    ?: if (rep != null) "No specific correction was found in the available measurements."
+                    else "Choose a rep below to inspect its turning point. Markers locate review moments, not exact fault timestamps.",
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        item { Eyebrow("${reps.size} reps · Tap to review", Modifier.padding(horizontal = 20.dp)) }
+        itemsIndexed(reps) { i, rep ->
+            Box(Modifier.padding(horizontal = 16.dp)) {
+                RepComment(rep, i, i == activeRep) {
+                    seek(moment(rep), i)
+                    scope.launch { listState.animateScrollToItem(0) }
+                }
+            }
+        }
     }
 }
 
