@@ -318,6 +318,35 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Transient network failures - an unresolvable host on weak wifi above
+     *  all - are not a dead clip, they are a moment. Tried again here, with a
+     *  growing pause, before the work is allowed to fail; every attempt is in
+     *  the work's log, so a later "why did this take a while" has an answer. */
+    private suspend fun <T> withRetry(
+        what: String,
+        workId: String,
+        attempts: Int = 3,
+        block: suspend () -> T,
+    ): T {
+        var last: Exception? = null
+        repeat(attempts) { i ->
+            try {
+                return block()
+            } catch (err: Exception) {
+                last = err
+                val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
+                    err.message?.contains("Failed to connect", ignoreCase = true) == true ||
+                    err.message?.contains("timeout", ignoreCase = true) == true ||
+                    err is java.io.IOException
+                WorkStore.append(getApplication(), workId, WorkStore.Level.WARN,
+                    "$what failed (attempt ${i + 1} of $attempts): ${err.message.orEmpty()}")
+                if (!transient || i == attempts - 1) throw err
+                delay(2500L * (i + 1))
+            }
+        }
+        throw last ?: IllegalStateException("unreachable")
+    }
+
     private fun publishWorks() {
         _state.update { it.copy(works = WorkStore.all(getApplication())) }
     }
@@ -343,7 +372,13 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             WorkStore.append(app, work.id, level, message)
         }
 
-        fun fail(message: String, traceId: String = "") {
+        fun fail(raw: String, traceId: String = "") {
+            val message = when {
+                raw.contains("resolve host", ignoreCase = true) ||
+                    raw.contains("Failed to connect", ignoreCase = true) ->
+                    "No internet connection. The clip is kept - press Retry when you are back online."
+                else -> raw
+            }
             log(WorkStore.Level.ERROR, message)
             update {
                 it.copy(status = WorkStore.STATUS_FAILED, stage = "", error = message,
@@ -362,18 +397,24 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 fail("The clip is no longer on the phone.")
                 return
             }
-            val created = withContext(Dispatchers.IO) { api.createJob("auto") }
+            val created = withRetry("creating the job", work.id) {
+                withContext(Dispatchers.IO) { api.createJob("auto") }
+            }
             val jobId = created.job.id
             update { it.copy(jobId = jobId, status = WorkStore.STATUS_SENDING,
                 stage = "sending the clip") }
             log(WorkStore.Level.INFO, "job $jobId created — sending the clip " +
                 "(%.1f MB)".format(clip.length() / 1e6))
             ProcessingNotifier.stage(app, "Sending the clip")
-            withContext(Dispatchers.IO) { api.uploadClip(clip, created.uploadUrl, created.uploadMethod) }
+            withRetry("sending the clip", work.id) {
+                withContext(Dispatchers.IO) { api.uploadClip(clip, created.uploadUrl, created.uploadMethod) }
+            }
             update { it.copy(status = WorkStore.STATUS_QUEUED, stage = "queued on the server") }
             log(WorkStore.Level.INFO, "uploaded — queued on the server")
             ProcessingNotifier.stage(app, "Queued on the server")
-            withContext(Dispatchers.IO) { api.submit(jobId) }
+            withRetry("queueing on the server", work.id) {
+                withContext(Dispatchers.IO) { api.submit(jobId) }
+            }
 
             // The wait. The server says where it is; the log keeps what it
             // said, so a wrong number later has a trail to be explained by.

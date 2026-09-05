@@ -306,48 +306,29 @@ private fun MainPane(
                 )
             }
 
-            state.days.isEmpty() -> Column(Modifier.fillMaxSize()) {
+            else -> Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
                 ObjectivesCard(
                     profile = state.profile,
                     goals = state.goals,
                     onSetup = vm::openObjectives,
                     onEditProfile = vm::openOnboarding,
                 )
-                EmptyState(
+                WeekHome(
+                    days = state.days,
+                    goals = state.goals,
+                    firstName = state.profile.firstName,
+                    onOpenLadder = { vm.showPane(Pane.Progress) },
+                    onOpenCoach = vm::openCoach,
                     onAdd = onPick,
-                    onSeeExample = vm::openExample,
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier.padding(horizontal = 20.dp),
                 )
-            }
-
-            else -> Column(Modifier.fillMaxSize()) {
-                ObjectivesCard(
-                    profile = state.profile,
-                    goals = state.goals,
-                    onSetup = vm::openObjectives,
-                    onEditProfile = vm::openOnboarding,
-                )
-                Box(Modifier.weight(1f).fillMaxSize()) {
-                    Column(
-                        Modifier.fillMaxSize(),
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.Center,
-                    ) {
-                        Text(
-                            "Pick a day to see it",
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            "Or add another clip.",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                        Spacer(Modifier.height(22.dp))
-                        AddButton(onPick, large = true)
-                        Spacer(Modifier.height(10.dp))
-                        TextButton(onClick = onRecord) { Text("Record now instead") }
-                    }
+                if (state.days.isEmpty()) {
+                    Spacer(Modifier.height(8.dp))
+                    EmptyState(
+                        onAdd = onPick,
+                        onSeeExample = vm::openExample,
+                        modifier = Modifier.fillMaxWidth(),
+                    )
                 }
             }
         }
@@ -480,7 +461,7 @@ private fun CompactBar(
             selected = pane == Pane.Session,
             onClick = { onSelect(Pane.Session) },
             icon = { Icon(Icons.Filled.Home, contentDescription = null) },
-            label = { Text("Session") },
+            label = { Text("Week") },
         )
         NavigationBarItem(
             selected = false,
@@ -492,7 +473,7 @@ private fun CompactBar(
             selected = pane == Pane.Progress,
             onClick = { onSelect(Pane.Progress) },
             icon = { Icon(Icons.Filled.Info, contentDescription = null) },
-            label = { Text("Progress") },
+            label = { Text("Ladder") },
         )
     }
 }

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -177,7 +178,7 @@ fun Eyebrow(text: String, modifier: Modifier = Modifier, color: Color? = null) {
     Text(
         text.uppercase(),
         style = MaterialTheme.typography.labelMedium,
-        color = color ?: MaterialTheme.colorScheme.onSurfaceVariant,
+        color = color ?: MaterialTheme.colorScheme.primary,
         modifier = modifier,
     )
 }
@@ -193,9 +194,10 @@ fun Pill(
     val c = color ?: MaterialTheme.colorScheme.onSurfaceVariant
     Box(
         modifier
-            .clip(RoundedCornerShape(50))
+            .clip(RoundedCornerShape(6.dp))
             .background(c.copy(alpha = 0.10f))
-            .padding(horizontal = 9.dp, vertical = 3.dp)
+            .border(1.dp, c.copy(alpha = 0.55f), RoundedCornerShape(6.dp))
+            .padding(horizontal = 9.dp, vertical = 4.dp)
     ) {
         Text(text, style = MaterialTheme.typography.labelSmall, color = c)
     }
@@ -210,9 +212,9 @@ fun Panel(
 ) {
     Surface(
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp),
+        shape = RoundedCornerShape(14.dp),
         color = MaterialTheme.colorScheme.surface,
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.55f)),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)),
     ) {
         Column(Modifier.padding(padding)) { content() }
     }

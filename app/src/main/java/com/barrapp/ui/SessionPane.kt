@@ -25,7 +25,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import com.barrapp.ui.theme.Numeric
+import com.barrapp.ui.theme.NumberLarge
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -141,6 +141,26 @@ fun SessionDetail(
         contentPadding = PaddingValues(20.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
+        // The verdict, as the design opens the session page: one word, big,
+        // then the cost in one line. Bands speak, not numbers.
+        item {
+            val verdict = when (analysis.sessionBand) {
+                "strong" -> "Strong."
+                "solid" -> "Solid."
+                "shaky" -> "Shaky."
+                "broken" -> "Broken down."
+                else -> "Unmeasured."
+            }
+            Text(verdict, style = MaterialTheme.typography.headlineMedium)
+            if (analysis.headline.isNotBlank()) {
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    analysis.headline,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
         item { SessionHeader(analysis, repsExpanded, onToggleReps =
             if (analysis.reps.isEmpty()) null else ({ repsExpanded = !repsExpanded })) }
 
@@ -237,7 +257,7 @@ fun SessionDetail(
                 Text(
                     "run ${analysis.traceId}" +
                         (analysis.provenance?.summary?.let { " · $it" } ?: ""),
-                    style = MaterialTheme.typography.labelSmall.merge(Numeric),
+                    style = MaterialTheme.typography.labelSmall.merge(NumberLarge),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )

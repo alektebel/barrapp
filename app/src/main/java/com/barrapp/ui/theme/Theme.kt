@@ -15,11 +15,11 @@ import androidx.core.view.WindowCompat
 private val DarkColorScheme = darkColorScheme(
     primary = DarkPrimary,
     onPrimary = DarkOnPrimary,
+    primaryContainer = DarkPrimaryContainer,
+    onPrimaryContainer = DarkOnPrimaryContainer,
     secondary = DarkSecondary,
     secondaryContainer = DarkSurfaceVariant,
-    onSecondaryContainer = DarkPrimary,
-    primaryContainer = DarkSurfaceVariant,
-    onPrimaryContainer = DarkPrimary,
+    onSecondaryContainer = DarkOnPrimaryContainer,
     background = DarkBackground,
     onBackground = DarkOnBackground,
     surface = DarkSurface,
@@ -27,18 +27,17 @@ private val DarkColorScheme = darkColorScheme(
     surfaceVariant = DarkSurfaceVariant,
     onSurfaceVariant = DarkOnSurfaceVariant,
     outline = DarkOutline,
-    outlineVariant = DarkOutline,
     error = DarkError,
 )
 
 private val LightColorScheme = lightColorScheme(
     primary = LightPrimary,
     onPrimary = LightOnPrimary,
+    primaryContainer = LightPrimaryContainer,
+    onPrimaryContainer = LightOnPrimaryContainer,
     secondary = LightSecondary,
-    secondaryContainer = androidx.compose.ui.graphics.Color(0xFFD6EEE6),
-    onSecondaryContainer = LightPrimary,
-    primaryContainer = androidx.compose.ui.graphics.Color(0xFFD6EEE6),
-    onPrimaryContainer = LightPrimary,
+    secondaryContainer = LightPrimaryContainer,
+    onSecondaryContainer = LightOnPrimaryContainer,
     background = LightBackground,
     onBackground = LightOnBackground,
     surface = LightSurface,
@@ -46,11 +45,8 @@ private val LightColorScheme = lightColorScheme(
     surfaceVariant = LightSurfaceVariant,
     onSurfaceVariant = LightOnSurfaceVariant,
     outline = LightOutline,
-    outlineVariant = LightOutline,
     error = LightError,
 )
-
-val LocalBandColors = staticCompositionLocalOf { LightBands }
 
 @Composable
 fun BarrappTheme(

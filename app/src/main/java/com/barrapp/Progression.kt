@@ -139,6 +139,18 @@ object Progression {
      * Reads the per-movement breakdown so a mixed training day counts each
      * movement on its own merits rather than on the day's total.
      */
+    /** The ladder as the home page reads it: the focus movement first when it
+     *  has not started yet, then everything trained, best first. */
+    fun verdicts(all: List<DayEntry>, focusExercise: String? = null): List<Verdict> {
+        val trained = LADDER.keys.map { assess(it, all) }
+            .filter { it.bestReps > 0 }
+            .sortedByDescending { it.bestReps }
+        val focus = focusExercise?.takeIf { it in LADDER }
+            ?.let { assess(it, all) }
+            ?.takeIf { it.bestReps == 0 }
+        return listOfNotNull(focus) + trained
+    }
+
     fun assess(movement: String, all: List<DayEntry>): Verdict {
         val step = LADDER[movement]
         val label = all.firstNotNullOfOrNull { it.byMovement[movement]?.label }

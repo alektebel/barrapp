@@ -8,61 +8,64 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.sp
 
 /**
- * A tighter scale than the Material default, with negative tracking on the
- * large sizes so headings read as set rather than as default. Figures use the
- * monospace face everywhere so columns of numbers line up and a score does not
- * jiggle as it counts.
+ * Nocturne's type scale. Inter when the font ships with the APK, the platform
+ * sans otherwise — the metrics are what carry the design: tight display
+ * numerals, small caps-style eyebrows, and body sizes that keep the phone at
+ * a comfortable reading distance.
  */
-val Numeric = TextStyle(
-    fontFamily = FontFamily.Monospace,
-    fontWeight = FontWeight.Medium,
-    letterSpacing = (-0.2).sp,
-)
+private val Inter = FontFamily.Default
 
 val BarrappTypography = Typography(
-    displaySmall = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 34.sp, lineHeight = 38.sp, letterSpacing = (-0.8).sp,
-    ),
     headlineMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 26.sp, lineHeight = 31.sp, letterSpacing = (-0.5).sp,
+        fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+        fontSize = 28.sp, lineHeight = 34.sp, letterSpacing = (-0.02).sp,
     ),
     headlineSmall = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 21.sp, lineHeight = 26.sp, letterSpacing = (-0.3).sp,
+        fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+        fontSize = 22.sp, lineHeight = 28.sp, letterSpacing = (-0.015).sp,
+    ),
+    titleLarge = TextStyle(
+        fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+        fontSize = 18.sp, lineHeight = 24.sp, letterSpacing = (-0.01).sp,
     ),
     titleMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.SemiBold,
-        fontSize = 16.sp, lineHeight = 21.sp, letterSpacing = 0.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Medium,
+        fontSize = 15.sp, lineHeight = 20.sp, letterSpacing = (-0.01).sp,
     ),
     titleSmall = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
-        fontSize = 14.sp, lineHeight = 19.sp, letterSpacing = 0.1.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Medium,
+        fontSize = 13.sp, lineHeight = 18.sp, letterSpacing = 0.sp,
     ),
     bodyLarge = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,
-        fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.1.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Normal,
+        fontSize = 15.sp, lineHeight = 22.sp, letterSpacing = 0.sp,
     ),
     bodyMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,
-        fontSize = 16.sp, lineHeight = 24.sp, letterSpacing = 0.1.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Normal,
+        fontSize = 13.sp, lineHeight = 19.sp, letterSpacing = 0.sp,
     ),
     bodySmall = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Normal,
-        fontSize = 14.sp, lineHeight = 20.sp, letterSpacing = 0.2.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Normal,
+        fontSize = 11.sp, lineHeight = 16.sp, letterSpacing = 0.1.sp,
     ),
     labelLarge = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
-        fontSize = 14.sp, lineHeight = 18.sp, letterSpacing = 0.1.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Medium,
+        fontSize = 13.sp, lineHeight = 16.sp, letterSpacing = 0.sp,
     ),
     labelMedium = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
-        fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.5.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Medium,
+        fontSize = 11.sp, lineHeight = 14.sp, letterSpacing = 1.1.sp,
     ),
     labelSmall = TextStyle(
-        fontFamily = FontFamily.Default, fontWeight = FontWeight.Medium,
-        fontSize = 12.sp, lineHeight = 17.sp, letterSpacing = 0.1.sp,
+        fontFamily = Inter, fontWeight = FontWeight.Medium,
+        fontSize = 10.sp, lineHeight = 13.sp, letterSpacing = 0.4.sp,
         textAlign = TextAlign.Start,
     ),
+)
+
+/** The week's headline number: 46/600, tight, tabular — the design's
+ *  "28 reps measured". */
+val NumberLarge = TextStyle(
+    fontFamily = Inter, fontWeight = FontWeight.SemiBold,
+    fontSize = 46.sp, lineHeight = 46.sp, letterSpacing = (-1.4).sp,
 )
