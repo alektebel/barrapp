@@ -34,7 +34,7 @@ import com.barrapp.ui.theme.nocturne
  *  hairline. Dots glow while a step is earned. */
 @Composable
 fun LadderScreen(steps: List<LadderStep>) {
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         androidx.compose.material3.Text("Your ladder", style = N.pageTitle)
         androidx.compose.material3.Text(
             "A step opens when the standard is met with verified reps. The standard " +
@@ -72,21 +72,25 @@ fun LadderScreen(steps: List<LadderStep>) {
 @Composable
 private fun Dot(kind: LadderDot, modifier: Modifier) {
     Canvas(modifier.size(14.dp)) {
+        // Radii in dp, converted once. The literals were raw pixels: on a 3x
+        // phone the 14dp canvas is 42px, so a 7px dot rendered at a third of
+        // its intended size while the dp-scaled glow around it kept growing.
+        val r = 7.dp.toPx()
         when (kind) {
             LadderDot.EARNED -> {
-                drawCircle(Nocturne.accent.copy(alpha = 0.25f), 7f + 6.dp.toPx())
-                drawCircle(Nocturne.background, 7f + 4.dp.toPx())
-                drawCircle(Nocturne.accent, 7f)
+                drawCircle(Nocturne.accent.copy(alpha = 0.25f), r + 6.dp.toPx())
+                drawCircle(Nocturne.background, r + 4.dp.toPx())
+                drawCircle(Nocturne.accent, r)
             }
             LadderDot.CURRENT -> {
-                drawCircle(Nocturne.background, 7f + 4.dp.toPx())
-                drawCircle(Nocturne.background, 7f)
-                drawCircle(Nocturne.accent, 7f, style = Stroke(2.dp.toPx()))
+                drawCircle(Nocturne.background, r + 4.dp.toPx())
+                drawCircle(Nocturne.background, r)
+                drawCircle(Nocturne.accent, r, style = Stroke(2.dp.toPx()))
             }
             LadderDot.LOCKED -> {
-                drawCircle(Nocturne.background, 7f + 2.dp.toPx())
-                drawCircle(Nocturne.background, 7f)
-                drawCircle(Nocturne.nothing, 7f, style = Stroke(2.dp.toPx()))
+                drawCircle(Nocturne.background, r + 2.dp.toPx())
+                drawCircle(Nocturne.background, r)
+                drawCircle(Nocturne.nothing, r, style = Stroke(2.dp.toPx()))
             }
         }
     }

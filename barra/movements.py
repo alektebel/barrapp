@@ -36,6 +36,7 @@ class Movement:
     min_rep_s: float
     turn_label: str          # what the turnaround means, for reports
     aliases: tuple[str, ...] = ()
+    is_hold: bool = False    # an isometric hold, not a set of repetitions
 
 
 SQUAT = Movement(
@@ -76,8 +77,35 @@ PUSH_UP = Movement(
     signal="shoulder_above_bar", min_rep_s=0.5, turn_label="bottom",
     aliases=("pushup", "push-up", "press-up", "pressup"),
 )
+# --- The isometric tracks. These are HOLDS, not sets of repetitions, so the
+# --- classifier routes them to the hold path (barra/holds.py) instead of the
+# --- rep segmenter. A front lever is a hang made horizontal; a planche is the
+# --- same body line pushed off the ground.
+FRONT_LEVER = Movement(
+    name="front_lever", origin="wrist", direction="ascending",
+    signal="body_horizontal", min_rep_s=0.6, turn_label="hold",
+    aliases=("frontlever", "front-lever", "fl", "tuck_front_lever"),
+    is_hold=True,
+)
+PLANCHE = Movement(
+    name="planche", origin="wrist", direction="descending",
+    signal="body_horizontal", min_rep_s=0.6, turn_label="hold",
+    aliases=("tuck_planche", "straddle_planche", "planche_lean"),
+    is_hold=True,
+)
+# A pistol is a single-leg squat. The hips move through the same path as a
+# squat, but ONE leg is planted and the other is carried forward, so it needs
+# per-leg geometry rather than the hip-midpoint frame a squat uses.
+PISTOL_SQUAT = Movement(
+    name="pistol_squat", origin="hip", direction="descending",
+    signal="hip_height", min_rep_s=0.8, turn_label="bottom",
+    aliases=("pistol", "pistolsquat", "pistol-squat", "one_leg_squat"),
+)
 
-MOVEMENTS = {m.name: m for m in (SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP)}
+MOVEMENTS = {m.name: m for m in (
+    SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP,
+    FRONT_LEVER, PLANCHE, PISTOL_SQUAT,
+)}
 _ALIASES = {a: m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
 
 DEFAULT = SQUAT
@@ -269,6 +297,18 @@ def tracking_signal(kp: np.ndarray, movement: Movement) -> tuple[np.ndarray, np.
         raw = (bar[:, 1] - sh[:, 1]) / scale       # + when shoulders are above the bar
         conf = np.minimum(pair_confidence(kp, "left_wrist", "right_wrist"),
                           pair_confidence(kp, "left_shoulder", "right_shoulder"))
+    elif movement.signal == "body_horizontal":
+        # The lever/planche body line: how horizontal the shoulder-hip line is,
+        # 0 = vertical, 1 = horizontal. This is what the hold path measures - a
+        # front lever's whole point is that the body leaves the hang and the
+        # legs come up to the line of the torso.
+        sh = midpoint(kp, "left_shoulder", "right_shoulder")
+        hip = midpoint(kp, "left_hip", "right_hip")
+        dx = np.abs(sh[:, 0] - hip[:, 0])
+        dy = np.abs(sh[:, 1] - hip[:, 1])
+        raw = np.arctan2(dx, np.maximum(dy, 1e-6)) / (np.pi / 2)   # 0..1
+        conf = np.minimum(pair_confidence(kp, "left_shoulder", "right_shoulder"),
+                          pair_confidence(kp, "left_hip", "right_hip"))
     else:
         hip = midpoint(kp, "left_hip", "right_hip")
         raw = -hip[:, 1] / scale                   # + is up in image coordinates

@@ -45,7 +45,7 @@ fun WeekScreen(
     onOpenSession: () -> Unit,
     onOpenCoach: () -> Unit,
 ) {
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         androidx.compose.material3.Text("THIS WEEK", style = N.eyebrowAccent,
             modifier = Modifier.padding(bottom = 8.dp))
 
@@ -84,7 +84,11 @@ fun WeekScreen(
             }
         }
 
-        Row(
+        // FlowRow, not Row: four labels plus their dots cannot fit one line on
+        // a narrow phone or at a large font scale, and a Row would push the
+        // last one off the edge instead of wrapping it.
+        @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+        androidx.compose.foundation.layout.FlowRow(
             Modifier.fillMaxWidth().padding(top = 10.dp),
             horizontalArrangement = Arrangement.spacedBy(14.dp),
         ) {

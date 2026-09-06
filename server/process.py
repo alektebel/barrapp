@@ -12,6 +12,12 @@ from pathlib import Path
 from deepseek import write_report
 from vision import technique_note, technique_second_opinion, count_from_clip
 
+from barra.faults_taxonomy import (classify_failures, pistol_geometry,
+                                   values_for_rep)
+from barra.holds import clip_failures, hold_attempts
+from barra.movements import robust_torso
+from barra.recommend import recommend_for_payload
+
 from barra.frames import technique_artifacts
 from barra.tracestore import put_trace
 
@@ -201,6 +207,58 @@ def _write_trace(trace, job_id: str = "") -> None:
         print(f"[barra] could not store trace {trace.id}: {exc}", flush=True)
 
 
+def _measure_hold(pose, fps: float, movement, session: str | None,
+                  detected: dict, tr, _stage) -> dict:
+    """One clip of a lever or planche: measure the hold, not the reps.
+
+    A hold is measured as one observation per attempt - sustain time, body
+    line, and the failure types it shows. There is no 0-100 score; a hold's
+    quality is its body line and its failures.
+    """
+    from barra.holds import clip_failures, hold_attempts
+
+    _stage("measuring the hold")
+    reps = hold_attempts(pose.keypoints, fps, movement, trace=tr)
+    failures = clip_failures(reps)
+    duration_s = round(len(pose.keypoints) / max(fps, 1.0), 2)
+
+    trim = None
+    if reps:
+        pad = 0.6
+        trim = {
+            "startS": max(0.0, round(reps[0]["startS"] - pad, 2)),
+            "endS": round(min(duration_s, reps[-1]["endS"] + pad), 2),
+        }
+
+    rec = recommend_for_payload({"track": movement.name, "failures": failures})
+    return {
+        "exercise": movement.name,
+        "track": movement.name,
+        "detected": detected,
+        "failures": failures,
+        "recommendation": rec,
+        "n_reps": len(reps),
+        "n_candidates": len(reps),
+        "reps": reps,
+        "rescued": False,
+        "countedBy": None,
+        "consistency": None,
+        "blockers": [],
+        "fps": round(float(fps), 3),
+        "duration_s": duration_s,
+        "trim": trim,
+        "session": session or date.today().isoformat(),
+        "sessionScore": None,
+        "sessionBand": "unmeasured",
+        "sessions": [{"date": session or date.today().isoformat(),
+                      "reps": len(reps), "note": "hold"}],
+        "nextSession": (
+            "Three or four holds, one set, tripod on a marked spot, same side "
+            "every time, the whole body in frame."
+        ),
+    }
+
+
 def _empty(exercise: str, blockers: list[str], **extra) -> dict:
     """A result the app can render when nothing could be measured.
 
@@ -337,6 +395,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     except SystemExit as exc:
         return _empty(chosen, [str(exc)], detected=detected)
 
+    # A front lever or planche is a hold, not a set of repetitions. The rep
+    # segmenter counts turnarounds and would find nothing; measure the hold
+    # instead - sustain time, body line, and the failure types it shows.
+    if movement.is_hold:
+        return _measure_hold(pose, fps, movement, session, detected, tr, _stage)
+
     _stage("finding the reps")
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
     rescued = False
@@ -436,10 +500,18 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         )
         if q.score is not None:
             scores.append(q.score)
+        # Classify the failure types this rep was measured to have, so the
+        # phone can say WHAT was wrong rather than only how far from "perfect".
+        vals = values_for_rep(measured.values, arm, signal, start, turn)
+        if movement.name == "pistol_squat":
+            vals.update(pistol_geometry(pose.keypoints, start, turn, end,
+                                        robust_torso(pose.keypoints)))
+        rep_failures = classify_failures(movement.name, vals)
         reps.append({
             "session": session,
             "label": f"r{i + 1}",
             "rescued": rescued,
+            "failures": rep_failures,
             "transition_s": transition.replace(" s", ""),
             "total_s": total.replace(" s", ""),
             "class": "INVARIANT",
@@ -515,9 +587,14 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             f"counted {vision_count['reps']} from stills of the clip "
             f"({vision_count['agreement']})")
 
+    clip_faults = clip_failures(reps)
+    rec = recommend_for_payload({"track": movement.name, "failures": clip_faults})
     return {
         "exercise": movement.name,
+        "track": movement.name,
         "detected": detected,
+        "failures": clip_faults,
+        "recommendation": rec,
         "n_reps": usable if found else (vision_count["reps"] if vision_count else 0),
         "n_candidates": len(found),
         "rescued": rescued,

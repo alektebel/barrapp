@@ -33,7 +33,7 @@ fun UploadScreen(
     onSkip: () -> Unit,
     onBackToWeek: () -> Unit,
 ) {
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         androidx.compose.material3.Text("← Week", style = N.back,
             modifier = Modifier.padding(bottom = 14.dp)
                 .then(NoRipple.noRipple(onBackToWeek)))

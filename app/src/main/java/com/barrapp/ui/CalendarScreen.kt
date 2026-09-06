@@ -39,7 +39,7 @@ fun CalendarScreen(
     rows: List<CalRow>,
     onOpenDay: (Int) -> Unit,
 ) {
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.Bottom) {
             androidx.compose.material3.Text(month, style = N.pageTitle)
             Spacer(Modifier.width(10.dp))
@@ -66,14 +66,27 @@ fun CalendarScreen(
                 )
             }
         }
-        Row(Modifier.fillMaxWidth().padding(top = 5.dp),
-            horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            repeat(days.firstOrNull()?.leadingBlanks ?: 0) {
-                Spacer(Modifier.weight(1f).aspectRatio(1f))
+        // One Row per week. A month is 28-31 cells; laying them all in one Row
+        // with weight(1f) shrank every cell to a fifth of its share and turned
+        // the calendar into a strip of unreadable squares. The blanks belong to
+        // the first week only - they are the days of the previous month.
+        val blanks = days.firstOrNull()?.leadingBlanks ?: 0
+        val firstWeek = minOf(7 - blanks, days.size)
+        var cursor = 0
+        while (cursor < days.size) {
+            val inWeek = if (cursor == 0) firstWeek else minOf(7, days.size - cursor)
+            Row(Modifier.fillMaxWidth().padding(top = 5.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+                if (cursor == 0) {
+                    repeat(blanks) {
+                        Spacer(Modifier.weight(1f).aspectRatio(1f))
+                    }
+                }
+                repeat(inWeek) {
+                    DayCell(days[cursor + it], Modifier.weight(1f), onOpenDay)
+                }
             }
-            days.forEach { d ->
-                DayCell(d, Modifier.weight(1f), onOpenDay)
-            }
+            cursor += inWeek
         }
 
         NocturneDivider(Modifier.padding(vertical = 20.dp))

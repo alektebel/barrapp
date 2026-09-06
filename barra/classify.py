@@ -148,6 +148,34 @@ def _parked(a: np.ndarray) -> float:
     return float(np.mean(np.abs(a - np.median(a)) <= HOLD_BAND))
 
 
+def _angle(pts: np.ndarray, a: int, b: int, c: int, ok: np.ndarray,
+           min_conf: float = MIN_CONF) -> np.ndarray:
+    """Interior angle at joint b (degrees), 180 = fully extended.
+
+    Used for the lever/planche straight-arm and straight-leg checks, and for
+    the pistol's bent supporting knee. Points are raw (T,17,3) keypoints.
+    """
+    pa, pb, pc = pts[:, a, :2], pts[:, b, :2], pts[:, c, :2]
+    v1 = pa - pb
+    v2 = pc - pb
+    denom = np.linalg.norm(v1, axis=1) * np.linalg.norm(v2, axis=1)
+    cosang = np.where(denom > 1e-6,
+                      np.clip(np.sum(v1 * v2, axis=1) / denom, -1.0, 1.0), 0.0)
+    deg = np.degrees(np.arccos(cosang))
+    return np.where(ok[a] & ok[b] & ok[c], deg, np.nan)
+
+
+def _frac(a: np.ndarray, thresh: float) -> float:
+    """Fraction of observed frames at or above a threshold, NaN-safe."""
+    a = a[np.isfinite(a)]
+    return float(np.mean(a >= thresh)) if a.size else float("nan")
+
+
+def _pct(a: np.ndarray, q: float) -> float:
+    a = a[np.isfinite(a)]
+    return float(np.percentile(a, q)) if a.size else float("nan")
+
+
 def features(kp: np.ndarray, fps: float = 30.0) -> dict:
     """Geometric summary of a clip, in torso-lengths. Every value is scale-free
     so it means the same thing whatever the camera distance."""
@@ -204,6 +232,59 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
     w_win = _best_window(wrist, w_ok, torso, win)
     a_win = _best_window(ankle, a_ok, torso, win)
 
+    # ---- progression geometry: the isometric tracks and the pistol ---------
+    # Body line: the shoulder-hip line's angle from vertical, in degrees.
+    # 0 = hanging vertical, 90 = horizontal. A front lever or planche is a
+    # body held horizontal, so this is what separates them from a pull-up or
+    # a squat, which are vertical.
+    body = np.where(
+        s_ok & h_ok,
+        np.degrees(np.arctan2(np.abs(shoulder[:, 0] - hip[:, 0]),
+                              np.maximum(np.abs(shoulder[:, 1] - hip[:, 1]), 1e-6))),
+        np.nan,
+    )
+    body_line_deg = _pct(body, 50)
+    horizontal_frac = _frac(body, 70.0)
+
+    # Straight arm / straight leg, 180 = fully extended. A lever or planche is
+    # held on straight arms with a straight body line; bent elbows are the
+    # first failure to look for.
+    elbow_l = _angle(kp, S.KP_INDEX["left_shoulder"], S.KP_INDEX["left_elbow"],
+                     S.KP_INDEX["left_wrist"], s_ok & w_ok)
+    elbow_r = _angle(kp, S.KP_INDEX["right_shoulder"], S.KP_INDEX["right_elbow"],
+                     S.KP_INDEX["right_wrist"], s_ok & w_ok)
+    arms_straight_frac = _frac(np.concatenate([elbow_l, elbow_r]), 160.0)
+
+    knee_l = _angle(kp, S.KP_INDEX["left_hip"], S.KP_INDEX["left_knee"],
+                    S.KP_INDEX["left_ankle"], h_ok & a_ok)
+    knee_r = _angle(kp, S.KP_INDEX["right_hip"], S.KP_INDEX["right_knee"],
+                    S.KP_INDEX["right_ankle"], h_ok & a_ok)
+    legs_straight_frac = _frac(np.concatenate([knee_l, knee_r]), 160.0)
+
+    # Legs lifted off the ground: ankle at or above hip height. In a push-up
+    # the ankles are below the hips (feet on the floor); in a planche the legs
+    # are carried horizontal, so the ankles rise to hip level. image y grows
+    # down, so ankle_y <= hip_y means the ankle is at/above the hip.
+    ankle_over_hip = np.where(
+        a_ok & h_ok, (hip[:, 1] - ankle[:, 1]) / torso, np.nan)
+    legs_lifted_frac = _frac(ankle_over_hip, -0.05)
+
+    # Single-leg stance (the pistol): one ankle planted under the hip, the
+    # other carried forward at hip height. The planted leg's ankle sits below
+    # the hip; the free leg's ankle sits well forward and near hip height.
+    # When only one side is confidently seen the planted one is the one whose
+    # ankle is lowest; a two-legged squat keeps BOTH ankles below the hips.
+    l_ankle_below = _pct((hip[:, 1] - kp[:, S.KP_INDEX["left_ankle"], 1]) / torso, 5)
+    r_ankle_below = _pct((hip[:, 1] - kp[:, S.KP_INDEX["right_ankle"], 1]) / torso, 5)
+    l_ok_s = kp[:, S.KP_INDEX["left_ankle"], 2] >= MIN_CONF
+    r_ok_s = kp[:, S.KP_INDEX["right_ankle"], 2] >= MIN_CONF
+    one_side_planted = bool(l_ok_s.mean() >= 0.5 or r_ok_s.mean() >= 0.5)
+    # The planted side is the one with the ankle lowest; the free side's ankle
+    # is carried forward. A pistol has exactly one low ankle.
+    l_low = l_ankle_below > 0.05 if np.isfinite(l_ankle_below) else False
+    r_low = r_ankle_below > 0.05 if np.isfinite(r_ankle_below) else False
+    single_leg_stance = bool(one_side_planted and (l_low != r_low))
+
     return {
         "n_frames": int(len(kp)),
         "fps": float(fps or 30.0),
@@ -244,6 +325,15 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
         if np.isfinite(knee_over_hip).any() else float("nan"),
         "knee_excursion": pct(knee_over_hip, 95) - pct(knee_over_hip, 5),
         "hip_articulation": pct(hip_over_hands, 95) - pct(hip_over_hands, 5),
+        # progression / isometric geometry
+        "body_line_deg": body_line_deg,
+        "horizontal_frac": horizontal_frac,
+        "arms_straight_frac": arms_straight_frac,
+        "legs_straight_frac": legs_straight_frac,
+        "legs_lifted_frac": legs_lifted_frac,
+        "single_leg_stance": single_leg_stance,
+        "l_ankle_below": l_ankle_below,
+        "r_ankle_below": r_ankle_below,
     }
 
 
@@ -323,6 +413,37 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         arms_measured=arms_measured, parked_frac=parked, parked_max=HOLD_FRAC,
     )
 
+    # --- the isometric tracks. A front lever and a planche ARE holds, so the
+    # hold-rejection below must not swallow them - they are checked first.
+    # A front lever is a hang held horizontal (hands overhead, body line near
+    # horizontal). A planche is the same body line pressed off the ground
+    # (hands below the shoulders, legs carried up).
+    if (anchored and f["hands_overhead_frac"] >= 0.35
+            and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0):
+        tr.decision("front_lever", "hanging from a fixed bar, body held horizontal",
+                    body_line_deg=f["body_line_deg"], horizontal_min=70.0,
+                    arms_straight_frac=f["arms_straight_frac"],
+                    legs_straight_frac=f["legs_straight_frac"], confidence=0.72)
+        return Classification(
+            "front_lever", 0.72,
+            f"hanging from a fixed bar with the body held "
+            f"{f['body_line_deg']:.0f} degrees from vertical - a front lever",
+            f, runner_up="pull_up",
+        )
+
+    if (anchored and f["hands_below_frac"] >= 0.80
+            and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0
+            and np.isfinite(f["legs_lifted_frac"]) and f["legs_lifted_frac"] >= 0.5):
+        tr.decision("planche", "body horizontal on straight arms, legs off the ground",
+                    body_line_deg=f["body_line_deg"], horizontal_min=70.0,
+                    legs_lifted_frac=f["legs_lifted_frac"], confidence=0.72)
+        return Classification(
+            "planche", 0.72,
+            f"body held {f['body_line_deg']:.0f} degrees from vertical on the "
+            f"hands with the legs carried up off the ground - a planche",
+            f, runner_up="push_up",
+        )
+
     # A hold is not a set. Checked before anything else, because the branches
     # below ask *which* movement this is and cannot notice that nothing
     # happened: a 23-second inverted hold has hands as fixed as any bar
@@ -383,6 +504,23 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f"hanging from a fixed bar, and the shoulders never rise above the "
             f"hands (peak {peak:+.2f} torso-lengths)",
             f, runner_up="muscle_up",
+        )
+
+    # A pistol is a single-leg squat: one ankle planted under the hips, the
+    # other carried forward. Checked before the squat branch because a pistol
+    # satisfies every squat condition except the one that matters - there is
+    # one low ankle, not two.
+    if planted and f["single_leg_stance"] and np.isfinite(f["hip_travel"])             and f["hip_travel"] >= 0.35:
+        tr.decision("pistol_squat", "one foot planted, the other carried forward",
+                    hip_travel=f["hip_travel"], hip_travel_min=0.35,
+                    l_ankle_below=f["l_ankle_below"], r_ankle_below=f["r_ankle_below"],
+                    confidence=0.74)
+        return Classification(
+            "pistol_squat", 0.74,
+            "one foot stayed planted and the other leg was carried forward while "
+            f"the hips moved through {f['hip_travel']:.2f} torso-lengths - a "
+            "single-leg squat",
+            f, runner_up="squat",
         )
 
     if planted and rigid_arms and np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35:
@@ -472,5 +610,8 @@ HUMAN = {
     "push_up": "Push-up",
     "squat": "Squat",
     "knee_raise": "Hanging knee raise",
+    "front_lever": "Front lever",
+    "planche": "Planche",
+    "pistol_squat": "Pistol squat",
     "unknown": "Not recognised",
 }

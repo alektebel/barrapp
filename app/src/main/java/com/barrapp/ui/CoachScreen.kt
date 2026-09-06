@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,7 +39,7 @@ fun CoachScreen(
     onBackToWeek: () -> Unit,
 ) {
     var draft by remember { mutableStateOf("") }
-    Column {
+    Column(Modifier.fillMaxWidth()) {
         androidx.compose.material3.Text("← Week", style = N.back,
             modifier = Modifier.padding(bottom = 14.dp)
                 .then(NoRipple.noRipple(onBackToWeek)))
@@ -70,7 +71,11 @@ fun CoachScreen(
                 Row(Modifier.fillMaxWidth().padding(top = 20.dp),
                     horizontalArrangement = Arrangement.End) {
                     Box(
-                        Modifier.width(270.dp)
+                        // A fraction of the row, capped at the design's width:
+                        // a fixed 270dp overflows any phone narrower than 360dp
+                        // and never grows with the text.
+                        Modifier.fillMaxWidth(0.85f)
+                            .widthIn(max = 270.dp)
                             .background(Nocturne.deep,
                                 RoundedCornerShape(14.dp, 14.dp, 4.dp, 14.dp))
                             .padding(horizontal = 13.dp, vertical = 10.dp),
@@ -81,7 +86,8 @@ fun CoachScreen(
             } else {
                 Row(Modifier.fillMaxWidth().padding(top = 10.dp)) {
                     Column(
-                        Modifier.width(290.dp)
+                        Modifier.fillMaxWidth(0.9f)
+                            .widthIn(max = 290.dp)
                             .background(Nocturne.surface,
                                 RoundedCornerShape(14.dp, 14.dp, 14.dp, 4.dp))
                             .border(1.dp, Nocturne.hairline,

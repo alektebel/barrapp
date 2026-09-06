@@ -119,9 +119,11 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                 when {
                     day != null && day.reps > 0 -> CalDay(d, if (d == today)
                         CalKind.TODAY else CalKind.MEASURED, bandColor(day.band),
-                        leadingBlanks = 0, bold = d == 26)
-                    day != null -> CalDay(d, CalKind.DASHED, leadingBlanks = 0)
-                    else -> CalDay(d, CalKind.PLAIN, leadingBlanks = 0)
+                        leadingBlanks = if (d == 1) firstDow else 0, bold = d == 26)
+                    day != null -> CalDay(d, CalKind.DASHED,
+                        leadingBlanks = if (d == 1) firstDow else 0)
+                    else -> CalDay(d, CalKind.PLAIN,
+                        leadingBlanks = if (d == 1) firstDow else 0)
                 }
             }
             val measured = state.days.count { it.reps > 0 }
