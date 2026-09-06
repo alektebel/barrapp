@@ -16,6 +16,7 @@ import com.barrapp.data.Goals
 import com.barrapp.data.GoalsStore
 import com.barrapp.data.Job
 import com.barrapp.data.Profile
+import com.barrapp.data.PartMark
 import com.barrapp.data.ProfileStore
 import com.barrapp.data.SessionStore
 import com.barrapp.data.Work
@@ -70,6 +71,22 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
      *  the kind of crash that takes the app down on open. */
     private val queue = Channel<String>(Channel.UNLIMITED)
 
+    /** Works currently in the channel or being processed, so a connectivity
+     *  pulse cannot enqueue the same one twice. */
+    private val inFlight = mutableSetOf<String>()
+
+    /** Fires when a VALIDATED network appears: paused uploads resume here. */
+    private val netCallback = object : android.net.ConnectivityManager.NetworkCallback() {
+        override fun onCapabilitiesChanged(
+            network: android.net.Network,
+            capabilities: android.net.NetworkCapabilities,
+        ) {
+            if (capabilities.hasCapability(
+                    android.net.NetworkCapabilities.NET_CAPABILITY_VALIDATED)
+            ) resumeConnectingWorks()
+        }
+    }
+
     init {
         val app = getApplication<Application>()
         val profile = ProfileStore.load(app)
@@ -82,15 +99,28 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         // It is not lost - the clip is on the phone - but it is not going
         // anywhere on its own either, so it becomes a failed work with a
         // reason and a Retry, rather than a lie that says "measuring".
-        val stale = WorkStore.all(app).filter { it.active }
-        stale.forEach { w ->
-            WorkStore.put(app, w.copy(
-                status = WorkStore.STATUS_FAILED,
-                stage = "",
-                error = "The app closed while this clip was in the queue.",
-            ).let { it.copy(log = it.log + WorkStore.Entry(
-                System.currentTimeMillis(), WorkStore.Level.WARN,
-                "interrupted — the app closed; retry to send it again")) })
+        val resumed = mutableListOf<String>()
+        WorkStore.all(app).filter { it.active }.forEach { w ->
+            if (w.status == WorkStore.STATUS_SENDING && w.uploadId.isNotBlank()) {
+                // died mid-upload: the parts already sent are still on the
+                // server, so this is a resume, not a failure
+                WorkStore.put(app, w.copy(
+                    status = WorkStore.STATUS_WAITING,
+                    stage = "resuming the upload",
+                ).let { it.copy(log = it.log + WorkStore.Entry(
+                    System.currentTimeMillis(), WorkStore.Level.INFO,
+                    "the app closed mid-upload - ${w.uploadedParts.size} part(s) " +
+                        "are safe; resuming from there")) })
+                resumed.add(w.id)
+            } else {
+                WorkStore.put(app, w.copy(
+                    status = WorkStore.STATUS_FAILED,
+                    stage = "",
+                    error = "The app closed while this clip was in the queue.",
+                ).let { it.copy(log = it.log + WorkStore.Entry(
+                    System.currentTimeMillis(), WorkStore.Level.WARN,
+                    "interrupted — the app closed; retry to send it again")) })
+            }
         }
         _state.update {
             it.copy(
@@ -104,6 +134,15 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             )
         }
         viewModelScope.launch { consumeQueue() }
+        resumed.forEach { queue.trySend(it) }
+        // The resume-on-connection watcher: a work paused mid-upload does not
+        // need a human to notice the wifi came back.
+        runCatching {
+            (getApplication<Application>().getSystemService(
+                android.content.Context.CONNECTIVITY_SERVICE)
+                as android.net.ConnectivityManager)
+                .registerDefaultNetworkCallback(netCallback)
+        }
         if (screen == Screen.Home) {
             WeeklyReviewWorker.schedule(app)
             refresh()
@@ -359,6 +398,83 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Raised when the network died mid-upload; handled locally, never shown
+     *  as a failure. */
+    private class PauseUpload : Exception("paused for network")
+
+    /** The upload, part by part, resumable from exactly where it stopped.
+     *
+     * Every finished part is persisted with its etag the moment the server
+     * acknowledges it, so a tunnel, a lift, or the app being killed costs one
+     * part - never the clip. */
+    private suspend fun uploadResumable(
+        workId: String,
+        clip: java.io.File,
+        onProgress: (Int, Int) -> Unit,
+    ) {
+        val app = getApplication<Application>()
+        val current = WorkStore.get(app, workId)
+        var uploadId = current?.uploadId.orEmpty()
+        var partSize = current?.partSize ?: 0L
+        val done = LinkedHashMap<Int, String?>()
+        current?.uploadedParts?.forEach { done[it.partNumber] = it.etag }
+
+        if (uploadId.isBlank() || partSize <= 0L) {
+            val (id, ps) = withRetry("starting the upload", workId) {
+                withContext(Dispatchers.IO) { api.startUpload(workId) }
+            }
+            uploadId = id
+            partSize = ps
+            WorkStore.put(app, WorkStore.get(app, workId)!!.copy(uploadId = id, partSize = ps))
+        }
+
+        val total = (((clip.length() + partSize - 1) / partSize).toInt()).coerceAtLeast(1)
+        var sent = done.size
+        for (n in 1..total) {
+            if (done.containsKey(n)) continue
+            val url = withRetry("sending part $n of $total", workId) {
+                withContext(Dispatchers.IO) { api.presignPart(workId, uploadId, n) }
+            }
+            val offset = (n - 1L) * partSize
+            val length = minOf(partSize, clip.length() - offset)
+            try {
+                val etag = withContext(Dispatchers.IO) { api.putPart(url, clip, offset, length) }
+                done[n] = etag
+                sent++
+                onProgress(sent.coerceAtMost(total), total)
+                WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
+                    uploadedParts = done.map { PartMark(it.key, it.value) },
+                    stage = "sending the clip (${sent.coerceAtMost(total)}/$total parts)"))
+                publishWorks()
+            } catch (err: Exception) {
+                val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
+                    err.message?.contains("Failed to connect", ignoreCase = true) == true ||
+                    err.message?.contains("timeout", ignoreCase = true) == true ||
+                    err is java.io.IOException
+                if (!transient) throw err
+                WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
+                    status = WorkStore.STATUS_CONNECTING,
+                    stage = "waiting for a connection - ${done.size}/$total parts are safe",
+                    uploadedParts = done.map { PartMark(it.key, it.value) },
+                    log = (WorkStore.get(app, workId)?.log ?: emptyList()) +
+                        WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.WARN,
+                            "connection lost during part $n of $total - " +
+                                "${done.size} part(s) already on the server")))
+                publishWorks()
+                throw PauseUpload()
+            }
+        }
+        withRetry("finishing the upload", workId) {
+            withContext(Dispatchers.IO) {
+                api.completeUpload(workId,
+                    done.map { BarraApi.PartSlot(it.key, it.value) })
+            }
+        }
+        WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
+            uploadId = "", partSize = 0, uploadedParts = emptyList(),
+            stage = "queued on the server"))
+    }
+
     private suspend fun runWork(work: Work) {
         val app = getApplication<Application>()
 
@@ -386,6 +502,12 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             }
             EventLog.error(app, "a work failed", message,
                 jobId = WorkStore.get(app, work.id)?.jobId.orEmpty())
+            val w = WorkStore.get(app, work.id)
+            if (w?.jobId?.isNotBlank() == true && w.uploadId.isNotBlank()) {
+                viewModelScope.launch {
+                    runCatching { withContext(Dispatchers.IO) { api.abortUpload(w.jobId) } }
+                }
+            }
             ProcessingNotifier.fail(app, message)
         }
 
@@ -406,8 +528,19 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             log(WorkStore.Level.INFO, "job $jobId created — sending the clip " +
                 "(%.1f MB)".format(clip.length() / 1e6))
             ProcessingNotifier.stage(app, "Sending the clip")
-            withRetry("sending the clip", work.id) {
-                withContext(Dispatchers.IO) { api.uploadClip(clip, created.uploadUrl, created.uploadMethod) }
+            try {
+                uploadResumable(work.id, clip) { sent, total ->
+                    update {
+                        it.copy(status = WorkStore.STATUS_SENDING,
+                            stage = "sending the clip ($sent/$total parts)")
+                    }
+                }
+            } catch (_: PauseUpload) {
+                // The network went away mid-send. Not a failure: the work sits
+                // in "connecting" and the connectivity watcher resumes it the
+                // moment a validated network appears - parts already sent stay
+                // sent, on the server, by part number.
+                return
             }
             update { it.copy(status = WorkStore.STATUS_QUEUED, stage = "queued on the server") }
             log(WorkStore.Level.INFO, "uploaded — queued on the server")
@@ -542,7 +675,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val work = WorkStore.get(app, workId) ?: return
         if (work.jobId.isNotBlank()) {
             viewModelScope.launch {
-                runCatching { withContext(Dispatchers.IO) { api.deleteJob(work.jobId) } }
+                runCatching { withContext(Dispatchers.IO) {
+                    if (work.uploadId.isNotBlank()) api.abortUpload(work.jobId)
+                    api.deleteJob(work.jobId)
+                } }
             }
         }
         java.io.File(work.clipPath).delete()
@@ -585,6 +721,38 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         jobId = job.id)
                     _state.update { it.copy(error = err.message) }
                 }
+        }
+    }
+
+    override fun onCleared() {
+        runCatching {
+            (getApplication<Application>().getSystemService(
+                android.content.Context.CONNECTIVITY_SERVICE)
+                as android.net.ConnectivityManager)
+                .unregisterNetworkCallback(netCallback)
+        }
+        super.onCleared()
+    }
+
+    /** Everything paused for the network goes back in the queue, oldest
+     *  first, once. */
+    private fun resumeConnectingWorks() {
+        val app = getApplication<Application>()
+        val paused = WorkStore.all(app)
+            .filter { it.status == WorkStore.STATUS_CONNECTING && it.id !in inFlight }
+        if (paused.isEmpty()) return
+        viewModelScope.launch {
+            paused.forEach { w ->
+                WorkStore.put(app, w.copy(status = WorkStore.STATUS_WAITING,
+                    stage = "waiting to be sent",
+                    log = w.log + WorkStore.Entry(System.currentTimeMillis(),
+                        WorkStore.Level.INFO, "connection is back - resuming the upload")))
+            }
+            publishWorks()
+            paused.forEach { w ->
+                inFlight.add(w.id)
+                queue.trySend(w.id)
+            }
         }
     }
 

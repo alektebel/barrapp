@@ -80,6 +80,84 @@ class BarraApi(context: Context) {
         call(builder.build())
     }
 
+    // ---- resumable upload: parts, etags, and a server that remembers ----
+
+    data class PartSlot(val partNumber: Int, val etag: String?)
+
+    /** A part already on the server, with the etag the server answered. */
+    fun startUpload(jobId: String): Pair<String, Long> {
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/jobs/$jobId/upload/start")
+                .post("{}".toRequestBody(JSON))
+        ).build()
+        val json = call(request)
+        return json.optString("uploadId") to json.optLong("partSize", 8L * 1024 * 1024)
+    }
+
+    fun presignPart(jobId: String, uploadId: String, partNumber: Int): String {
+        val body = JSONObject().put("partNumber", partNumber).toString()
+            .toRequestBody(JSON)
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/jobs/$jobId/upload/part")
+                .post(body)
+        ).build()
+        return call(request).optString("url")
+    }
+
+    /** Send one part; returns the server's etag when it gives one. */
+    fun putPart(url: String, clip: java.io.File, offset: Long, length: Long): String? {
+        val resolved = if (url.startsWith("http")) url else "$baseUrl$url"
+        val body = object : RequestBody() {
+            // No Content-Type header at all: the presigned URL signs nothing
+            // of it, and S3 rejects a signature computed over a header the
+            // request then sends differently. Send nothing.
+            override fun contentType(): okhttp3.MediaType? = null
+            override fun contentLength() = length
+            override fun writeTo(sink: BufferedSink) {
+                clip.inputStream().use { input ->
+                    input.skip(offset)
+                    val buf = ByteArray(1 shl 20)
+                    var remaining = length
+                    while (remaining > 0) {
+                        val n = input.read(buf, 0, minOf(buf.size.toLong(), remaining).toInt())
+                        if (n < 0) break
+                        sink.write(buf, 0, n)
+                        remaining -= n
+                    }
+                }
+            }
+        }
+        val builder = Request.Builder().url(resolved).put(body)
+        if (!isS3(resolved)) builder.header("X-Device-Id", deviceId)
+        client.newCall(builder.build()).execute().use { response ->
+            if (!response.isSuccessful) error("part upload failed: HTTP ${response.code}")
+            return response.header("ETag")
+                ?: response.header("etag")
+        }
+    }
+
+    fun completeUpload(jobId: String, parts: List<PartSlot>) {
+        val arr = JSONArray()
+        parts.sortedBy { it.partNumber }.forEach {
+            arr.put(JSONObject().put("partNumber", it.partNumber)
+                .put("etag", it.etag ?: "${it.partNumber}"))
+        }
+        val body = JSONObject().put("parts", arr).toString().toRequestBody(JSON)
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/jobs/$jobId/upload/complete")
+                .post(body)
+        ).build()
+        call(request)
+    }
+
+    fun abortUpload(jobId: String) {
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/jobs/$jobId/upload/abort")
+                .post("{}".toRequestBody(JSON))
+        ).build()
+        runCatching { call(request) }
+    }
+
     fun submit(jobId: String): Job {
         val request = authed(
             Request.Builder().url("$baseUrl/v1/jobs/$jobId/submit").post("{}".toRequestBody(JSON))

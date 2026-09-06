@@ -31,22 +31,32 @@ data class Work(
     val error: String? = null,
     val traceId: String = "",
     val clipPath: String = "",  // the phone's copy, for retry and replay
+    val uploadId: String = "",  // the server's multipart session, when sending
+    val partSize: Long = 0,     // bytes per part, fixed at start
+    val uploadedParts: List<PartMark> = emptyList(),
     val log: List<WorkStore.Entry> = emptyList(),
 ) {
     val active: Boolean
         get() = status in setOf(
             WorkStore.STATUS_WAITING, WorkStore.STATUS_SENDING,
-            WorkStore.STATUS_QUEUED, WorkStore.STATUS_MEASURING)
+            WorkStore.STATUS_CONNECTING, WorkStore.STATUS_QUEUED,
+            WorkStore.STATUS_MEASURING)
 
     /** One line for the list: the stage when it means something, the error
      *  when there is one, the plain status otherwise. */
     val line: String
         get() = when {
             status == WorkStore.STATUS_FAILED && !error.isNullOrBlank() -> error.orEmpty()
+            status == WorkStore.STATUS_CONNECTING ->
+                stage.ifBlank { "waiting for a connection - the upload will resume" }
             stage.isNotBlank() -> stage
             else -> status
         }
 }
+
+/** One part the server already holds, and its etag. Persisted, so a resumed
+ *  upload sends only what is missing - even across process death. */
+data class PartMark(val partNumber: Int, val etag: String?)
 
 object WorkStore {
     const val STATUS_WAITING = "waiting"        // known locally, not yet sent
@@ -54,6 +64,7 @@ object WorkStore {
     const val STATUS_QUEUED = "queued"          // the server holds the clip
     const val STATUS_MEASURING = "measuring"    // the server's worker is running
     const val STATUS_DONE = "done"
+    const val STATUS_CONNECTING = "connecting"  // network gone; will auto-resume
     const val STATUS_FAILED = "failed"
 
     const val MAX_WORKS = 12
@@ -85,6 +96,15 @@ object WorkStore {
                 error = o.optString("error").ifBlank { null },
                 traceId = o.optString("traceId"),
                 clipPath = o.optString("clipPath"),
+                uploadId = o.optString("uploadId"),
+                partSize = o.optLong("partSize"),
+                uploadedParts = (o.optJSONArray("uploadedParts") ?: JSONArray())
+                    .let { arr ->
+                        (0 until arr.length()).mapNotNull { j ->
+                            val q = arr.optJSONObject(j) ?: return@mapNotNull null
+                            PartMark(q.optInt("partNumber"), q.optString("etag"))
+                        }
+                    },
                 log = (0 until logJson.length()).mapNotNull { j ->
                     val e = logJson.optJSONObject(j) ?: return@mapNotNull null
                     Entry(
@@ -106,11 +126,18 @@ object WorkStore {
                 log.put(JSONObject().put("at", e.at)
                     .put("level", e.level.name).put("message", e.message))
             }
+            val parts = JSONArray()
+            w.uploadedParts.forEach { pm ->
+                parts.put(JSONObject().put("partNumber", pm.partNumber)
+                    .put("etag", pm.etag.orEmpty()))
+            }
             arr.put(JSONObject()
                 .put("id", w.id).put("createdAt", w.createdAt).put("status", w.status)
                 .put("jobId", w.jobId).put("stage", w.stage).put("exercise", w.exercise)
                 .put("error", w.error.orEmpty()).put("traceId", w.traceId)
-                .put("clipPath", w.clipPath).put("log", log))
+                .put("clipPath", w.clipPath)
+                .put("uploadId", w.uploadId).put("partSize", w.partSize)
+                .put("uploadedParts", parts).put("log", log))
         }
         file(context).writeText(arr.toString())
     }

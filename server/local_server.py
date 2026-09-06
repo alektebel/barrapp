@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import sys
 import threading
@@ -161,6 +162,11 @@ class Handler(BaseHTTPRequestHandler):
 
             return self._send(200, chat(body.get("messages") or []))
 
+        parts = [p for p in path.split("/") if p]
+        if (len(parts) == 5 and parts[0] == "v1" and parts[1] == "jobs"
+                and parts[3] == "upload"):
+            return self.do_POST_upload(parts, body, owner)
+
         if path.endswith("/submit") and path.startswith("/v1/jobs/"):
             job_id = path.split("/")[3]
             with LOCK:
@@ -173,11 +179,90 @@ class Handler(BaseHTTPRequestHandler):
 
         self._send(404, {"error": "not found"})
 
+    # ---- resumable upload, same contract as the AWS API, parts on disk ----
+    def _part_dir(self, job_id: str) -> Path:
+        d = DATA / f"{job_id}.parts"
+        d.mkdir(exist_ok=True)
+        return d
+
+    def do_POST_upload(self, parts: list[str], body: dict, owner: str) -> None:
+        job_id = parts[2]
+        action = parts[4]
+        with LOCK:
+            job = JOBS.get(job_id)
+        if not job or job.get("owner") != owner:
+            return self._send(404, {"error": "unknown job"})
+        if action == "start":
+            with LOCK:
+                upload_id = JOBS[job_id].setdefault("uploadId", uuid.uuid4().hex)
+            self._part_dir(job_id)
+            return self._send(201, {"uploadId": upload_id, "partSize": 8 * 1024 * 1024})
+        if action == "part":
+            upload_id = JOBS.get(job_id, {}).get("uploadId")
+            if not upload_id:
+                return self._send(409, {"error": "no upload in progress - start first"})
+            part_number = int((body or {}).get("partNumber") or 0)
+            return self._send(200, {
+                "url": f"/v1/jobs/{job_id}/video/part/{part_number}",
+                "partNumber": part_number,
+            })
+        if action == "complete":
+            if not JOBS.get(job_id, {}).get("uploadId"):
+                return self._send(409, {"error": "no upload in progress"})
+            dest = DATA / f"{job_id}.mp4"
+            part_dir = self._part_dir(job_id)
+            got = sorted(
+                int(p["partNumber"]) for p in (body or {}).get("parts") or [])
+            with dest.open("wb") as out:
+                for n in got:
+                    part = part_dir / f"{n:05d}"
+                    with part.open("rb") as fh:
+                        while True:
+                            chunk = fh.read(1 << 20)
+                            if not chunk:
+                                break
+                            out.write(chunk)
+            for part in part_dir.glob("*"):
+                part.unlink()
+            part_dir.rmdir()
+            with LOCK:
+                JOBS[job_id]["status"] = "uploaded"
+                JOBS[job_id].pop("uploadId", None)
+            return self._send(200, {"ok": True})
+        if action == "abort":
+            part_dir = self._part_dir(job_id)
+            for part in part_dir.glob("*"):
+                part.unlink()
+            with LOCK:
+                JOBS.get(job_id, {}).pop("uploadId", None)
+            return self._send(200, {"ok": True})
+        self._send(404, {"error": "not found"})
+
     def do_PUT(self) -> None:  # noqa: N802
         owner = self._owner()
         if not owner:
             return self._send(401, {"error": "missing X-Device-Id"})
         path = urlparse(self.path).path.rstrip("/")
+        m = re.fullmatch(r"/v1/jobs/([0-9a-f]+)/video/part/(\d+)", path)
+        if m:
+            job_id, n = m.group(1), int(m.group(2))
+            with LOCK:
+                job = JOBS.get(job_id)
+            if not job or job.get("owner") != owner:
+                return self._send(404, {"error": "unknown job"})
+            length = int(self.headers.get("Content-Length") or 0)
+            part = self._part_dir(job_id) / f"{n:05d}"
+            with part.open("wb") as fh:
+                remaining = length
+                while remaining > 0:
+                    chunk = self.rfile.read(min(1 << 20, remaining))
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    remaining -= len(chunk)
+            self._send(200, {"ok": True, "partNumber": n,
+                             "etag": f'"{n:05d}"'})
+            return
         if not (path.startswith("/v1/jobs/") and path.endswith("/video")):
             return self._send(404, {"error": "not found"})
         job_id = path.split("/")[3]

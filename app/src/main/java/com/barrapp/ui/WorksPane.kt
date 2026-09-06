@@ -96,6 +96,7 @@ private fun WorkRow(
                 when (work.status) {
                     WorkStore.STATUS_FAILED -> "failed"
                     WorkStore.STATUS_SENDING -> "sending"
+                    WorkStore.STATUS_CONNECTING -> "paused"
                     WorkStore.STATUS_QUEUED -> "queued"
                     WorkStore.STATUS_MEASURING -> "measuring"
                     WorkStore.STATUS_DONE -> "done"

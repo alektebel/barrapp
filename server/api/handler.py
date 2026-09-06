@@ -177,6 +177,79 @@ def api(event, _context):
         table.delete_item(Key={"id": job_id})
         return _resp(200, {"ok": True, "id": job_id})
 
+    # ---- resumable upload: S3 multipart, one presigned part at a time ----
+    # A phone on mobile data does not lose a 40 MB clip because a train went
+    # through a tunnel. Parts already uploaded are kept server-side; the
+    # client re-asks only for the part URLs it has not finished.
+    if method == "POST" and len(parts) == 5 and parts[0] == "v1" and parts[1] == "jobs" and parts[3] == "upload":
+        item = _item(parts[2])
+        if not _owned(item, owner):
+            return _resp(404, {"error": "unknown job"})
+        action = parts[4]
+        if action == "start":
+            if item.get("uploadId"):
+                upload_id = item["uploadId"]
+            else:
+                upload = s3.create_multipart_upload(
+                    Bucket=BUCKET, Key=f"{owner}/{parts[2]}.mp4",
+                    ContentType="video/mp4",
+                )
+                upload_id = upload["UploadId"]
+                table.update_item(
+                    Key={"id": parts[2]},
+                    UpdateExpression="SET #u = :u",
+                    ExpressionAttributeNames={"#u": "uploadId"},
+                    ExpressionAttributeValues={":u": upload_id},
+                )
+            return _resp(201, {"uploadId": upload_id, "partSize": 8 * 1024 * 1024})
+        if action == "part":
+            part_number = int((body or {}).get("partNumber") or 0)
+            if part_number < 1 or part_number > 10000:
+                return _resp(400, {"error": "bad partNumber"})
+            upload_id = item.get("uploadId")
+            if not upload_id:
+                return _resp(409, {"error": "no upload in progress - start first"})
+            url = s3.generate_presigned_url(
+                "upload_part",
+                Params={
+                    "Bucket": BUCKET, "Key": f"{owner}/{parts[2]}.mp4",
+                    "UploadId": upload_id, "PartNumber": part_number,
+                },
+                ExpiresIn=3600,
+            )
+            return _resp(200, {"url": url, "partNumber": part_number})
+        if action == "complete":
+            upload_id = item.get("uploadId")
+            if not upload_id:
+                return _resp(409, {"error": "no upload in progress"})
+            s3parts = sorted(
+                ({"ETag": p["etag"], "PartNumber": int(p["partNumber"])}
+                 for p in (body or {}).get("parts") or []),
+                key=lambda x: x["PartNumber"],
+            )
+            s3.complete_multipart_upload(
+                Bucket=BUCKET, Key=f"{owner}/{parts[2]}.mp4",
+                UploadId=upload_id, MultipartUpload={"Parts": s3parts},
+            )
+            table.update_item(
+                Key={"id": parts[2]},
+                UpdateExpression="REMOVE #u SET #s = :s",
+                ExpressionAttributeNames={"#u": "uploadId", "#s": "status"},
+                ExpressionAttributeValues={":s": "uploaded"},
+            )
+            return _resp(200, {"ok": True})
+        if action == "abort":
+            upload_id = item.get("uploadId")
+            if upload_id:
+                s3.abort_multipart_upload(
+                    Bucket=BUCKET, Key=f"{owner}/{parts[2]}.mp4", UploadId=upload_id)
+                table.update_item(
+                    Key={"id": parts[2]},
+                    UpdateExpression="REMOVE #u",
+                    ExpressionAttributeNames={"#u": "uploadId"},
+                )
+            return _resp(200, {"ok": True})
+
     if method == "POST" and len(parts) == 4 and parts[-1] == "submit":
         job_id = parts[2]
         item = _item(job_id)
