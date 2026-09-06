@@ -7,8 +7,10 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -16,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -24,6 +27,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.unit.dp
 import com.barrapp.ui.theme.Nocturne
 import com.barrapp.ui.theme.N
@@ -36,13 +41,18 @@ fun CoachScreen(
     thinking: Boolean,
     suggestions: List<String>,
     onSend: (String) -> Unit,
-    onBackToWeek: () -> Unit,
+    onBackToWeek: (() -> Unit)? = null,
 ) {
     var draft by remember { mutableStateOf("") }
-    Column(Modifier.fillMaxWidth()) {
-        androidx.compose.material3.Text("← Week", style = N.back,
-            modifier = Modifier.padding(bottom = 14.dp)
-                .then(NoRipple.noRipple(onBackToWeek)))
+    val focusRequester = remember { FocusRequester() }
+    val chatScroll = rememberScrollState()
+    Column(Modifier.fillMaxSize()) {
+        // A root tab has no back link - only a detail screen does.
+        if (onBackToWeek != null) {
+            androidx.compose.material3.Text("← Week", style = N.back,
+                modifier = Modifier.padding(bottom = 14.dp)
+                    .then(NoRipple.noRipple(onBackToWeek)))
+        }
 
         androidx.compose.material3.Text("Coach", style = N.pageTitle)
         androidx.compose.material3.Text(
@@ -51,6 +61,11 @@ fun CoachScreen(
             style = N.bodyNote, modifier = Modifier.padding(top = 6.dp),
         )
 
+        // The conversation scrolls in its own pane; the entry box below is
+        // pinned, so it is visible no matter how long the chat gets.
+        Column(
+            Modifier.weight(1f).fillMaxWidth().verticalScroll(chatScroll),
+        ) {
         androidx.compose.material3.Text("TRY", style = N.eyebrowMuted,
             modifier = Modifier.padding(top = 20.dp, bottom = 9.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
@@ -112,16 +127,23 @@ fun CoachScreen(
             }
         }
 
+        } // end of the scrollable conversation
+
+        // Pinned entry row: always visible, above the keyboard.
         Row(
-            Modifier.fillMaxWidth().padding(top = 18.dp),
+            Modifier.fillMaxWidth().padding(top = 8.dp).imePadding(),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // The whole bordered area is the tap target. Tapping anywhere in it
+            // focuses the field, not just the tiny intrinsic-width text field.
             Box(
                 Modifier.weight(1f)
-                    .heightIn(min = 36.dp)
+                    .heightIn(min = 44.dp)
                     .background(Nocturne.surface, RoundedCornerShape(8.dp))
                     .border(1.dp, Nocturne.fgA(0.16f), RoundedCornerShape(8.dp))
-                    .padding(horizontal = 11.dp, vertical = 9.dp),
+                    .padding(horizontal = 11.dp, vertical = 8.dp)
+                    .focusRequester(focusRequester)
+                    .then(NoRipple.noRipple { focusRequester.requestFocus() }),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 BasicTextField(
@@ -129,6 +151,7 @@ fun CoachScreen(
                     onValueChange = { draft = it },
                     textStyle = N.captionPlain,
                     cursorBrush = SolidColor(Nocturne.accent),
+                    modifier = Modifier.fillMaxWidth(),
                     decorationBox = { inner ->
                         if (draft.isEmpty()) {
                             androidx.compose.material3.Text("Ask about your training",

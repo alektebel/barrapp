@@ -138,6 +138,7 @@ fun WorkLogScreen(
     onBack: () -> Unit,
     onRetry: (String) -> Unit,
     onDismiss: (String) -> Unit,
+    onDismissAll: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
@@ -153,6 +154,8 @@ fun WorkLogScreen(
                 TextButton(onClick = onBack) { Text("Back") }
                 Spacer(Modifier.size(6.dp))
                 Text("Work log", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.weight(1f))
+                TextButton(onClick = onDismissAll) { Text("Dismiss all failed") }
             }
         }
         if (work == null) {

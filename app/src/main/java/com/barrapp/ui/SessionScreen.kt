@@ -89,8 +89,12 @@ fun SessionScreen(
                 .border(1.dp, Nocturne.hairline, RoundedCornerShape(8.dp))
                 .padding(14.dp),
         ) {
+            val n = minOf(cues.size, 2)
             androidx.compose.material3.Text(
-                "TWO THINGS TO CARRY INTO THE NEXT SET", style = N.eyebrowAccent)
+                // Don't promise "TWO THINGS" above a one-item list.
+                if (n > 1) "TWO THINGS TO CARRY INTO THE NEXT SET"
+                else "WHAT TO CARRY INTO THE NEXT SET",
+                style = N.eyebrowAccent)
             cues.take(2).forEachIndexed { i, cue ->
                 Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 12.dp else 10.dp)) {
                     androidx.compose.material3.Text(
@@ -108,7 +112,8 @@ fun SessionScreen(
             val shape = RoundedCornerShape(8.dp)
             Box(
                 Modifier.weight(1f)
-                    .border(1.dp, Nocturne.accent, shape)
+                    .border(1.dp, if (onWatchReplay != null) Nocturne.accent
+                        else Nocturne.fgA(0.16f), shape)
                     .padding(vertical = 10.dp)
                     .then(
                         if (onWatchReplay != null) NoRipple.noRipple(onWatchReplay)
@@ -116,8 +121,13 @@ fun SessionScreen(
                     ),
                 contentAlignment = Alignment.Center,
             ) {
-                androidx.compose.material3.Text("Watch the replay", style = N.button
-                    .copy(color = Nocturne.accentText))
+                androidx.compose.material3.Text(
+                    if (onWatchReplay != null) "Watch the replay"
+                    else "Replay not kept on device",
+                    style = N.button.copy(
+                        color = if (onWatchReplay != null) Nocturne.accentText
+                        else Nocturne.fgA(0.4f)),
+                )
             }
             Box(
                 Modifier.weight(1f)

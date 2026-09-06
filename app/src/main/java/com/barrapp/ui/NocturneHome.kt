@@ -5,7 +5,11 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -14,7 +18,9 @@ import com.barrapp.BarrappViewModel
 import com.barrapp.Pane
 import com.barrapp.data.WorkStore
 import com.barrapp.Progression
+import androidx.compose.ui.unit.dp
 import com.barrapp.ui.theme.Nocturne
+import com.barrapp.ui.theme.N
 import com.barrapp.ui.parts.bandColor
 import com.barrapp.improvementCues
 import java.util.Calendar
@@ -29,6 +35,7 @@ import java.util.Locale
 fun NocturneHome(vm: BarrappViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     val nstate = remember { NocturneState() }
+    val monthOffset = remember { mutableStateOf(0) }
 
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -104,14 +111,22 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
             )
         },
         calendar = {
-            val cal = Calendar.getInstance()
+            // monthOffset lets the ‹ › arrows walk the calendar; it starts at
+            // the current month. Only the current month marks a "today" cell.
+            val cal = Calendar.getInstance().apply {
+                add(Calendar.MONTH, monthOffset.value)
+            }
             val month = cal.getDisplayName(
                 Calendar.MONTH, Calendar.LONG, Locale.UK) ?: "August"
             val year = "${cal.get(Calendar.YEAR)}"
             val byDate = state.days.associateBy { it.date }
             val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
-            val today = cal.get(Calendar.DAY_OF_MONTH)
-            val firstDow = (cal.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Monday first
+            val today = if (monthOffset.value == 0) cal.get(Calendar.DAY_OF_MONTH) else -1
+            // The leading blanks belong to the FIRST day of the displayed month.
+            val firstOfMonth = (cal.clone() as Calendar).apply {
+                set(Calendar.DAY_OF_MONTH, 1)
+            }
+            val firstDow = (firstOfMonth.get(Calendar.DAY_OF_WEEK) + 5) % 7 // Monday first
             val cells = (1..daysInMonth).map { d ->
                 val key = "%04d-%02d-%02d".format(
                     cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, d)
@@ -148,6 +163,8 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                 summaryMeasured = "$measured measured days",
                 summaryReps = "$totalReps reps in $month",
                 rows = rows,
+                onPrevMonth = { monthOffset.value-- },
+                onNextMonth = { monthOffset.value++ },
                 onOpenDay = { n ->
                     val key = "%04d-%02d-%02d".format(
                         cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, n)
@@ -196,7 +213,9 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                             lines = listOf(
                                 LadderLine("The standard", v.standard),
                                 LadderLine("Your evidence", v.evidence),
-                                LadderLine("", "Still needed: " + v.missing, accent = true),
+                                // v.missing already begins with "Still needed: " -
+                                // prepending it again produced "Still needed: Still needed:".
+                                LadderLine("", v.missing, accent = true),
                             ),
                             dot = LadderDot.CURRENT, big = true,
                             borderColor = Nocturne.accentDeep))
@@ -217,11 +236,21 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                     "strong" -> "Strong set." to "Keep the standard."
                     "shaky" -> "Shaky set." to "The basics slipped."
                     "broken" -> "Broken down." to "Start smaller."
+                    "unmeasured" -> "Not measured." to "Barra couldn't score this set."
                     else -> "Solid set." to "Fix the stall."
                 }
                 val bandC = bandColor(band)
+                // Humanise the header: "5 Sept · Muscle-up", never the raw enum
+                // and ISO date ("2026-09-05 · PUSH_UP").
+                val exLabel = (a.exercise ?: "set")
+                    .replace("_", " ")
+                    .lowercase()
+                    .split(" ")
+                    .joinToString(" ") { it.replaceFirstChar(Char::uppercase) }
+                val dateLabel = a.sessionDate?.takeIf { it.isNotBlank() }
+                    ?.let { formatShortDate(it) } ?: "today"
                 SessionScreen(
-                    eyebrow = "${a.sessionDate ?: "today"} · ${a.exercise ?: "set"}",
+                    eyebrow = "$dateLabel · $exLabel",
                     verdict = "$l1\n$l2",
                     subtitle = "${a.repCount ?: 0} reps over a " +
                         "%.0f-second working set.".format(
@@ -234,7 +263,7 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                     cues = improvementCues(a).ifEmpty {
                         listOf("Nothing flagged — the set measured clean.")
                     },
-                    onWatchReplay = { vm.openReplay() },
+                    onWatchReplay = state.current?.let { { vm.openReplay() } },
                     reps = a.reps.map { rep ->
                         RepCardData(
                             title = rep.label.replace("_", " ")
@@ -269,46 +298,17 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                     onToggleReps = nstate::toggleReps,
                 )
             } else {
-                SessionScreen(
-                    eyebrow = "Thu 14 Aug · muscle-up",
-                    verdict = "Solid set.\nFix the stall.",
-                    subtitle = "2 reps over a 13-second working set. Under the 3-rep " +
-                        "floor, so treat it as one observation, not a session.",
-                    score = 78, scoreBand = "solid", bandColor = Nocturne.solid,
-                    cues = listOf(
-                        "Smoothness, 67% — 31% of the ascent made no upward progress. " +
-                            "Drive through the sticking point instead of resetting.",
-                        "Film 3+ reps. Below that nothing here can be compared to anything.",
-                    ),
-                    onWatchReplay = null,
-                    reps = listOf(
-                        RepCardData(
-                            title = "Rep 1", chip = "solid", chipColor = Nocturne.solid,
-                            score = "78", scoreColor = Nocturne.solid, measured = true,
-                            times = "4.2s – 10.1s",
-                            trace = listOf(0.02f, 0.08f, 0.22f, 0.4f, 0.58f, 0.62f, 0.65f,
-                                0.85f, 0.95f, 0.92f, 0.35f),
-                            components = listOf(
-                                RepComponent("Range", 40, 86),
-                                RepComponent("Control", 25, 87),
-                                RepComponent("Smoothness", 35, 67),
-                            ),
-                            asides = listOf("Swing" to "0.14 torso",
-                                "Asymmetry" to "0.06 torso"),
-                        ),
-                        RepCardData(
-                            title = "Rep 3", chip = "unmeasured",
-                            chipColor = Nocturne.muted, score = null, scoreColor = null,
-                            measured = false,
-                            note = "Wrists left the frame at the turnaround. Not a bad " +
-                                "rep — an unmeasured one, and it counts neither way.",
-                        ),
-                    ),
-                    runLine = "run 260828-221455-4f8a59 · build 1.2.0 · mediapipe-heavy",
-                    onBackToWeek = nstate::goWeek,
-                    repsOpen = nstate.repsOpen,
-                    onToggleReps = nstate::toggleReps,
-                )
+                // No measured session is selected. Show an honest empty state
+                // rather than a hardcoded example - the example is what made
+                // every session entry point appear to open the same stale
+                // "14 Aug muscle-up" record (see feedback B1).
+                Column(Modifier.fillMaxWidth()) {
+                    androidx.compose.material3.Text("No session", style = N.pageTitle)
+                    androidx.compose.material3.Text(
+                        "Pick a measured day from the calendar, or film a set.",
+                        style = N.bodyNote, modifier = Modifier.padding(top = 6.dp),
+                    )
+                }
             }
         },
         upload = {
@@ -343,7 +343,8 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                 thinking = state.coachThinking,
                 suggestions = vm.suggestions().take(3),
                 onSend = vm::ask,
-                onBackToWeek = nstate::goWeek,
+                // Coach is a root tab, not a detail - no back link.
+                onBackToWeek = null,
             )
         },
     )

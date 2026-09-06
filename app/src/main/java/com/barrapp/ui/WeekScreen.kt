@@ -195,10 +195,15 @@ data class WeekBar(
 
 @Composable
 private fun WeekBarView(bar: WeekBar, modifier: Modifier) {
+    // The bar lives in a 92dp column with the day label below it. A bar drawn
+    // to the full 92dp, plus the 6dp spacer and the label, overflowed the
+    // column and drew over the label - so the tallest bar is capped to leave
+    // room for the letter underneath.
+    val maxBar = 72.dp
     val height = when {
         bar.fillFraction == null -> 4.dp
-        bar.dashed -> (92.dp * bar.fillFraction)
-        else -> (92.dp * bar.fillFraction).coerceAtLeast(4.dp)
+        bar.dashed -> (maxBar * bar.fillFraction)
+        else -> (maxBar * bar.fillFraction).coerceAtLeast(4.dp)
     }
     Box(modifier.height(height)) {
         if (bar.dashed) {

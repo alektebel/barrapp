@@ -364,7 +364,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     private suspend fun <T> withRetry(
         what: String,
         workId: String,
-        attempts: Int = 3,
+        attempts: Int = 5,
         block: suspend () -> T,
     ): T {
         var last: Exception? = null
@@ -376,6 +376,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
                     err.message?.contains("Failed to connect", ignoreCase = true) == true ||
                     err.message?.contains("timeout", ignoreCase = true) == true ||
+                    err.message?.contains("unknown job", ignoreCase = true) == true ||
+                    err.message?.contains("500", ignoreCase = true) == true ||
+                    err.message?.contains("502", ignoreCase = true) == true ||
+                    err.message?.contains("503", ignoreCase = true) == true ||
                     err is java.io.IOException
                 WorkStore.append(getApplication(), workId, WorkStore.Level.WARN,
                     "$what failed (attempt ${i + 1} of $attempts): ${err.message.orEmpty()}")
@@ -493,6 +497,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 raw.contains("resolve host", ignoreCase = true) ||
                     raw.contains("Failed to connect", ignoreCase = true) ->
                     "No internet connection. The clip is kept - press Retry when you are back online."
+                raw.contains("unknown job", ignoreCase = true) ->
+                    "That clip's job was lost on the server. Retry - it sends as a fresh job."
+                raw.contains("timed out", ignoreCase = true) ||
+                    raw.contains("timeout", ignoreCase = true) ->
+                    "The server took too long to answer. Retry - the clip is kept."
                 else -> raw
             }
             log(WorkStore.Level.ERROR, message)
@@ -630,9 +639,18 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         }
                     }
                 }, onFailure = { err ->
+                    val msg = err.message.orEmpty()
+                    // A job the server no longer knows about (reaped as stale,
+                    // or created under a different device) will never come back
+                    // by polling. Say so plainly and let Retry re-send it fresh.
+                    if (msg.contains("unknown job", ignoreCase = true)) {
+                        log(WorkStore.Level.WARN, "the job was lost on the server")
+                        fail("That clip's job was lost on the server. Retry to re-send it.")
+                        return
+                    }
                     contactLost++
                     log(WorkStore.Level.WARN,
-                        "lost contact with the server (${contactLost}) — ${err.message.orEmpty()}")
+                        "lost contact with the server (${contactLost}) — $msg")
                     if (contactLost >= 5) {
                         fail("Lost contact with the server while measuring.")
                         return
@@ -670,6 +688,13 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     }
 
     /** A failed work leaves the list, and its clip goes with it. */
+    fun dismissAllFailed() {
+        val app = getApplication<Application>()
+        WorkStore.all(app).filter { it.status == WorkStore.STATUS_FAILED }.forEach {
+            dismissWork(it.id)
+        }
+    }
+
     fun dismissWork(workId: String) {
         val app = getApplication<Application>()
         val work = WorkStore.get(app, workId) ?: return
@@ -769,17 +794,24 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
     fun ask(question: String) {
         val app = getApplication<Application>()
-        val turn = ChatTurn(fromUser = true, text = question)
-        SessionStore.appendChat(app, turn)
+        SessionStore.appendChat(app, ChatTurn(fromUser = true, text = question))
         _state.update { it.copy(chat = SessionStore.chat(app), coachThinking = true) }
         viewModelScope.launch {
-            val snapshot = _state.value
-            val answer = withContext(Dispatchers.Default) {
-                Coach.answer(question, snapshot.days, snapshot.profile)
+            try {
+                val snapshot = _state.value
+                val answer = withContext(Dispatchers.Default) {
+                    Coach.answer(question, snapshot.days, snapshot.profile)
+                }
+                delay(250)
+                SessionStore.appendChat(app, ChatTurn(fromUser = false, text = answer))
+            } catch (t: Throwable) {
+                // A crash must never leave the chat stuck thinking with no
+                // answer - say the coach fell over, and let the user retry.
+                SessionStore.appendChat(app, ChatTurn(fromUser = false,
+                    text = "I could not answer that just now. Ask again, or rephrase it."))
+            } finally {
+                _state.update { it.copy(chat = SessionStore.chat(app), coachThinking = false) }
             }
-            delay(250)
-            SessionStore.appendChat(app, ChatTurn(fromUser = false, text = answer))
-            _state.update { it.copy(chat = SessionStore.chat(app), coachThinking = false) }
         }
     }
 

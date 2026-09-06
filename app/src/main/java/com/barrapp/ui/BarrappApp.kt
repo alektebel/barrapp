@@ -130,6 +130,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::closeWorkLog,
                 onRetry = { vm.retryWork(it); vm.closeWorkLog() },
                 onDismiss = { vm.dismissWork(it); vm.closeWorkLog() },
+                onDismissAll = { vm.dismissAllFailed(); vm.closeWorkLog() },
             )
 
             Screen.Diagnostics -> DiagnosticsScreen(

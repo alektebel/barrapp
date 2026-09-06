@@ -38,6 +38,8 @@ fun CalendarScreen(
     summaryReps: String,
     rows: List<CalRow>,
     onOpenDay: (Int) -> Unit,
+    onPrevMonth: () -> Unit = {},
+    onNextMonth: () -> Unit = {},
 ) {
     Column(Modifier.fillMaxWidth()) {
         Row(verticalAlignment = Alignment.Bottom) {
@@ -45,9 +47,9 @@ fun CalendarScreen(
             Spacer(Modifier.width(10.dp))
             androidx.compose.material3.Text(year, style = N.pageTitleMuted)
             Spacer(Modifier.weight(1f))
-            MonthArrow("‹")
+            MonthArrow("‹", onPrevMonth)
             Spacer(Modifier.width(6.dp))
-            MonthArrow("›")
+            MonthArrow("›", onNextMonth)
         }
         androidx.compose.material3.Text(
             "A filled day is a measured day, painted the colour of its technique. " +
@@ -71,22 +73,33 @@ fun CalendarScreen(
         // the calendar into a strip of unreadable squares. The blanks belong to
         // the first week only - they are the days of the previous month.
         val blanks = days.firstOrNull()?.leadingBlanks ?: 0
-        val firstWeek = minOf(7 - blanks, days.size)
+        // A month is 28-31 cells; lay them one week per Row. A single row with
+        // weight(1f) shrank every cell to a fifth of its share and turned the
+        // calendar into a strip of unreadable squares. The blanks belong to the
+        // first week only.
+        // Every row is exactly 7 slots (day cells or empty spacers), so a
+        // trailing partial week keeps the SAME column pitch as the full rows.
+        // Filling the remainder with spacers is what stops 28/29/30 from being
+        // drawn much wider than the rest of the month.
         var cursor = 0
         while (cursor < days.size) {
-            val inWeek = if (cursor == 0) firstWeek else minOf(7, days.size - cursor)
+            val leading = if (cursor == 0) blanks else 0
+            val cells = minOf(7 - leading, days.size - cursor)
+            if (cells <= 0) break
+            val trailing = 7 - leading - cells
             Row(Modifier.fillMaxWidth().padding(top = 5.dp),
                 horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-                if (cursor == 0) {
-                    repeat(blanks) {
-                        Spacer(Modifier.weight(1f).aspectRatio(1f))
-                    }
+                repeat(leading) {
+                    Spacer(Modifier.weight(1f).aspectRatio(1f))
                 }
-                repeat(inWeek) {
+                repeat(cells) {
                     DayCell(days[cursor + it], Modifier.weight(1f), onOpenDay)
                 }
+                repeat(trailing) {
+                    Spacer(Modifier.weight(1f).aspectRatio(1f))
+                }
             }
-            cursor += inWeek
+            cursor += cells
         }
 
         NocturneDivider(Modifier.padding(vertical = 20.dp))
@@ -122,10 +135,11 @@ fun CalendarScreen(
 }
 
 @Composable
-private fun MonthArrow(glyph: String) {
+private fun MonthArrow(glyph: String, onClick: () -> Unit) {
     Box(
         Modifier.size(26.dp)
-            .border0(1.dp, Nocturne.fgA(0.16f), RoundedCornerShape(8.dp)),
+            .border0(1.dp, Nocturne.fgA(0.16f), RoundedCornerShape(8.dp))
+            .then(NoRipple.noRipple(onClick)),
         contentAlignment = Alignment.Center,
     ) {
         androidx.compose.material3.Text(glyph, style = N.monthCell

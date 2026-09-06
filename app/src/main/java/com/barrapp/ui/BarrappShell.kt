@@ -101,36 +101,74 @@ fun BarrappShell(
             Modifier.fillMaxWidth().padding(start = 17.dp, top = 14.dp, end = 17.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Canvas(Modifier.size(32.dp)) { logoMark() }
+            // The app's own launcher icon, not the prototype's drawn mark.
+            androidx.compose.foundation.Image(
+                painter = androidx.compose.ui.res.painterResource(
+                    com.barrapp.R.drawable.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(32.dp).background(
+                    androidx.compose.ui.graphics.Color(0xFF102421),
+                    RoundedCornerShape(9.dp)),
+            )
             Spacer(Modifier.width(10.dp))
             Column(Modifier.weight(1f)) {
                 androidx.compose.material3.Text("barrapp", style = N.logo)
                 androidx.compose.material3.Text(subtitle, style = N.subtitle)
             }
+            // A chat bubble, not "?": this is the Coach shortcut, and a "?"
+            // reads as a help affordance that then silently opens a chat.
             Box(
                 Modifier.size(30.dp)
                     .border(1.dp, Nocturne.fgA(0.16f), RoundedCornerShape(8.dp))
                     .then(noRipple(state::goCoach)),
                 contentAlignment = Alignment.Center,
             ) {
-                androidx.compose.material3.Text("?", style = N.headerButton)
+                Canvas(Modifier.size(16.dp)) {
+                    val s = size.width / 16f
+                    val p = Path().apply {
+                        moveTo(2f * s, 3f * s)
+                        lineTo(14f * s, 3f * s)
+                        arcTo(androidx.compose.ui.geometry.Rect(10f * s, 2f * s, 15f * s, 7f * s), 0f, 180f, false)
+                        lineTo(2f * s, 7f * s)
+                        arcTo(androidx.compose.ui.geometry.Rect(1f * s, 2f * s, 6f * s, 7f * s), 180f, 180f, false)
+                        close()
+                    }
+                    drawPath(p, Nocturne.fgA(0.6f), style = Stroke(1.5f * s,
+                        cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
+                    drawLine(Nocturne.fgA(0.6f), Offset(4f * s, 8f * s), Offset(2.5f * s, 11f * s), 1.4f * s)
+                    drawLine(Nocturne.fgA(0.6f), Offset(2.5f * s, 11f * s), Offset(7f * s, 8f * s), 1.4f * s)
+                }
             }
         }
 
         // ---- scroll area: the active screen renders here ----
+        // The coach renders OUTSIDE the page scroll and manages its own, so its
+        // entry box stays pinned while the conversation scrolls past. A screen
+        // inside a page scroll would carry the input away with the content.
         Box(Modifier.weight(1f)) {
-            Column(
-                Modifier.fillMaxSize()
-                    .verticalScroll(rememberScrollState())
-                    .padding(start = 17.dp, top = 6.dp, end = 17.dp, bottom = 96.dp),
-            ) {
-                when (state.effective) {
-                    NScreen.WEEK -> week()
-                    NScreen.CALENDAR -> calendar()
-                    NScreen.TREE -> tree()
-                    NScreen.SESSION -> session()
-                    NScreen.UPLOAD -> upload()
-                    NScreen.COACH -> coach()
+            if (state.effective == NScreen.COACH) {
+                // A small bottom pad only: the pinned entry box should sit
+                // next to the nav bar, not a page-scroll's 96dp above it.
+                Box(
+                    Modifier.fillMaxSize()
+                        .padding(start = 17.dp, top = 6.dp, end = 17.dp, bottom = 8.dp),
+                ) {
+                    coach()
+                }
+            } else {
+                Column(
+                    Modifier.fillMaxSize()
+                        .verticalScroll(rememberScrollState())
+                        .padding(start = 17.dp, top = 6.dp, end = 17.dp, bottom = 96.dp),
+                ) {
+                    when (state.effective) {
+                        NScreen.WEEK -> week()
+                        NScreen.CALENDAR -> calendar()
+                        NScreen.TREE -> tree()
+                        NScreen.SESSION -> session()
+                        NScreen.UPLOAD -> upload()
+                        NScreen.COACH -> {}
+                    }
                 }
             }
         }
