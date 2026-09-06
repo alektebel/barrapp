@@ -17,6 +17,13 @@ Parameters:
     Type: String
     Default: ""
     Description: Base URL of the OpenAI-compatible nan.builder endpoint (root that serves /chat/completions).
+  WorkerImageUri:
+    Type: String
+    Description: >-
+      ECR image for the worker, built and pushed by deploy.sh. Built outside
+      SAM on purpose: Docker 29 with the containerd snapshotter pushes an OCI
+      index that Lambda refuses, so deploy.sh builds with --provenance=false
+      and checks the media type before the stack is touched.
 
 Globals:
   Function:
@@ -34,6 +41,8 @@ Globals:
         NAN_MODEL: qwen3.8-flash
         BARRA_ROOT: /opt/barra
         TRACES_TABLE: !Ref TracesTable
+        USER_POOL_ID: !Ref UserPool
+        USER_POOL_CLIENT_ID: !Ref UserPoolClient
 
 Resources:
   VideoBucket:
@@ -137,6 +146,20 @@ Resources:
             - Effect: Allow
               Action: lambda:InvokeFunction
               Resource: !GetAtt WorkerFunction.Arn
+        # The exact set auth.py calls. These are token-authorized operations,
+        # but boto3 signs every request with the role's credentials, so IAM is
+        # evaluated too and a missing action fails as AccessDenied.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - cognito-idp:SignUp
+                - cognito-idp:ConfirmSignUp
+                - cognito-idp:ResendConfirmationCode
+                - cognito-idp:InitiateAuth
+                - cognito-idp:GetUser
+                - cognito-idp:ForgotPassword
+                - cognito-idp:ConfirmForgotPassword
+              Resource: !GetAtt UserPool.Arn
       Events:
         Proxy:
           Type: HttpApi
@@ -155,6 +178,7 @@ Resources:
     Type: AWS::Serverless::Function
     Properties:
       PackageType: Image
+      ImageUri: !Ref WorkerImageUri
       Timeout: 600
       MemorySize: 3008
       EphemeralStorage:
@@ -170,12 +194,79 @@ Resources:
             TableName: !Ref TracesTable
         - S3ReadPolicy:
             BucketName: !Ref VideoBucket
-    Metadata:
-      DockerTag: worker
-      DockerContext: .
-      Dockerfile: Dockerfile
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !GetAtt WorkerDLQ.Arn
+
+  # Accounts. Cognito holds the credentials; the API proxies to it so the
+  # phone never carries the AWS SDK and the client id stays server-side.
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireUppercase: false
+          RequireSymbols: false
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      # No client secret: the API calls Cognito with no credential of its own
+      # beyond its IAM role, and USER_PASSWORD_AUTH is what lets it exchange an
+      # email and password for tokens on the phone's behalf.
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 1
+      IdTokenValidity: 1
+      RefreshTokenValidity: 365
+      TokenValidityUnits:
+        AccessToken: hours
+        IdToken: hours
+        RefreshToken: days
+
+  WorkerDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      MessageRetentionPeriod: 1209600  # 14 days
+
+  WorkerAsyncConfig:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref WorkerFunction
+      Qualifier: $LATEST
+      MaximumRetryAttempts: 2
+      MaximumEventAgeInSeconds: 3600
+      DestinationConfig:
+        OnFailure:
+          Destination: !GetAtt WorkerDLQ.Arn
 
 Outputs:
+  UserPoolId:
+    Description: Cognito user pool holding the accounts.
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Description: App client the API uses to sign users in.
+    Value: !Ref UserPoolClient
   ApiUrl:
     Description: Paste this into gradle.properties as barrapp.apiUrlRelease
     Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com"

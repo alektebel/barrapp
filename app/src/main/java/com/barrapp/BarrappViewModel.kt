@@ -8,6 +8,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.barrapp.data.ActivityLevel
 import com.barrapp.data.Analysis
+import com.barrapp.data.AuthStore
 import com.barrapp.data.BarraApi
 import com.barrapp.data.ChatTurn
 import com.barrapp.data.DayEntry
@@ -32,7 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Privacy, Onboarding, Home, Coach, Diagnostics, Objectives, Replay, Plan, WorkLog }
+enum class Screen { Privacy, Onboarding, Auth, Home, Coach, Diagnostics, Objectives, Replay, Plan, WorkLog }
 
 /** Which pane the compact layout is showing. Wide layouts show all three. */
 enum class Pane { Calendar, Session, Progress }
@@ -58,6 +59,12 @@ data class UiState(
     val goals: Goals? = null,
     val weeklyNote: String? = null,
     val events: List<EventLog.Event> = emptyList(),
+    /** The account screen's own little flow, and what it is doing. */
+    val authStep: com.barrapp.ui.AuthStep = com.barrapp.ui.AuthStep.SignIn,
+    val authBusy: Boolean = false,
+    val authError: String? = null,
+    val authNotice: String? = null,
+    val signedInAs: String = "",
 )
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
@@ -131,6 +138,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 chat = SessionStore.chat(app),
                 works = WorkStore.all(app),
                 weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
+                signedInAs = AuthStore.email(app),
             )
         }
         viewModelScope.launch { consumeQueue() }
@@ -226,6 +234,96 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         refresh()
     }
 
+    // ---- accounts ---------------------------------------------------------
+
+    fun openAuth(step: com.barrapp.ui.AuthStep = com.barrapp.ui.AuthStep.SignIn) =
+        _state.update {
+            it.copy(screen = Screen.Auth, authStep = step, authError = null,
+                authNotice = null)
+        }
+
+    fun setAuthStep(step: com.barrapp.ui.AuthStep) =
+        _state.update { it.copy(authStep = step, authError = null, authNotice = null) }
+
+    /** One shape for every account call: busy while it runs, the server's own
+     *  sentence when it fails. The API's error messages are already written
+     *  for a person, so they are shown rather than replaced. */
+    private fun authAction(onOk: suspend (Application) -> Unit) {
+        val app = getApplication<Application>()
+        _state.update { it.copy(authBusy = true, authError = null, authNotice = null) }
+        viewModelScope.launch {
+            runCatching { withContext(Dispatchers.IO) { onOk(app) } }
+                .onFailure { err ->
+                    _state.update {
+                        it.copy(authBusy = false,
+                            authError = err.message ?: "That did not work. Try again.")
+                    }
+                }
+                .onSuccess { _state.update { it.copy(authBusy = false) } }
+        }
+    }
+
+    fun signUp(email: String, password: String) = authAction { app ->
+        api.signUp(email, password)
+        _state.update {
+            it.copy(authStep = com.barrapp.ui.AuthStep.Confirm,
+                authNotice = "Account created. Enter the code we emailed you.")
+        }
+    }
+
+    fun confirmAccount(email: String, code: String) = authAction { app ->
+        api.confirm(email, code)
+        _state.update {
+            it.copy(authStep = com.barrapp.ui.AuthStep.SignIn,
+                authNotice = "Confirmed. Sign in to finish.")
+        }
+    }
+
+    fun resendCode(email: String) = authAction { _ ->
+        api.resendCode(email)
+        _state.update { it.copy(authNotice = "Sent. Check your email again.") }
+    }
+
+    fun forgotPassword(email: String) = authAction { _ ->
+        api.forgotPassword(email)
+        _state.update {
+            it.copy(authStep = com.barrapp.ui.AuthStep.Reset,
+                authNotice = "We emailed you a code.")
+        }
+    }
+
+    fun resetPassword(email: String, code: String, password: String) = authAction { _ ->
+        api.resetPassword(email, code, password)
+        _state.update {
+            it.copy(authStep = com.barrapp.ui.AuthStep.SignIn,
+                authNotice = "Password changed. Sign in with it.")
+        }
+    }
+
+    fun signIn(email: String, password: String) = authAction { app ->
+        api.signIn(email, password)
+        // The sessions measured before signing in belong to this person, not
+        // to a device id they will never type again - move them across, once.
+        val device = api.deviceId()
+        if (!AuthStore.alreadyClaimed(app, device)) {
+            runCatching { api.claimDevice() }
+                .onSuccess { AuthStore.markClaimed(app, device) }
+        }
+        _state.update { it.copy(screen = Screen.Home, signedInAs = AuthStore.email(app)) }
+        refresh()
+    }
+
+    fun signOut() {
+        val app = getApplication<Application>()
+        AuthStore.clear(app)
+        SessionStore.forgetAll(app)
+        _state.update {
+            it.copy(screen = Screen.Home, signedInAs = "", days = emptyList(),
+                analysis = null, current = null, selectedDate = null)
+        }
+        refresh()
+    }
+
     fun openPrivacy() = _state.update { it.copy(screen = Screen.Privacy) }
     fun openOnboarding() = _state.update { it.copy(screen = Screen.Onboarding) }
 
@@ -289,7 +387,15 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     // Fold anything finished on the server into the local
                     // calendar, so a job that completed while the app was shut
                     // shows up without the user having to open it.
-                    jobs.filter { it.status == "done" && it.result != null }
+                    //
+                    // Only jobs the calendar has never seen. record() ADDS to
+                    // its day - reps, verified count, score sum - so replaying
+                    // a job already folded in counts it twice. This ran on
+                    // every refresh, which is every app open and every finished
+                    // upload, and it is why the week read 1875 reps against a
+                    // server that had measured 74.
+                    val known = SessionStore.knownJobIds(app)
+                    jobs.filter { it.status == "done" && it.result != null && it.id !in known }
                         .forEach { SessionStore.record(app, it.id, it.result!!) }
                     _state.update {
                         it.copy(
@@ -410,9 +516,15 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
      *
      * Every finished part is persisted with its etag the moment the server
      * acknowledges it, so a tunnel, a lift, or the app being killed costs one
-     * part - never the clip. */
+     * part - never the clip.
+     *
+     * Two ids, and they are not interchangeable: [workId] names the row in
+     * the local queue, [jobId] is what the server calls this clip. Every
+     * upload endpoint is addressed by the job id - passing the local one
+     * gets "unknown job" back on the very first part. */
     private suspend fun uploadResumable(
         workId: String,
+        jobId: String,
         clip: java.io.File,
         onProgress: (Int, Int) -> Unit,
     ) {
@@ -425,7 +537,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
         if (uploadId.isBlank() || partSize <= 0L) {
             val (id, ps) = withRetry("starting the upload", workId) {
-                withContext(Dispatchers.IO) { api.startUpload(workId) }
+                withContext(Dispatchers.IO) { api.startUpload(jobId) }
             }
             uploadId = id
             partSize = ps
@@ -437,7 +549,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         for (n in 1..total) {
             if (done.containsKey(n)) continue
             val url = withRetry("sending part $n of $total", workId) {
-                withContext(Dispatchers.IO) { api.presignPart(workId, uploadId, n) }
+                withContext(Dispatchers.IO) { api.presignPart(jobId, uploadId, n) }
             }
             val offset = (n - 1L) * partSize
             val length = minOf(partSize, clip.length() - offset)
@@ -470,7 +582,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
         withRetry("finishing the upload", workId) {
             withContext(Dispatchers.IO) {
-                api.completeUpload(workId,
+                api.completeUpload(jobId,
                     done.map { BarraApi.PartSlot(it.key, it.value) })
             }
         }
@@ -528,17 +640,23 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 fail("The clip is no longer on the phone.")
                 return
             }
-            val created = withRetry("creating the job", work.id) {
+            // A work that stopped mid-upload keeps its job: the parts already
+            // on the server belong to that job's multipart session, and a new
+            // job would strand them under a key nothing points at. Only a
+            // work with nothing in flight asks for a fresh job.
+            val resuming = work.jobId.isNotBlank() && work.uploadId.isNotBlank()
+            val jobId = if (resuming) work.jobId else withRetry("creating the job", work.id) {
                 withContext(Dispatchers.IO) { api.createJob("auto") }
-            }
-            val jobId = created.job.id
+            }.job.id
             update { it.copy(jobId = jobId, status = WorkStore.STATUS_SENDING,
                 stage = "sending the clip") }
-            log(WorkStore.Level.INFO, "job $jobId created — sending the clip " +
-                "(%.1f MB)".format(clip.length() / 1e6))
+            log(WorkStore.Level.INFO,
+                if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
+                else "job $jobId created — sending the clip " +
+                    "(%.1f MB)".format(clip.length() / 1e6))
             ProcessingNotifier.stage(app, "Sending the clip")
             try {
-                uploadResumable(work.id, clip) { sent, total ->
+                uploadResumable(work.id, jobId, clip) { sent, total ->
                     update {
                         it.copy(status = WorkStore.STATUS_SENDING,
                             stage = "sending the clip ($sent/$total parts)")
@@ -678,8 +796,15 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         viewModelScope.launch {
+            // Fresh job means fresh upload: drop the half-finished multipart
+            // session too, or the next run would resume into a job the server
+            // has already given up on.
+            if (work.uploadId.isNotBlank() && work.jobId.isNotBlank()) {
+                runCatching { withContext(Dispatchers.IO) { api.abortUpload(work.jobId) } }
+            }
             WorkStore.put(app, work.copy(status = WorkStore.STATUS_WAITING, error = null,
                 stage = "waiting to be sent", traceId = "",
+                jobId = "", uploadId = "", partSize = 0, uploadedParts = emptyList(),
                 log = work.log + WorkStore.Entry(System.currentTimeMillis(),
                     WorkStore.Level.INFO, "retry requested")))
             publishWorks()

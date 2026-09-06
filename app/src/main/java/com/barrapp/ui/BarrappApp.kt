@@ -108,6 +108,24 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 showBack = DeviceId.privacyAccepted(context),
                 onBack = vm::openHome,
                 onDiagnostics = vm::openDiagnostics,
+                signedInAs = state.signedInAs,
+                onSignIn = { vm.openAuth() },
+                onSignOut = vm::signOut,
+            )
+
+            Screen.Auth -> AuthScreen(
+                step = state.authStep,
+                busy = state.authBusy,
+                error = state.authError,
+                notice = state.authNotice,
+                onStep = vm::setAuthStep,
+                onSignIn = vm::signIn,
+                onSignUp = vm::signUp,
+                onConfirm = vm::confirmAccount,
+                onResend = vm::resendCode,
+                onForgot = vm::forgotPassword,
+                onReset = vm::resetPassword,
+                onSkip = vm::openHome,
             )
 
             Screen.Onboarding -> Onboarding(
@@ -475,6 +493,9 @@ private fun PrivacyScreen(
     showBack: Boolean,
     onBack: () -> Unit,
     onDiagnostics: () -> Unit,
+    signedInAs: String = "",
+    onSignIn: (() -> Unit)? = null,
+    onSignOut: (() -> Unit)? = null,
 ) {
     Column(
         Modifier
@@ -487,6 +508,27 @@ private fun PrivacyScreen(
         }
         Text("Privacy", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(14.dp))
+        // The account lives on this screen because this is where the identity
+        // is explained: the paragraph below says a random device id names your
+        // training, and signing in is what replaces that with something you
+        // can carry to another phone.
+        if (showBack && onSignIn != null) {
+            if (signedInAs.isBlank()) {
+                Text(
+                    "Your sessions are tied to this phone. Sign in and they follow you " +
+                        "to the next one.",
+                    style = MaterialTheme.typography.bodyMedium,
+                )
+                TextButton(onClick = onSignIn) { Text("Sign in or create an account") }
+            } else {
+                Text("Signed in as $signedInAs",
+                    style = MaterialTheme.typography.bodyMedium)
+                if (onSignOut != null) {
+                    TextButton(onClick = onSignOut) { Text("Sign out") }
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+        }
         Text(
             "barrapp measures your own reps from a clip you send. It is not coaching and not " +
                 "medical advice.",

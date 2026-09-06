@@ -127,6 +127,16 @@ object SessionStore {
         write(context, existing.values.sortedByDescending { it.date })
     }
 
+    /** Drop the whole local calendar.
+     *
+     *  Signing out has to clear this: the days cached here belong to whoever
+     *  was signed in, and leaving them would show one account's training to
+     *  the next person to open the app. The measurements themselves are safe
+     *  on the server - a refresh rebuilds this from whoever is signed in now. */
+    fun forgetAll(context: Context) {
+        write(context, emptyList())
+    }
+
     fun forget(context: Context, jobId: String) {
         val kept = days(context).mapNotNull { day ->
             if (jobId !in day.jobIds) day

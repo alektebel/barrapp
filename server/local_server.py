@@ -19,6 +19,7 @@ if VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve():
     os.execv(str(VENV_PY), [str(VENV_PY), *sys.argv])
 
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "api"))
 
 from process import process_job  # noqa: E402
 

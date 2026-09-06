@@ -88,6 +88,10 @@ fun BarrappShell(
     state: NocturneState,
     subtitle: String,
     onPlus: (() -> Unit)? = null,
+    /** The account and privacy screen. Before this existed the header's only
+     *  button was the coach shortcut, so Screen.Privacy - which holds signing
+     *  in and out - was unreachable from the Nocturne shell entirely. */
+    onAccount: (() -> Unit)? = null,
     week: @Composable () -> Unit,
     calendar: @Composable () -> Unit,
     tree: @Composable () -> Unit,
@@ -137,6 +141,32 @@ fun BarrappShell(
                         cap = StrokeCap.Round, join = androidx.compose.ui.graphics.StrokeJoin.Round))
                     drawLine(Nocturne.fgA(0.6f), Offset(4f * s, 8f * s), Offset(2.5f * s, 11f * s), 1.4f * s)
                     drawLine(Nocturne.fgA(0.6f), Offset(2.5f * s, 11f * s), Offset(7f * s, 8f * s), 1.4f * s)
+                }
+            }
+            if (onAccount != null) {
+                Spacer(Modifier.width(8.dp))
+                Box(
+                    Modifier.size(30.dp)
+                        .border(1.dp, Nocturne.fgA(0.16f), RoundedCornerShape(8.dp))
+                        .then(noRipple(onAccount)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    // A head and shoulders: the account, drawn rather than
+                    // pulled in as an icon font for one glyph.
+                    Canvas(Modifier.size(16.dp)) {
+                        val s = size.width / 16f
+                        val ink = Nocturne.fgA(0.6f)
+                        drawCircle(ink, radius = 2.6f * s,
+                            center = Offset(8f * s, 5.6f * s),
+                            style = Stroke(1.5f * s))
+                        val shoulders = Path().apply {
+                            moveTo(3.2f * s, 13.4f * s)
+                            arcTo(androidx.compose.ui.geometry.Rect(
+                                3.2f * s, 8.6f * s, 12.8f * s, 18.2f * s), 180f, 180f, false)
+                        }
+                        drawPath(shoulders, ink, style = Stroke(1.5f * s,
+                            cap = StrokeCap.Round))
+                    }
                 }
             }
         }

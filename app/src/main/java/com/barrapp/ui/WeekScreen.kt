@@ -152,7 +152,7 @@ fun WeekScreen(
                             style = Stroke(5f, cap = StrokeCap.Round))
                     }
                     androidx.compose.material3.Text(
-                        "${lastSession.score}",
+                        lastSession.score?.toString() ?: "—",
                         style = N.ringNumber.copy(color = lastSession.ringColor),
                     )
                 }
@@ -284,7 +284,9 @@ data class LastSessionCard(
     val title: String,
     val note: String,
     val meta: String,
-    val score: Int,
+    /** Null when there is nothing measured yet. A card with no session must
+     *  not print "0" in the ring - that reads as a score of zero. */
+    val score: Int?,
     val ringFraction: Float,
     val ringColor: Color,
 )

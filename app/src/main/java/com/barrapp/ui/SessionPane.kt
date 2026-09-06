@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import com.barrapp.data.Analysis
 import com.barrapp.data.RepRow
 import com.barrapp.improvementCues
+import com.barrapp.improvementLines
 import com.barrapp.ui.parts.ComponentBar
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Panel
@@ -179,12 +180,9 @@ fun SessionDetail(
             Panel {
                 Eyebrow("Improve")
                 Spacer(Modifier.height(8.dp))
-                val cues = improvementCues(analysis)
-                if (cues.isEmpty()) {
-                    Text(
-                        "Nothing flagged — the set measured clean.",
-                        style = MaterialTheme.typography.bodyMedium,
-                    )
+                val cues = improvementLines(analysis)
+                if (cues.size == 1 && improvementCues(analysis).isEmpty()) {
+                    Text(cues.first(), style = MaterialTheme.typography.bodyMedium)
                 } else {
                     cues.forEachIndexed { i, cue ->
                         Text(

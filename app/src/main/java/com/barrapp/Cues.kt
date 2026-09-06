@@ -82,3 +82,19 @@ private val CUES = mapOf(
 
 /** Advice is tied to the selected rep's measured fault. */
 fun repAdvice(rep: RepRow): String? = repFaults(rep).firstOrNull()?.let { CUES[it] }
+
+/** The lines the "Improve" panel shows.
+ *
+ * An empty fault list means two different things, and they must not share a
+ * sentence: a set that was measured and held up, or a set with no measurable
+ * rep at all. The second one printed "the set measured clean" directly under
+ * a headline reading "Barra couldn't score this set". */
+fun improvementLines(analysis: Analysis): List<String> {
+    val cues = improvementCues(analysis)
+    if (cues.isNotEmpty()) return cues
+    return listOf(
+        if (analysis.reps.isEmpty())
+            "Nothing to flag — barra could not measure a rep in this clip."
+        else "Nothing flagged — the set measured clean.",
+    )
+}

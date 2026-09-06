@@ -22,7 +22,7 @@ import androidx.compose.ui.unit.dp
 import com.barrapp.ui.theme.Nocturne
 import com.barrapp.ui.theme.N
 import com.barrapp.ui.parts.bandColor
-import com.barrapp.improvementCues
+import com.barrapp.improvementLines
 import java.util.Calendar
 import java.util.Locale
 
@@ -43,10 +43,23 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
 
     val weekNumber = remember { Calendar.getInstance().get(Calendar.WEEK_OF_YEAR) }
 
+    // The shell navigates by `nstate`, but a finished measurement only lands
+    // in the view model's own state - so the upload screen used to sit on
+    // "Measuring your set" after the result had already arrived, and the only
+    // way to it was the "Skip ahead" button. Carry the completion across:
+    // once nothing is in flight and a measurement exists, show it.
+    val measuring = state.works.any { it.active }
+    androidx.compose.runtime.LaunchedEffect(measuring, state.analysis) {
+        if (nstate.effective == NScreen.UPLOAD && !measuring && state.analysis != null) {
+            nstate.goSession()
+        }
+    }
+
     BarrappShell(
         state = nstate,
         subtitle = "Week $weekNumber · ${state.profile.firstName}",
         onPlus = { nstate.goUpload(); pickVideo.launch("video/*") },
+        onAccount = vm::openPrivacy,
         week = {
             val tally = weekTally(state.days)
             val focus = state.goals?.focusExercise
@@ -95,13 +108,17 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                         ringColor = bandColor(day.band),
                     )
                 } ?: LastSessionCard(
-                    title = "Muscle-up · 2 reps",
-                    note = "Solid. Weakest part was smoothness — 31% of the ascent " +
-                        "went nowhere.",
-                    meta = "Thu 14 Aug · 13s working set",
-                    score = 78,
-                    ringFraction = 0.78f,
-                    ringColor = Nocturne.solid,
+                    // Nothing measured yet. The design's literal here was a
+                    // full fake record - "Muscle-up · 2 reps, Thu 14 Aug,
+                    // score 78" - which a new user read as their own training
+                    // (feedback B1). An empty state says less and lies none.
+                    title = "No session yet",
+                    note = "Film a set and barra will measure it. Your last " +
+                        "session shows up here.",
+                    meta = "",
+                    score = null,
+                    ringFraction = 0f,
+                    ringColor = bandColor("unmeasured"),
                 ),
                 onOpenSession = {
                     state.days.maxByOrNull { it.date }?.let { vm.selectDate(it.date) }
@@ -260,9 +277,7 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                     score = a.sessionScore,
                     scoreBand = band,
                     bandColor = bandC,
-                    cues = improvementCues(a).ifEmpty {
-                        listOf("Nothing flagged — the set measured clean.")
-                    },
+                    cues = improvementLines(a),
                     onWatchReplay = state.current?.let { { vm.openReplay() } },
                     reps = a.reps.map { rep ->
                         RepCardData(
@@ -356,14 +371,20 @@ private fun PickHook(onPickVideo: () -> Unit) {
 }
 
 private fun uploadStages(active: com.barrapp.data.Work?): Pair<List<UploadStage>, Int> {
+    // Every subtitle here is either something this work actually reported or
+    // a description of the step. Never an example measurement: the old
+    // fallbacks ("22.0s clip · 41 MB", "Muscle-up · 91% confident") rendered
+    // whenever no work was active - which is exactly when a job had just
+    // finished - so the screen showed a clip size and a movement the server
+    // never measured, in the same type as the real thing (see feedback B1).
     val stages = listOf(
         UploadStage("Sent", active?.let { w ->
             "clip on the server" + if (w.uploadedParts.isNotEmpty())
                 " · ${w.uploadedParts.size} part(s) sent" else ""
-        } ?: "22.0s clip · 41 MB"),
+        } ?: "The clip is on the server"),
         UploadStage("Movement recognised",
             active?.stage?.takeIf { it.contains("recognising", true) }
-                ?: "Muscle-up · 91% confident"),
+                ?: "Working out which exercise this is"),
         UploadStage("Trimming to the working set",
             "Dropping the walk-up and the drop-off"),
         UploadStage("Counting and measuring reps",

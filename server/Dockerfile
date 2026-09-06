@@ -29,6 +29,6 @@ RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir --only-binary=:all: -r ${LAMBDA_TASK_ROOT}/requirements-worker.txt
 
 COPY vendor/barra /opt/barra
-COPY api/handler.py process.py deepseek.py ${LAMBDA_TASK_ROOT}/
+COPY api/handler.py process.py deepseek.py vision.py ${LAMBDA_TASK_ROOT}/
 
 CMD ["handler.worker"]

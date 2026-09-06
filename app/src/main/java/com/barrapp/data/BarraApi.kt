@@ -15,6 +15,7 @@ import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 class BarraApi(context: Context) {
+    private val app = context.applicationContext
     private val deviceId = DeviceId.get(context)
     private val baseUrl = BuildConfig.API_BASE_URL.trimEnd('/')
     private val client: OkHttpClient = OkHttpClient.Builder()
@@ -217,8 +218,96 @@ class BarraApi(context: Context) {
         )
     }
 
-    private fun authed(builder: Request.Builder): Request.Builder =
+    /** Every call to our own API carries an identity.
+     *
+     *  Signed in, that is the bearer token and the server answers with the
+     *  account's history. Signed out, it is the device id, exactly as before
+     *  accounts existed. The device id is sent either way so a claim can name
+     *  this phone without a second round trip.
+     *
+     *  The access token lasts an hour, so it is refreshed here rather than at
+     *  every call site - a token that goes stale mid-session must not surface
+     *  as "sign in again" while a valid refresh token is sitting on disk. */
+    private fun authed(builder: Request.Builder): Request.Builder {
         builder.header("X-Device-Id", deviceId)
+        val session = AuthStore.session(app) ?: return builder
+        val token = if (session.expired) refreshed(session) else session.accessToken
+        if (token.isNotBlank()) builder.header("Authorization", "Bearer $token")
+        return builder
+    }
+
+    /** Swap the refresh token for a new access token. Returns blank when the
+     *  refresh itself fails, which leaves the request to go out as the device
+     *  - the caller sees their anonymous history rather than an error. */
+    private fun refreshed(session: AuthStore.Session): String = runCatching {
+        val body = JSONObject().put("refreshToken", session.refreshToken)
+            .toString().toRequestBody(JSON)
+        val json = call(
+            Request.Builder().url("$baseUrl/v1/auth/refresh").post(body).build())
+        val token = json.optString("accessToken")
+        if (token.isNotBlank()) {
+            AuthStore.save(app, token, json.optString("refreshToken").ifBlank { null },
+                json.optLong("expiresIn", 3600), null)
+        }
+        token
+    }.getOrDefault("")
+
+    // ---- accounts ---------------------------------------------------------
+
+    private fun authPost(action: String, fields: Map<String, String>): JSONObject {
+        val payload = JSONObject()
+        fields.forEach { (k, v) -> payload.put(k, v) }
+        return call(
+            Request.Builder().url("$baseUrl/v1/auth/$action")
+                .post(payload.toString().toRequestBody(JSON))
+                .header("X-Device-Id", deviceId)
+                .build()
+        )
+    }
+
+    /** Create the account. The server sends a code; nothing is signed in yet. */
+    fun signUp(email: String, password: String) {
+        authPost("signup", mapOf("email" to email, "password" to password))
+    }
+
+    fun confirm(email: String, code: String) {
+        authPost("confirm", mapOf("email" to email, "code" to code))
+    }
+
+    fun resendCode(email: String) {
+        authPost("resend", mapOf("email" to email))
+    }
+
+    fun forgotPassword(email: String) {
+        authPost("forgot", mapOf("email" to email))
+    }
+
+    fun resetPassword(email: String, code: String, password: String) {
+        authPost("reset", mapOf("email" to email, "code" to code, "password" to password))
+    }
+
+    /** Sign in and persist the session. */
+    fun signIn(email: String, password: String) {
+        val json = authPost("login", mapOf("email" to email, "password" to password))
+        AuthStore.save(
+            app,
+            accessToken = json.optString("accessToken"),
+            refreshToken = json.optString("refreshToken").ifBlank { null },
+            expiresIn = json.optLong("expiresIn", 3600),
+            email = email,
+        )
+    }
+
+    /** Move this phone's anonymous sessions onto the signed-in account.
+     *  Returns how many moved. */
+    fun claimDevice(): Int {
+        val body = JSONObject().put("deviceId", deviceId).toString().toRequestBody(JSON)
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/auth/claim").post(body)).build()
+        return call(request).optInt("claimed")
+    }
+
+    fun deviceId(): String = deviceId
 
     private fun isS3(url: String): Boolean =
         url.contains(".amazonaws.com") || url.contains(".s3.")

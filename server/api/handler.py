@@ -11,6 +11,8 @@ from pathlib import Path
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
 
+import auth
+
 s3 = boto3.client("s3")
 ddb = boto3.resource("dynamodb")
 lam = boto3.client("lambda")
@@ -53,12 +55,30 @@ def _resp(code: int, body: dict) -> dict:
     return {"statusCode": code, "headers": _headers(), "body": json.dumps(body, cls=_Enc)}
 
 
-def _owner(event) -> str:
+def _header(event, name: str) -> str:
     headers = event.get("headers") or {}
     for key, value in headers.items():
-        if key.lower() == "x-device-id":
+        if key.lower() == name:
             return (value or "").strip()
     return ""
+
+
+def _owner(event) -> str:
+    """Who this request belongs to.
+
+    A signed-in caller owns "u:<sub>"; anyone else owns their device id. Both
+    are just strings in the `owner` column, which is what lets an anonymous
+    install keep working after accounts exist and lets /v1/auth/claim move one
+    to the other by rewriting the column.
+
+    A bearer token that does not verify is an error, never a silent fall back
+    to the device id - that would hand a stale session someone else's data.
+    """
+    bearer = _header(event, "authorization")
+    if bearer.lower().startswith("bearer "):
+        owner, _email = auth.identify(bearer[7:].strip())
+        return owner
+    return _header(event, "x-device-id")
 
 
 def _public(item: dict | None) -> dict | None:
@@ -72,11 +92,96 @@ def _item(job_id: str) -> dict | None:
     return table.get_item(Key={"id": job_id}).get("Item")
 
 
+STALE_AFTER_MIN = 30
+
+
+def _reap_stale(item: dict | None) -> dict | None:
+    """A job stuck in queued/processing means the worker died before it could
+    mark anything (broken image, killed container). Reap it lazily on read so
+    the phone gets a real error and its Retry button works, instead of an
+    eternal spinner.
+
+    `created` counts as stuck too. It means the phone asked for a job and then
+    never finished sending the clip - a dead upload. Left alone it is the
+    quietest failure the pipeline has: not `done`, so /v1/history skips it,
+    and the phone's queue has long since forgotten the work, so it shows up on
+    no screen at all while still sitting in the table. Reaped, it at least
+    reads as failed with a reason."""
+    if not item or item.get("status") not in {"created", "queued", "processing"}:
+        return item
+    created = item.get("createdAt") or ""
+    try:
+        then = datetime.strptime(created, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return item
+    age_min = (datetime.now(timezone.utc) - then).total_seconds() / 60
+    if age_min < STALE_AFTER_MIN:
+        return item
+    reason = (
+        "the clip was never finished uploading. Retry."
+        if item.get("status") == "created"
+        else "the worker never picked this up. Retry."
+    )
+    table.update_item(
+        Key={"id": item["id"]},
+        UpdateExpression="SET #s = :s, #e = :e",
+        ExpressionAttributeNames={"#s": "status", "#e": "error"},
+        ExpressionAttributeValues={
+            ":s": "failed",
+            ":e": "%s (stuck for %d min)" % (reason, int(age_min)),
+        },
+    )
+    item = dict(item)
+    item["status"] = "failed"
+    item["error"] = reason
+    return item
+
+
 def _owned(item: dict | None, owner: str) -> bool:
     return bool(item and owner and item.get("owner") == owner)
 
 
+def _claim(owner: str, device_id: str) -> dict:
+    """Move an anonymous install's finished sessions onto an account.
+
+    Only `done` jobs move. An in-flight job's clip lives at
+    `<owner>/<job>.mp4` in the bucket, and rewriting the owner would point the
+    worker at a key that does not exist - so uploads in progress stay with the
+    device and finish where they started. The history is what matters here,
+    and the history is exactly the done ones.
+    """
+    if not device_id:
+        return {"claimed": 0, "error": "no device id given"}
+    if device_id.startswith("u:"):
+        return {"claimed": 0, "error": "that is already an account"}
+    resp = table.query(
+        IndexName="owner-index",
+        KeyConditionExpression=Key("owner").eq(device_id),
+        FilterExpression=Attr("status").eq("done"),
+    )
+    moved = 0
+    for item in resp.get("Items") or []:
+        table.update_item(
+            Key={"id": item["id"]},
+            UpdateExpression="SET #o = :new, claimedFrom = :old",
+            ExpressionAttributeNames={"#o": "owner"},
+            ExpressionAttributeValues={":new": owner, ":old": device_id},
+            # Two phones racing the same claim must not double-count, and a
+            # job someone else already owns must never move.
+            ConditionExpression=Attr("owner").eq(device_id),
+        )
+        moved += 1
+    return {"claimed": moved}
+
+
 def api(event, _context):
+    try:
+        return _route(event)
+    except auth.AuthError as err:
+        return _resp(err.status, {"error": str(err)})
+
+
+def _route(event):
     method = event.get("requestContext", {}).get("http", {}).get("method") or event.get("httpMethod")
     path = event.get("rawPath") or event.get("path") or "/"
     owner = _owner(event)
@@ -96,10 +201,34 @@ def api(event, _context):
         return {"statusCode": 204, "headers": _headers(), "body": ""}
 
     if method == "GET" and path.rstrip("/") == "/health":
-        return _resp(200, {"ok": True})
+        return _resp(200, {"ok": True, "accounts": auth.configured()})
+
+    # Signing up and signing in are the only calls that cannot already have an
+    # identity, so they are routed before the check for one.
+    if method == "POST" and path.rstrip("/").startswith("/v1/auth/"):
+        action = path.rstrip("/").rsplit("/", 1)[-1]
+        handler = {
+            "signup": auth.signup,
+            "confirm": auth.confirm,
+            "resend": auth.resend,
+            "login": auth.login,
+            "refresh": auth.refresh,
+            "forgot": auth.forgot,
+            "reset": auth.reset,
+        }.get(action)
+        if handler:
+            return _resp(200, handler(body))
+        if action == "claim":
+            if not owner.startswith("u:"):
+                return _resp(401, {"error": "sign in first"})
+            return _resp(200, _claim(owner, (body.get("deviceId") or "").strip()))
+        return _resp(404, {"error": "not found"})
 
     if method in {"POST", "GET", "DELETE"} and path.rstrip("/") != "/health" and not owner:
         return _resp(401, {"error": "missing X-Device-Id"})
+
+    if method == "GET" and path.rstrip("/") == "/v1/me":
+        return _resp(200, {"owner": owner, "account": owner.startswith("u:")})
 
     if method == "POST" and path.rstrip("/") == "/v1/jobs":
         job_id = uuid.uuid4().hex[:12]
@@ -128,7 +257,11 @@ def api(event, _context):
             KeyConditionExpression=Key("owner").eq(owner),
             ScanIndexForward=False,
         )
-        jobs = [_public(i) for i in resp.get("Items") or []]
+        # Reap here too, not only on the single-job read. A dead upload is
+        # precisely the job nobody ever reads by id again - the phone dropped
+        # the work from its queue long ago - so the list is the only place
+        # left that can notice it and give it a reason.
+        jobs = [_public(_reap_stale(i)) for i in resp.get("Items") or []]
         return _resp(200, {"jobs": jobs})
 
     if method == "GET" and path.rstrip("/") == "/v1/history":
@@ -163,7 +296,7 @@ def api(event, _context):
     parts = [p for p in path.split("/") if p]
 
     if method == "GET" and len(parts) == 3 and parts[0] == "v1" and parts[1] == "jobs":
-        item = _item(parts[2])
+        item = _reap_stale(_item(parts[2]))
         if not _owned(item, owner):
             return _resp(404, {"error": "unknown job"})
         return _resp(200, _public(item))
@@ -275,38 +408,15 @@ def api(event, _context):
 
 
 def worker(event, _context):
-    from process import process_job
-
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
     dest = Path("/tmp") / f"{job_id}.mp4"
 
-    def _stage(name: str) -> None:
-        table.update_item(
-            Key={"id": job_id},
-            UpdateExpression="SET #st = :st",
-            ExpressionAttributeNames={"#st": "stage"},
-            ExpressionAttributeValues={":st": name},
-        )
-
-    _stage("receiving the clip")
-    s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))
-    item = _item(job_id) or {"id": job_id, "exercise": "muscle_up"}
-    table.update_item(
-        Key={"id": job_id},
-        UpdateExpression="SET #s = :s",
-        ExpressionAttributeNames={"#s": "status"},
-        ExpressionAttributeValues={":s": "processing"},
-    )
-    try:
-        result = process_job(item, dest, on_stage=_stage)
-        table.update_item(
-            Key={"id": job_id},
-            UpdateExpression="SET #s = :s, #r = :r",
-            ExpressionAttributeNames={"#s": "status", "#r": "result"},
-            ExpressionAttributeValues={":s": "done", ":r": _to_ddb(result)},
-        )
-    except Exception as exc:  # noqa: BLE001
+    def _fail(exc: Exception) -> None:
+        # Any death inside this handler must land on the job record, not in a
+        # log stream nobody reads. An async invoke that dies at import time
+        # used to leave the clip queued forever while the phone showed a
+        # spinner no one would ever answer.
         table.update_item(
             Key={"id": job_id},
             UpdateExpression="SET #s = :s, #e = :e",
@@ -318,4 +428,38 @@ def worker(event, _context):
             put_failure(job_id, "worker", str(exc))
         except Exception:  # noqa: BLE001
             pass
+
+    try:
+        # Inside the try on purpose: a broken image (missing module, bad
+        # dependency) must fail the job, not crash before the first update.
+        from process import process_job
+
+        def _stage(name: str) -> None:
+            table.update_item(
+                Key={"id": job_id},
+                UpdateExpression="SET #st = :st",
+                ExpressionAttributeNames={"#st": "stage"},
+                ExpressionAttributeValues={":st": name},
+            )
+
+        _stage("receiving the clip")
+        s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))
+        if not dest.exists() or dest.stat().st_size == 0:
+            raise RuntimeError("the clip never arrived in storage")
+        item = _item(job_id) or {"id": job_id, "exercise": "muscle_up"}
+        table.update_item(
+            Key={"id": job_id},
+            UpdateExpression="SET #s = :s",
+            ExpressionAttributeNames={"#s": "status"},
+            ExpressionAttributeValues={":s": "processing"},
+        )
+        result = process_job(item, dest, on_stage=_stage)
+        table.update_item(
+            Key={"id": job_id},
+            UpdateExpression="SET #s = :s, #r = :r",
+            ExpressionAttributeNames={"#s": "status", "#r": "result"},
+            ExpressionAttributeValues={":s": "done", ":r": _to_ddb(result)},
+        )
+    except Exception as exc:  # noqa: BLE001
+        _fail(exc)
     return {"ok": True}
