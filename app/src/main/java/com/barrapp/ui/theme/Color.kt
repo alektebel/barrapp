@@ -1,7 +1,6 @@
 package com.barrapp.ui.theme
 
 import androidx.compose.ui.graphics.Color
-import androidx.compose.runtime.staticCompositionLocalOf
 
 /**
  * Nocturne — the palette the design mockup ships in.
@@ -67,5 +66,3 @@ val LightBands = BandColors(
     broken = Color(0xFFA9503F),
     unmeasured = Color(0xFFC4C4CE),
 )
-
-val LocalBandColors = staticCompositionLocalOf { LightBands }

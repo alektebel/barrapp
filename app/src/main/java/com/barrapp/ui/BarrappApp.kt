@@ -1,6 +1,5 @@
 package com.barrapp.ui
 
-import android.app.Activity
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -96,16 +95,6 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
             Screen.Diagnostics, Screen.WorkLog),
     ) { vm.openHome() }
 
-    val pickVideo = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri -> vm.upload(uri) }
-
-    val recordVideo = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) vm.upload(result.data?.data)
-    }
-
     Box(
         Modifier
             .fillMaxSize()
@@ -113,6 +102,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
             .safeDrawingPadding()
     ) {
         when (state.screen) {
+            Screen.Home -> NocturneHome(vm)
             Screen.Privacy -> PrivacyScreen(
                 onAccept = vm::acceptPrivacy,
                 showBack = DeviceId.privacyAccepted(context),
@@ -152,13 +142,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::openHome,
             )
 
-            Screen.Coach -> CoachScreen(
-                turns = state.chat,
-                thinking = state.coachThinking,
-                suggestions = vm.suggestions(),
-                onSend = vm::ask,
-                onBack = vm::openHome,
-            )
+            Screen.Coach -> NocturneHome(vm)
 
             Screen.Replay -> ReplayScreen(
                 analysis = state.analysis,
@@ -172,11 +156,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::openHome,
             )
 
-            Screen.Home -> HomeShell(
-                vm = vm,
-                onPick = { pickVideo.launch("video/*") },
-                onRecord = { recordVideo.launch(vm.recordIntent()) },
-            )
+            Screen.Home -> NocturneHome(vm)
         }
     }
 }

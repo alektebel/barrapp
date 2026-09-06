@@ -13,7 +13,6 @@ import androidx.compose.ui.unit.sp
  * numerals, small caps-style eyebrows, and body sizes that keep the phone at
  * a comfortable reading distance.
  */
-private val Inter = FontFamily.Default
 
 val BarrappTypography = Typography(
     headlineMedium = TextStyle(
