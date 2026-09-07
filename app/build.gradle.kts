@@ -29,13 +29,13 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.barrapp"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.alektebel.barrapp"
+        applicationId = "com.fitness.barrapp"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 15
+        targetSdk = 36
+        versionCode = 17
         versionName = "1.2.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
