@@ -37,11 +37,13 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 # trick -> (youtube queries, commons queries: categories first, then search terms)
 TRICKS: dict[str, dict] = {
     "muscle_up": {
-        "yt": ["bar muscle up calisthenics", "ring muscle up calisthenics"],
+        "yt": ["bar muscle up calisthenics", "ring muscle up calisthenics",
+               "muscle up tutorial"],
         "commons": ["Category:Muscle-ups", "muscle-up exercise filetype:video"],
     },
     "pull_up": {
-        "yt": ["pull up calisthenics form", "weighted pull up calisthenics"],
+        "yt": ["pull up calisthenics form", "weighted pull up calisthenics",
+               "pull up exercise"],
         "commons": ["Category:Pull-ups",
                     'incategory:Pull-ups filetype:video',
                     "pull-up exercise filetype:video"],
@@ -53,7 +55,8 @@ TRICKS: dict[str, dict] = {
                     "parallel bars dip filetype:video"],
     },
     "push_up": {
-        "yt": ["push up calisthenics form", "pseudo planche push up"],
+        "yt": ["push up calisthenics form", "pseudo planche push up",
+               "push up exercise"],
         "commons": ["Category:Push-ups",
                     "incategory:Push-ups filetype:video",
                     "push-up exercise filetype:video"],
@@ -64,8 +67,18 @@ TRICKS: dict[str, dict] = {
                     "bodyweight squat filetype:video",
                     "pistol squat filetype:video"],
     },
+    "knee_raise": {
+        "yt": ["hanging knee raise", "knee raise calisthenics"],
+        "commons": ["hanging knee raise filetype:video",
+                    "knee raise calisthenics filetype:video"],
+    },
+    "pistol_squat": {
+        "yt": ["pistol squat", "pistol squat tutorial"],
+        "commons": ["pistol squat filetype:video"],
+    },
     "handstand": {
-        "yt": ["handstand hold calisthenics", "handstand push up calisthenics"],
+        "yt": ["handstand hold calisthenics", "handstand push up calisthenics",
+               "handstand hold"],
         "commons": ["Category:Handstands",
                     "handstand filetype:video",
                     "handstand push-up filetype:video"],
@@ -75,7 +88,7 @@ TRICKS: dict[str, dict] = {
         "commons": ["front lever calisthenics filetype:video"],
     },
     "planche": {
-        "yt": ["planche calisthenics", "tuck planche"],
+        "yt": ["planche calisthenics", "tuck planche", "planche exercise"],
         "commons": ["planche calisthenics filetype:video"],
     },
     "back_lever": {
@@ -83,12 +96,67 @@ TRICKS: dict[str, dict] = {
         "commons": ["back lever calisthenics filetype:video"],
     },
     "human_flag": {
-        "yt": ["human flag calisthenics"],
+        "yt": ["human flag calisthenics", "human flag pole"],
         "commons": ["human flag calisthenics filetype:video"],
+    },
+    "bench_press": {
+        "yt": ["bench press form", "bench press exercise"],
+        "commons": ["Category:Bench press", "bench press filetype:video"],
+    },
+    "deadlift": {
+        "yt": ["deadlift exercise", "deadlift form", "deadlift form powerlifting"],
+        "commons": ["Category:Deadlift", "deadlift filetype:video"],
+    },
+    "barbell_squat": {
+        "yt": ["barbell back squat", "barbell squat form"],
+        "commons": ["barbell squat filetype:video"],
     },
 }
 
 VIDEO_EXTS = (".mp4", ".webm", ".ogv", ".ogg", ".mov", ".mkv")
+
+# Explicit-content guard. Wikimedia Commons full-text search and a few CC
+# channels can surface non-training footage; a title that names this content is
+# dropped rather than guessed. Applied to every candidate before download.
+EXPLICIT_BLOCKLIST = [
+    "masturbat", "ejaculat", "semen", "erect", "kegel", "penis", "vagina",
+    "vulva", "nude", "naked", "sex", "porn", "lingerie", "fetish", "orgasm",
+    "penile", "cock", "dildo", "fuck", "striptease",
+]
+
+
+def is_clean(text: str) -> bool:
+    """True when the text is free of explicit-content blocklist terms."""
+    low = (text or "").lower()
+    return not any(term in low for term in EXPLICIT_BLOCKLIST)
+
+
+# Title keywords that make a Commons clip actually about the movement. Wikimedia
+# full-text search is loose ("press", "up", "pull" match lots of non-training
+# footage), so a candidate whose title names no movement is dropped.
+TRICK_KEYWORDS: dict[str, list[str]] = {
+    "muscle_up": ["muscle up", "muscle-up", "muscleup"],
+    "pull_up": ["pull up", "pull-up", "pullup"],
+    "dip": ["dip bar", "dips", "parallel bar", "parallel bars"],
+    "push_up": ["push up", "push-up", "pushup"],
+    "squat": ["squat", "squats"],
+    "knee_raise": ["knee raise", "knee-raise", "leg raise", "toes to bar"],
+    "pistol_squat": ["pistol squat", "pistol"],
+    "handstand": ["handstand"],
+    "front_lever": ["front lever", "front-lever"],
+    "planche": ["planche"],
+    "back_lever": ["back lever", "back-lever"],
+    "human_flag": ["human flag", "human-flag", "full flag"],
+    "bench_press": ["bench press", "bench-press"],
+    "deadlift": ["deadlift"],
+    "barbell_squat": ["back squat", "barbell squat"],
+}
+
+
+def relevant_title(trick: str, title: str) -> bool:
+    """True when a title names the movement for `trick` (or is a tight hit)."""
+    low = (title or "").lower()
+    return any(k in low for k in TRICK_KEYWORDS.get(trick, []))
 
 # Title keywords used to route one channel's uploads to tricks. A channel
 # (Chris Heria, THENX, ...) is not organised by movement, so the title is the
@@ -100,11 +168,16 @@ CHANNEL_KEYWORDS: dict[str, list[str]] = {
     "push_up": ["push up", "push-up"],
     "dip": ["dip"],
     "squat": ["squat", "pistol"],
+    "knee_raise": ["knee raise", "leg raise", "toes to bar"],
+    "pistol_squat": ["pistol squat"],
     "handstand": ["handstand"],
     "front_lever": ["front lever"],
     "planche": ["planche"],
     "back_lever": ["back lever"],
     "human_flag": ["human flag", "full flag"],
+    "bench_press": ["bench press"],
+    "deadlift": ["deadlift", "sumo deadlift"],
+    "barbell_squat": ["back squat", "barbell squat"],
 }
 
 
@@ -138,7 +211,7 @@ def commons_category_files(category: str, limit: int = 20) -> list[str]:
         pages = d.get("query", {}).get("pages", {})
         for p in pages.values():
             t = p.get("title", "")
-            if t.lower().endswith(VIDEO_EXTS):
+            if t.lower().endswith(VIDEO_EXTS) and is_clean(t):
                 out.append(t)
         if "continue" in d and len(out) < limit:
             cont = d["continue"]
@@ -158,7 +231,8 @@ def commons_search_files(query: str, limit: int = 10) -> list[str]:
     d = commons_get(params)
     pages = d.get("query", {}).get("pages", {})
     return [p["title"] for p in pages.values()
-            if p.get("title", "").lower().endswith(VIDEO_EXTS)]
+            if p.get("title", "").lower().endswith(VIDEO_EXTS)
+            and is_clean(p.get("title", ""))]
 
 
 def commons_file_info(titles: list[str]) -> list[dict]:
@@ -238,6 +312,8 @@ def route_by_title(videos: list[tuple[str, str]]) -> dict[str, list[tuple[str, s
     """Group channel videos by the trick their title names."""
     routed: dict[str, list[tuple[str, str]]] = {}
     for vid, title in videos:
+        if not is_clean(title):
+            continue
         low = title.lower()
         for trick, keywords in CHANNEL_KEYWORDS.items():
             if any(k in low for k in keywords):
@@ -443,6 +519,8 @@ def main() -> int:
                     titles.extend(found)
                 except Exception as e:
                     print(f"  [commons] {cat} failed: {e}", file=sys.stderr)
+            titles = [t for t in dict.fromkeys(titles) if relevant_title(trick, t)]
+            print(f"  [commons] {len(titles)} relevant candidates after title filter")
             for info in commons_file_info(list(dict.fromkeys(titles))):
                 if got >= a.per_trick:
                     break
@@ -479,6 +557,9 @@ def main() -> int:
                     break
                 info = yt_info(vid)
                 if not info:
+                    continue
+                if not is_clean(info.get("title", "")):
+                    print(f"  [yt] skip explicit-content title: {vid}")
                     continue
                 cc = is_cc_license(info)
                 if not cc and not (a.channel and a.allow_standard_license):
