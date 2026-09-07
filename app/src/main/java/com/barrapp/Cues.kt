@@ -6,44 +6,55 @@ import com.barrapp.data.RepRow
 /**
  * The coaching layer, kept deliberately small.
  *
- * Everything here is a restatement of a number the server already measured -
- * the range component's lockout share, the control penalty, the swing aside -
- * so a cue can only appear when the measurement says it should. No cue is
+ * Everything here is a restatement of a fault the server already measured, so
+ * a cue can only appear when the measurement says it should. No cue is
  * invented from a score alone, and no more than three are ever offered: three
  * things is what carries into the next set.
+ *
+ * This file used to DERIVE the faults itself: regular expressions over the
+ * range component's why-string ("lockout 76% of full"), compared against its
+ * own copies of 0.85, 0.75 and 0.4. Both halves of that were wrong. Rewording
+ * one sentence on the server switched fault detection off on every phone in
+ * the field, silently, with no test that could see it; and the thresholds
+ * existed in three places - here, barra/faults.py, barra/faults_taxonomy.py -
+ * that nothing kept equal.
+ *
+ * The server ships each fired fault by name with the value and threshold that
+ * fired it. This file renders names. It holds no thresholds and parses no
+ * prose, and tests/test_cues_parity.py fails the build if either comes back.
  */
 
 /** The faults one rep was actually measured to have, most important first. */
 internal fun repFaults(rep: RepRow): List<String> {
+    if (rep.faults.isNotEmpty()) {
+        return rep.faults.map { it.name }.sortedBy { orderOf(it) }
+    }
+    return legacyFaults(rep)
+}
+
+/**
+ * Reps stored before the server shipped `faults`.
+ *
+ * Deliberately narrow: it reads the two signals that are structured numbers
+ * already - the swing aside and the control penalty - and no others. The
+ * regex-over-prose derivation is gone rather than preserved, because a history
+ * row showing fewer cues is a smaller lie than one showing cues that depend on
+ * a sentence nobody may edit. Delete this once stored history has rolled over.
+ */
+private fun legacyFaults(rep: RepRow): List<String> {
     val faults = mutableListOf<String>()
-
-    // Swing is measured in torso-lengths of travel; a strict rep stays small.
     rep.asides.firstOrNull { it.name == "swing" }?.let {
-        if (it.value > 0.4) faults += "momentum"
+        if (it.value > LEGACY_SWING_TORSO) faults += "momentum"
     }
-
-    // The range component's why carries the two shares it scored on.
-    rep.components.firstOrNull { it.name == "range" }?.let { range ->
-        val lockout = Regex("lockout (\\d+)% of full").find(range.why)
-            ?.groupValues?.get(1)?.toIntOrNull()
-        val hang = Regex("hang (\\d+)% of full").find(range.why)
-            ?.groupValues?.get(1)?.toIntOrNull()
-        if (lockout != null && lockout < 85) faults += "lockout"
-        if (hang != null && hang < 75) faults += "dead hang"
-    }
-
-    // A descent that fell rather than lowered. One-sided: absent costs nothing.
     rep.penalties.firstOrNull { it.name == "control" }?.let {
         if ((it.value ?: 0.0) > 0.0) faults += "control"
     }
-
-    // The ascent stopped and snatched through the sticking point.
-    rep.components.firstOrNull { it.name == "smoothness" }?.let {
-        if ("% of the ascent made no progress" in it.why) faults += "stall"
-    }
-
     return faults
 }
+
+/** The one threshold left on the phone, and only for rows measured before the
+ *  server named its own faults. Not consulted for anything current. */
+private const val LEGACY_SWING_TORSO = 0.4
 
 /** The one fault that leads the rep's score, or null when it measured clean.
  *  These are the words that go over the video. */
@@ -53,6 +64,23 @@ fun repFault(rep: RepRow): String? = when (repFaults(rep).firstOrNull()) {
     "dead hang" -> "Not a dead hang"
     "control" -> "Dropped the descent"
     "stall" -> "Stalled mid-pull"
+    "poor transition" -> "Slow transition"
+    "bent arms" -> "Bent arms"
+    "no active hang" -> "No active hang"
+    "too fast" -> "Thrown, not pulled"
+    "too deep" -> "Too deep"
+    "bounce at bottom" -> "Bounced at the bottom"
+    "poor range of motion" -> "Short range"
+    "sagging hips" -> "Hips sagging"
+    "uncontrolled descent" -> "Dropped the descent"
+    "knee valgus" -> "Knees caving in"
+    "heel raise" -> "Heels lifting"
+    "leaning back" -> "Leaning back"
+    "arm swing" -> "Arm swing"
+    "piked hips", "piked body" -> "Piked body line"
+    "bent knees" -> "Bent knees"
+    "poor scapular retraction" -> "Shoulders not set"
+    "poor scapular protraction" -> "Shoulders not pushed"
     else -> null
 }
 
@@ -65,12 +93,29 @@ fun improvementCues(analysis: Analysis): List<String> {
     }
     return counts.entries
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }
-            .thenBy { CUE_ORDER.indexOf(it.key) })
+            .thenBy { orderOf(it.key) })
         .mapNotNull { CUES[it.key] }
         .take(3)
 }
 
-private val CUE_ORDER = listOf("momentum", "lockout", "dead hang", "control", "stall")
+/**
+ * The order faults are offered in when several fired on the same rep.
+ *
+ * Range of motion first: a rep that did not happen through its full travel is
+ * not a rep with a tempo problem, it is a shorter rep. Then the things that
+ * change how the load is carried, then the things that change how it looked.
+ */
+private val CUE_ORDER = listOf(
+    "poor range of motion", "lockout", "dead hang", "too deep", "no active hang",
+    "momentum", "sagging hips", "piked hips", "piked body", "bent arms",
+    "bent knees", "knee valgus", "heel raise", "leaning back", "arm swing",
+    "poor scapular retraction", "poor scapular protraction",
+    "control", "uncontrolled descent", "too fast", "bounce at bottom",
+    "stall", "poor transition",
+)
+
+private fun orderOf(name: String): Int =
+    CUE_ORDER.indexOf(name).let { if (it < 0) CUE_ORDER.size else it }
 
 private val CUES = mapOf(
     "momentum" to "Stop the swing — pull strict, no momentum",
@@ -78,10 +123,47 @@ private val CUES = mapOf(
     "dead hang" to "Start every rep from a full dead hang",
     "control" to "Lower under control — don't drop from the top",
     "stall" to "Drive through the sticking point in one arc",
+    "poor transition" to "Get through the transition in one movement",
+    "bent arms" to "Straighten the arms at the bottom of every rep",
+    "no active hang" to "Straighten the arms between reps — hang, then pull",
+    "too fast" to "Slow the pull down — these are being thrown",
+    "too deep" to "Stop at ninety degrees — deeper is shoulder, not chest",
+    "bounce at bottom" to "Pause at the bottom instead of bouncing out of it",
+    "poor range of motion" to "Take every rep through its full range",
+    "sagging hips" to "Hold the hips in line — squeeze the glutes",
+    "uncontrolled descent" to "Lower under control — don't drop into the hole",
+    "knee valgus" to "Drive the knees out over the toes",
+    "heel raise" to "Keep the heels down through the whole rep",
+    "leaning back" to "Keep the chest up — stop leaning back out of it",
+    "arm swing" to "Keep the arms still — no swinging for balance",
+    "piked hips" to "Hold the body flat — no piking at the hips",
+    "piked body" to "Hold the body flat — no piking at the hips",
+    "bent knees" to "Keep the legs straight through the hold",
+    "poor scapular retraction" to "Set the shoulders down and back first",
+    "poor scapular protraction" to "Push the shoulders away at the top",
 )
 
 /** Advice is tied to the selected rep's measured fault. */
 fun repAdvice(rep: RepRow): String? = repFaults(rep).firstOrNull()?.let { CUES[it] }
+
+/**
+ * What this rep could not be judged on, in plain words.
+ *
+ * A fault that did not fire because its measurement was missing is not the
+ * same as a rep that passed, and the app has to be able to say so - a camera
+ * that cannot see the knees is not evidence of good knees.
+ */
+fun unmeasuredNote(rep: RepRow): String? {
+    if (rep.viewBlocked.isNotEmpty()) {
+        return "Some checks need a different camera angle — " +
+            "${rep.viewBlocked.size} of them were not judged from this one."
+    }
+    if (rep.unmeasured.isNotEmpty()) {
+        return "${rep.unmeasured.size} check${if (rep.unmeasured.size == 1) "" else "s"} " +
+            "had no measurement in this clip and were left unjudged."
+    }
+    return null
+}
 
 /** The lines the "Improve" panel shows.
  *

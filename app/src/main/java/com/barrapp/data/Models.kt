@@ -97,6 +97,39 @@ data class Aside(
     val why: String,
 )
 
+/**
+ * A fault the server measured, with the number that fired it.
+ *
+ * The phone used to re-derive the faults itself, by running regular
+ * expressions over the human-readable `why` strings ("lockout 76% of full")
+ * and comparing against its own copies of the thresholds. Two consequences:
+ * rewording a sentence on the server switched fault detection off on every
+ * device, and the thresholds existed in three places that nothing kept equal.
+ * The server ships the verdict and its evidence now, and this is that shape.
+ */
+data class MeasuredFault(
+    val name: String,
+    val primitive: String = "",
+    val value: Double? = null,
+    val threshold: Double = 0.0,
+    val comparison: String = "",
+    val unit: String = "",
+    val cls: String = "",
+) {
+    /** "76% of reach, needs 85" - the number, never re-derived here. */
+    fun evidence(): String {
+        val v = value ?: return ""
+        val needs = if (comparison.startsWith("<")) "needs" else "limit"
+        return "${fmt(v)}${unitSuffix()}, $needs ${fmt(threshold)}${unitSuffix()}"
+    }
+
+    private fun unitSuffix() = if (unit.isBlank()) "" else " $unit"
+
+    private fun fmt(d: Double): String =
+        if (d >= 10 || d == d.toLong().toDouble()) d.toLong().toString()
+        else String.format("%.2f", d)
+}
+
 data class RepRow(
     val session: String,
     val label: String,
@@ -129,6 +162,14 @@ data class RepRow(
     val penalties: List<ScorePart> = emptyList(),
     /** Small copy of the rep's own trace, for drawing. */
     val trace: List<Float> = emptyList(),
+    /** The faults the server measured, each with its own number. */
+    val faults: List<MeasuredFault> = emptyList(),
+    /** Measurements this rep could not produce. Not the same as clean: a fault
+     *  whose evidence is missing did not fire, and did not pass either. */
+    val unmeasured: List<String> = emptyList(),
+    /** Measurements the camera angle cannot support - knee valgus needs a
+     *  frontal view, a sagging hip line a side-on one. */
+    val viewBlocked: List<String> = emptyList(),
 )
 
 /**

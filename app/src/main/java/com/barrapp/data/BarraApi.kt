@@ -413,6 +413,19 @@ class BarraApi(context: Context) {
                             if (t == null) emptyList()
                             else (0 until t.length()).map { i -> t.optDouble(i, 0.0).toFloat() }
                         },
+                        faults = row.optJSONArray("faults").mapObjects { f ->
+                            MeasuredFault(
+                                name = f.optString("name"),
+                                primitive = f.optString("primitive"),
+                                value = if (f.isNull("value")) null else f.optDouble("value").orZero(),
+                                threshold = f.optDouble("threshold", 0.0).orZero(),
+                                comparison = f.optString("comparison"),
+                                unit = f.optString("unit"),
+                                cls = f.optString("class"),
+                            )
+                        },
+                        unmeasured = row.optJSONArray("unmeasured").strings(),
+                        viewBlocked = row.optJSONArray("viewBlocked").strings(),
                     )
                 },
                 blockers = (0 until blockers.length()).map { blockers.getString(it) },
@@ -457,6 +470,11 @@ class BarraApi(context: Context) {
         private fun <T> JSONArray?.mapObjects(block: (JSONObject) -> T): List<T> {
             if (this == null) return emptyList()
             return (0 until length()).mapNotNull { optJSONObject(it) }.map(block)
+        }
+
+        private fun JSONArray?.strings(): List<String> {
+            if (this == null) return emptyList()
+            return (0 until length()).mapNotNull { optString(it).ifBlank { null } }
         }
 
         fun sampleFromAssets(context: Context): Analysis {

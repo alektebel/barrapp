@@ -46,6 +46,7 @@ import com.barrapp.data.Analysis
 import com.barrapp.data.RepRow
 import com.barrapp.improvementCues
 import com.barrapp.improvementLines
+import com.barrapp.unmeasuredNote
 import com.barrapp.ui.parts.ComponentBar
 import com.barrapp.ui.parts.Eyebrow
 import com.barrapp.ui.parts.Panel
@@ -405,6 +406,41 @@ private fun RepCard(rep: RepRow, number: Int) {
                     ComponentBar(c.name, c.value, c.why, c.weight)
                 }
             }
+        }
+
+        if (rep.faults.isNotEmpty()) {
+            Spacer(Modifier.height(14.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.4f))
+            Spacer(Modifier.height(10.dp))
+            Eyebrow("What was flagged")
+            Spacer(Modifier.height(6.dp))
+            rep.faults.forEach { f ->
+                val evidence = f.evidence()
+                Row(
+                    Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                ) {
+                    Text(
+                        f.name.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Text(
+                        evidence,
+                        fontFamily = FontFamily.Monospace,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+
+        unmeasuredNote(rep)?.let { note ->
+            Spacer(Modifier.height(10.dp))
+            Text(
+                note,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         if (rep.asides.isNotEmpty()) {
