@@ -80,3 +80,6 @@ models/
 
 # Kotlin build residue
 .kotlin/
+
+# Android App Bundle artifacts
+*.aab
