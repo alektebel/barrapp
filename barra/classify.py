@@ -154,6 +154,14 @@ def _angle(pts: np.ndarray, a: int, b: int, c: int, ok: np.ndarray,
 
     Used for the lever/planche straight-arm and straight-leg checks, and for
     the pistol's bent supporting knee. Points are raw (T,17,3) keypoints.
+
+    `ok` is a per-FRAME mask. It used to be indexed with the three KEYPOINT
+    indices - ok[a] & ok[b] & ok[c] - which reads three arbitrary frames and
+    broadcasts their conjunction over the whole clip: one unconfident frame
+    numbered 5, 7 or 9 turned every elbow angle in the clip into NaN, and
+    otherwise the mask waved through frames where the joint was never seen.
+    The three joints are now masked by their own confidence, per frame, which
+    is what min_conf was always there to do.
     """
     pa, pb, pc = pts[:, a, :2], pts[:, b, :2], pts[:, c, :2]
     v1 = pa - pb
@@ -162,7 +170,11 @@ def _angle(pts: np.ndarray, a: int, b: int, c: int, ok: np.ndarray,
     cosang = np.where(denom > 1e-6,
                       np.clip(np.sum(v1 * v2, axis=1) / denom, -1.0, 1.0), 0.0)
     deg = np.degrees(np.arccos(cosang))
-    return np.where(ok[a] & ok[b] & ok[c], deg, np.nan)
+    seen = (np.asarray(ok, dtype=bool)
+            & (pts[:, a, 2] >= min_conf)
+            & (pts[:, b, 2] >= min_conf)
+            & (pts[:, c, 2] >= min_conf))
+    return np.where(seen, deg, np.nan)
 
 
 def _frac(a: np.ndarray, thresh: float) -> float:
