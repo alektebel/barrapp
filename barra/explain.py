@@ -29,7 +29,7 @@ def explain(video: Path, exercise: str = "auto", show: str = "decisions",
     from .ingest import _clean_signal, probe_video, segment_reps_verbose
     from .metrics import MIN_REP_QUALITY, arm_reach, rep_metrics
     from .movements import resolve, tracking_signal
-    from .pose import available_backends, get_backend
+    from .posecache import load_or_estimate
     from .quality import band, score_rep
 
     tr = Trace(new_id(video.name), video.name, exercise_requested=exercise)
@@ -46,38 +46,16 @@ def explain(video: Path, exercise: str = "auto", show: str = "decisions",
     # to wait 80 seconds for is a debug loop you stop using. Cached keypoints
     # are reused when they exist - and the trace says so, because a trace that
     # silently mixed a fresh run with an old pose would be worse than none.
-    cached = PATHS.o(S.P_KEYPOINTS, f"{video.stem}.parquet")
-    keypoints = None
-    if cached.exists() and not fresh:
-        import pandas as pd
-
-        from .ingest import frame_to_keypoints
-        keypoints = frame_to_keypoints(pd.read_parquet(cached))
-        tr.step("keypoints reused from an earlier run", path=str(cached),
-                written=cached.stat().st_mtime, frames=int(len(keypoints)),
-                note="pass --fresh to re-run pose estimation")
-        fps = info["fps"] or 30.0
-    else:
-        backends = available_backends()
-        tr.step("backends available", backends=backends)
-        if not backends:
-            tr.error("no pose backend installed",
-                     fix='pip install -e ".[mediapipe]" in the server venv')
-            return _finish(tr, video, show, write, None)
-        backend = get_backend(backends[0])
-        model = getattr(backend, "model_path", None)
-        tr.step("estimating", backend=backend.name,
-                model=str(model) if model else None,
-                model_bytes=Path(model).stat().st_size
-                if model and Path(model).exists() else None)
-        pose = backend.estimate(video)
-        keypoints = pose.keypoints
-        fps = pose.fps or info["fps"] or 30.0
-
-    class _P:
-        pass
-    pose = _P()
-    pose.keypoints = keypoints
+    # The cache itself lives in barra/posecache.py, so the debug server can hand
+    # the same keypoints to the server's analyze_clip instead of paying twice.
+    try:
+        pose = load_or_estimate(video, fresh=fresh, trace=tr, write_cache=True,
+                                fallback_fps=info["fps"] or 30.0)
+    except SystemExit as exc:
+        tr.error(str(exc),
+                 fix='pip install -e ".[mediapipe]" in the server venv')
+        return _finish(tr, video, show, write, None)
+    fps = pose.fps or info["fps"] or 30.0
     conf = pose.keypoints[:, S.ANALYSIS_IDX, 2]
     tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps),
             mean_confidence=float(conf.mean()),

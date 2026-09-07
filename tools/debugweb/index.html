@@ -1,0 +1,52 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>barra · pipeline debug</title>
+<link rel="stylesheet" href="app.css">
+
+<div id="top">
+  <select id="clip" title="clips in ., data/videos and server/data"></select>
+  <select id="exercise" title="force a movement instead of detecting one">
+    <option value="auto">auto</option>
+    <option>muscle_up</option><option>pull_up</option><option>dip</option>
+    <option>push_up</option><option>squat</option><option>pistol_squat</option>
+    <option>knee_raise</option><option>front_lever</option><option>planche</option>
+  </select>
+  <select id="backend" title="pose backend"></select>
+  <label><input type="checkbox" id="fresh"> fresh</label>
+  <button id="run" class="primary">▶ Run</button>
+  <span id="status">idle</span>
+  <span class="sp"></span>
+  <select id="trace" title="traces on disk, newest first"></select>
+  <button id="diff" title="diff this trace against the one before it">⇄ diff</button>
+</div>
+
+<div id="main">
+  <div id="rail"></div>
+
+  <div id="centre">
+    <div class="card">
+      <h3 id="clip-title">clip</h3>
+      <div id="stage-wrap">
+        <video id="video" controls preload="metadata"></video>
+        <canvas id="overlay"></canvas>
+      </div>
+      <canvas id="chart"></canvas>
+      <div id="legend">
+        <span style="color:var(--accent)">tracking signal</span>
+        <span style="color:var(--ok)">accepted rep</span>
+        <span style="color:var(--warn)">rejected candidate</span>
+        <span style="color:#8a6bd1">apex p97 / rest p15</span>
+        <span style="color:var(--faint)">turnaround gate</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 id="entries-title">evidence</h3>
+      <div class="body" id="entries"></div>
+    </div>
+  </div>
+
+  <div id="right"></div>
+</div>
+
+<script src="app.js"></script>
