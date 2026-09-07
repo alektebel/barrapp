@@ -18,33 +18,41 @@ from __future__ import annotations
 
 import math
 
+from .config import THRESHOLDS
+
+# Every threshold below is a name for one field of config.THRESHOLDS. Nothing
+# here holds its own number: this module and barra/faults.py used to keep
+# separate copies of the same three constants, and the phone a third, so the
+# only thing keeping them equal was a comment asking future readers to be
+# careful. Now they cannot disagree.
+
 # ---- straightness: 180 = fully extended -------------------------------------
-STRAIGHT_ARM = 160.0
-STRAIGHT_LEG = 160.0
+STRAIGHT_ARM = THRESHOLDS.straight_arm
+STRAIGHT_LEG = THRESHOLDS.straight_leg
 
 # ---- body line: 0 = vertical, 90 = horizontal -------------------------------
 # A lever or planche wants the body horizontal. Anything below this band is a
 # range-of-motion failure (the body has not come up to the line).
-HORIZONTAL = 70.0
-STRICT_HORIZONTAL = 75.0
+HORIZONTAL = THRESHOLDS.horizontal
+STRICT_HORIZONTAL = THRESHOLDS.strict_horizontal
 
 # ---- hip pike: 180 = fully straight -----------------------------------------
 # A piked body flexes the hips. This is the "sagging hips" / broken body line.
-PIKE = 150.0
+PIKE = THRESHOLDS.pike
 
-# ---- shared bar faults, mirrors barra/faults.py -----------------------------
-SWING_TORSO = 0.4
-LOCKOUT_MIN = 0.85
-HANG_MIN = 0.75
-CONTROLLED_TEMPO = 0.70
-STALL_RATE = 0.20
+# ---- shared bar faults ------------------------------------------------------
+SWING_TORSO = THRESHOLDS.swing_torso
+LOCKOUT_MIN = THRESHOLDS.lockout_min
+HANG_MIN = THRESHOLDS.hang_min
+CONTROLLED_TEMPO = THRESHOLDS.controlled_tempo
+STALL_RATE = THRESHOLDS.stall_rate
 
 # How deep a pistol must go for the ROM to count (hip depth below the standing
 # ankle, in torso-lengths).
-PISTOL_DEPTH = 0.55
+PISTOL_DEPTH = THRESHOLDS.pistol_depth
 # How far the standing knee may travel sideways before it counts as valgus
 # (knee collapse inward), in torso-lengths.
-PISTOL_VALGUS = 0.12
+PISTOL_VALGUS = THRESHOLDS.pistol_valgus
 
 
 def _f(x, default: float | None = None) -> float | None:

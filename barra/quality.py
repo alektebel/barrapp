@@ -35,6 +35,8 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
+from .config import THRESHOLDS
+
 # Component weights. Fixed here, before any clip is scored, so the number cannot
 # be tuned after the fact to make a session look better.
 #
@@ -48,13 +50,13 @@ import numpy as np
 WEIGHTS = {"range": 0.40, "smoothness": 0.35}
 
 # A descent at least this fraction of the ascent's duration counts as controlled.
-CONTROLLED_TEMPO = 0.70
+CONTROLLED_TEMPO = THRESHOLDS.controlled_tempo
 # What dropping the descent entirely costs, as a fraction of the score. Set to
 # the weight control used to carry, so the fault costs exactly what it did
 # before - the change removes the constant, not the penalty.
 CONTROL_PENALTY = 0.25
 # Progress below this fraction of the rep's mean ascent rate counts as a stall.
-STALL_RATE = 0.20
+STALL_RATE = THRESHOLDS.stall_rate
 
 # Band boundaries.
 #

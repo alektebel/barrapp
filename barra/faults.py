@@ -28,9 +28,14 @@ from __future__ import annotations
 import math
 import re
 
-SWING_TORSO = 0.4
-LOCKOUT_MIN = 0.85
-HANG_MIN = 0.75
+from .config import THRESHOLDS
+
+# Names kept for readability at the call sites; the values live in config.py,
+# which is the file `validate` fingerprints. Two modules holding their own copy
+# of 0.85 is how a threshold moves on one side of the wire only.
+SWING_TORSO = THRESHOLDS.swing_torso
+LOCKOUT_MIN = THRESHOLDS.lockout_min
+HANG_MIN = THRESHOLDS.hang_min
 
 _LOCKOUT_RE = re.compile(r"lockout (\d+)% of full")
 _HANG_RE = re.compile(r"hang (\d+)% of full")
