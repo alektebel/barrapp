@@ -6,19 +6,39 @@ the opposite: it classifies each measured rep or hold into the COMMON failure
 types that actually occur, from the geometry that was already measured.
 
 Each failure is a threshold on a measured signal, so it is deterministic and
-testable, and it is stated with the number behind it. The taxonomy is per
-track: a front lever fails in different ways from a pistol squat. Shared basics
-(poor range of motion, momentum) appear where they apply.
+testable, and it is stated with the number behind it: a fired fault carries the
+value, the threshold and the comparison that fired it, which is what the phone
+renders and what the trace records.
 
-The thresholds are pinned here because the phone (Cues.kt) and this module must
-agree. Change them together, or the app starts saying things the harness never
-tested.
+Three rules hold everywhere in here, and they are the ones the previous version
+broke:
+
+1. A predicate reads an `Evidence` record, never a bare dict, so an absent
+   measurement is `None` and cannot satisfy a condition. "bent arms" used to
+   default a missing `arms_straight_frac` to 1.0 - perfect - which made the
+   fault unfireable on any rep, since nothing on the rep path produced that
+   key at all.
+2. Bar faults belong to bar movements. `shoulder_above` is measured against the
+   movement's ORIGIN, and on a hip-origin track that origin is the hips
+   themselves: a squat reported peak_height 1.0 and start_depth -1.0 on every
+   rep, so "dead hang" fired unconditionally and "momentum" - the hips'
+   distance from the hips - never could. A squat has its own classifier now,
+   reading an ankle-referenced depth.
+3. A PLANAR quantity is not fired from an unknowable viewpoint. Knee valgus is
+   a frontal measurement and torso lean a sagittal one; docs/FINDINGS.md
+   already showed a 10-degree azimuth change outweighing a deliberate error.
+   The evidence layer blocks them, and a blocked fault is reported as
+   unmeasured rather than as clean.
+
+Thresholds are named here and defined once in config.py, which `validate`
+fingerprints.
 """
 from __future__ import annotations
 
-import math
+from dataclasses import dataclass
 
 from .config import THRESHOLDS
+from .evidence import UNKNOWN_VIEW, Evidence, View
 
 # Every threshold below is a name for one field of config.THRESHOLDS. Nothing
 # here holds its own number: this module and barra/faults.py used to keep
@@ -55,223 +75,232 @@ PISTOL_DEPTH = THRESHOLDS.pistol_depth
 PISTOL_VALGUS = THRESHOLDS.pistol_valgus
 
 
-def _f(x, default: float | None = None) -> float | None:
-    if x is None:
-        return default
-    try:
-        v = float(x)
-    except (TypeError, ValueError):
-        return default
-    return v if math.isfinite(v) else default
+# ---------------------------------------------------------------------------
+# What a fired fault is
+# ---------------------------------------------------------------------------
+@dataclass(frozen=True)
+class Fault:
+    """A fault, with the number that fired it.
+
+    The phone used to re-derive these by regular expression from the prose in
+    the range component's why-string, which meant a copy edit could silently
+    switch off fault detection on every device. It renders `name` now, and
+    everything needed to explain the call travels with it.
+    """
+    name: str
+    primitive: str
+    value: float | None
+    threshold: float
+    comparison: str          # "<", "<=", ">", ">="
+    unit: str = ""
+    robustness: str = "SCALED"
+
+    def as_dict(self) -> dict:
+        return {
+            "name": self.name,
+            "primitive": self.primitive,
+            "value": (None if self.value is None else round(float(self.value), 4)),
+            "threshold": round(float(self.threshold), 4),
+            "comparison": self.comparison,
+            "unit": self.unit,
+            "class": self.robustness,
+        }
+
+
+def _fire(ev: Evidence, primitive: str, comparison: str, threshold: float,
+          name: str) -> Fault | None:
+    """The fault, if the measurement exists AND crosses the threshold.
+
+    Not measured means not fired - and, crucially, not clean either: the caller
+    reports `ev.unmeasured()` beside the faults so the two are told apart.
+    """
+    value = ev.value(primitive)
+    if value is None:
+        return None
+    fired = {
+        "<": value < threshold,
+        "<=": value <= threshold,
+        ">": value > threshold,
+        ">=": value >= threshold,
+    }[comparison]
+    if not fired:
+        return None
+    m = ev.get(primitive)
+    return Fault(name, primitive, value, threshold, comparison, m.unit,
+                 m.robustness)
+
+
+def _collect(*faults: Fault | None) -> list[Fault]:
+    return [f for f in faults if f is not None]
+
+
+# ---------------------------------------------------------------------------
+# Shared bar rules - wrist-origin movements only
+# ---------------------------------------------------------------------------
+def _bar_faults(ev: Evidence) -> list[Fault]:
+    """The five faults defined for a body hanging from its hands.
+
+    Every one of them is measured against the hands. On a hip-origin track they
+    would be measured against the hips, which is why they are not offered there.
+    """
+    return _collect(
+        _fire(ev, "swing", ">", SWING_TORSO, "momentum"),
+        _fire(ev, "lockout_pct", "<", LOCKOUT_MIN * 100, "lockout"),
+        _fire(ev, "hang_pct", "<", HANG_MIN * 100, "dead hang"),
+        _fire(ev, "tempo_ratio", "<", CONTROLLED_TEMPO, "control"),
+        _fire(ev, "stalled_frac", ">=", THRESHOLDS.stalled_frac, "stall"),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Front lever
 # ---------------------------------------------------------------------------
-def front_lever(values: dict) -> list[str]:
+def front_lever(ev: Evidence) -> list[Fault]:
     """The failures a front lever was measured to have."""
-    out: list[str] = []
-    body = _f(values.get("body_line_deg"))
-    if body is not None and body < STRICT_HORIZONTAL:
-        out.append("poor range of motion")     # body not held horizontal
-    if _f(values.get("arms_straight_frac"), 1.0) < 0.6:
+    return _collect(
+        _fire(ev, "body_line_deg", "<", STRICT_HORIZONTAL, "poor range of motion"),
         # Bent elbows are the visible face of failed scapular retraction: the
         # shoulders are not held down and back, so the arms take the load.
-        out.append("poor scapular retraction")
-    if _f(values.get("legs_straight_frac"), 1.0) < 0.6:
-        out.append("bent knees")
-    pike = _f(values.get("hip_pike_deg"))
-    if pike is not None and pike < PIKE:
-        out.append("piked hips")
-    if _f(values.get("swing"), 0.0) > SWING_TORSO:
-        out.append("momentum")
-    return out
+        _fire(ev, "arms_straight_frac", "<", THRESHOLDS.arms_straight_frac,
+              "poor scapular retraction"),
+        _fire(ev, "legs_straight_frac", "<", THRESHOLDS.legs_straight_frac,
+              "bent knees"),
+        _fire(ev, "hip_pike_deg", "<", PIKE, "piked hips"),
+        _fire(ev, "swing", ">", SWING_TORSO, "momentum"),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Planche
 # ---------------------------------------------------------------------------
-def planche(values: dict) -> list[str]:
-    out: list[str] = []
-    body = _f(values.get("body_line_deg"))
-    if body is not None and body < STRICT_HORIZONTAL:
-        out.append("poor range of motion")
-    if _f(values.get("arms_straight_frac"), 1.0) < 0.6:
+def planche(ev: Evidence) -> list[Fault]:
+    return _collect(
+        _fire(ev, "body_line_deg", "<", STRICT_HORIZONTAL, "poor range of motion"),
         # A planche is pushed from the shoulders; bent elbows mean the shoulders
         # are not protracted and the arms are doing the pushing instead.
-        out.append("poor scapular protraction")
-    if _f(values.get("legs_straight_frac"), 1.0) < 0.6:
-        out.append("bent knees")
-    pike = _f(values.get("hip_pike_deg"))
-    if pike is not None and pike < PIKE:
-        out.append("piked body")
-    if _f(values.get("swing"), 0.0) > SWING_TORSO:
-        out.append("momentum")
-    return out
+        _fire(ev, "arms_straight_frac", "<", THRESHOLDS.arms_straight_frac,
+              "poor scapular protraction"),
+        _fire(ev, "legs_straight_frac", "<", THRESHOLDS.legs_straight_frac,
+              "bent knees"),
+        _fire(ev, "hip_pike_deg", "<", PIKE, "piked body"),
+        _fire(ev, "swing", ">", SWING_TORSO, "momentum"),
+    )
 
 
 # ---------------------------------------------------------------------------
-# Muscle-up / bar
+# Muscle-up
 # ---------------------------------------------------------------------------
-def muscle_up(values: dict) -> list[str]:
-    """The bar faults, extended with what a muscle-up adds over a pull-up.
+def muscle_up(ev: Evidence) -> list[Fault]:
+    """The bar faults, extended with what a muscle-up adds over a pull-up."""
+    return _bar_faults(ev) + _collect(
+        _fire(ev, "transition_s", ">", THRESHOLDS.transition_s, "poor transition"),
+        _fire(ev, "arms_straight_frac", "<", THRESHOLDS.bent_arms_frac, "bent arms"),
+    )
 
-    The first five mirror barra/faults.py so the phone and the harness still
-    agree on the ones they already named.
+
+# ---------------------------------------------------------------------------
+# Pull-up
+# ---------------------------------------------------------------------------
+def pull_up(ev: Evidence) -> list[Fault]:
+    """The bar faults plus the two the coaching literature cites most.
+
+    `no active hang` is the bottom of the rep seen at the elbow rather than at
+    the shoulder: the athlete never straightens the arms between reps. `too
+    fast` is measured against the SET'S OWN median concentric, so it is one
+    athlete on one day compared with themselves - no absolute seconds, nothing
+    that moves when the camera does.
     """
-    out: list[str] = []
-    if _f(values.get("swing"), 0.0) > SWING_TORSO:
-        out.append("momentum")
-    lockout = _f(values.get("lockout_pct"))
-    if lockout is not None and lockout < LOCKOUT_MIN * 100:
-        out.append("lockout")                 # poor ROM at the top
-    hang = _f(values.get("hang_pct"))
-    if hang is not None and hang < HANG_MIN * 100:
-        out.append("dead hang")               # poor ROM at the bottom
-    tempo = _f(values.get("tempo_ratio"))
-    if tempo is not None and tempo < CONTROLLED_TEMPO:
-        out.append("control")                 # descent was dropped
-    if _f(values.get("stalled_frac"), 0.0) >= 0.05:
-        out.append("stall")
-    transition = _f(values.get("transition_s"))
-    if transition is not None and transition > 0.60:
-        out.append("poor transition")
-    if _f(values.get("arms_straight_frac"), 1.0) < 0.5:
-        out.append("bent arms")
-    return out
+    return _bar_faults(ev) + _collect(
+        _fire(ev, "start_elbow_deg", "<", THRESHOLDS.active_hang_deg,
+              "no active hang"),
+        _fire(ev, "fast_ratio", "<", THRESHOLDS.fast_rep_frac, "too fast"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Dip
+# ---------------------------------------------------------------------------
+def dip(ev: Evidence) -> list[Fault]:
+    """A dip starts locked out at the top and turns around at the bottom.
+
+    So both ends are read at the elbow rather than as a share of arm reach: the
+    top is where the arms should be straight, and the bottom is where going
+    past ninety degrees stops being depth and starts being the shoulder.
+    """
+    return _collect(
+        _fire(ev, "start_elbow_deg", "<", STRAIGHT_ARM, "lockout"),
+        _fire(ev, "bottom_elbow_deg", "<", THRESHOLDS.dip_bottom_deg, "too deep"),
+        _fire(ev, "turn_speed", ">", THRESHOLDS.bounce_speed, "bounce at bottom"),
+        _fire(ev, "tempo_ratio", "<", CONTROLLED_TEMPO, "control"),
+        _fire(ev, "stalled_frac", ">=", THRESHOLDS.stalled_frac, "stall"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Push-up
+# ---------------------------------------------------------------------------
+def push_up(ev: Evidence) -> list[Fault]:
+    """A push-up is a plank that bends: the body line is half of the movement.
+
+    `sagging hips` is the hip's distance from the shoulder-ankle line, which
+    only exists from the side - filmed head-on the whole line projects to
+    nothing - so it is a PLANAR primitive and does not fire from an unknown
+    viewpoint.
+    """
+    return _collect(
+        _fire(ev, "travel", "<", THRESHOLDS.push_up_depth, "poor range of motion"),
+        _fire(ev, "start_elbow_deg", "<", STRAIGHT_ARM, "lockout"),
+        _fire(ev, "hip_sag", ">", THRESHOLDS.hip_sag, "sagging hips"),
+        _fire(ev, "tempo_ratio", "<", CONTROLLED_TEMPO, "control"),
+        _fire(ev, "stalled_frac", ">=", THRESHOLDS.stalled_frac, "stall"),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Squat
+# ---------------------------------------------------------------------------
+def squat(ev: Evidence) -> list[Fault]:
+    """A squat measured where a squat happens: at the hips, over the ankles.
+
+    Depth is the hip's drop from THIS rep's own standing height, so it needs no
+    ruler and no reference athlete, and because it is purely vertical it does
+    not change when the camera walks around. Valgus and heel rise are planar
+    and gated accordingly.
+    """
+    return _collect(
+        _fire(ev, "squat_depth", "<", THRESHOLDS.squat_depth, "poor range of motion"),
+        _fire(ev, "tempo_ratio", "<", CONTROLLED_TEMPO, "uncontrolled descent"),
+        _fire(ev, "knee_valgus", ">", PISTOL_VALGUS, "knee valgus"),
+        _fire(ev, "heel_rise", ">", THRESHOLDS.heel_rise, "heel raise"),
+        _fire(ev, "stalled_frac", ">=", THRESHOLDS.stalled_frac, "stall"),
+    )
 
 
 # ---------------------------------------------------------------------------
 # Pistol squat
 # ---------------------------------------------------------------------------
-def pistol_squat(values: dict) -> list[str]:
-    out: list[str] = []
-    depth = _f(values.get("pistol_depth"))
-    if depth is not None and depth < PISTOL_DEPTH:
-        out.append("poor range of motion")    # not deep enough
-    valgus = _f(values.get("knee_valgus"))
-    if valgus is not None and valgus > PISTOL_VALGUS:
-        out.append("knee valgus")             # the standing knee caves inward
-    if _f(values.get("heel_raise"), 0.0) > 0.20:
-        out.append("heel raise")              # ankle mobility / calf tightness
-    lean = _f(values.get("torso_lean"))
-    if lean is not None and lean < -0.30:
-        out.append("leaning back")            # over-compensating, hips forward
-    tempo = _f(values.get("tempo_ratio"))
-    if tempo is not None and tempo < CONTROLLED_TEMPO:
-        out.append("uncontrolled descent")
-    if _f(values.get("swing"), 0.0) > SWING_TORSO:
-        out.append("arm swing")
-    return out
+def pistol_squat(ev: Evidence) -> list[Fault]:
+    return _collect(
+        _fire(ev, "pistol_depth", "<", PISTOL_DEPTH, "poor range of motion"),
+        _fire(ev, "knee_valgus", ">", PISTOL_VALGUS, "knee valgus"),
+        _fire(ev, "heel_rise", ">", THRESHOLDS.heel_rise, "heel raise"),
+        _fire(ev, "torso_lean", "<", THRESHOLDS.lean_back, "leaning back"),
+        _fire(ev, "tempo_ratio", "<", CONTROLLED_TEMPO, "uncontrolled descent"),
+        _fire(ev, "swing", ">", SWING_TORSO, "arm swing"),
+    )
 
-
-# ---------------------------------------------------------------------------
-# Enriching a rep's measured values for the classifiers
-# ---------------------------------------------------------------------------
-def values_for_rep(metrics: dict, arm: float, signal,
-                   start: int, turn: int) -> dict:
-    """Turn the standard rep metrics into the keys the classifiers read.
-
-    `metrics` is the dict from barra.metrics.rep_metrics. The classifiers want
-    a few things the rep metrics do not carry directly (lockout/hang as a
-    percent of the athlete's own arm, the stalled fraction, the pistol's depth),
-    so they are derived here, in one place.
-    """
-    out: dict = dict(metrics)
-    if _np_isfinite(arm) and arm > 0:
-        if out.get("peak_height") is not None and _np_isfinite(out["peak_height"]):
-            out["lockout_pct"] = out["peak_height"] / arm * 100.0
-        if out.get("start_depth") is not None and _np_isfinite(out["start_depth"]):
-            out["hang_pct"] = out["start_depth"] / arm * 100.0
-
-    # The stalled fraction is the smoothness component's read-out: what share of
-    # the ascent made no progress. Recomputing it here keeps the failure text
-    # consistent with the score, without threading the component through.
-    if signal is not None and len(signal) > 0:
-        seg = np.asarray(signal[start:turn + 1], dtype=float)
-        if seg.size >= 6:
-            step = np.diff(seg)
-            total = seg[-1] - seg[0]
-            if total > 1e-9:
-                mean_rate = total / step.size
-                out["stalled_frac"] = float(np.mean(step < STALL_RATE * mean_rate))
-
-    # A pistol's depth is its range of motion: how far the hips dropped.
-    if out.get("rom") is not None and _np_isfinite(out["rom"]):
-        out["pistol_depth"] = out["rom"]
-    return out
-
-
-def pistol_geometry(kp, start: int, turn: int, end: int, torso: float) -> dict:
-    """Per-leg geometry a pistol needs, from the raw keypoints.
-
-    These are frontal/planar quantities (knee valgus, backward lean), so they
-    only mean something from a consistent camera side - the taxonomy keeps that
-    caveat on the failure it feeds.
-    """
-    seg = slice(start, end + 1)
-    sh = _mid(kp, "left_shoulder", "right_shoulder")
-    hip = _mid(kp, "left_hip", "right_hip")
-    knee = _mid(kp, "left_knee", "right_knee")
-    ankle = _mid(kp, "left_ankle", "right_ankle")
-
-    # Backward lean: hips ahead of the shoulders (image x grows rightward, so
-    # a positive hip-shoulder gap that is large means the hips have gone
-    # forward of the shoulders - the "leaning back" compensation).
-    lean = (hip[:, 0] - sh[:, 0])[seg] / torso
-    lean = lean[np.isfinite(lean)]
-    torso_lean = float(np.percentile(lean, 90)) if lean.size else np.nan
-
-    # Knee valgus: the knees deviate sideways from the hip-ankle line. Measured
-    # on whichever side is better seen; a big deviation is a collapsed knee.
-    dev = []
-    for side in ("left", "right"):
-        kx = kp[:, S.KP_INDEX[f"{side}_knee"], 0]
-        hx = kp[:, S.KP_INDEX[f"{side}_hip"], 0]
-        ax = kp[:, S.KP_INDEX[f"{side}_ankle"], 0]
-        ok = (kp[:, S.KP_INDEX[f"{side}_knee"], 2] >= MIN_CONF) & \
-             (kp[:, S.KP_INDEX[f"{side}_hip"], 2] >= MIN_CONF) & \
-             (kp[:, S.KP_INDEX[f"{side}_ankle"], 2] >= MIN_CONF)
-        d = np.abs(kx - (hx + ax) / 2.0)[seg] / torso
-        d = d[ok[seg] & np.isfinite(d)]
-        if d.size:
-            dev.append(float(np.percentile(d, 90)))
-    knee_valgus = max(dev) if dev else np.nan
-
-    # Heel raise: the standing ankle sits too high above the toe line. We have
-    # no toe landmark, so this is approximated by how high the planted ankle is
-    # relative to the body - a raised heel lifts the ankle toward the knee.
-    # Only reported; it is the weakest of the pistol signals.
-    ankle_below = (hip[:, 1] - ankle[:, 1])[seg] / torso
-    ankle_below = ankle_below[np.isfinite(ankle_below)]
-    heel_raise = float(1.0 - np.percentile(ankle_below, 5)) if ankle_below.size else np.nan
-
-    return {"torso_lean": torso_lean, "knee_valgus": knee_valgus,
-            "heel_raise": heel_raise}
-
-
-# --- small local imports to keep the module self-contained -------------------
-import numpy as np
-from . import schema as S
-from .movements import midpoint as _mid, pair_confidence, robust_torso
-
-MIN_CONF = 0.5
-
-def _np_isfinite(x):
-    try:
-        return bool(np.isfinite(x))
-    except (TypeError, ValueError):
-        return False
 
 # ---------------------------------------------------------------------------
 # Dispatch
 # ---------------------------------------------------------------------------
-# Track -> the failure classifier. Anything not in here is classified by the
-# shared bar rules via muscle_up's overlap with the old faults.
 CLASSIFIERS = {
     "front_lever": front_lever,
     "planche": planche,
     "muscle_up": muscle_up,
+    "pull_up": pull_up,
+    "dip": dip,
+    "push_up": push_up,
+    "squat": squat,
     "pistol_squat": pistol_squat,
 }
 
@@ -283,26 +312,57 @@ TRACK_FAILURES: dict[str, tuple[str, ...]] = {
                 "bent knees", "piked body", "momentum"),
     "muscle_up": ("momentum", "lockout", "dead hang", "control", "stall",
                   "poor transition", "bent arms"),
+    "pull_up": ("momentum", "lockout", "dead hang", "control", "stall",
+                "no active hang", "too fast"),
+    "dip": ("lockout", "too deep", "bounce at bottom", "control", "stall"),
+    "push_up": ("poor range of motion", "lockout", "sagging hips", "control",
+                "stall"),
+    "squat": ("poor range of motion", "uncontrolled descent", "knee valgus",
+              "heel raise", "stall"),
     "pistol_squat": ("poor range of motion", "knee valgus", "heel raise",
                      "leaning back", "uncontrolled descent", "arm swing"),
 }
 
+# Errors these movements are commonly coached on that this pipeline does NOT
+# measure, and why. Data rather than prose, so the app can state what it is not
+# looking at instead of implying the list is complete. Adding a row here is how
+# you decline to measure something; inventing a threshold for it is not.
+NOT_MEASURED: dict[str, str] = {
+    "gaze": "head direction needs a face-on view no training clip has",
+    "grip type": "hand orientation is below the resolution of a 2D wrist point",
+    "wrist loading": "no load or joint-torque signal exists in a video",
+    "elbow flare": "the 90-degree flare check needs a camera overhead",
+    "lumbar rounding": "there are no spine landmarks between shoulders and hips",
+    "breathing": "not visible",
+}
 
-def classify_failures(track: str, values: dict) -> list[str]:
-    """The failure types one rep or hold of `track` was measured to have.
 
-    Unknown track -> empty. The shared muscle_up classifier also covers the
-    plain bar movements (dip, pull-up, push-up) because those five faults are
-    defined for the bar in general.
+def classify_faults(track: str, ev: Evidence) -> list[Fault]:
+    """The faults one rep or hold of `track` was measured to have.
+
+    An unknown track produces nothing - not a guess borrowed from a movement
+    that happens to share a classifier.
     """
     fn = CLASSIFIERS.get(track)
-    if fn is None:
-        # For the older bar movements keep the established five-fault set.
-        if track in ("pull_up", "dip", "push_up", "squat"):
-            return muscle_up(values)
-        return []
-    return fn(values)
+    return fn(ev) if fn else []
+
+
+def classify_failures(track: str, values: dict | Evidence,
+                      view: View = UNKNOWN_VIEW) -> list[str]:
+    """Fault NAMES only - the shape the hold path and the harness still use."""
+    ev = (values if isinstance(values, Evidence)
+          else Evidence.from_values(values, track=track, view=view))
+    return [f.name for f in classify_faults(track, ev)]
 
 
 def all_tracks() -> tuple[str, ...]:
     return tuple(CLASSIFIERS)
+
+
+def all_fault_names() -> tuple[str, ...]:
+    """Every fault name any track can produce, in a stable order."""
+    seen: dict[str, None] = {}
+    for names in TRACK_FAILURES.values():
+        for n in names:
+            seen.setdefault(n, None)
+    return tuple(seen)

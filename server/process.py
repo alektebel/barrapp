@@ -12,10 +12,9 @@ from pathlib import Path
 from deepseek import write_report
 from vision import technique_note, technique_second_opinion, count_from_clip
 
-from barra.faults_taxonomy import (classify_failures, pistol_geometry,
-                                   values_for_rep)
+from barra.evidence import declared_view, estimate_view, rep_evidence
+from barra.faults_taxonomy import classify_faults
 from barra.holds import clip_failures, hold_attempts
-from barra.movements import robust_torso
 from barra.recommend import recommend_for_payload
 
 from barra.frames import technique_artifacts
@@ -108,7 +107,8 @@ def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
 
     metrics = analyze_clip(video_path, requested, session=job.get("session"),
                            trace=trace, on_stage=_stage,
-                           visual_count=_visual_count)
+                           visual_count=_visual_count,
+                           declared_bin=job.get("view"))
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -287,12 +287,19 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
 
 def analyze_clip(video_path: Path, exercise: str = "auto",
                  session: str | None = None, trace=None, on_stage=None,
-                 visual_count=None) -> dict:
+                 visual_count=None, pose=None,
+                 declared_bin: str | None = None) -> dict:
     """Measure one clip. `on_stage`, when given, is called with a short human
     phrase at each step that can take real time, so a waiting phone can say
     where the work is. `visual_count`, when given, is the last resort for a
     count: a callable(list[Path]) -> int | None, asked only when every
-    geometric pass found nothing."""
+    geometric pass found nothing. `pose`, when given, is keypoints already
+    estimated for this clip (anything with `.keypoints` and `.fps`) and the
+    backend loop is skipped - that is how the debug tool reuses the cache in
+    barra/posecache.py instead of paying 78 seconds for a second opinion on
+    frames that have not changed. `declared_bin` is the viewpoint the session
+    row states (SAGITTAL / OBLIQUE / FRONTAL); given one, the planar faults
+    trust it instead of the single-clip estimator."""
     def _stage(name: str) -> None:
         if on_stage is None:
             return
@@ -324,8 +331,16 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             "Use server/.venv (pip install -e ../barrapp[mediapipe])."
         ])
 
+    if pose is not None:
+        # Keypoints supplied by the caller. The trace records where they came
+        # from: a run whose pose is implicit cannot answer "which model made
+        # these numbers", which is the one question a replay must answer.
+        tr.step("pose supplied by the caller",
+                source=getattr(pose, "source", "caller"),
+                frames=int(len(pose.keypoints)))
+
     backends = available_backends()
-    if not backends:
+    if not backends and pose is None:
         return _empty(exercise, [
             "No pose backend installed. In server/.venv run: "
             "pip install -e ../barrapp[mediapipe]"
@@ -336,7 +351,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     # the first frame: BARRA_POSE_BACKEND pins one, and the rest are tried in
     # registry order if the first estimate raises.
     requested = os.environ.get("BARRA_POSE_BACKEND", "").strip()
-    if requested:
+    if requested and pose is None:
         if requested not in backends:
             return _empty(exercise, [
                 f"pose backend {requested!r} is not installed; have: {', '.join(backends)}"
@@ -354,16 +369,16 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                       [f"Could not open the clip: {info.get('reason', 'unknown')}"])
 
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
-    pose = None
     pose_error = None
-    for name in order:
-        try:
-            pose = get_backend(name).estimate(video_path)
-            tr.step("pose backend", backend=name)
-            break
-        except Exception as exc:  # noqa: BLE001 - the next backend may still work
-            pose_error = exc
-            tr.reject("pose backend failed", backend=name, reason=str(exc)[:200])
+    if pose is None:
+        for name in order:
+            try:
+                pose = get_backend(name).estimate(video_path)
+                tr.step("pose backend", backend=name)
+                break
+            except Exception as exc:  # noqa: BLE001 - the next backend may still work
+                pose_error = exc
+                tr.reject("pose backend failed", backend=name, reason=str(exc)[:200])
     if pose is None:
         reason = str(pose_error) if pose_error else "unknown"
         return _empty(exercise, [f"Pose estimation failed: {reason}"])
@@ -468,6 +483,22 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     except Exception as exc:  # noqa: BLE001 - evidence must not fail the job
         tr.error("could not record the keypoint timesteps", reason=str(exc)[:200])
 
+    # Where the camera stood, and whether that is knowable at all. Faults that
+    # only exist in one plane - knee valgus is frontal, a sagging hip line
+    # sagittal - are not fired from a viewpoint the estimator cannot pin down:
+    # docs/FINDINGS.md measured a 10-degree azimuth change outweighing a
+    # deliberately induced error, so a planar fault called from an unknown
+    # angle is a coin flip with a number printed on it. A view declared on the
+    # session row beats the estimate, because a person who wrote it down knows
+    # where they put the tripod.
+    view = declared_view(declared_bin) if declared_bin else estimate_view(pose.keypoints)
+    tr.step("viewpoint", **view.as_dict())
+
+    # The set's own median concentric, so "too fast" compares this athlete's
+    # reps with each other rather than with a number someone chose.
+    concentrics = sorted(max(turn - start, 1) / fps for start, turn, _ in found)
+    median_concentric = (concentrics[len(concentrics) // 2] if concentrics else None)
+
     _stage("scoring the reps")
     rep_amplitudes: list[float] = []
     rep_durations: list[float] = []
@@ -502,16 +533,36 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             scores.append(q.score)
         # Classify the failure types this rep was measured to have, so the
         # phone can say WHAT was wrong rather than only how far from "perfect".
-        vals = values_for_rep(measured.values, arm, signal, start, turn)
-        if movement.name == "pistol_squat":
-            vals.update(pistol_geometry(pose.keypoints, start, turn, end,
-                                        robust_torso(pose.keypoints)))
-        rep_failures = classify_failures(movement.name, vals)
+        ev = rep_evidence(measured.values, arm, signal, start, turn, end, fps,
+                          movement, kp=pose.keypoints, view=view,
+                          median_concentric_s=median_concentric)
+        rep_faults = classify_faults(movement.name, ev)
+        rep_failures = [f.name for f in rep_faults]
+        # The one decision in the chain that recorded no evidence. Every other
+        # stage prints the number it measured next to the threshold it had to
+        # clear (docs/DEBUGGING.md); the fault layer printed only its verdict,
+        # so "why did it not say dead hang" had no answer in the trace. Now the
+        # primitives it read are printed with their state, and a primitive that
+        # is unmeasured or blocked by the viewpoint is a fault that could not
+        # have fired rather than one the rep passed.
+        tr.step(f"failure classification r{i + 1}",
+                track=movement.name, failures=rep_failures,
+                faults=[f.as_dict() for f in rep_faults],
+                evidence=ev.as_dict(), unmeasured=ev.unmeasured(),
+                view_blocked=ev.view_blocked(), view=view.as_dict())
         reps.append({
             "session": session,
             "label": f"r{i + 1}",
             "rescued": rescued,
             "failures": rep_failures,
+            # The structured contract the phone renders: each fired fault with
+            # the value and the threshold that fired it, and, beside it, what
+            # could not be looked at. Cues.kt used to recover these by regular
+            # expression from human-readable prose, so a copy edit could switch
+            # fault detection off on every device at once.
+            "faults": [f.as_dict() for f in rep_faults],
+            "unmeasured": ev.unmeasured(),
+            "viewBlocked": ev.view_blocked(),
             "transition_s": transition.replace(" s", ""),
             "total_s": total.replace(" s", ""),
             "class": "INVARIANT",
@@ -600,7 +651,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "rescued": rescued,
         "countedBy": counted_by,
         "consistency": consistency or None,
-        "blockers": blockers_out,
+        "view": view.as_dict(),
         "fps": round(float(fps), 3),
         "duration_s": round(float(info.get("duration_s") or 0), 2),
         "trim": trim,
@@ -609,7 +660,11 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "sessionBand": qband(session_score),
         "sessions": [{"date": session, "reps": usable, "note": note}],
         "reps": reps,
-        "blockers": blockers,
+        # blockers_out, not blockers: the key was written twice in this literal
+        # and the second one won, so the "the geometry could not time the reps,
+        # so two vision models counted N" line was built and then dropped on
+        # every clip that needed it.
+        "blockers": blockers_out,
         "nextSession": (
             "Five or six reps, one set, tripod on a marked spot, same side every time, "
             "lockout in frame, trimmed to the working set."

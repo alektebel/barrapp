@@ -51,24 +51,31 @@ ANATOMICAL_PRIOR_RANGE = (0.65, 0.95)
 CALIBRATION_TOLERANCE = 0.15   # relative slack on R_true for the interval
 
 
-def _apparent_ratios(video: str) -> np.ndarray:
+def apparent_ratios_kp(kp: np.ndarray) -> np.ndarray:
     """Apparent shoulder width in torso-lengths, per usable frame.
 
     The divisor is one robust torso length for the whole clip, not the
     per-frame value. A per-frame divisor turns any frame where the pose
     estimator briefly collapses the torso into a ratio of 50-plus, which then
     sets the calibration for every clip and mis-bins the entire session.
+
+    Takes keypoints rather than a video name so the server can ask the same
+    question of a clip it has in memory - the harness reads its parquet, the
+    Lambda has no parquet to read.
     """
     from .movements import robust_torso
 
-    df = read_parquet(PATHS.o(S.P_KEYPOINTS, f"{video}.parquet"), "ingest")
-    kp = frame_to_keypoints(df)
     ls, rs = S.KP_INDEX["left_shoulder"], S.KP_INDEX["right_shoulder"]
     w = np.linalg.norm(kp[:, ls, :2] - kp[:, rs, :2], axis=1)
     t = robust_torso(kp)
     conf = np.minimum(kp[:, ls, 2], kp[:, rs, 2])
     ok = conf >= MIN_MEAN_CONFIDENCE
     return (w[ok] / t) if ok.any() else np.array([])
+
+
+def _apparent_ratios(video: str) -> np.ndarray:
+    df = read_parquet(PATHS.o(S.P_KEYPOINTS, f"{video}.parquet"), "ingest")
+    return apparent_ratios_kp(frame_to_keypoints(df))
 
 
 def camera_side(video: str) -> tuple[str, float]:
@@ -86,7 +93,11 @@ def camera_side(video: str) -> tuple[str, float]:
     even on footage shot squarely from behind.
     """
     df = read_parquet(PATHS.o(S.P_KEYPOINTS, f"{video}.parquet"), "ingest")
-    kp = frame_to_keypoints(df)
+    return camera_side_kp(frame_to_keypoints(df))
+
+
+def camera_side_kp(kp: np.ndarray) -> tuple[str, float]:
+    """camera_side, for keypoints already in hand."""
     idx = [S.KP_INDEX[n] for n in
            ("left_shoulder", "right_shoulder", "left_hip", "right_hip")]
     conf = kp[:, idx, 2].min(axis=1)

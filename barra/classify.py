@@ -167,8 +167,9 @@ def _angle(pts: np.ndarray, a: int, b: int, c: int, ok: np.ndarray,
     v1 = pa - pb
     v2 = pc - pb
     denom = np.linalg.norm(v1, axis=1) * np.linalg.norm(v2, axis=1)
-    cosang = np.where(denom > 1e-6,
-                      np.clip(np.sum(v1 * v2, axis=1) / denom, -1.0, 1.0), 0.0)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        cosang = np.where(denom > 1e-6,
+                          np.clip(np.sum(v1 * v2, axis=1) / denom, -1.0, 1.0), 0.0)
     deg = np.degrees(np.arccos(cosang))
     seen = (np.asarray(ok, dtype=bool)
             & (pts[:, a, 2] >= min_conf)
