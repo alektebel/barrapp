@@ -5,8 +5,14 @@
 > muscle-up, push-up) y [gmb.io](https://www.gmb.io/planche/) (planche). Los errores son los
 > **5 más citados** en cada página de "common mistakes".
 
-> Corresponde a los movimientos que mide **barrapp** (`barra/movements.py`): squat,
-> muscle_up, pull_up, push_up, front_lever, planche, pistol_squat, dip.
+> Corresponde a los movimientos que mide **barrapp** (`barra/movements.py`):
+> squat, muscle_up, pull_up, push_up, front_lever, planche, pistol_squat,
+> dip, split_squat, bulgarian_split_squat. El mismo contenido vive como datos
+> estructurados en `data/exercises/catalog.json` (lo consumen el servidor y la
+> app); este documento es la versión legible. La distinción es la de siempre:
+> los errores de los movimientos **medibles** tienen un `ruleId` de
+> `barra/rules.py`; el resto (peso muerto, press banca, máquinas…) son
+> contenido de referencia, marcados como *no medibles*.
 
 ---
 
@@ -106,6 +112,31 @@ Componentes: pull-up + dip.
 | 5 | **Cargar peso demasiado pronto** | Añadir peso sin base estricta | Sólo con 8–10 reps estrictas a rango completo |
 
 **Progresiones:** dip de banco → asistido (banda) → negativo → estricto → ring dip → weighted dip.
+
+---
+
+### Sentadilla búlgara (Bulgarian split squat)
+| # | Error | Por qué falla | Cómo se corrige |
+|---|-------|---------------|-----------------|
+| 1 | **Recorrido incompleto** | Se baja poco; la profundidad se mide contra el pie delantero | Bajar el trasero hacia el talón delantero hasta el rango completo |
+| 2 | **Rodillas hacia dentro (valgo)** | La rodilla delantera cae hacia dentro al bajar | Rodilla delantera sobre la punta del pie; empujar con el borde externo |
+| 3 | **Talón delantero levantado** | El talón se despega y la carga pasa a la punta | Mantener el talón delantero pegada al suelo toda la rep |
+| 4 | **Espalda echada atrás** | Las caderas se adelantan para compensar | Pecho arriba, torso ligeramente adelante sobre la pierna delantera |
+| 5 | **Caída sin control** | Se cae al fondo en vez de frenar con la pierna delantera | Bajar controlando; pausa breve abajo y subida controlada |
+
+> En *weighted* (con peso), los mismos fallos se acentúan (valgo, rango corto),
+> pero barra **no ve la carga** en 2D: se captura en la app, no se adivina.
+
+---
+
+## Split squat (zancada estática)
+| # | Error | Por qué falla | Cómo se corrige |
+|---|-------|---------------|-----------------|
+| 1 | **Recorrido incompleto** | Baja demasiado poco; la rodilla trasera casi toca el suelo | Bajar hasta que la rodilla trasera roce el suelo |
+| 2 | **Rodillas hacia dentro (valgo)** | La rodilla delantera colapsa hacia dentro | Contra el glúteo de la pierna delantera, rodilla fuera sobre los dedos |
+| 3 | **Talón delantero levantado** | El talón se levanta | Talón delantero en el suelo; ajustar la longitud de la zancada |
+| 4 | **Espalda echada atrás** | El torso se echa atrás | Torso vertical a ligeramente inclinado adelante |
+| 5 | **Caída sin control** | Desciende en caída | Frenar con el cuádriceps; bajar en tempo controlado |
 
 ---
 

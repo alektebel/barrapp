@@ -26,7 +26,7 @@ from scipy.signal import find_peaks, savgol_filter
 from .movements import resolve
 
 from . import schema as S
-from .config import PATHS
+from .config import PATHS, THRESHOLDS
 from .io_utils import read_csv, write_csv, write_parquet, video_stem
 
 VIDEO_EXTS = {".mp4", ".mov", ".m4v", ".avi", ".mkv"}
@@ -134,6 +134,16 @@ def probe_video(path: Path) -> dict:
 # ---------------------------------------------------------------------------
 # Rep segmentation
 # ---------------------------------------------------------------------------
+def _smooth_window(n: int) -> int:
+    """The Savitzky-Golay window `_clean_signal` uses on a signal of length n.
+
+    Named because a second caller needs it: a smoothed sample within half a
+    window of a span's edge is built partly from frames on the other side of
+    that edge, so a span's own statistics have to be taken from its interior.
+    """
+    return max(5, min(21, (n // 12) | 1))
+
+
 def _clean_signal(sig: np.ndarray, conf: np.ndarray,
                   min_conf: float = 0.35) -> tuple[np.ndarray, np.ndarray]:
     """Interpolate short low-confidence gaps, smooth, and report which frames
@@ -149,7 +159,7 @@ def _clean_signal(sig: np.ndarray, conf: np.ndarray,
         return np.zeros_like(sig), valid
     idx = np.arange(len(sig))
     out = np.interp(idx, idx[valid], sig[valid])
-    win = max(5, min(21, (len(out) // 12) | 1))
+    win = _smooth_window(len(out))
     if len(out) > win:
         out = savgol_filter(out, win, 2)
     return out, valid
@@ -157,7 +167,8 @@ def _clean_signal(sig: np.ndarray, conf: np.ndarray,
 
 def segment_reps(kp: np.ndarray, fps: float, movement=None,
                  max_invented_frac: float = 0.4,
-                 max_half_rep_s: float = 4.0, trace=None) -> list[tuple[int, int, int]]:
+                 max_half_rep_s: float | None = None,
+                 trace=None) -> list[tuple[int, int, int]]:
     """See `segment_reps_verbose`; returns the reps only."""
     return segment_reps_verbose(kp, fps, movement, max_invented_frac,
                                 max_half_rep_s, trace)[0]
@@ -180,32 +191,18 @@ def active_mask(kp: np.ndarray, fps: float, movement) -> np.ndarray:
     window around it. Windows overlap, so the mask dilates naturally to the
     edges of the set rather than clipping the first and last rep.
     """
-    from .classify import ANCHOR_FIXED, ANCHOR_WINDOW_S, MIN_SEEN, MIN_CONF, _travel
+    from .classify import ANCHOR_WINDOW_S, MIN_CONF, anchored_mask
     from .movements import midpoint, pair_confidence, robust_torso
 
     n = len(kp)
-    active = np.zeros(n, dtype=bool)
     if n == 0:
-        return active
+        return np.zeros(0, dtype=bool)
     a, b = (("left_wrist", "right_wrist") if movement.origin == "wrist"
             else ("left_ankle", "right_ankle"))
-    torso = robust_torso(kp)
-    pts = midpoint(kp, a, b)
-    ok = pair_confidence(kp, a, b) >= MIN_CONF
-
     win = int(max(15, min(n, round(ANCHOR_WINDOW_S * (fps or 30.0)))))
-    if n <= win:
-        active[:] = (_travel(pts, ok, torso) <= ANCHOR_FIXED
-                     and float(ok.mean()) >= MIN_SEEN)
-        return active
-    step = max(1, win // 10)
-    for i in range(0, n - win + 1, step):
-        j = i + win
-        if float(ok[i:j].mean()) < MIN_SEEN:
-            continue
-        if _travel(pts[i:j], ok[i:j], torso) <= ANCHOR_FIXED:
-            active[i:j] = True
-    return active
+    return anchored_mask(midpoint(kp, a, b),
+                         pair_confidence(kp, a, b) >= MIN_CONF,
+                         robust_torso(kp), win)
 
 
 def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
@@ -222,9 +219,105 @@ def _runs(mask: np.ndarray) -> list[tuple[int, int]]:
     return out
 
 
+# The least of a candidate rep's frames the pose estimator must actually have
+# observed. One number for both passes: the relaxed pass used to carry its own
+# copy, and "relaxed" must never come to mean "counted footage nobody saw".
+MIN_OBSERVED_FRAC = 0.6
+
+
+def candidate_checks(kp: np.ndarray, raw: np.ndarray | None, valid: np.ndarray,
+                     a: int, pk: int, b: int, movement, fps: float, *,
+                     min_frames: int, tr=None, label: str = "",
+                     min_observed: float = MIN_OBSERVED_FRAC) -> str | None:
+    """The physical checks a candidate rep must pass whichever pass found it.
+
+    Returns None when the candidate is acceptable, otherwise the human-readable
+    reason it is not - and records the rejection in the trace with the number
+    and the limit it failed against. The standard and relaxed segmenters both
+    call this and nothing else for these four checks, so they cannot drift:
+
+    1. long enough to be a rep at all;
+    2. mostly OBSERVED, not interpolated across a tracking gap;
+    3. on a wrist-origin movement, the hands stayed on something fixed;
+    4. on a hanging movement, the rest position is a hang - the shoulders
+       below the hands - and on a support movement (dip, push-up) it is a
+       support, shoulders above them. A "rep" that rests with the shoulders
+       0.86 torso-lengths above the hands (0014, 22.6-25.2 s) is a person
+       standing beside the rig whose wrists happened to be tracked below the
+       shoulders. The anchor test alone let it through: standing still is as
+       anchored as hanging still.
+    """
+    from .movements import MAX_BAR_TRAVEL, anchor_travel
+    from .trace import NullTrace
+
+    tr = tr or NullTrace()
+    at = round(float(pk) / fps, 2)
+    label = label or f"candidate at {at}s"
+    n_frames = int(b - a)
+    if n_frames < min_frames:
+        tr.reject(label, "too brief to be a rep", frames=n_frames, min_frames=min_frames)
+        return f"candidate at {pk / fps:.1f}s was too brief to be a rep"
+    observed = float(valid[a:b + 1].mean()) if b >= a else 0.0
+    if observed < min_observed:
+        tr.reject(label, "mostly interpolated frames",
+                  observed_frac=round(observed, 3), min_observed=min_observed)
+        return (f"candidate at {pk / fps:.1f}s is mostly interpolated - "
+                f"only {observed:.0%} of its frames were tracked")
+    if movement.origin == "wrist":
+        travel = anchor_travel(kp, a, b)
+        if not np.isfinite(travel) or travel > MAX_BAR_TRAVEL:
+            tr.reject(label, "the hands were not on anything fixed",
+                      wrist_travel=float(travel), max_travel=MAX_BAR_TRAVEL,
+                      window_s=[round(a / fps, 2), round(b / fps, 2)])
+            return (f"candidate at {pk / fps:.1f}s: the hands travelled "
+                    f"{travel:.1f} torso-lengths, so they were not on a fixed bar "
+                    "- this is movement around the rig, not a rep")
+    if raw is not None and movement.signal == "shoulder_above_bar":
+        rest = _rest_level(raw, valid, a, b, fps)
+        tol = THRESHOLDS.rest_side_tolerance
+        if np.isfinite(rest):
+            if movement.direction == "ascending" and rest > tol:
+                tr.reject(label, "the rest position is not a hang",
+                          shoulders_above_hands_at_rest=round(rest, 3),
+                          max_above=tol,
+                          window_s=[round(a / fps, 2), round(b / fps, 2)])
+                return (f"candidate at {pk / fps:.1f}s rests with the shoulders "
+                        f"{rest:.2f} torso-lengths above the hands, so it did not "
+                        "start from a hang - not a rep of a hanging movement")
+            if movement.direction == "descending" and rest < -tol:
+                tr.reject(label, "the rest position is not a support",
+                          shoulders_above_hands_at_rest=round(rest, 3),
+                          min_above=-tol,
+                          window_s=[round(a / fps, 2), round(b / fps, 2)])
+                return (f"candidate at {pk / fps:.1f}s rests with the shoulders "
+                        f"{-rest:.2f} torso-lengths below the hands, so it did not "
+                        "start from a support - not a rep of a pressing movement")
+    return None
+
+
+def _rest_level(raw: np.ndarray, valid: np.ndarray, a: int, b: int,
+                fps: float) -> float:
+    """The raw (un-oriented) signal at the candidate's rest: the median over
+    the observed frames of a short window at each end, then the LOWER of the
+    two for a hanging movement's purposes - a rep that rests properly at
+    either end is given the benefit of it."""
+    half = max(1, int(round(0.10 * max(fps, 1.0))))
+    ends = []
+    for centre in (a, b):
+        lo, hi = max(a, centre - half), min(b, centre + half)
+        seg = np.asarray(raw[lo:hi + 1], dtype=float)
+        ok = np.asarray(valid[lo:hi + 1], dtype=bool) & np.isfinite(seg)
+        if ok.sum():
+            ends.append(float(np.median(seg[ok])))
+    if not ends:
+        return float("nan")
+    # Closest to the hands wins: the candidate is judged on its better end.
+    return min(ends, key=abs)
+
+
 def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                          max_invented_frac: float = 0.4,
-                         max_half_rep_s: float = 4.0,
+                         max_half_rep_s: float | None = None,
                          trace=None,
                          ) -> tuple[list[tuple[int, int, int]], list[str]]:
     """Split a set into reps on the movement's own tracking signal.
@@ -245,15 +338,20 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
     out/reps.csv is a plain editable file: fix it there and re-run. Nothing
     downstream re-derives segmentation.
     """
-    from .movements import DEFAULT, MAX_BAR_TRAVEL, anchor_travel, tracking_signal
+    from .movements import DEFAULT, tracking_signal
     from .trace import NullTrace
 
     tr = trace or NullTrace()
     movement = movement or DEFAULT
+    if max_half_rep_s is None:
+        max_half_rep_s = THRESHOLDS.max_half_rep_s
     tr.stage("segment")
     reasons: list[str] = []
     raw, conf = tracking_signal(kp, movement)
     sig, valid = _clean_signal(raw, conf)
+    # `raw` is oriented so the turnaround is a maximum; the rest-posture check
+    # in candidate_checks needs the physical sign (+ = shoulders above hands).
+    physical = raw if movement.direction == "ascending" else -raw
     tr.step("signal built", movement=movement.name, signal=movement.signal,
             frames=int(len(sig)), observed_frames=int(valid.sum()),
             observed_frac=float(valid.mean()) if len(valid) else 0.0)
@@ -279,27 +377,91 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             active_frac=float(active.mean()),
             dropped_frames=int(len(active) - active.sum()))
 
-    rest = float(np.percentile(sig[measured], 15))
-    apex = float(np.percentile(sig[measured], 97))
-    amplitude = apex - rest
-    tr.step("amplitude", rest_p15=rest, apex_p97=apex, amplitude=amplitude,
-            measured_over="active frames only")
-    if amplitude <= 1e-6:
-        tr.reject("all reps", "the tracked signal never moved")
+    # Amplitude is taken PER ACTIVE SPAN, not once for the clip.
+    #
+    # Trimming to the active spans stopped the walk to the bar from setting the
+    # bar, but one span could still set it for another. A clip is often two
+    # sets with a rest between them - or one set plus a single explosive
+    # attempt - and the clip-wide percentile then derives every span's
+    # prominence threshold from the loudest span. The quiet span's genuine
+    # turnarounds sit below a threshold they were never measured against, and
+    # they are not rejected with a reason: they are never proposed at all,
+    # which is the failure mode that hid three muscle-ups behind a walk.
+    #
+    # A span with too few measured frames to have its own percentiles falls
+    # back to the clip's, which is what it used to get anyway.
+    clip_rest = float(np.percentile(sig[measured], 15))
+    clip_apex = float(np.percentile(sig[measured], 97))
+    clip_amplitude = clip_apex - clip_rest
+
+    # Statistics come from the span's INTERIOR. Smoothing runs before the
+    # spans are known, so a sample within half a window of an edge is built
+    # partly from frames on the other side of it - and the frame on the other
+    # side of a set's edge is the athlete standing with their hands at their
+    # hips, a full torso-length from anything in the set. Ten such frames in a
+    # span of 180 sit above the 97th percentile and set the apex, which turned
+    # a shallow set's amplitude from 0.38 into 0.64: the contamination is
+    # exactly the walk-in the span was drawn to exclude.
+    half = _smooth_window(len(sig)) // 2
+    span_stats: list[tuple[int, int, float, float]] = []   # lo, hi, rest, amplitude
+    for lo, hi in spans:
+        i, j = lo, hi
+        if j - i > 4 * half:
+            i, j = lo + half, hi - half
+        seen = measured[i:j + 1]
+        if seen.sum() >= 5:
+            s_ = sig[i:j + 1][seen]
+            r = float(np.percentile(s_, 15))
+            a_ = float(np.percentile(s_, 97))
+        else:
+            r, a_ = clip_rest, clip_apex
+        span_stats.append((lo, hi, r, a_ - r))
+    tr.step("amplitude", rest_p15=clip_rest, apex_p97=clip_apex,
+            amplitude=clip_amplitude, measured_over="per active span",
+            per_span=[{"at_seconds": [round(lo / fps, 2), round(hi / fps, 2)],
+                       "rest_p15": round(r, 4), "amplitude": round(a_, 4)}
+                      for lo, hi, r, a_ in span_stats])
+    # A span that never moved is not a quiet set, and giving it its own
+    # threshold would make it one: 0.35 of nothing is nothing, and pose jitter
+    # clears nothing. Spans below the floor are dropped before they can
+    # propose a candidate.
+    floor = THRESHOLDS.min_span_amplitude
+    still = [(lo, hi, a_) for lo, hi, _, a_ in span_stats if a_ < floor]
+    if still:
+        tr.step("spans too still to be a set discarded", count=len(still),
+                floor_torso_lengths=floor,
+                at_seconds=[[round(lo / fps, 2), round(hi / fps, 2)]
+                            for lo, hi, _ in still],
+                amplitudes=[round(a_, 4) for *_, a_ in still])
+    span_stats = [t for t in span_stats if t[3] >= floor]
+    if not span_stats:
+        tr.reject("all reps", "the tracked signal never moved",
+                  floor_torso_lengths=floor, amplitude=round(clip_amplitude, 4))
         return [], ["the tracked signal never moved - no movement detected"]
 
     min_dist = max(1, int(movement.min_rep_s * fps))
-    peaks, _ = find_peaks(sig, prominence=0.35 * amplitude, distance=min_dist)
-    outside = int((~active[peaks]).sum()) if len(peaks) else 0
-    if outside:
-        tr.step("turnarounds outside the active spans discarded", count=outside)
-    peaks = peaks[active[peaks]] if len(peaks) else peaks
+    prominence = THRESHOLDS.peak_prominence
+    # Peaks are found inside each span, against that span's own amplitude. The
+    # slice is padded so a turnaround sitting near a span edge still has the
+    # shoulders find_peaks needs to measure its prominence; only peaks landing
+    # inside the span itself are kept.
+    found: list[np.ndarray] = []
+    for lo, hi, r, amp in span_stats:
+        pad_lo = max(0, lo - min_dist)
+        pad_hi = min(len(sig) - 1, hi + min_dist)
+        pk, _ = find_peaks(sig[pad_lo:pad_hi + 1], prominence=prominence * amp,
+                           distance=min_dist)
+        pk = pk + pad_lo
+        found.append(pk[(pk >= lo) & (pk <= hi)])
+    peaks = (np.unique(np.concatenate(found)) if found
+             else np.array([], dtype=int))
     tr.step("candidate turnarounds", count=int(len(peaks)),
             at_seconds=[round(float(p) / fps, 2) for p in peaks],
-            prominence_required=0.35 * amplitude, min_separation_frames=min_dist)
+            prominence_frac=prominence, min_separation_frames=min_dist,
+            measured_over="per active span")
     if len(peaks) == 0:
         tr.reject("all reps", "no turnaround stood out from the noise",
-                  prominence_required=0.35 * amplitude)
+                  prominence_frac=prominence)
         return [], ["no turnaround stood out from the noise"]
 
     # Boundaries: cross a 30%-of-amplitude gate to leave the peak, then keep
@@ -311,11 +473,18 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
     # of from the hang, and every duration metric omit the slowest part of the
     # rep - both wrong in the same direction on every rep, which is exactly the
     # kind of bias that survives averaging.
-    gate = rest + 0.30 * amplitude
     max_half = int(max_half_rep_s * fps)
     reps: list[tuple[int, int, int]] = []
     for pk in peaks:
         at = round(float(pk) / fps, 2)
+        # A rep cannot run out of the span that contains its turnaround: past
+        # that edge the athlete is off the apparatus, and the signal there is
+        # about walking. The span also carries the rest position and amplitude
+        # this candidate is judged against - its own, not the clip's.
+        lo, hi, rest, amplitude = next(
+            ((x, y, r, a) for x, y, r, a in span_stats if x <= pk <= y),
+            (0, len(sig) - 1, clip_rest, clip_amplitude))
+        gate = rest + 0.30 * amplitude
         if sig[pk] < rest + 0.6 * amplitude:
             tr.reject(f"candidate at {at}s", "peak too shallow to be a turnaround",
                       peak_value=float(sig[pk]), required=rest + 0.6 * amplitude)
@@ -331,11 +500,6 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                       frame=int(pk))
             continue
 
-        # A rep cannot run out of the span that contains its turnaround: past
-        # that edge the athlete is off the apparatus, and the signal there is
-        # about walking.
-        lo, hi = next(((x, y) for x, y in spans if x <= pk <= y), (0, len(sig) - 1))
-
         def walk(i: int, step: int) -> int:
             n, limit = 0, hi
             while lo <= i + step <= limit and sig[i + step] > gate and n < max_half:
@@ -347,33 +511,15 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             return i
 
         a, b = walk(pk, -1), walk(pk, +1)
-        if b - a < max(3, min_dist // 2):
-            reasons.append(f"candidate at {pk / fps:.1f}s was too brief to be a rep")
-            tr.reject(f"candidate at {at}s", "too brief to be a rep",
-                      frames=int(b - a), min_frames=max(3, min_dist // 2))
+        # Length, observation, anchor and rest posture: the checks shared with
+        # the relaxed pass, so the two cannot disagree about what a rep is.
+        why = candidate_checks(kp, physical, valid, a, pk, b, movement, fps,
+                               min_frames=max(3, min_dist // 2), tr=tr,
+                               label=f"candidate at {at}s",
+                               min_observed=1.0 - max_invented_frac)
+        if why is not None:
+            reasons.append(why)
             continue
-        if valid[a:b + 1].mean() < (1.0 - max_invented_frac):
-            reasons.append(
-                f"candidate at {pk / fps:.1f}s is mostly interpolated - "
-                f"only {valid[a:b + 1].mean():.0%} of its frames were tracked"
-            )
-            tr.reject(f"candidate at {at}s", "mostly interpolated frames",
-                      observed_frac=float(valid[a:b + 1].mean()),
-                      min_observed=1.0 - max_invented_frac)
-            continue
-        # The anchor a bar movement is measured against has to stay put.
-        if movement.origin == "wrist":
-            travel = anchor_travel(kp, a, b)
-            if travel > MAX_BAR_TRAVEL:
-                reasons.append(
-                    f"candidate at {pk / fps:.1f}s: the hands travelled "
-                    f"{travel:.1f} torso-lengths, so they were not on a fixed bar "
-                    "- this is movement around the rig, not a rep"
-                )
-                tr.reject(f"candidate at {at}s", "the hands were not on anything fixed",
-                          wrist_travel=float(travel), max_travel=MAX_BAR_TRAVEL,
-                          window_s=[round(a / fps, 2), round(b / fps, 2)])
-                continue
         # Two reps may legitimately share a boundary frame: a lifter with a
         # tight cadence returns to the same rest position and goes again, so
         # one rep ends exactly where the next begins. Only a substantial
@@ -494,7 +640,8 @@ def load_reps() -> pd.DataFrame:
 
 
 def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
-                       movement, tr=None) -> list[tuple[int, int, int]]:
+                       movement, tr=None, kp: np.ndarray | None = None,
+                       raw: np.ndarray | None = None) -> list[tuple[int, int, int]]:
     """The relaxed fallback segmenter, validated by the signal's own gradients.
 
     The standard pass asks a lot: prominence above a third of the amplitude,
@@ -505,6 +652,14 @@ def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
     floor of the clip's own velocity, and the displacement is a real fraction
     of the amplitude. Drift, a sway, or one interpolated spike do not survive
     that, which is what makes relaxing the thresholds safe.
+
+    What is relaxed is prominence, and only prominence. The physical checks -
+    observed frames, fixed hands, a rest position that is a hang - are the
+    same `candidate_checks` the standard pass runs, applied here BEFORE a
+    candidate is recorded as accepted. They used to run afterwards, in the
+    caller, so the trace showed "rescue rep 1 accepted" for a candidate that
+    the very next entry threw out; a replay could not tell a retained rep
+    from a rejected one without reading to the end.
     """
     from .movements import DEFAULT
     from .trace import NullTrace
@@ -531,14 +686,20 @@ def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
     climb_floor = 2.5 * scale
 
     min_dist = max(1, int(0.7 * movement.min_rep_s * fps))
-    gate = rest + 0.15 * amplitude
+    relaxed = THRESHOLDS.rescue_prominence
+    gate = rest + relaxed * amplitude
     min_half_frames = max(2, int(0.5 * movement.min_rep_s * fps))
 
-    peaks, props = find_peaks(sig, prominence=0.15 * amplitude, distance=min_dist)
+    peaks, props = find_peaks(sig, prominence=relaxed * amplitude, distance=min_dist)
     # The scale a candidate is judged against is its peers' prominence, not
     # the clip-wide amplitude: one violent mount or dismount would otherwise
     # set a bar the actual reps in the rest of the clip can never clear.
     med_prom = float(np.median(props["prominences"])) if len(peaks) else amplitude
+    # Candidates first, as their own event, so the trace shows what was
+    # proposed separately from what was rejected and what was finally kept.
+    tr.step("rescue candidate turnarounds", count=int(len(peaks)),
+            at_seconds=[round(float(p) / fps, 2) for p in peaks],
+            prominence_frac=relaxed, min_separation_frames=min_dist)
     kept: list[tuple[int, int, int]] = []
     for pk in peaks:
         at = round(float(pk) / fps, 2)
@@ -561,10 +722,6 @@ def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
                 m += 1
             return cur
         a, b = walk(int(pk), -1), walk(int(pk), +1)
-        if b - a < min_half_frames:
-            tr.reject(f"rescue candidate at {at}s", "too brief",
-                      frames=int(b - a), min=min_half_frames)
-            continue
         # The gradient test: real reps accelerate into the turnaround and out
         # of it. A wiggle that only exists because of noise has velocities
         # inside the noise floor; a rep does not.
@@ -583,14 +740,29 @@ def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
             tr.reject(f"rescue candidate at {at}s", "one leg of the rep is missing",
                       smallest_leg=round(up, 4), required=round(0.5 * med_prom, 4))
             continue
-        # And a rep is evidence only where the pose was actually seen. The
-        # standard pass refuses reps that are mostly interpolated; relaxed
-        # thresholds are not a licence to count footage nobody watched.
-        observed = float(valid[a:b + 1].mean())
-        if observed < 0.6:
-            tr.reject(f"rescue candidate at {at}s", "mostly interpolated frames",
-                      observed_frac=round(observed, 2), min_observed=0.6)
-            continue
+        # Length, observed frames, fixed hands and rest posture: the SAME
+        # checks as the standard pass. Relaxed thresholds are not a licence to
+        # count footage nobody watched, or a person walking past the rig.
+        # `kp` is None only in unit tests that hand over a bare signal; the
+        # anchor and rest checks then cannot run, and the trace says so.
+        if kp is not None:
+            if candidate_checks(kp, raw, valid, a, int(pk), b, movement, fps,
+                                min_frames=min_half_frames, tr=tr,
+                                label=f"rescue candidate at {at}s") is not None:
+                continue
+        else:
+            tr.note("rescue candidate checked without keypoints",
+                    at_s=at, skipped=["anchor travel", "rest posture"])
+            if b - a < min_half_frames:
+                tr.reject(f"rescue candidate at {at}s", "too brief",
+                          frames=int(b - a), min=min_half_frames)
+                continue
+            observed = float(valid[a:b + 1].mean())
+            if observed < MIN_OBSERVED_FRAC:
+                tr.reject(f"rescue candidate at {at}s", "mostly interpolated frames",
+                          observed_frac=round(observed, 2),
+                          min_observed=MIN_OBSERVED_FRAC)
+                continue
         if kept:
             pa, _, pb = kept[-1]
             overlap = min(b, pb) - max(a, pa)
@@ -620,13 +792,22 @@ def rescue_reps(kp: np.ndarray, fps: float, movement=None,
     tr = trace or NullTrace()
     movement = movement or DEFAULT
     tr.stage("rescue")
-    raw, conf = tracking_signal(kp, movement)
-    sig, valid = _clean_signal(raw, conf)
+    oriented, conf = tracking_signal(kp, movement)
+    sig, valid = _clean_signal(oriented, conf)
     if not valid.any():
         tr.reject("rescue", "no frame had a usable pose")
         return [], "no frame had a usable pose for this movement's landmarks"
-    reps = _rescue_candidates(sig, valid, fps, movement, tr)
+    # The un-oriented signal (+ = shoulders above the hands) for the rest-
+    # posture check; `tracking_signal` flips descending movements so the
+    # turnaround is a maximum, and the check needs the physical sign back.
+    raw = oriented if movement.direction == "ascending" else -oriented
+    # Relax prominence, never the physical reference frame: the anchor and
+    # rest checks run inside the candidate loop, before anything is accepted,
+    # so the fallback cannot re-accept walking or a dismount the standard
+    # pass rejected - and cannot record an acceptance it then withdraws.
+    reps = _rescue_candidates(sig, valid, fps, movement, tr, kp=kp, raw=raw)
     note = (f"the relaxed pass validated by the movement's own gradients "
-            f"counted {len(reps)} rep(s) the standard pass missed") if reps else            "even the gradient-validated relaxed pass found no rep"
+            f"counted {len(reps)} rep(s) the standard pass missed") if reps else \
+        "even the gradient-validated relaxed pass found no rep"
     tr.step("rescue complete", accepted=len(reps), note=note)
     return reps, note

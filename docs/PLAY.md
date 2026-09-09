@@ -4,7 +4,7 @@
 2. Data safety: Photos and videos, collected, sent off-device, not sold, not used for ads. Device or other IDs: a random app-generated id.
 3. Category: Health & Fitness. Content rating questionnaire. Do not claim medical or coaching benefits.
 4. Screenshots (phone), 1024×500 feature graphic, short description.
-5. Upload `app/build/outputs/bundle/release/app-release.aab` (not the debug APK). Package name is `com.alektebel.barrapp` and cannot change later.
+5. Upload `app/build/outputs/bundle/release/app-release.aab` (not the debug APK). Package name is `com.fitness.barrapp` (`applicationId` in `app/build.gradle.kts`) and cannot change later.
 6. Create the release keystore **once**, back it up off this machine, and never commit it:
 
 ```bash

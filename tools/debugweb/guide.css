@@ -1,0 +1,44 @@
+/* The guide. Long-form, so: one measure-limited column of prose, the tables
+   and the diagram allowed to run wider, and every heading in the display voice.
+   Colour comes from library.css / organic.css tokens only. */
+.live {
+  margin-top: var(--space-3); font-family: var(--mono); font-size: 12.5px;
+  color: var(--color-accent-800);
+}
+.section { margin: var(--space-8) 0; }
+.section > .lead { color: var(--color-neutral-800); font-size: 14.5px; max-width: 84ch; margin: 0 0 var(--space-3); }
+
+.walk { min-width: 1180px; height: 232px; }
+.walk .n { font: var(--font-heading-weight) 15px var(--font-heading); fill: var(--color-neutral-900); text-anchor: middle; }
+.walk .t { font: 700 13px var(--font-body); fill: var(--color-text); text-anchor: middle; }
+.walk .s { font: 400 11.5px var(--font-body); fill: var(--color-neutral-700); text-anchor: middle; }
+.walk .f { font: 400 11px var(--font-body); fill: var(--color-accent-700); text-anchor: middle; }
+
+.steps { list-style: none; counter-reset: step; padding: 0; margin: 0; max-width: 84ch; }
+.steps > li {
+  counter-increment: step; position: relative; padding: var(--space-4) 0 var(--space-4) 62px;
+  border-top: 1px solid var(--color-divider);
+}
+.steps > li:first-child { border-top: 0; }
+.steps > li::before {
+  content: counter(step); position: absolute; left: 0; top: var(--space-4);
+  width: 42px; height: 42px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--color-accent); color: var(--color-neutral-100);
+  font: var(--font-heading-weight) 18px/1 var(--font-heading);
+}
+.steps h3 { margin-bottom: 5px; }
+.steps p { margin: 0; color: var(--color-neutral-800); }
+
+.grid { display: grid; gap: var(--space-3); grid-template-columns: repeat(auto-fit, minmax(min(100%, 290px), 1fr)); }
+.mini { padding: var(--space-4); }
+.mini h3 { font-size: 16px; }
+.mini p { margin: 0; font-size: 13.5px; color: var(--color-neutral-800); }
+
+code {
+  font-family: var(--mono); font-size: .92em; background: var(--color-neutral-200);
+  border-radius: 6px; padding: 1px 6px;
+}
+pre { margin: 10px 0 0; overflow-x: auto; }
+pre code { display: block; background: none; padding: 0; font-size: 12.5px; line-height: 1.7; }
+.inset pre, pre.inset { border-radius: var(--radius-md); }
+.table code { background: none; padding: 0; }

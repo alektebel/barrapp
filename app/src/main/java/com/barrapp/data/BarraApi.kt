@@ -24,9 +24,19 @@ class BarraApi(context: Context) {
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
-    fun createJob(exercise: String): CreatedJob {
+    /**
+     * `variant` and `view` are DECLARATIONS the athlete makes, sent only when
+     * made: the server never infers a technique standard from one posture,
+     * and an unknown word comes back as `unspecified` with the word beside it
+     * rather than switching on the wrong fault taxonomy.
+     */
+    fun createJob(exercise: String, variant: String? = null, view: String? = null): CreatedJob {
         val body = JSONObject()
             .put("exercise", exercise)
+            .apply {
+                variant?.takeIf { it.isNotBlank() }?.let { put("variant", it) }
+                view?.takeIf { it.isNotBlank() }?.let { put("view", it) }
+            }
             .toString()
             .toRequestBody(JSON)
         val request = authed(Request.Builder().url("$baseUrl/v1/jobs").post(body)).build()
@@ -336,7 +346,7 @@ class BarraApi(context: Context) {
                 status = json.optString("status"),
                 exercise = json.optString("exercise"),
                 createdAt = json.optString("createdAt"),
-                error = json.optString("error").ifBlank { null },
+                error = json.textOrNull("error"),
                 stage = json.optString("stage"),
                 result = resultJson?.let { parseAnalysis(it) },
             )
@@ -422,10 +432,37 @@ class BarraApi(context: Context) {
                                 comparison = f.optString("comparison"),
                                 unit = f.optString("unit"),
                                 cls = f.optString("class"),
+                                errorId = f.optString("errorId"),
+                                phase = f.optString("phase"),
+                                intervalS = f.optJSONArray("intervalS").doubles(),
                             )
                         },
                         unmeasured = row.optJSONArray("unmeasured").strings(),
                         viewBlocked = row.optJSONArray("viewBlocked").strings(),
+                        assessments = row.optJSONArray("assessments").mapObjects { a ->
+                            val ev = a.optJSONObject("evidence")
+                            val avail = a.optJSONObject("availability")
+                            Assessment(
+                                errorId = a.optString("errorId"),
+                                name = a.optString("name"),
+                                phase = a.optString("phase"),
+                                status = a.optString("status"),
+                                intervalS = a.optJSONArray("intervalS").doubles(),
+                                value = if (ev == null || ev.isNull("value")) null
+                                        else ev.optDouble("value").orZero(),
+                                threshold = ev?.optDouble("threshold", 0.0)?.orZero() ?: 0.0,
+                                comparison = ev?.optString("comparison").orEmpty(),
+                                unit = ev?.optString("unit").orEmpty(),
+                                reason = avail?.optString("reason").orEmpty(),
+                                reasonDetail = avail?.optString("detail").orEmpty(),
+                                variantDependent = a.optBoolean("variantDependent", false),
+                                source = a.optString("source").ifBlank { Assessment.SOURCE_GEOMETRY },
+                            )
+                        },
+                        phases = row.optJSONObject("phases")?.let { p ->
+                            p.keys().asSequence().associateWith { k -> p.optJSONArray(k).doubles() }
+                        } ?: emptyMap(),
+                        assessmentBlocked = row.textOrNull("assessmentBlocked"),
                     )
                 },
                 blockers = (0 until blockers.length()).map { blockers.getString(it) },
@@ -437,7 +474,31 @@ class BarraApi(context: Context) {
                         label = d.optString("label"),
                         confidence = d.optDouble("confidence", 0.0).orZero(),
                         reason = d.optString("reason"),
-                        runnerUp = d.optString("runnerUp").ifBlank { null },
+                        runnerUp = d.textOrNull("runnerUp"),
+                        certainty = d.optString("certainty")
+                            .ifBlank { Detected.MARGIN_TO_THRESHOLD },
+                    )
+                },
+                model = json.optJSONObject("model")?.let { mm ->
+                    ModelVerdict(
+                        classification = mm.optJSONObject("classification")?.let { c ->
+                            ModelClassification(
+                                exercise = c.optString("exercise"),
+                                confidence = c.optDouble("confidence", 0.0).orZero(),
+                                runnerUp = c.textOrNull("runnerUp"),
+                                marginToRunnerUp = c.optDouble("marginToRunnerUp", 0.0).orZero(),
+                                probabilities = c.optJSONObject("probabilities")
+                                    .toDoubleMap(),
+                                modelVersion = c.optString("model"),
+                            )
+                        },
+                        load = mm.optJSONObject("load")?.let { l ->
+                            LoadEstimate(
+                                kg = l.optDouble("kg", 0.0).orZero(),
+                                estimated = l.optBoolean("estimated", false),
+                                note = l.optString("note"),
+                            )
+                        },
                     )
                 },
                 trim = json.optJSONObject("trim")?.let { t ->
@@ -460,12 +521,50 @@ class BarraApi(context: Context) {
                             ?.optString("sha256_12").orEmpty(),
                     )
                 },
+                variant = json.optJSONObject("variant")?.let { v ->
+                    Variant(
+                        name = v.optString("name").ifBlank { Variant.UNSPECIFIED },
+                        source = v.optString("source").ifBlank { "none" },
+                        declared = v.textOrNull("declared"),
+                    )
+                } ?: Variant(),
+                measurementVersion = json.optInt("measurementVersion", 0),
+                checks = json.optJSONObject("assessment")
+                    ?.optJSONArray("checks").mapObjects { c ->
+                        CheckSummary(
+                            errorId = c.optString("errorId"),
+                            name = c.optString("name"),
+                            phase = c.optString("phase"),
+                            observed = c.optInt("observed"),
+                            notObserved = c.optInt("notObserved"),
+                            unobservable = c.optInt("unobservable"),
+                        )
+                    },
+                visionObservations = json.optJSONArray("visionObservations").mapObjects { o ->
+                    VisionObservation(
+                        rep = o.optString("rep"),
+                        errorId = o.optString("errorId"),
+                        name = o.optString("name"),
+                        phase = o.optString("phase"),
+                        status = o.optString("status"),
+                        description = o.optString("description"),
+                        frames = o.optJSONArray("frames").strings(),
+                    )
+                },
+                visionDisagreesOnMovement = json.optJSONObject("visionMovement")
+                    ?.optBoolean("review", false) ?: false,
             )
         }
 
         /** JSONObject.optDouble returns NaN for a missing key, which then
          *  propagates silently into every arithmetic result downstream. */
         private fun Double.orZero(): Double = if (isNaN() || isInfinite()) 0.0 else this
+
+        /** A string the server may send as JSON `null`. `optString` renders
+         *  that as the four letters "null", which then reads as a real reason
+         *  ("not judged — null"); this reads it as absent. */
+        private fun JSONObject.textOrNull(key: String): String? =
+            if (isNull(key)) null else optString(key).ifBlank { null }
 
         private fun <T> JSONArray?.mapObjects(block: (JSONObject) -> T): List<T> {
             if (this == null) return emptyList()
@@ -475,6 +574,25 @@ class BarraApi(context: Context) {
         private fun JSONArray?.strings(): List<String> {
             if (this == null) return emptyList()
             return (0 until length()).mapNotNull { optString(it).ifBlank { null } }
+        }
+
+        /** A JSON array of numbers; a null or non-numeric entry drops the
+         *  whole list rather than inventing a 0.0 endpoint. */
+        private fun JSONArray?.doubles(): List<Double> {
+            if (this == null) return emptyList()
+            val out = (0 until length()).map { optDouble(it, Double.NaN) }
+            return if (out.any { it.isNaN() }) emptyList() else out
+        }
+
+        /** A JSON object of numbers (e.g. the model's class probabilities). */
+        private fun JSONObject?.toDoubleMap(): Map<String, Double> {
+            if (this == null) return emptyMap()
+            val out = LinkedHashMap<String, Double>()
+            keys().forEach { k ->
+                val v = optDouble(k, Double.NaN)
+                if (!v.isNaN()) out[k] = v
+            }
+            return out
         }
 
         fun sampleFromAssets(context: Context): Analysis {

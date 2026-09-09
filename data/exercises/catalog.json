@@ -1,0 +1,417 @@
+{
+  "schema": 1,
+  "version": "2026-09-09.1",
+  "note": "The exercise catalogue. Every row carries the 5 most common mistakes a coach corrects on that movement. The distinction the whole app is built on: `measurable` true means barra actually measures the fault against a threshold (a ruleId in barra/rules.py) and can report it from footage; `measurable` false means the faults are authored coaching knowledge (ruleId null) - shown for teaching, never reported as a measurement. A weighted row is a calisthenics variant carrying added load, which barra cannot see in a video, so the load is captured by the athlete and stored, not inferred. Sources for the errors are the common-mistakes references used to build tecnicas-errores-comunes.md (ampainsoc.org, gmb.io) plus standard coaching literature; they are the 5 most cited.",
+  "exercises": [
+    {
+      "id": "squat",
+      "nameEs": "Sentadilla",
+      "nameEn": "Bodyweight squat",
+      "family": "legs",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "poor range of motion", "nameEs": "Recorrido incompleto", "ruleId": "squat.shallow_depth", "why": "No se llega a la profundidad (media sentadilla).", "fix": "Bajar el peso, alcanzar la profundidad completa, subir despu\u00e9s."},
+        {"name": "knee valgus", "nameEs": "Rodillas hacia dentro", "ruleId": "squat.knee_medial_drift", "why": "Debilidad de gl\u00fateos o stance demasiado estrecho.", "fix": "Abrir el suelo con los pies y ensanchar ligeramente el stance."},
+        {"name": "heel raise", "nameEs": "Talones levantados", "ruleId": "squat.planted_ankle_rise", "why": "Falta de movilidad de tobillo.", "fix": "Zapatos con tal\u00f3n o un plato bajo el tal\u00f3n mientras se trabaja movilidad."},
+        {"name": "uncontrolled descent", "nameEs": "Ca\u00edda sin control", "ruleId": "squat.dropped_descent", "why": "Bajar solt\u00e1ndose por gravedad en vez de frenar.", "fix": "Bajar controlando en 2-3 segundos, sin dejarse caer al fondo."},
+        {"name": "stall", "nameEs": "Estancamiento", "ruleId": "squat.lift_stall", "why": "La subida se atasca en el punto muerto.", "fix": "Empujar con intenci\u00f3n a trav\u00e9s del punto de estancamiento."}
+      ]
+    },
+    {
+      "id": "bulgarian_split_squat",
+      "nameEs": "Sentadilla b\u00falgara",
+      "nameEn": "Bulgarian split squat",
+      "family": "legs",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "poor range of motion", "nameEs": "Recorrido incompleto", "ruleId": "bulgarian_split_squat.shallow_depth", "why": "Se baja poco; la profundidad se mide contra el pie delantero.", "fix": "Bajar el trasero hacia el tal\u00f3n delantero hasta el rango completo."},
+        {"name": "knee valgus", "nameEs": "Rodillas hacia dentro", "ruleId": "bulgarian_split_squat.knee_medial_drift", "why": "La rodilla delantera cae hacia dentro al bajar.", "fix": "Rodilla delantera sobre la punta del pie; empujar con el borde externo."},
+        {"name": "heel raise", "nameEs": "Tal\u00f3n levantado", "ruleId": "bulgarian_split_squat.planted_ankle_rise", "why": "El tal\u00f3n delantero se despega y la carga pasa a la punta.", "fix": "Mantener el tal\u00f3n delantero pegada al suelo toda la rep."},
+        {"name": "leaning back", "nameEs": "Espalda echada atr\u00e1s", "ruleId": "bulgarian_split_squat.backward_lean", "why": "El pecho se echa atr\u00e1s y las caderas se adelantan para compensar.", "fix": "Pecho arriba y torso ligeramente inclinado adelante sobre la pierna delantera."},
+        {"name": "uncontrolled descent", "nameEs": "Ca\u00edda sin control", "ruleId": "bulgarian_split_squat.dropped_descent", "why": "Se cae al fondo en vez de frenar con la pierna delantera.", "fix": "Bajar controlando; pausa breve abajo y subida controlada."}
+      ]
+    },
+    {
+      "id": "split_squat",
+      "nameEs": "Split squat",
+      "nameEn": "Split squat",
+      "family": "legs",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "poor range of motion", "nameEs": "Recorrido incompleto", "ruleId": "split_squat.shallow_depth", "why": "Baja demasiado poco; la rodilla trasera casi toca el suelo.", "fix": "Bajar hasta que la rodilla trasera roce el suelo."},
+        {"name": "knee valgus", "nameEs": "Rodillas hacia dentro", "ruleId": "split_squat.knee_medial_drift", "why": "La rodilla delantera colapsa hacia dentro.", "fix": "Contra el gl\u00fateo de la pierna delantera, rodilla fuera sobre los dedos."},
+        {"name": "heel raise", "nameEs": "Tal\u00f3n levantado", "ruleId": "split_squat.planted_ankle_rise", "why": "El tal\u00f3n delantero se levanta.", "fix": "Tal\u00f3n delantero en el suelo; ajustar la longitud de la zancada."},
+        {"name": "leaning back", "nameEs": "Espalda echada atr\u00e1s", "ruleId": "split_squat.backward_lean", "why": "El torso se echa atr\u00e1s.", "fix": "Torso vertical a ligeramente inclinado adelante."},
+        {"name": "uncontrolled descent", "nameEs": "Ca\u00edda sin control", "ruleId": "split_squat.dropped_descent", "why": "Desciende en ca\u00edda.", "fix": "Frenar con el cu\u00e1driceps; bajar en tempo controlado."}
+      ]
+    },
+    {
+      "id": "pistol_squat",
+      "nameEs": "Sentadilla a una pierna",
+      "nameEn": "Pistol squat",
+      "family": "legs",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "poor range of motion", "nameEs": "Recorrido incompleto", "ruleId": "pistol_squat.shallow_depth", "why": "No se baja hasta tocar fondo con la cadera.", "fix": "Trabajar la profundidad con box pistol / asistido primero."},
+        {"name": "knee valgus", "nameEs": "Rodillas hacia dentro", "ruleId": "pistol_squat.knee_medial_drift", "why": "La rodilla de apoyo cae hacia dentro.", "fix": "Rodilla apuntando hacia fuera; empujar el suelo con el borde externo."},
+        {"name": "heel raise", "nameEs": "Tal\u00f3n levantado", "ruleId": "pistol_squat.planted_ankle_rise", "why": "Falta de movilidad de tobillo.", "fix": "Mover el tobillo o elevar un plato bajo el tal\u00f3n."},
+        {"name": "leaning back", "nameEs": "Espalda echada atr\u00e1s", "ruleId": "pistol_squat.backward_lean", "why": "El centro de masa queda demasiado atr\u00e1s.", "fix": "Inclinarse adelante; llevar los brazos o un contrapeso delante."},
+        {"name": "uncontrolled descent", "nameEs": "Ca\u00edda sin control", "ruleId": "pistol_squat.dropped_descent", "why": "Se deja caer al fondo.", "fix": "Bajar controlado en 3-4 segundos."}
+      ]
+    },
+    {
+      "id": "push_up",
+      "nameEs": "Flexi\u00f3n",
+      "nameEn": "Push-up",
+      "family": "push",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "poor range of motion", "nameEs": "Recorrido incompleto", "ruleId": "push_up.short_travel", "why": "No baja el pecho al suelo.", "fix": "5 reps completas > 10 a medias; el pecho debe acercarse al suelo."},
+        {"name": "sagging hips", "nameEs": "Cadera hundida", "ruleId": "push_up.hip_sag", "why": "Gl\u00fateos sueltos, lumbar se hunde.", "fix": "Apretar gl\u00fateos y bracear el abdomen; cuerpo = l\u00ednea r\u00edgida."},
+        {"name": "lockout", "nameEs": "Sin bloqueo arriba", "ruleId": "push_up.incomplete_lockout", "why": "No se extienden del todo los brazos arriba.", "fix": "Bloquear del todo cada rep."},
+        {"name": "uncontrolled descent", "nameEs": "Ca\u00edda sin control", "ruleId": "push_up.dropped_descent", "why": "Se cae al suelo en vez de frenar.", "fix": "Bajar controlando; pausa breve abajo."},
+        {"name": "stall", "nameEs": "Estancamiento", "ruleId": "push_up.lift_stall", "why": "La subida se atasca a mitad.", "fix": "Empujar el suelo con toda la mano a trav\u00e9s del punto muerto."}
+      ]
+    },
+    {
+      "id": "pull_up",
+      "nameEs": "Dominada",
+      "nameEn": "Pull-up",
+      "family": "pull",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "momentum", "nameEs": "Balanceo", "ruleId": "pull_up.body_swing", "why": "El impulso hace el trabajo.", "fix": "Tirar estricto, sin balanceo; piernas quietas."},
+        {"name": "lockout", "nameEs": "Sin bloqueo arriba", "ruleId": "pull_up.incomplete_lockout", "why": "No se extienden del todo los brazos arriba.", "fix": "Bloquear del todo arriba en cada rep."},
+        {"name": "dead hang", "nameEs": "Sin dead hang", "ruleId": "pull_up.incomplete_hang", "why": "La rep no empieza desde un colgado completo.", "fix": "Empezar cada rep desde un dead hang."},
+        {"name": "no active hang", "nameEs": "Sin colgado activo", "ruleId": "pull_up.no_active_hang", "why": "Se tira con los brazos sin activar el dorsal.", "fix": "Deprimir las esc\u00e1pulas antes de tirar."},
+        {"name": "too fast", "nameEs": "Reps lanzadas", "ruleId": "pull_up.fast_lift", "why": "La rep va lanzada frente a la media de la serie.", "fix": "Bajar el ritmo; 5 limpias en 20 s > 8 en 10 s con impulso."}
+      ]
+    },
+    {
+      "id": "dip",
+      "nameEs": "Fondo",
+      "nameEn": "Dip",
+      "family": "push",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "lockout", "nameEs": "Sin bloqueo arriba", "ruleId": "dip.incomplete_lockout", "why": "No se extienden del todo los brazos arriba.", "fix": "Bloquear del todo arriba."},
+        {"name": "too deep", "nameEs": "Demasiado profundo", "ruleId": "dip.excessive_depth", "why": "M\u00e1s all\u00e1 de 90\u00ba, el hombro anterior sufre.", "fix": "Parar cuando los brazos est\u00e9n paralelos al suelo."},
+        {"name": "bounce at bottom", "nameEs": "Rebote abajo", "ruleId": "dip.bounce", "why": "Rebota al fondo usando impulso.", "fix": "Pausa breve abajo y subida controlada."},
+        {"name": "uncontrolled descent", "nameEs": "Ca\u00edda sin control", "ruleId": "dip.dropped_descent", "why": "Se suelta desde arriba.", "fix": "Bajar controlando."},
+        {"name": "stall", "nameEs": "Estancamiento", "ruleId": "dip.lift_stall", "why": "La subida se atasca.", "fix": "Pasar el punto muerto en un s\u00f3lo arco."}
+      ]
+    },
+    {
+      "id": "muscle_up",
+      "nameEs": "Muscle-up",
+      "nameEn": "Muscle-up",
+      "family": "bar",
+      "equipment": "bodyweight",
+      "measurable": true,
+      "weightSupported": true,
+      "errors": [
+        {"name": "momentum", "nameEs": "Balanceo", "ruleId": "muscle_up.body_swing", "why": "El kipping hace el trabajo cuando el objetivo es estricto.", "fix": "Si se busca estricto, trabajar las progresiones estrictas."},
+        {"name": "stall", "nameEs": "Estancamiento", "ruleId": "muscle_up.lift_stall", "why": "La transici\u00f3n se atasca en la barra.", "fix": "Pasar el punto de estancamiento en un solo arco."},
+        {"name": "poor transition", "nameEs": "Transici\u00f3n lenta", "ruleId": "muscle_up.slow_transition", "why": "La barra se cruza con pausa.", "fix": "Pasar de tir\u00f3n a fondo sin pausa."},
+        {"name": "dead hang", "nameEs": "Sin dead hang", "ruleId": "muscle_up.incomplete_hang", "why": "No empieza desde colgado completo.", "fix": "Empezar desde dead hang completo."},
+        {"name": "lockout", "nameEs": "Sin bloqueo arriba", "ruleId": "muscle_up.incomplete_lockout", "why": "No se bloquean del todo los brazos en el apoyo.", "fix": "Press-out a brazos rectos arriba."}
+      ]
+    },
+    {
+      "id": "bench_press",
+      "nameEs": "Press de banca",
+      "nameEn": "Bench press",
+      "family": "push",
+      "equipment": "barbell",
+      "measurable": false,
+      "weightSupported": true,
+      "errors": [
+        {"name": "bounce at chest", "nameEs": "Rebote en el pecho", "ruleId": null, "why": "El rebote transforma el press en un gesto de impulso y carga el hombro.", "fix": "Tocar y presionar; pausa breve en el pecho."},
+        {"name": "shoulders shrug", "nameEs": "Hombros sin retraer", "ruleId": null, "why": "Esc\u00e1pulas sin fijar abajo y atr\u00e1s, el hombro pierde estabilidad.", "fix": "Retraer y deprimir las esc\u00e1pulas; arqueo tor\u00e1cico estable."},
+        {"name": "elbow flare", "nameEs": "Codos abiertos a 90\u00ba", "ruleId": null, "why": "Codos muy abiertos cargan el hombro anterior.", "fix": "Meter codos a ~45\u00ba del torso."},
+        {"name": "too high on neck", "nameEs": "Barra al cuello", "ruleId": null, "why": "Recorrido hacia el cuello fuerza el hombro.", "fix": "Llevar la barra a la l\u00ednea media baja del pecho."},
+        {"name": "feet flat", "nameEs": "Pies sin apoyar", "ruleId": null, "why": "Los pies colgando quitan base y fuerza al empuje.", "fix": "Pies firmes y empujando el suelo."}
+      ]
+    },
+    {
+      "id": "deadlift",
+      "nameEs": "Peso muerto",
+      "nameEn": "Deadlift",
+      "family": "pull",
+      "equipment": "barbell",
+      "measurable": false,
+      "weightSupported": true,
+      "errors": [
+        {"name": "lumbar rounding", "nameEs": "Espalda redondeada", "ruleId": null, "why": "La lumbar cede al cargar y pasa la carga a los discos.", "fix": "Neutro espinal; empujar el suelo y apretar el core."},
+        {"name": "bar too far", "nameEs": "Barra separada del cuerpo", "ruleId": null, "why": "La barra alejada del centro de masa multiplica la palanca.", "fix": "Barra pegada a las piernas durante todo el recorrido."},
+        {"name": "hitching", "nameEs": "Bajar sin control", "ruleId": null, "why": "Bajar la barra con impaciencia y sin controlar la exc\u00e9ntrica.", "fix": "Bajar con la cadera hacia atr\u00e1s y el control de la carga."},
+        {"name": "hips too high", "nameEs": "Cadera muy alta", "ruleId": null, "why": "Empieza con la cadera alta y la espalda horizontal, convertido en un remo.", "fix": "Hombros sobre la barra, cadera media y pecho arriba."},
+        {"name": "locked knees", "nameEs": "Rodillas cerradas", "ruleId": null, "why": "Estirar el peso muerto con las rodillas bloqueadas lo convierte en un curl.", "fix": "Extender cadera y rodilla a la vez al levantar."}
+      ]
+    },
+    {
+      "id": "barbell_squat",
+      "nameEs": "Sentadilla con barra",
+      "nameEn": "Barbell back squat",
+      "family": "legs",
+      "equipment": "barbell",
+      "measurable": false,
+      "weightSupported": true,
+      "errors": [
+        {"name": "knee valgus", "nameEs": "Rodillas hacia dentro", "ruleId": null, "why": "Colapso medial bajo carga.", "fix": "Barras los pies y empujar las rodillas hacia fuera."},
+        {"name": "no depth", "nameEs": "Sin profundidad", "ruleId": null, "why": "Media sentadilla bajo peso.", "fix": "Reducir carga y llegar a paralela."},
+        {"name": "chest drop", "nameEs": "Pecho que cae", "ruleId": null, "why": "Perder el pecho arriba arquea la lumbar.", "fix": "Pecho arriba, mirada 2-3 m adelante en el suelo."},
+        {"name": "butt wink", "nameEs": "Redondeo lumbar (butt wink)", "ruleId": null, "why": "La pelvis se tuckea al fondo bajo carga.", "fix": "Reducir la profundidad manteniendo la columna neutra."},
+        {"name": "heels lift", "nameEs": "Talones que suben", "ruleId": null, "why": "Falta de movilidad de tobillo.", "fix": "Mover tobillo o usar plato bajo el tal\u00f3n."}
+      ]
+    },
+    {
+      "id": "overhead_press",
+      "nameEs": "Press militar",
+      "nameEn": "Overhead press",
+      "family": "push",
+      "equipment": "barbell",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "big lean", "nameEs": "Arqueo excesivo", "ruleId": null, "why": "Echar la lumbar atr\u00e1s para empujar.", "fix": "Gl\u00fateos y core apretados; poca extensi\u00f3n lumbar."},
+        {"name": "bar path out", "nameEs": "Barra adelante", "ruleId": null, "why": "La barra se aleja del eje del cuerpo.", "fix": "Barra sobre el eje; pasar la cabeza y bloquear sobre la nuca."},
+        {"name": "elbows out", "nameEs": "Codos hacia fuera", "ruleId": null, "why": "Empujar con los codos muy abiertos.", "fix": "Codos ligeramente adelante del plano frontal; antebrazo vertical."},
+        {"name": "no lockout", "nameEs": "Sin bloqueo", "ruleId": null, "why": "No se extienden los brazos ni se encaja el hombro.", "fix": "Pelear la barra al techo y encajar la cabeza."},
+        {"name": "legs press", "nameEs": "Dip de piernas", "ruleId": null, "why": "Empujar con las piernas en vez del torso.", "fix": "Press estricto sin rebote de piernas."}
+      ]
+    },
+    {
+      "id": "barbell_row",
+      "nameEs": "Remo con barra",
+      "nameEn": "Barbell row",
+      "family": "pull",
+      "equipment": "barbell",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "support lost", "nameEs": "Sin base estable", "ruleId": null, "why": "El busto se levanta con la rodada a pulso.", "fix": "Rodilla floja o espalda recta fijar el busto estable; el remo es de espalda."},
+        {"name": "momentum", "nameEs": "Impulso", "ruleId": null, "why": "El torso se balancea para tirar la barra.", "fix": "Tirar con la espalda, el busto estable."},
+        {"name": "dead row", "nameEs": "Tirar con brazos", "ruleId": null, "why": "Los brazos hacen el trabajo en vez del dorsal.", "fix": "Tirar los codos atr\u00e1s; pr\u00f3xima los codos al cuerpo."},
+        {"name": "bounce", "nameEs": "Rebote al fondo", "ruleId": null, "why": "Rebotar la barra al pecho.", "fix": "Bajar controlado y reiniciar el tir\u00f3n sin rebote."},
+        {"name": "shrug", "nameEs": "Encoger hombros", "ruleId": null, "why": "Trapecio sube en vez de retraer esc\u00e1pulas.", "fix": "Deprimir y retraer esc\u00e1pulas al tirar."}
+      ]
+    },
+    {
+      "id": "lat_pulldown",
+      "nameEs": "Jal\u00f3n al pecho",
+      "nameEn": "Lat pulldown",
+      "family": "pull",
+      "equipment": "machine",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "behind neck", "nameEs": "Jal\u00f3n a la nuca", "ruleId": null, "why": "Cargar el cuello y el hombro; recorrido anormal.", "fix": "Jalar al frente, hacia la parte alta del pecho."},
+        {"name": "leaning back", "nameEs": "Echarse atr\u00e1s", "ruleId": null, "why": "Mover el torso para tirar m\u00e1s peso.", "fix": "Torso estable, tirar con el dorsal."},
+        {"name": "partial", "nameEs": "Reps a medias", "ruleId": null, "why": "No llevar la barra al pecho ni estirar los brazos.", "fix": "Recorrido completo: estirar arriba, pecho abajo."},
+        {"name": "momentum", "nameEs": "Impulso", "ruleId": null, "why": "Balancear el peso.", "fix": "Tempo controlado sin balanc\u00edn."},
+        {"name": "shrug", "nameEs": "Hombros arriba", "ruleId": null, "why": "Esc\u00e1pulas se elevan en vez de bajar.", "fix": "Deprimir las esc\u00e1pulas al inicio y mantener."}
+      ]
+    },
+    {
+      "id": "curl",
+      "nameEs": "Curl de b\u00edceps",
+      "nameEn": "Biceps curl",
+      "family": "pull",
+      "equipment": "dumbbell",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "momentum", "nameEs": "Balanceo", "ruleId": null, "why": "El deltoide y el impulso hacen el curl.", "fix": "Codos pegados al torso, sin balancear."},
+        {"name": "shoulder forward", "nameEs": "Hombro adelantado", "ruleId": null, "why": "El hombro se adelanta al subir.", "fix": "Hombro quieto; subir s\u00f3lo el antebrazo."},
+        {"name": "partial lockout", "nameEs": "Sin bloquear abajo", "ruleId": null, "why": "No se baja del todo entre reps.", "fix": "Extender del todo los codos al bajar."},
+        {"name": "wrist curl", "nameEs": "Mu\u00f1eca que cede", "ruleId": null, "why": "La mu\u00f1eca se flexiona y sobrecarga.", "fix": "Pu\u00f1o firme y neutro durante todo el recorrido."},
+        {"name": "too heavy", "nameEs": "Peso excesivo", "ruleId": null, "why": "Carga que no permite control.", "fix": "Bajar el peso y mantener la tensi\u00f3n."}
+      ]
+    },
+    {
+      "id": "tricep_pushdown",
+      "nameEs": "Extensi\u00f3n de tr\u00edceps",
+      "nameEn": "Triceps pushdown",
+      "family": "push",
+      "equipment": "cable",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "elbow flaring", "nameEs": "Codos hacia fuera", "ruleId": null, "why": "Los codos se abren al empujar.", "fix": "Codos pegados al cuerpo durante todo el recorrido."},
+        {"name": "shoulder shrug", "nameEs": "Hombros arriba", "ruleId": null, "why": "Trapecio sube al empujar.", "fix": "Hombros abajo y atr\u00e1s."},
+        {"name": "full extension", "nameEs": "Sin extensi\u00f3n completa", "ruleId": null, "why": "No se extienden del todo los codos.", "fix": "Bloquear al fondo y sentir el trabajo en el tr\u00edceps."},
+        {"name": "trunk hinge", "nameEs": "Baultar adelante", "ruleId": null, "why": "El torso se inclina para empujar m\u00e1s.", "fix": "Torso vertical y estable."},
+        {"name": "partial range", "nameEs": "Recorrido corto", "ruleId": null, "why": "El agarre baja a mitad.", "fix": "Recorrido completo hasta brazos rectos."}
+      ]
+    },
+    {
+      "id": "lateral_raise",
+      "nameEs": "Elevaciones laterales",
+      "nameEn": "Lateral raise",
+      "family": "push",
+      "equipment": "dumbbell",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "trap shrug", "nameEs": "Trapecio sube", "ruleId": null, "why": "Se encogen los hombros en lugar de elevar el brazo.", "fix": "Hombros abajo; liderar con el codo, no con el hombro."},
+        {"name": "momentum", "nameEs": "Balanceo", "ruleId": null, "why": "El torso se mece para subir el peso.", "fix": "Subir controlado; pausa arriba."},
+        {"name": "too heavy", "nameEs": "Con mucho peso", "ruleId": null, "why": "El deltoide sobreelevado lo convierte en un press.", "fix": "Peso ligero para control; aislar el deltoide."},
+        {"name": "above shoulder", "nameEs": "M\u00e1s arriba de la horizontal", "ruleId": null, "why": "Pasar la altura de hombro cargando el supraespinoso.", "fix": "Bajar hasta la altura del hombro."},
+        {"name": "arm lock", "nameEs": "Codo fijo", "ruleId": null, "why": "Codo r\u00edgido carga la articulaci\u00f3n.", "fix": "Codo levemente flexionado, no bloqueado."}
+      ]
+    },
+    {
+      "id": "leg_press",
+      "nameEs": "Prensa de piernas",
+      "nameEn": "Leg press",
+      "family": "legs",
+      "equipment": "machine",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "knees out", "nameEs": "Rodillas que colapsan", "ruleId": null, "why": "Las rodillas se van hacia dentro al bajar.", "fix": "Rodillas alineadas con los pies durante todo el recorrido."},
+        {"name": "too deep", "nameEs": "Flexi\u00f3n excesiva", "ruleId": null, "why": "Arrancar la cadera de la base descomprime la espalda baja.", "fix": "Bajar hasta que la cadera est\u00e9 a punto de despegarse."},
+        {"name": "heels high", "nameEs": "Talones levantados", "ruleId": null, "why": "Apoyar en la punta.", "fix": "Pies altos y planos en la plataforma."},
+        {"name": "half reps", "nameEs": "Reps a medias", "ruleId": null, "why": "No se baja todo.", "fix": "Recorrido completo."},
+        {"name": "locked knees", "nameEs": "Bloqueo agresivo", "ruleId": null, "why": "Bloquear las rodillas arriba apaga el trabajo.", "fix": "Subir sin bloquear del todo."}
+      ]
+    },
+    {
+      "id": "calf_raise",
+      "nameEs": "Elevaci\u00f3n de gemelos",
+      "nameEn": "Calf raise",
+      "family": "legs",
+      "equipment": "bodyweight",
+      "measurable": false,
+      "weightSupported": false,
+      "errors": [
+        {"name": "bounce", "nameEs": "Rebote", "ruleId": null, "why": "Rebotar con la punta en vez de elevar con el gemelo.", "fix": "Subir y bajar controlado, pausa abajo."},
+        {"name": "partial range", "nameEs": "Recorrido incompleto", "ruleId": null, "why": "No llega a la extensi\u00f3n completa ni al estiramiento al fondo.", "fix": "Puntillas completas arriba y estiramiento abajo."},
+        {"name": "knee bend", "nameEs": "Rodilla doblada", "ruleId": null, "why": "Doblar las rodillas roba el recorrido al gemelo.", "fix": "Piernas rectas para gemelo, o contralado para s\u00f3leo."},
+        {"name": "toes in/out", "nameEs": "Pies mal orientados", "ruleId": null, "why": "La rotaci\u00f3n de pies cambia el m\u00fasculo.", "fix": "Pies paralelos o al elegir la variante correctamente."},
+        {"name": "fast", "nameEs": "Tempo r\u00e1pido", "ruleId": null, "why": "Reps r\u00e1pidas sin tensi\u00f3n.", "fix": "Tempo 2-1-2 controlado."}
+      ]
+    },
+    {
+      "id": "lunges",
+      "nameEs": "Zancadas",
+      "nameEn": "Lunges",
+      "family": "legs",
+      "equipment": "bodyweight",
+      "measurable": false,
+      "weightSupported": true,
+      "errors": [
+        {"name": "toe lead", "nameEs": "Rodilla que pasa el pie", "ruleId": null, "why": "La rodilla delantera sobrepasa los dedos y carga la articulaci\u00f3n.", "fix": "Paso m\u00e1s largo; rodilla sobre el pie, no pasado."},
+        {"name": "valgus", "nameEs": "Rodilla hacia dentro", "ruleId": null, "why": "La rodilla colapsa hacia dentro.", "fix": "Rodilla apuntando a los dedos."},
+        {"name": "front knee", "nameEs": "Paso corto", "ruleId": null, "why": "El pie delantero queda cercano al cuerpo y se pierde base.", "fix": "Paso suficiente para que el pie caiga bajo la rodilla."},
+        {"name": "bounce", "nameEs": "Rebote abajo", "ruleId": null, "why": "Rebotar al fondo.", "fix": "Tocar y subir controlado."},
+        {"name": "leaning back", "nameEs": "Torso echado atr\u00e1s", "ruleId": null, "why": "Echarse atr\u00e1s y usar los cuadriceps de forma compensada.", "fix": "Torso vertical; peso repartido entre ambas piernas."}
+      ]
+    },
+    {
+      "id": "hip_thrust",
+      "nameEs": "Empuje de cadera",
+      "nameEn": "Hip thrust",
+      "family": "legs",
+      "equipment": "barbell",
+      "measurable": false,
+      "weightSupported": true,
+      "errors": [
+        {"name": "lumbar arch", "nameEs": "Arquear la lumbar", "ruleId": null, "why": "Se arquea la espalda baja en vez de empujar con la cadera.", "fix": "Cost\u00edllas abajo, empujar la cadera con los gl\u00fateos."},
+        {"name": "short base", "nameEs": "Apoyo de espalda corto", "ruleId": null, "why": "El banco queda alto en la espalda.", "fix": "El borde del banco bajo el costado de la esc\u00e1pula."},
+        {"name": "partial extension", "nameEs": "Sin extensi\u00f3n completa", "ruleId": null, "why": "No se llega a la l\u00ednea recta cadera-hombros.", "fix": "Subir hasta la l\u00ednea, con un pico de contracci\u00f3n arriba."},
+        {"name": "chin up", "nameEs": "Mirar al techo", "ruleId": null, "why": "Mirar arriba saca el cuello (m\u00e1s una queja de confort).", "fix": "Mantener la cabeza y el cuello neutros."},
+        {"name": "feeling legs", "nameEs": "Sentirlo en el cu\u00e1driceps", "ruleId": null, "why": "Dominan los cu\u00e1driceps en vez del gl\u00fateo.", "fix": "Empujar con el tal\u00f3n y la cadera; meter las rodillas para afinar hacia gl\u00fateo."}
+      ]
+    }
+  ],
+  "weightedCalisthenics": [
+    {
+      "id": "weighted_pull_up",
+      "nameEs": "Dominada con peso",
+      "nameEn": "Weighted pull-up",
+      "family": "pull",
+      "equipment": "weighted",
+      "baseOf": "pull_up",
+      "measurable": false,
+      "weightSupported": true,
+      "weighted": true,
+      "errors": [
+        {"name": "swing", "nameEs": "Balanceo", "ruleId": null, "why": "El peso a\u00f1adido amplifica el balanceo.", "fix": "Freno con las piernas y tir\u00f3n estricto."},
+        {"name": "incomplete lockout", "nameEs": "Sin bloqueo", "ruleId": null, "why": "No bloquear arriba con el peso.", "fix": "Extender del todo cada rep."},
+        {"name": "jump start", "nameEs": "Saltar al inicio", "ruleId": null, "why": "Saltar desde el suelo para iniciar el tir\u00f3n.", "fix": "Empezar desde dead hang; no usar impulso."},
+        {"name": "load too heavy", "nameEs": "Carga excesiva", "ruleId": null, "why": "Un peso que rompe la t\u00e9cnica.", "fix": "Peso que permita el rango completo con control."},
+        {"name": "bounce", "nameEs": "Rebotar al fondo", "ruleId": null, "why": "Bajar sin frenar.", "fix": "Desmontar controlado; pausa abajo."}
+      ]
+    },
+    {
+      "id": "weighted_dip",
+      "nameEs": "Fondo con peso",
+      "nameEn": "Weighted dip",
+      "family": "push",
+      "equipment": "weighted",
+      "baseOf": "dip",
+      "measurable": false,
+      "weightSupported": true,
+      "weighted": true,
+      "errors": [
+        {"name": "too deep", "nameEs": "Demasiado profundo", "ruleId": null, "why": "Con peso, bajar demasiado carga el hombro.", "fix": "Parar en 90\u00ba con el peso."},
+        {"name": "bounce", "nameEs": "Rebote abajo", "ruleId": null, "why": "El peso hace que se rebote al fondo.", "fix": "Pausa controlada abajo."},
+        {"name": "shoulder shrug", "nameEs": "Hombros encogidos", "ruleId": null, "why": "Falta de depresi\u00f3n escapular bajo carga.", "fix": "Esc\u00e1pulas abajo y atr\u00e1s."},
+        {"name": "swing", "nameEs": "Balanceo", "ruleId": null, "why": "El cintur\u00f3n de peso balancea.", "fix": "Fijar el cuerpo; balanceo m\u00ednimo."},
+        {"name": "incomplete lockout", "nameEs": "Sin bloqueo", "ruleId": null, "why": "No bloquear arriba.", "fix": "Bloquear del todo con el peso."}
+      ]
+    },
+    {
+      "id": "weighted_squat",
+      "nameEs": "Sentadilla b\u00falgara con peso",
+      "nameEn": "Weighted Bulgarian split squat",
+      "family": "legs",
+      "equipment": "weighted",
+      "baseOf": "bulgarian_split_squat",
+      "measurable": false,
+      "weightSupported": true,
+      "weighted": true,
+      "errors": [
+        {"name": "knee valgus", "nameEs": "Rodillas hacia dentro", "ruleId": null, "why": "El peso a\u00f1adido acent\u00faa el colapso medial.", "fix": "Rodilla delantera sobre los dedos; empujar el suelo."},
+        {"name": "shallow depth", "nameEs": "Recorrido incompleto", "ruleId": null, "why": "Con peso se baja poco.", "fix": "Bajar el peso manteniendo el rango."},
+        {"name": "leaning back", "nameEs": "Espalda echada atr\u00e1s", "ruleId": null, "why": "El peso tira del torso atr\u00e1s.", "fix": "Pecho arriba sobre la pierna delantera."},
+        {"name": "rear foot slip", "nameEs": "Pie trasero inestable", "ruleId": null, "why": "El pie en el banco no est\u00e1 bien fijado.", "fix": "Empeine firme y banco bajo el pie completo."},
+        {"name": "uncontrolled", "nameEs": "Ca\u00edda sin control", "ruleId": null, "why": "Bajar con el peso sin frenar.", "fix": "Tempo controlado sin dejarse caer."}
+      ]
+    },
+    {
+      "id": "weighted_muscle_up",
+      "nameEs": "Muscle-up con peso",
+      "nameEn": "Weighted muscle-up",
+      "family": "bar",
+      "equipment": "weighted",
+      "baseOf": "muscle_up",
+      "measurable": false,
+      "weightSupported": true,
+      "weighted": true,
+      "errors": [
+        {"name": "momentum", "nameEs": "Balanceo", "ruleId": null, "why": "Kipping con peso es peligroso.", "fix": "Estricto; nada de impulso."},
+        {"name": "transition stall", "nameEs": "Estancamiento en la transici\u00f3n", "ruleId": null, "why": "El peso atasca la transici\u00f3n.", "fix": "Nivel correcto: se pierde la transici\u00f3n si la carga rompe la t\u00e9cnica."},
+        {"name": "incomplete lockout", "nameEs": "Sin bloqueo", "ruleId": null, "why": "No bloquea en el fondo del apoyo.", "fix": "Press-out completo."},
+        {"name": "dead hang", "nameEs": "Sin dead hang", "ruleId": null, "why": "El peso hace empezar en movimiento.", "fix": "Colgado completo al inicio."},
+        {"name": "bent arms", "nameEs": "Brazos doblados", "ruleId": null, "why": "El apoyo no se hace con brazos rectos.", "fix": "Desarrollar la fuerza de extensi\u00f3n con peso menor."}
+      ]
+    }
+  ]
+}

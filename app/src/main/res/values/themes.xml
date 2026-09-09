@@ -15,5 +15,14 @@
      limitations under the License.
 -->
 <resources>
-    <style name="Theme.Barrapp" parent="android:Theme.Material.Light.NoActionBar" />
+    <!--
+         The window behind Compose. It has to be the design's own ground:
+         a light window flashes white on every cold launch, before the first
+         frame is drawn, on an app whose every screen is #0B0B12.
+    -->
+    <style name="Theme.Barrapp" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/tracker_bg</item>
+        <item name="android:navigationBarColor">@color/tracker_bg</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+    </style>
 </resources>

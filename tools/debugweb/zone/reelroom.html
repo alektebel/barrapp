@@ -1,0 +1,1439 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="_ds/organic-a13cf7a0-995f-422d-883b-0db4ec6d8995/styles.css">
+<script src="_ds/organic-a13cf7a0-995f-422d-883b-0db4ec6d8995/_ds_bundle.js"></script>
+<style>
+  body { margin: 0; }
+  a { color: var(--color-accent-700); }
+  a:hover { color: var(--color-accent-600); }
+  @keyframes scan { 0% { top: 6%; } 100% { top: 90%; } }
+  @keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  @keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+  .bk { transition: transform .2s cubic-bezier(.2,.8,.3,1), box-shadow .2s; }
+  .bk:hover { transform: translateY(-5px); box-shadow: var(--shadow-lg); }
+  .nd { transition: transform .18s; }
+  .nd:hover { transform: scale(1.07); }
+  ::-webkit-scrollbar { height: 9px; width: 9px; }
+  ::-webkit-scrollbar-thumb { background: var(--color-neutral-400); border-radius: 999px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+</style>
+</helmet>
+
+<div style="min-height:100vh;background:var(--color-bg);color:var(--color-text);font-family:var(--font-body);padding-bottom:110px">
+
+  <div style="position:sticky;top:0;z-index:40;background:color-mix(in srgb, var(--color-bg) 90%, transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--color-divider)">
+    <div style="max-width:1480px;margin:0 auto;padding:var(--space-3) var(--space-6);display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:var(--space-2);cursor:pointer" onClick="{{ goShelf }}">
+        <div style="width:30px;height:30px;border-radius:999px;background:var(--color-accent);display:grid;place-items:center;flex:none">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#f5ead8" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
+        </div>
+        <div style="font-family:var(--font-heading);font-size:19px;letter-spacing:-.02em;white-space:nowrap">The Reel Room</div>
+        <div style="font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-600);padding-top:4px;white-space:nowrap">barrapp pipeline</div>
+      </div>
+      <div style="flex:1"></div>
+      <div style="display:flex;align-items:center;gap:var(--space-3);flex-wrap:wrap">
+        <div style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-600)">alektebel/barrapp</div>
+        <div style="display:flex;gap:3px;background:var(--color-surface);border:1px solid var(--color-divider);border-radius:999px;padding:3px">
+          <sc-for list="{{ versions }}" as="vr" hint-placeholder-count="3">
+            <button class="btn" style="border-radius:999px;padding:4px 12px;font-size:12.5px;white-space:nowrap;background:{{ vr.bg }};color:{{ vr.fg }}" onClick="{{ vr.pick }}">{{ vr.label }}</button>
+          </sc-for>
+        </div>
+        <button class="btn btn-secondary" style="border-radius:999px;gap:7px;font-size:12.5px" onClick="{{ toggleAgent }}">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4.97 0 9 3.58 9 8s-4.03 8-9 8a10 10 0 0 1-2.6-.34L5 21l1.2-3.6A7.6 7.6 0 0 1 3 11c0-4.42 4.03-8 9-8Z"></path></svg>agent
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <sc-if value="{{ isShelf }}" hint-placeholder-val="{{ true }}">
+  <div style="max-width:1480px;margin:0 auto;padding:var(--space-8) var(--space-6) 0">
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:var(--space-8);align-items:end;margin-bottom:var(--space-6)">
+      <div>
+        <h1 style="font-size:46px;margin:0 0 var(--space-2);letter-spacing:-.03em">The shelf</h1>
+        <p class="text-muted" style="max-width:48ch;margin:0;font-size:15px;text-wrap:pretty">Every clip that has run through <span style="font-family:ui-monospace,Menlo,monospace;font-size:13px">analyze_clip</span>. Hover a spine to watch the tracked skeleton; open one to walk it left to right, from the bytes leaving the phone to the payload the app renders.</p>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:var(--space-2)">
+        <sc-for list="{{ stats }}" as="s" hint-placeholder-count="4">
+          <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:var(--space-3)">
+            <div style="font-family:var(--font-heading);font-size:25px;line-height:1;color:{{ s.c }}">{{ s.v }}</div>
+            <div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-600);margin-top:6px;line-height:1.3">{{ s.k }}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:var(--space-3);align-items:center;flex-wrap:wrap;margin-bottom:var(--space-3)">
+      <div style="position:relative;flex:1;min-width:220px;max-width:340px">
+        <input class="input" style="border-radius:999px;padding-left:34px" placeholder="clip name, trace id, athlete" value="{{ query }}" onChange="{{ onQuery }}"></input>
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--color-neutral-600)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" style="position:absolute;left:12px;top:11px"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-3.5-3.5"></path></svg>
+      </div>
+      <div style="font-size:12px;color:var(--color-neutral-600)">{{ countLabel }}</div>
+    </div>
+
+    <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:var(--space-4) var(--space-6);margin-bottom:var(--space-4)">
+      <div style="display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-3)">
+        <h4 style="margin:0;font-size:18px;letter-spacing:-.02em">Where the time goes</h4>
+        <div style="font-size:11.5px;color:var(--color-neutral-600);font-family:ui-monospace,Menlo,monospace">{{ corpusTotal }}</div>
+        <div style="flex:1"></div>
+        <div style="font-size:11px;color:var(--color-neutral-600)">median clip, all {{ corpusN }} runs · click a stage to sort the shelf by it</div>
+      </div>
+      <div style="display:flex;height:26px;border-radius:999px;overflow:hidden;border:1px solid var(--color-divider)">
+        <sc-for list="{{ corpusBars }}" as="b" hint-placeholder-count="11">
+          <div style="width:{{ b.w }};background:{{ b.c }};cursor:pointer;display:grid;place-items:center;overflow:hidden" onClick="{{ b.pick }}">
+            <span style="font-size:9.5px;font-weight:700;letter-spacing:.04em;color:{{ b.fg }};white-space:nowrap">{{ b.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin:5px 0 var(--space-3)">log scale — pose would otherwise be the whole bar</div>
+      <div style="display:flex;align-items:baseline;gap:var(--space-3);flex-wrap:wrap;margin-bottom:6px">
+        <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600)">the other ten stages, linear · {{ restTotalLabel }}</div>
+      </div>
+      <div style="display:flex;height:20px;border-radius:999px;overflow:hidden;border:1px solid var(--color-divider)">
+        <sc-for list="{{ restBars }}" as="b" hint-placeholder-count="10">
+          <div style="width:{{ b.w }};background:{{ b.c }};cursor:pointer;display:grid;place-items:center;overflow:hidden" onClick="{{ b.pick }}">
+            <span style="font-size:9px;font-weight:700;letter-spacing:.04em;white-space:nowrap;color:{{ b.fg }}">{{ b.label }}</span>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:var(--space-2) var(--space-4);margin-top:var(--space-4)">
+        <sc-for list="{{ corpusRows }}" as="r" hint-placeholder-count="11">
+          <div style="display:flex;align-items:baseline;gap:7px">
+            <span style="width:8px;height:8px;border-radius:999px;flex:none;background:{{ r.c }}"></span>
+            <span style="font-size:11.5px;flex:1;min-width:0">{{ r.name }}</span>
+            <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:{{ r.pc }}">{{ r.v }}</span>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:var(--space-6)">
+      <sc-for list="{{ filters }}" as="f" hint-placeholder-count="8">
+        <button class="btn" style="border-radius:999px;font-size:12.5px;padding:5px 13px;gap:7px;background:{{ f.bg }};color:{{ f.fg }};border:1px solid {{ f.bd }}" onClick="{{ f.pick }}">{{ f.label }}<span style="opacity:.65;font-family:ui-monospace,Menlo,monospace">{{ f.n }}</span></button>
+      </sc-for>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:var(--space-6) var(--space-4)">
+      <sc-for list="{{ shelf }}" as="v" hint-placeholder-count="12">
+        <div class="bk" style="cursor:pointer;border-radius:var(--radius-lg);background:var(--color-surface);border:1px solid var(--color-divider);box-shadow:var(--shadow-sm);overflow:hidden" onClick="{{ v.open }}" onMouseEnter="{{ v.enter }}" onMouseLeave="{{ v.leave }}">
+          <div style="position:relative;aspect-ratio:3/4;background:{{ v.plate }};overflow:hidden">
+            <div style="position:absolute;left:0;top:0;bottom:0;width:13px;display:flex;flex-direction:column;justify-content:space-around;align-items:center;background:color-mix(in srgb, #201e1d 26%, transparent)">
+              <sc-for list="{{ sprockets }}" as="sp" hint-placeholder-count="7">
+                <span style="width:5px;height:8px;border-radius:2px;background:color-mix(in srgb, #f9f4ed 65%, transparent)"></span>
+              </sc-for>
+            </div>
+            <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%;opacity:{{ v.skelOp }}">
+              <sc-for list="{{ v.segs }}" as="g" hint-placeholder-count="11">
+                <line x1="{{ g.x1 }}" y1="{{ g.y1 }}" x2="{{ g.x2 }}" y2="{{ g.y2 }}" stroke="{{ g.c }}" stroke-width="1.4" stroke-linecap="round"></line>
+              </sc-for>
+              <sc-for list="{{ v.pts }}" as="p" hint-placeholder-count="12">
+                <circle cx="{{ p.x }}" cy="{{ p.y }}" r="1.7" fill="{{ p.c }}"></circle>
+              </sc-for>
+            </svg>
+            <sc-if value="{{ v.isHover }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;left:13px;right:0;height:2px;background:linear-gradient(90deg,transparent,#ffe1d0,transparent);animation:scan 2.2s linear infinite"></div>
+            </sc-if>
+            <div style="position:absolute;top:7px;right:7px;display:flex;align-items:center;gap:5px;background:{{ v.pillBg }};color:{{ v.pillFg }};border-radius:999px;padding:3px 8px;font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700">{{ v.stLabel }}</div>
+            <sc-if value="{{ v.flagged }}" hint-placeholder-val="{{ false }}">
+              <div style="position:absolute;top:7px;left:20px;width:16px;height:16px;border-radius:999px;background:#c67139;display:grid;place-items:center">
+                <svg viewBox="0 0 24 24" width="10" height="10" fill="none" stroke="#f5ead8" stroke-width="3.4" stroke-linecap="round"><path d="M12 8v5M12 17h.01"></path></svg>
+              </div>
+            </sc-if>
+            <div style="position:absolute;bottom:7px;left:20px;right:7px;display:flex;align-items:center;gap:6px">
+              <div style="flex:1;height:3px;border-radius:999px;background:color-mix(in srgb, #201e1d 32%, transparent);overflow:hidden">
+                <div style="height:100%;border-radius:999px;width:{{ v.playPct }};background:#ffc6a5"></div>
+              </div>
+              <span style="font-size:9px;font-family:ui-monospace,Menlo,monospace;color:#f9f4ed">{{ v.frameLabel }}</span>
+            </div>
+          </div>
+          <div style="padding:var(--space-3) var(--space-3) var(--space-4)">
+            <div style="font-family:var(--font-heading);font-size:14px;line-height:1.2;letter-spacing:-.01em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.name }}</div>
+            <div style="font-size:11px;color:var(--color-neutral-600);margin-top:5px;display:flex;gap:6px;flex-wrap:wrap">
+              <span>{{ v.exLabel }}</span><span style="opacity:.5">·</span><span>{{ v.durLabel }}</span><span style="opacity:.5">·</span><span>{{ v.repLabel }}</span>
+            </div>
+            <div style="margin-top:var(--space-3);display:flex;align-items:center;gap:7px">
+              <div style="flex:1;height:5px;border-radius:999px;background:var(--color-neutral-300);overflow:hidden">
+                <div style="height:100%;border-radius:999px;width:{{ v.confPct }};background:{{ v.confC }}"></div>
+              </div>
+              <span style="font-size:10.5px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-700)">{{ v.confLabel }}</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:7px;margin-top:7px">
+              <div style="flex:1;display:flex;height:6px;border-radius:999px;overflow:hidden;background:var(--color-neutral-300);min-width:0">
+                <sc-for list="{{ v.timeBars }}" as="tb" hint-placeholder-count="11">
+                  <div style="width:{{ tb.w }};background:{{ tb.c }}" title="{{ tb.t }}"></div>
+                </sc-for>
+              </div>
+              <span style="font-size:10.5px;font-family:ui-monospace,Menlo,monospace;color:{{ v.totalC }}">{{ v.totalLabel }}</span>
+            </div>
+            <div style="font-size:10.5px;color:var(--color-neutral-600);margin-top:4px;font-family:ui-monospace,Menlo,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ v.timeNote }}</div>
+            <div style="font-size:11px;margin-top:6px;color:{{ v.subC }};min-height:15px;line-height:1.35;text-wrap:pretty">{{ v.sub }}</div>
+          </div>
+        </div>
+      </sc-for>
+    </div>
+
+    <sc-if value="{{ hasMore }}" hint-placeholder-val="{{ false }}">
+      <div style="display:flex;justify-content:center;padding:var(--space-8) 0">
+        <button class="btn btn-secondary" style="border-radius:999px" onClick="{{ more }}">{{ moreLabel }}</button>
+      </div>
+    </sc-if>
+  </div>
+  </sc-if>
+
+  <sc-if value="{{ isTrace }}" hint-placeholder-val="{{ false }}">
+  <div style="max-width:1480px;margin:0 auto;padding:var(--space-4) var(--space-6) 0">
+
+    <button class="btn btn-ghost" style="margin-bottom:var(--space-3);gap:7px" onClick="{{ goShelf }}">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"></path></svg>the shelf
+    </button>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:var(--space-6);align-items:start;margin-bottom:var(--space-4)">
+      <div>
+        <div style="font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:6px">{{ cur.trace }} · {{ cur.exLabel }}</div>
+        <h2 style="font-size:32px;letter-spacing:-.03em;margin:0 0 var(--space-3);text-wrap:pretty">{{ cur.name }}</h2>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          <sc-for list="{{ curChips }}" as="c" hint-placeholder-count="6">
+            <span style="display:inline-flex;gap:6px;white-space:nowrap;background:{{ c.bg }};color:{{ c.fg }};border-radius:999px;padding:4px 10px;font-size:11px;font-family:ui-monospace,Menlo,monospace"><span>{{ c.k }}</span><span>{{ c.v }}</span></span>
+          </sc-for>
+        </div>
+      </div>
+      <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:var(--space-4)">
+        <div style="font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:var(--space-2)">this clip, re-run on every logic change</div>
+        <div style="display:flex;flex-direction:column;gap:5px">
+          <sc-for list="{{ runs }}" as="r" hint-placeholder-count="3">
+            <button class="btn" style="justify-content:flex-start;gap:var(--space-3);border-radius:var(--radius-md);padding:7px 11px;width:100%;background:{{ r.bg }};border:1px solid {{ r.bd }}" onClick="{{ r.pick }}">
+              <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;flex:none;width:88px;text-align:left">{{ r.ver }}</span>
+              <span style="font-size:11.5px;color:var(--color-neutral-600);flex:none;width:58px;text-align:left">{{ r.when }}</span>
+              <span style="font-size:12px;flex:1;text-align:left">{{ r.verdict }}</span>
+              <span style="font-size:10.5px;border-radius:999px;padding:2px 8px;font-weight:700;background:{{ r.dbg }};color:{{ r.dfg }};flex:none">{{ r.delta }}</span>
+            </button>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:var(--space-4) 0 var(--space-3);margin-bottom:var(--space-4)">
+      <div style="display:flex;align-items:center;gap:var(--space-3);padding:0 var(--space-6) var(--space-3);flex-wrap:wrap">
+        <button class="btn btn-secondary" style="border-radius:999px;padding:4px 10px" onClick="{{ prevStage }}">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"></path></svg>
+        </button>
+        <button class="btn btn-primary" style="border-radius:999px;gap:7px" onClick="{{ stepStage }}">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--color-bg)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M5 4v16M11 4l8 8-8 8"></path></svg>step into next stage
+        </button>
+        <button class="btn btn-secondary" style="border-radius:999px;gap:7px;font-size:12.5px;white-space:nowrap" onClick="{{ toggleAuto }}">{{ autoLabel }}</button>
+        <div style="flex:1"></div>
+        <div style="font-size:11.5px;color:var(--color-neutral-600);font-family:ui-monospace,Menlo,monospace">{{ railTotal }}</div>
+      </div>
+      <div style="overflow-x:auto;padding:0 var(--space-6) var(--space-2)">
+        <div style="display:flex;align-items:flex-start;min-width:min-content">
+          <sc-for list="{{ rail }}" as="st" hint-placeholder-count="11">
+            <div style="display:flex;align-items:flex-start;flex:none">
+              <div class="nd" style="width:98px;cursor:pointer;text-align:center;opacity:{{ st.op }}" onClick="{{ st.pick }}">
+                <div style="width:50px;height:50px;margin:0 auto;border-radius:999px;display:grid;place-items:center;background:{{ st.bg }};border:{{ st.bd }};box-shadow:{{ st.sh }}">
+                  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="{{ st.fg }}" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="{{ st.icon }}"></path></svg>
+                </div>
+                <div style="font-family:var(--font-heading);font-size:12.5px;margin-top:8px;letter-spacing:-.01em;color:{{ st.nameC }}">{{ st.name }}</div>
+                <div style="font-size:9.5px;color:var(--color-neutral-600);line-height:1.3;margin-top:2px;text-wrap:pretty">{{ st.sub }}</div>
+                <div style="font-size:10px;font-family:ui-monospace,Menlo,monospace;margin-top:4px;color:{{ st.msC }}">{{ st.ms }}</div>
+                <div style="font-size:9px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;margin-top:5px;border-radius:999px;padding:2px 0;background:{{ st.tagBg }};color:{{ st.tagFg }}">{{ st.tag }}</div>
+              </div>
+              <div style="width:26px;height:50px;display:flex;align-items:center;flex:none">
+                <div style="height:3px;width:100%;border-radius:999px;background:{{ st.pipeC }};opacity:{{ st.pipeOp }}"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:var(--space-4);align-items:start">
+
+      <div style="background:var(--color-surface);border:1px solid var(--color-divider);border-radius:var(--radius-lg);padding:var(--space-6);min-width:0">
+        <div style="display:flex;align-items:flex-start;gap:var(--space-3);flex-wrap:wrap;margin-bottom:var(--space-4)">
+          <div style="flex:1;min-width:180px">
+            <div style="font-size:10.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-600)">{{ sel.pos }}</div>
+            <h3 style="margin:4px 0 4px;font-size:26px;letter-spacing:-.02em">{{ sel.name }}</h3>
+            <div style="font-size:12px;color:var(--color-neutral-700);font-family:ui-monospace,Menlo,monospace">{{ sel.fn }}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">
+            <span style="border-radius:999px;padding:5px 12px;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;background:{{ sel.pillBg }};color:{{ sel.pillFg }}">{{ sel.stLabel }}</span>
+            <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-600)">{{ sel.ms }} · {{ sel.sha }}</span>
+          </div>
+        </div>
+
+        <div style="display:grid;grid-template-columns:minmax(0,1fr) 34px minmax(0,1fr);align-items:center;gap:var(--space-2);margin-bottom:var(--space-4)">
+          <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md);padding:var(--space-3)">
+            <div style="font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:4px">in</div>
+            <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.45;color:var(--color-neutral-700);overflow-wrap:anywhere">{{ sel.inSummary }}</div>
+          </div>
+          <div style="position:relative;height:3px;border-radius:999px;background:var(--color-neutral-300);overflow:hidden">
+            <div style="position:absolute;inset:0;width:{{ beamW }};background:var(--color-accent);border-radius:999px;transition:width .65s cubic-bezier(.3,.8,.3,1)"></div>
+          </div>
+          <div style="background:var(--color-bg);border:1px solid {{ sel.outBd }};border-radius:var(--radius-md);padding:var(--space-3);opacity:{{ outOp }};transform:{{ outTf }};transition:opacity .45s ease-out .15s, transform .45s ease-out .15s">
+            <div style="font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:4px">out</div>
+            <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.45;color:{{ sel.outC }};overflow-wrap:anywhere">{{ sel.outSummary }}</div>
+          </div>
+        </div>
+
+        <sc-if value="{{ sel.hasErr }}" hint-placeholder-val="{{ false }}">
+          <div style="background:var(--color-accent-200);border:1px solid var(--color-accent-400);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4)">
+            <div style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;font-weight:700;color:var(--color-accent-800)">{{ sel.errCode }}</div>
+            <div style="font-size:13px;margin-top:4px;color:var(--color-accent-900);text-wrap:pretty">{{ sel.errMsg }}</div>
+          </div>
+        </sc-if>
+
+        <div style="display:flex;gap:3px;flex-wrap:wrap;background:var(--color-bg);border:1px solid var(--color-divider);border-radius:999px;padding:3px;margin-bottom:var(--space-4)">
+          <sc-for list="{{ tabs }}" as="tb" hint-placeholder-count="4">
+            <button class="btn" style="border-radius:999px;padding:5px 13px;font-size:12px;background:{{ tb.bg }};color:{{ tb.fg }}" onClick="{{ tb.pick }}">{{ tb.label }}</button>
+          </sc-for>
+        </div>
+
+        <sc-if value="{{ isDiff }}" hint-placeholder-val="{{ true }}">
+          <div>
+            <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:var(--space-2);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);padding:0 var(--space-2) 6px">
+              <div>payload key</div><div>coming in</div><div>going out</div>
+            </div>
+            <sc-for list="{{ diff }}" as="d" hint-placeholder-count="7">
+              <div style="display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr) minmax(0,1fr);gap:var(--space-2);padding:7px var(--space-2);border-top:1px solid var(--color-divider);background:{{ d.rowBg }};align-items:baseline">
+                <div style="font-size:12px;display:flex;gap:6px;align-items:baseline;min-width:0">
+                  <span style="font-family:ui-monospace,Menlo,monospace;font-weight:700;flex:none;color:{{ d.mc }}">{{ d.mark }}</span>
+                  <span style="font-family:ui-monospace,Menlo,monospace;font-size:11.5px;overflow-wrap:anywhere">{{ d.k }}</span>
+                </div>
+                <div style="font-size:11.5px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-600);overflow-wrap:anywhere">{{ d.a }}</div>
+                <div style="font-size:11.5px;font-family:ui-monospace,Menlo,monospace;color:{{ d.bc }};font-weight:{{ d.bw }};overflow-wrap:anywhere">{{ d.b }}</div>
+              </div>
+            </sc-for>
+            <div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:var(--space-3);text-wrap:pretty">{{ diffNote }}</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isWhy }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="background:var(--color-accent-2-200);border-radius:var(--radius-md);padding:var(--space-3) var(--space-4);margin-bottom:var(--space-4)">
+              <div style="font-size:9.5px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-2-800);margin-bottom:4px">what this stage decided, and on what</div>
+              <div style="font-size:14px;color:var(--color-accent-2-900);text-wrap:pretty">{{ whyClaim }}</div>
+            </div>
+
+            <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:var(--space-2)">evidence against its threshold</div>
+            <sc-for list="{{ whyBasis }}" as="w" hint-placeholder-count="4">
+              <div style="padding:8px 0;border-top:1px solid var(--color-divider)">
+                <div style="display:flex;align-items:baseline;gap:var(--space-2);flex-wrap:wrap">
+                  <span style="font-size:12px;font-family:ui-monospace,Menlo,monospace;flex:1;min-width:120px">{{ w.k }}</span>
+                  <span style="font-size:12px;font-family:ui-monospace,Menlo,monospace;font-weight:700;color:{{ w.vc }}">{{ w.v }}</span>
+                  <span style="font-size:11px;color:var(--color-neutral-600);font-family:ui-monospace,Menlo,monospace">{{ w.rel }} {{ w.thr }}</span>
+                  <span style="font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;border-radius:999px;padding:2px 8px;background:{{ w.tagBg }};color:{{ w.tagFg }}">{{ w.tag }}</span>
+                </div>
+                <div style="position:relative;height:6px;border-radius:999px;background:var(--color-neutral-300);margin-top:6px;overflow:hidden">
+                  <div style="height:100%;border-radius:999px;width:{{ w.barW }};background:{{ w.barC }}"></div>
+                  <div style="position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--color-neutral-800);left:{{ w.thrX }}"></div>
+                </div>
+                <div style="font-size:11px;color:var(--color-neutral-600);margin-top:5px;text-wrap:pretty">{{ w.note }}</div>
+              </div>
+            </sc-for>
+
+            <sc-if value="{{ whyPose }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:var(--space-6)">
+                <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:var(--space-2)">raw pose output · what the model actually emitted</div>
+                <div style="display:grid;grid-template-columns:minmax(0,180px) minmax(0,1fr);gap:var(--space-4);align-items:start">
+                  <div>
+                    <div style="position:relative;aspect-ratio:3/4;border-radius:var(--radius-md);overflow:hidden;background:{{ poseePlate }};border:1px solid var(--color-divider)">
+                      <svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%">
+                        <sc-for list="{{ poseSegs }}" as="g" hint-placeholder-count="12">
+                          <line x1="{{ g.x1 }}" y1="{{ g.y1 }}" x2="{{ g.x2 }}" y2="{{ g.y2 }}" stroke="{{ g.c }}" stroke-width="1.6" stroke-linecap="round"></line>
+                        </sc-for>
+                        <sc-for list="{{ posePts }}" as="p" hint-placeholder-count="13">
+                          <circle cx="{{ p.x }}" cy="{{ p.y }}" r="2" fill="{{ p.c }}"></circle>
+                        </sc-for>
+                      </svg>
+                      <div style="position:absolute;top:6px;left:7px;font-size:9.5px;font-family:ui-monospace,Menlo,monospace;color:#f9f4ed;background:rgba(46,43,37,.5);border-radius:999px;padding:1px 7px">{{ poseFrameLabel }}</div>
+                    </div>
+                    <div style="display:flex;align-items:center;gap:var(--space-2);margin-top:var(--space-2)">
+                      <button class="btn btn-secondary" style="border-radius:999px;padding:4px 11px;font-size:12px" onClick="{{ togglePose }}">{{ poseBtn }}</button>
+                      <input type="range" min="0" max="100" value="{{ poseScrub }}" onChange="{{ onScrub }}" style="flex:1;accent-color:var(--color-accent)"></input>
+                    </div>
+                    <div style="font-size:11px;color:var(--color-neutral-600);margin-top:6px;text-wrap:pretty">Amber landmarks fell under MIN_CONF 0.5 — the segmenter treats those frames as interpolated.</div>
+                  </div>
+                  <div style="min-width:0">
+                    <sc-for list="{{ jointRows }}" as="j" hint-placeholder-count="8">
+                      <div style="display:flex;align-items:center;gap:var(--space-2);padding:3px 0">
+                        <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;width:76px;flex:none">{{ j.k }}</span>
+                        <div style="flex:1;height:6px;border-radius:999px;background:var(--color-neutral-300);overflow:hidden;min-width:0">
+                          <div style="height:100%;border-radius:999px;width:{{ j.w }};background:{{ j.c }}"></div>
+                        </div>
+                        <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;width:34px;text-align:right;color:{{ j.c2 }}">{{ j.v }}</span>
+                      </div>
+                    </sc-for>
+                    <div style="background:#2e2b25;border-radius:var(--radius-md);padding:var(--space-3);margin-top:var(--space-3);overflow:auto;max-height:150px">
+                      <sc-for list="{{ rawRows }}" as="rw" hint-placeholder-count="5">
+                        <div style="display:flex;font-family:ui-monospace,Menlo,monospace;font-size:10.5px;line-height:1.6"><span style="white-space:pre;color:{{ rw.c }}">{{ rw.s }}</span></div>
+                      </sc-for>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ whyBranch }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:var(--space-6)">
+                <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:var(--space-2)">branches tried, in order</div>
+                <sc-for list="{{ branches }}" as="b" hint-placeholder-count="5">
+                  <div style="display:flex;align-items:baseline;gap:var(--space-3);padding:7px var(--space-3);border-radius:var(--radius-md);background:{{ b.bg }};margin-bottom:4px">
+                    <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;width:16px;flex:none;color:{{ b.mc }};font-weight:700">{{ b.mark }}</span>
+                    <span style="font-size:12.5px;flex:1;min-width:0;text-wrap:pretty">{{ b.name }}</span>
+                    <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-700)">{{ b.ev }}</span>
+                  </div>
+                </sc-for>
+                <div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:var(--space-2);text-wrap:pretty">{{ branchNote }}</div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ whyCands }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:var(--space-6)">
+                <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:var(--space-2)">every candidate turnaround, kept or thrown away</div>
+                <sc-for list="{{ cands }}" as="c" hint-placeholder-count="5">
+                  <div style="display:grid;grid-template-columns:64px minmax(0,1fr) 72px 96px;gap:var(--space-2);align-items:center;padding:7px var(--space-3);border-radius:var(--radius-md);background:{{ c.bg }};margin-bottom:4px">
+                    <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace">{{ c.at }}</span>
+                    <span style="font-size:12px;text-wrap:pretty;min-width:0">{{ c.why }}</span>
+                    <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-700);text-align:right">{{ c.ev }}</span>
+                    <span style="font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;font-weight:700;border-radius:999px;padding:2px 8px;text-align:center;background:{{ c.tagBg }};color:{{ c.tagFg }}">{{ c.tag }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ whyComponents }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:var(--space-6)">
+                <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:var(--space-2)">how the score was built · weight × value, then penalties</div>
+                <sc-for list="{{ components }}" as="c" hint-placeholder-count="5">
+                  <div style="padding:7px 0;border-top:1px solid var(--color-divider)">
+                    <div style="display:flex;align-items:baseline;gap:var(--space-2)">
+                      <span style="font-size:12px;flex:1;min-width:0">{{ c.name }}</span>
+                      <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;color:var(--color-neutral-600)">{{ c.detail }}</span>
+                      <span style="font-size:12px;font-family:ui-monospace,Menlo,monospace;font-weight:700;color:{{ c.pc }};width:52px;text-align:right">{{ c.pts }}</span>
+                    </div>
+                    <div style="height:6px;border-radius:999px;background:var(--color-neutral-300);margin-top:5px;overflow:hidden">
+                      <div style="height:100%;border-radius:999px;width:{{ c.w }};background:{{ c.bc }}"></div>
+                    </div>
+                  </div>
+                </sc-for>
+                <div style="display:flex;align-items:baseline;gap:var(--space-2);padding-top:var(--space-3);margin-top:var(--space-2);border-top:2px solid var(--color-neutral-800)">
+                  <span style="font-family:var(--font-heading);font-size:15px;flex:1">session score</span>
+                  <span style="font-family:var(--font-heading);font-size:26px">{{ scoreTotal }}</span>
+                </div>
+              </div>
+            </sc-if>
+
+            <sc-if value="{{ whyModels }}" hint-placeholder-val="{{ false }}">
+              <div style="margin-top:var(--space-6);display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:var(--space-3)">
+                <sc-for list="{{ models }}" as="m" hint-placeholder-count="3">
+                  <div style="background:var(--color-bg);border:1px solid {{ m.bd }};border-radius:var(--radius-md);padding:var(--space-3)">
+                    <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600)">{{ m.who }}</div>
+                    <div style="font-family:var(--font-heading);font-size:22px;margin-top:5px;color:{{ m.c }}">{{ m.said }}</div>
+                    <div style="font-size:11px;color:var(--color-neutral-600);margin-top:4px;text-wrap:pretty">{{ m.note }}</div>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-if>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isTime }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;margin-bottom:var(--space-4)">
+              <sc-for list="{{ timeStats }}" as="s" hint-placeholder-count="3">
+                <div>
+                  <div style="font-family:var(--font-heading);font-size:22px;color:{{ s.c }}">{{ s.v }}</div>
+                  <div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-600)">{{ s.k }}</div>
+                </div>
+              </sc-for>
+            </div>
+            <div style="display:grid;grid-template-columns:78px minmax(0,1fr) 62px 74px;gap:var(--space-2);font-size:9.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);padding-bottom:6px">
+              <div>stage</div><div>when it ran</div><div style="text-align:right">ms</div><div style="text-align:right">vs median</div>
+            </div>
+            <sc-for list="{{ waterfall }}" as="w" hint-placeholder-count="11">
+              <div style="display:grid;grid-template-columns:78px minmax(0,1fr) 62px 74px;gap:var(--space-2);align-items:center;padding:5px 0;border-top:1px solid var(--color-divider);cursor:pointer;background:{{ w.rowBg }}" onClick="{{ w.pick }}">
+                <span style="font-size:11.5px;font-family:ui-monospace,Menlo,monospace;color:{{ w.nc }}">{{ w.name }}</span>
+                <div style="position:relative;height:14px;border-radius:999px;background:var(--color-neutral-200);min-width:0">
+                  <div style="position:absolute;top:0;bottom:0;left:{{ w.x }};width:{{ w.w }};background:{{ w.c }};border-radius:999px"></div>
+                </div>
+                <span style="font-size:11.5px;font-family:ui-monospace,Menlo,monospace;text-align:right">{{ w.ms }}</span>
+                <span style="font-size:11px;font-family:ui-monospace,Menlo,monospace;text-align:right;color:{{ w.dc }}">{{ w.delta }}</span>
+              </div>
+            </sc-for>
+            <div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:var(--space-4);text-wrap:pretty">{{ timeNote }}</div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isEvidence }}" hint-placeholder-val="{{ false }}">
+          <div style="background:#2e2b25;border-radius:var(--radius-md);padding:var(--space-3);max-height:360px;overflow:auto">
+            <sc-for list="{{ evidence }}" as="e" hint-placeholder-count="6">
+              <div style="padding:5px 0">
+                <div style="display:flex;gap:var(--space-3);font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.5">
+                  <span style="color:#a19786;flex:none">{{ e.at }}</span>
+                  <span style="color:{{ e.c }};flex:none;width:16px;font-weight:700">{{ e.mark }}</span>
+                  <span style="color:#eee7db;overflow-wrap:anywhere">{{ e.msg }}</span>
+                </div>
+                <sc-for list="{{ e.data }}" as="kv" hint-placeholder-count="2">
+                  <div style="display:flex;gap:6px;padding-left:64px;font-family:ui-monospace,Menlo,monospace;font-size:11px;line-height:1.55">
+                    <span style="color:#82796a">{{ kv.k }}</span><span style="color:#645c50">=</span><span style="color:{{ kv.c }}">{{ kv.v }}</span>
+                  </div>
+                </sc-for>
+              </div>
+            </sc-for>
+          </div>
+          <div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:var(--space-3);text-wrap:pretty">Straight off <span style="font-family:ui-monospace,Menlo,monospace">Trace.entries</span> — a rejection prints the value and the threshold it was compared against, so it can be checked rather than believed.</div>
+        </sc-if>
+
+        <sc-if value="{{ isSignals }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:5px">{{ signalName }} · tracked signal, torso-lengths</div>
+            <svg viewBox="0 0 600 150" preserveAspectRatio="none" style="width:100%;height:140px;background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+              <sc-for list="{{ repBands }}" as="b" hint-placeholder-count="4">
+                <rect x="{{ b.x }}" y="0" width="{{ b.w }}" height="150" fill="{{ b.fill }}"></rect>
+              </sc-for>
+              <line x1="0" y1="{{ gateY }}" x2="600" y2="{{ gateY }}" stroke="#a19786" stroke-width="1.2" stroke-dasharray="6 5"></line>
+              <polyline points="{{ sigPts }}" fill="none" stroke="#b2622d" stroke-width="2.2" stroke-linejoin="round"></polyline>
+              <sc-for list="{{ turnMarks }}" as="m" hint-placeholder-count="4">
+                <line x1="{{ m.x }}" y1="0" x2="{{ m.x }}" y2="150" stroke="#728157" stroke-width="1.3" stroke-dasharray="4 4"></line>
+              </sc-for>
+            </svg>
+            <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin:var(--space-4) 0 5px">landmark visibility · pair confidence</div>
+            <svg viewBox="0 0 600 90" preserveAspectRatio="none" style="width:100%;height:82px;background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+              <sc-for list="{{ dropouts }}" as="d" hint-placeholder-count="2">
+                <rect x="{{ d.x }}" y="0" width="{{ d.w }}" height="90" fill="color-mix(in srgb, #c67139 20%, transparent)"></rect>
+              </sc-for>
+              <line x1="0" y1="{{ confGateY }}" x2="600" y2="{{ confGateY }}" stroke="#a19786" stroke-width="1.2" stroke-dasharray="6 5"></line>
+              <polyline points="{{ confPts }}" fill="none" stroke="#728157" stroke-width="2.2" stroke-linejoin="round"></polyline>
+            </svg>
+            <div style="display:flex;gap:var(--space-6);flex-wrap:wrap;margin-top:var(--space-4)">
+              <sc-for list="{{ sigStats }}" as="s" hint-placeholder-count="4">
+                <div>
+                  <div style="font-family:var(--font-heading);font-size:19px;color:{{ s.c }}">{{ s.v }}</div>
+                  <div style="font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:var(--color-neutral-600)">{{ s.k }}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{ isCode }}" hint-placeholder-val="{{ false }}">
+          <div>
+            <sc-for list="{{ config }}" as="c" hint-placeholder-count="5">
+              <div style="display:flex;gap:var(--space-3);align-items:baseline;padding:8px 0;border-top:1px solid var(--color-divider)">
+                <span style="font-size:12px;flex:1;min-width:0;overflow-wrap:anywhere">{{ c.k }}</span>
+                <span style="font-size:11.5px;font-family:ui-monospace,Menlo,monospace;text-align:right;color:{{ c.c }};overflow-wrap:anywhere">{{ c.v }}</span>
+              </div>
+            </sc-for>
+            <div style="margin-top:var(--space-4);padding:var(--space-3) var(--space-4);background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-md)">
+              <div style="font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--color-neutral-600);margin-bottom:5px">last change to this stage · {{ sel.sha }}</div>
+              <div style="font-size:13px;text-wrap:pretty">{{ sel.changeNote }}</div>
+              <div style="font-size:11.5px;color:var(--color-neutral-600);margin-top:6px;font-family:ui-monospace,Menlo,monospace">{{ sel.source }}</div>
+            </div>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="min-width:0;display:flex;flex-direction:column;gap:var(--space-4)">
+        <div style="background:#2e2b25;border-radius:var(--radius-lg);padding:var(--space-4) var(--space-4) var(--space-6);min-width:0">
+          <div style="display:flex;align-items:center;gap:var(--space-2);margin-bottom:var(--space-3);flex-wrap:wrap">
+            <span style="width:8px;height:8px;border-radius:999px;flex:none;background:{{ outDot }}"></span>
+            <div style="font-family:var(--font-heading);font-size:14.5px;color:#f9f4ed">{{ outTitle }}</div>
+            <div style="flex:1"></div>
+            <div style="font-size:10px;font-family:ui-monospace,Menlo,monospace;color:#a19786">{{ outMeta }}</div>
+          </div>
+          <div style="overflow:auto;max-height:540px">
+            <sc-for list="{{ jsonLines }}" as="ln" hint-placeholder-count="18">
+              <div style="display:flex;font-family:ui-monospace,Menlo,monospace;font-size:11.5px;line-height:1.7;background:{{ ln.bg }}"><sc-for list="{{ ln.tk }}" as="tk" hint-placeholder-count="3"><span style="white-space:pre;color:{{ tk.c }}">{{ tk.s }}</span></sc-for></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="background:var(--color-accent-2-200);border-radius:var(--radius-lg);padding:var(--space-4)">
+          <div style="font-size:10px;letter-spacing:.09em;text-transform:uppercase;color:var(--color-accent-2-800);margin-bottom:var(--space-2)">what to look at first</div>
+          <div style="font-size:13.5px;color:var(--color-accent-2-900);text-wrap:pretty">{{ hint }}</div>
+          <button class="btn btn-primary" style="border-radius:999px;margin-top:var(--space-3);gap:7px" onClick="{{ askAboutStage }}">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="var(--color-bg)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4.97 0 9 3.58 9 8s-4.03 8-9 8a10 10 0 0 1-2.6-.34L5 21l1.2-3.6A7.6 7.6 0 0 1 3 11c0-4.42 4.03-8 9-8Z"></path></svg>ask the agent about {{ sel.name }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  </sc-if>
+
+  <div style="position:fixed;right:var(--space-4);bottom:var(--space-4);z-index:60;width:min(408px, calc(100vw - 28px))">
+    <sc-if value="{{ agentOpen }}" hint-placeholder-val="{{ false }}">
+      <div style="background:var(--color-bg);border:1px solid var(--color-divider);border-radius:var(--radius-lg);box-shadow:var(--shadow-lg);overflow:hidden;animation:rise .2s ease-out">
+        <div style="display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:#56633f">
+          <span style="width:26px;height:26px;border-radius:999px;background:#e1eecc;display:grid;place-items:center;flex:none">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="#272e1b" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4.97 0 9 3.58 9 8s-4.03 8-9 8a10 10 0 0 1-2.6-.34L5 21l1.2-3.6A7.6 7.6 0 0 1 3 11c0-4.42 4.03-8 9-8Z"></path></svg>
+          </span>
+          <div style="flex:1;min-width:0">
+            <div style="font-family:var(--font-heading);font-size:14px;color:#f0fae1">Pipeline agent</div>
+            <div style="font-size:10px;font-family:ui-monospace,Menlo,monospace;color:#ccdbb2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ agentScope }}</div>
+          </div>
+          <button class="btn btn-icon" style="border-radius:999px;color:#f0fae1" onClick="{{ toggleAgent }}">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18M6 6l12 12"></path></svg>
+          </button>
+        </div>
+        <div style="max-height:42vh;overflow:auto;padding:var(--space-4);display:flex;flex-direction:column;gap:var(--space-3)">
+          <sc-for list="{{ msgs }}" as="m" hint-placeholder-count="2">
+            <div style="align-self:{{ m.align }};max-width:90%;background:{{ m.bg }};color:{{ m.fg }};border:1px solid {{ m.bd }};border-radius:var(--radius-md);padding:var(--space-2) var(--space-3);font-size:13px;line-height:1.5;white-space:pre-wrap;text-wrap:pretty">{{ m.text }}</div>
+          </sc-for>
+          <sc-if value="{{ thinking }}" hint-placeholder-val="{{ false }}">
+            <div style="align-self:flex-start;display:flex;gap:5px;padding:var(--space-2) var(--space-3)">
+              <span style="width:6px;height:6px;border-radius:999px;background:var(--color-accent-2-600);animation:pulse 1.1s infinite"></span>
+              <span style="width:6px;height:6px;border-radius:999px;background:var(--color-accent-2-600);animation:pulse 1.1s infinite .2s"></span>
+              <span style="width:6px;height:6px;border-radius:999px;background:var(--color-accent-2-600);animation:pulse 1.1s infinite .4s"></span>
+            </div>
+          </sc-if>
+        </div>
+        <div style="padding:0 var(--space-4) var(--space-3);display:flex;gap:5px;flex-wrap:wrap">
+          <sc-for list="{{ prompts }}" as="p" hint-placeholder-count="3">
+            <button class="btn btn-secondary" style="border-radius:999px;font-size:11.5px;padding:4px 10px;background:var(--color-surface)" onClick="{{ p.send }}">{{ p.label }}</button>
+          </sc-for>
+        </div>
+        <div style="padding:0 var(--space-4) var(--space-4);display:flex;gap:var(--space-2)">
+          <input class="input" style="border-radius:999px" placeholder="why did this stage reject it?" value="{{ draft }}" onChange="{{ onDraft }}" onKeyDown="{{ onKey }}"></input>
+          <button class="btn btn-primary" style="border-radius:999px;flex:none" onClick="{{ send }}">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--color-bg)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12h14M13 6l6 6-6 6"></path></svg>
+          </button>
+        </div>
+      </div>
+    </sc-if>
+    <sc-if value="{{ agentShut }}" hint-placeholder-val="{{ true }}">
+      <div style="display:flex;justify-content:flex-end">
+        <button class="btn btn-primary" style="border-radius:999px;gap:8px;box-shadow:var(--shadow-md);padding:10px 18px" onClick="{{ toggleAgent }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--color-bg)" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3c4.97 0 9 3.58 9 8s-4.03 8-9 8a10 10 0 0 1-2.6-.34L5 21l1.2-3.6A7.6 7.6 0 0 1 3 11c0-4.42 4.03-8 9-8Z"></path></svg>ask the pipeline
+        </button>
+      </div>
+    </sc-if>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1400,&quot;height&quot;:1000}}">
+const C = {
+  bg: '#f5ead8', surf: '#ebddc5', ink: '#201e1d', div: 'rgba(32,30,29,.16)',
+  n1: '#f9f4ed', n2: '#eee7db', n3: '#dcd3c4', n4: '#c0b6a5', n5: '#a19786', n6: '#82796a', n7: '#645c50', n8: '#474238', n9: '#2e2b25',
+  a1: '#fff2eb', a2: '#ffe1d0', a3: '#ffc6a5', a4: '#f6a06b', a5: '#d67f48', a6: '#b2622d', a7: '#8c491a', a8: '#643312', a9: '#402310',
+  s1: '#f0fae1', s2: '#e1eecc', s3: '#ccdbb2', s4: '#aebf92', s5: '#8fa073', s6: '#728157', s7: '#56633f', s8: '#3d472b', s9: '#272e1b',
+};
+
+const STAGES = [
+  { key: 'transport', name: 'transport', sub: 'multipart to /jobs', fn: 'api/handler.py · presign + put', src: 'server/api/handler.py',
+    icon: 'M12 3v12M7 10l5 5 5-5M5 21h14' },
+  { key: 'probe', name: 'probe', sub: 'can it be opened', fn: 'barra.ingest.probe_video()', src: 'barra/ingest.py:118',
+    icon: 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 8v4M12 16h.01' },
+  { key: 'constraints', name: 'gate', sub: 'size · length · fps', fn: 'process.analyze_clip() guards', src: 'server/process.py:262',
+    icon: 'M4 7h16M7 12h10M10 17h4' },
+  { key: 'pose', name: 'pose', sub: 'landmarks per frame', fn: 'pose.mediapipe_backend.estimate()', src: 'barra/pose/mediapipe_backend.py',
+    icon: 'M12 4a2 2 0 1 0 0 4 2 2 0 0 0 0-4ZM12 8v6M8 11h8M9 20l3-6 3 6' },
+  { key: 'classify', name: 'classify', sub: 'geometric vote', fn: 'barra.classify.classify()', src: 'barra/classify.py:544',
+    icon: 'M4 5h16M4 12h10M4 19h6M18 15l3 3-3 3' },
+  { key: 'model', name: 'model', sub: 'learned vote', fn: 'barra.model.model_classify()', src: 'barra/model.py',
+    icon: 'M8 4h8M8 20h8M4 8v8M20 8v8M9 9h6v6H9z' },
+  { key: 'fusion', name: 'fusion', sub: 'final movement', fn: 'barra.fusion.fuse_detection()', src: 'barra/fusion.py',
+    icon: 'M5 7h5a7 7 0 0 1 0 10H5M14 12h5M14 7h5M14 17h5' },
+  { key: 'normalise', name: 'signal', sub: 'track + clean', fn: 'movements.tracking_signal + _clean_signal', src: 'barra/movements.py:149',
+    icon: 'M3 16c3 0 4-9 7-9s4 9 7 9 4-5 4-5' },
+  { key: 'segment', name: 'segment', sub: 'turnarounds to reps', fn: 'ingest.segment_reps_verbose()', src: 'barra/ingest.py:226',
+    icon: 'M4 6v12M10 6v12M16 6v12M20 6v12' },
+  { key: 'metrics', name: 'metrics', sub: 'tempo · rom · swing', fn: 'barra.metrics.rep_metrics()', src: 'barra/metrics.py',
+    icon: 'M4 20V10M10 20V4M16 20v-7M22 20H2' },
+  { key: 'quality', name: 'score', sub: '0–100 per rep', fn: 'barra.quality.score_rep()', src: 'barra/quality.py:203',
+    icon: 'm12 3 2.6 5.6 6.1.8-4.5 4.2 1.2 6-5.4-3-5.4 3 1.2-6L3.3 9.4l6.1-.8L12 3Z' },
+  { key: 'vision', name: 'vision', sub: 'two models, stills', fn: 'server.vision.technique_note()', src: 'server/vision.py',
+    icon: 'M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6-10-6-10-6Zm10-2.4a2.4 2.4 0 1 0 0 4.8 2.4 2.4 0 0 0 0-4.8Z' },
+  { key: 'payload', name: 'payload', sub: 'what the phone draws', fn: 'process_job() return', src: 'server/process.py:183',
+    icon: 'M8 4h8l4 5-8 11L4 9l4-5ZM4 9h16' },
+];
+
+const EX = { muscle_up: 'muscle-up', pull_up: 'pull-up', dip: 'dip', push_up: 'push-up', pistol_squat: 'pistol squat', toes_to_bar: 'toes-to-bar', front_lever: 'front lever' };
+const CODECS = ['h264/mp4', 'hevc/mov', 'h264/mp4', 'vp9/webm', 'h264/mp4'];
+const ATHLETES = ['alek', 'noa', 'ivan', 'sara', 'tomas', 'lena'];
+
+const VERSIONS = [
+  { id: 'v1.6', label: 'v1.6 · head', sha: '9ff88d5', touched: ['segment', 'vision'], note: 'barra-deviation-detection' },
+  { id: 'v1.5', label: 'v1.5', sha: 'c74b7ff', touched: ['quality'], note: 'rep-quality floor raised' },
+  { id: 'v1.4', label: 'v1.4', sha: '2562dea', touched: ['classify'], note: 'anchor window widened' },
+];
+
+const FILTERS = [
+  { id: 'all', label: 'everything' },
+  { id: 'flagged', label: 'athlete said it was wrong' },
+  { id: 'disagree', label: 'vision ≠ geometry' },
+  { id: 'rescued', label: 'counted by the rescue pass' },
+  { id: 'byvision', label: 'counted from stills' },
+  { id: 'zero', label: 'zero reps' },
+  { id: 'ingest', label: 'never got past ingest' },
+  { id: 'lowconf', label: 'confidence under .60' },
+  { id: 'slow', label: 'over 40 s' },
+];
+
+function rng(seed) { let s = seed >>> 0; return () => { s = (s + 0x6D2B79F5) >>> 0; let t = Math.imul(s ^ (s >>> 15), 1 | s); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function pick(r, a) { return a[Math.floor(r() * a.length)]; }
+function n2(x) { return Math.round(x * 100) / 100; }
+function n3(x) { return Math.round(x * 1000) / 1000; }
+
+const JOINTS = ['nose', 'l_sh', 'r_sh', 'l_el', 'r_el', 'l_wr', 'r_wr', 'l_hip', 'r_hip', 'l_kn', 'r_kn', 'l_an', 'r_an'];
+const EDGES = [['l_sh', 'r_sh'], ['l_sh', 'l_hip'], ['r_sh', 'r_hip'], ['l_hip', 'r_hip'], ['l_sh', 'l_el'], ['l_el', 'l_wr'], ['r_sh', 'r_el'], ['r_el', 'r_wr'], ['l_hip', 'l_kn'], ['l_kn', 'l_an'], ['r_hip', 'r_kn'], ['r_kn', 'r_an']];
+
+function skeleton(phase, ex, conf, seed) {
+  const a = 0.5 - 0.5 * Math.cos(phase * Math.PI * 2);
+  const r = rng(seed + Math.floor(phase * 40));
+  const j = {};
+  if (ex === 'pistol_squat' || ex === 'push_up') {
+    const d = a * 15;
+    j.nose = [50, 20 + d]; j.l_sh = [44, 32 + d]; j.r_sh = [56, 32 + d];
+    j.l_el = [40, 42 + d * .8]; j.r_el = [60, 42 + d * .8];
+    j.l_wr = [38, 51 + d * .5]; j.r_wr = [62, 51 + d * .5];
+    j.l_hip = [45, 54 + d]; j.r_hip = [55, 54 + d];
+    j.l_kn = [40 - a * 5, 71 + d * .3]; j.r_kn = [60 + a * 5, 71 + d * .3];
+    j.l_an = [42, 90]; j.r_an = [58, 90];
+  } else {
+    const up = a * 16;
+    j.l_wr = [42, 10]; j.r_wr = [58, 10];
+    j.nose = [50, 30 - up]; j.l_sh = [44, 38 - up]; j.r_sh = [56, 38 - up];
+    j.l_el = [40, 24 - up * .35]; j.r_el = [60, 24 - up * .35];
+    j.l_hip = [46, 60 - up]; j.r_hip = [54, 60 - up];
+    j.l_kn = [45, 76 - up]; j.r_kn = [55, 76 - up];
+    j.l_an = [44, 91 - up]; j.r_an = [56, 91 - up];
+  }
+  const jit = (1 - conf) * 6;
+  const pts = {}; const out = [];
+  JOINTS.forEach(k => {
+    const c = Math.max(0.05, Math.min(1, conf + (r() - 0.5) * 0.5));
+    const p = { x: n2(j[k][0] + (r() - 0.5) * jit), y: n2(j[k][1] + (r() - 0.5) * jit), c: c < 0.5 ? C.a4 : C.n1 };
+    pts[k] = p; out.push(p);
+  });
+  const segs = EDGES.map(([a1, b1]) => {
+    const p = pts[a1], q = pts[b1];
+    const weak = p.c === C.a4 || q.c === C.a4;
+    return { x1: p.x, y1: p.y, x2: q.x, y2: q.y, c: weak ? 'rgba(246,160,107,.55)' : 'rgba(249,244,237,.9)' };
+  });
+  return { pts: out, segs };
+}
+
+function makeVideos() {
+  const out = [];
+  for (let i = 0; i < 264; i++) {
+    const r = rng(1337 + i * 7919);
+    const day = 28 - Math.floor(i / 9);
+    const ex = pick(r, ['muscle_up', 'pull_up', 'pull_up', 'dip', 'push_up', 'pistol_squat', 'toes_to_bar', 'front_lever']);
+    const codec = pick(r, CODECS);
+    const dur = n2(4 + r() * 46);
+    const sizeMb = n2(dur * (1.1 + r() * 2.6));
+    const fps = pick(r, [29.97, 30, 30, 60, 24]);
+    const roll = r();
+    let fail = -1, kind = 'ok';
+    if (roll > 0.955) { fail = 1; kind = 'moov'; }
+    else if (roll > 0.935) { fail = 1; kind = 'notvideo'; }
+    else if (roll > 0.915) { fail = 2; kind = 'toolong'; }
+    else if (roll > 0.9) { fail = 2; kind = 'tooshort'; }
+    else if (roll > 0.885) { fail = 3; kind = 'nobackend'; }
+    else if (roll > 0.855) { fail = 4; kind = 'unknownmove'; }
+    else if (roll > 0.79) { fail = 8; kind = 'noreps'; }
+    const meanConf = n3(fail === 6 ? 0.32 + r() * 0.28 : 0.55 + r() * 0.42);
+    const truth = 3 + Math.floor(r() * 9);
+    let reps = truth, rescued = false, countedBy = null;
+    if (fail === 6) {
+      const save = r();
+      if (save > 0.62) { rescued = true; reps = Math.max(1, truth - Math.round(r() * 2)); fail = -1; kind = 'rescued'; }
+      else if (save > 0.34) { countedBy = 'vision'; reps = truth + (r() > 0.6 ? 1 : 0); fail = -1; kind = 'vision'; }
+      else { reps = 0; }
+    } else if (fail < 0 && r() > 0.82) { reps = Math.max(0, truth + (r() > 0.5 ? 1 : -1)); }
+    const feedback = fail < 0 && r() > 0.87 ? (reps !== truth ? 'count' : 'exercise') : null;
+    const geoVerdict = pick(r, ['clean', 'minor', 'minor', 'major']);
+    const visVerdict = fail < 0 && r() > 0.78 ? pick(r, ['clean', 'minor', 'major']) : geoVerdict;
+    const stageMs = STAGES.map((s, k) => {
+      if (k === 3) return Math.round(dur * (620 + r() * 420));
+      if (k === 11) return (countedBy !== null || r() > 0.35) ? Math.round(2600 + r() * 5200) : 0;
+      return Math.round(4 + r() * (k === 8 ? 90 : k === 9 ? 70 : 26));
+    });
+    const total = stageMs.reduce((a2, b) => a2 + b, 0);
+    out.push({
+      i, id: 'job-' + (7100 + i).toString(36), ex, athlete: pick(r, ATHLETES), codec, dur, sizeMb, fps,
+      w: fps === 60 ? 1080 : 720, h: fps === 60 ? 1920 : 1280,
+      name: 'VID-2026' + String(Math.max(1, Math.floor(day / 4) + 5)).padStart(2, '0') + String(Math.max(1, day)).padStart(2, '0') + '-WA' + String(i).padStart(4, '0') + '.mp4',
+      trace: '2609' + String(Math.max(1, day)).padStart(2, '0') + '-' + String(100000 + Math.floor(r() * 899999)) + '-' + Math.floor(r() * 1e6).toString(16).slice(0, 6),
+      fail, kind, meanConf, reps, truth, rescued, countedBy, feedback, geoVerdict, visVerdict,
+      score: fail < 0 && reps > 0 ? Math.round(48 + r() * 46) : null,
+      candidates: fail === 8 ? Math.round(r() * 3) : reps + Math.round(r() * 2),
+      ampCV: n3(0.05 + r() * 0.34), tempoCV: n3(0.05 + r() * 0.4),
+      stageMs, total, seed: 1337 + i * 7919, r1: r(), r2: r(), r3: r(),
+      amp: n2(0.4 + r() * 1.2), travel: n2(0.05 + r() * 1.4), interp: n2(r() * 0.6),
+    });
+  }
+  return out;
+}
+
+const VIDEOS = makeVideos();
+
+function statusOf(v) {
+  if (v.fail >= 0) return 'fail';
+  if (v.feedback || v.rescued || v.countedBy || v.meanConf < 0.6 || v.visVerdict !== v.geoVerdict || v.reps !== v.truth) return 'warn';
+  return 'ok';
+}
+
+const KIND_TEXT = {
+  moov: ['probe', 'ffprobe: moov atom not found', 'The container is truncated — the upload finished but the file never got its index. Retry from the phone.'],
+  notvideo: ['probe', 'cv2.VideoCapture: 0 frames', 'A still image arrived with a video content-type. Nothing downstream can run.'],
+  toolong: ['gate', 'duration 96.4 s > 90 s', 'Whole-session clip. The walk to the bar is in frame, which is exactly what skews the amplitude gate.'],
+  tooshort: ['gate', 'duration 1.8 s < 2.5 s', 'Shorter than one rep of anything. Almost always a mis-tap on the record button.'],
+  nobackend: ['pose', 'no pose backend installed', 'The worker came up without mediapipe. pip install -e ../barrapp[mediapipe] in server/.venv.'],
+  unknownmove: ['classify', 'no branch matched', 'Neither the hands nor the feet were on anything fixed for long enough to name a movement.'],
+  noreps: ['segment', 'no turnaround stood out from the noise', 'The tracked signal moved, but nothing cleared 0.35 × amplitude. Check the trim before the thresholds.'],
+};
+
+class Component extends DCLogic {
+  state = {
+    view: 'shelf', sel: 4, cur: null, tab: 'diff', filter: 'all', query: '', shown: 48,
+    hover: null, hoverFrame: 0, ver: 'v1.6', run: 0,
+    beam: 100, outShown: true, auto: false,
+    poseFrame: 0, posePlaying: true, sortBy: null,
+    agentOpen: false, draft: '', msgs: [{ role: 'assistant', text: 'I read the trace for whatever you have open — entries, rejections, thresholds, and the payload each stage handed on. Ask me why a stage did what it did.' }], thinking: false,
+  };
+
+  componentDidMount() {
+    this._t = setInterval(() => {
+      if (this.state.hover != null) this.setState(s => ({ hoverFrame: s.hoverFrame + 1 }));
+      if (this.state.posePlaying && this.state.tab === 'why' && this.state.view === 'trace') this.setState(s => ({ poseFrame: (s.poseFrame + 1) % 40 }));
+    }, 110);
+    this._a = setInterval(() => {
+      if (this.state.auto && this.state.view === 'trace') this.step(1);
+    }, 1500);
+  }
+  componentWillUnmount() { clearInterval(this._t); clearInterval(this._a); }
+
+  // ---- pipeline payload, accreted stage by stage -------------------------
+  snapshots(v) {
+    const s = [];
+    let o = {};
+    const add = p => { o = JSON.parse(JSON.stringify(Object.assign({}, o, p))); s.push(o); };
+    const failed = k => v.fail === k;
+    add({ jobId: v.id, contentType: 'video/mp4', bytes: Math.round(v.sizeMb * 1048576), sha256: v.trace.slice(-6) + '…', transport: { mode: 'multipart', parts: Math.max(1, Math.round(v.sizeMb / 8)), retries: v.r1 > 0.9 ? 1 : 0 } });
+    if (failed(1)) { add({ probe: { ok: false, reason: v.kind === 'moov' ? 'moov atom not found' : 'no decodable frames' }, blockers: ['Could not open the clip'] }); }
+    else add({ probe: { ok: true, codec: v.codec, fps: v.fps, duration_s: v.dur, width: v.w, height: v.h } });
+    if (v.fail >= 0 && v.fail < 2) { while (s.length < STAGES.length) s.push(null); return s; }
+    if (failed(2)) { add({ gate: { verdict: 'rejected', reason: KIND_TEXT[v.kind][1] }, blockers: [KIND_TEXT[v.kind][2]] }); while (s.length < STAGES.length) s.push(null); return s; }
+    add({ gate: { verdict: 'accepted', sizeMb: v.sizeMb, duration_s: v.dur, fps: v.fps } });
+    if (failed(3)) { add({ blockers: ['No pose backend installed.'] }); while (s.length < STAGES.length) s.push(null); return s; }
+    add({ pose: { backend: 'mediapipe', model: 'pose_landmarker_heavy.task', frames: Math.round(v.dur * v.fps), meanConfidence: v.meanConf, framesAbove06: Math.round(v.dur * v.fps * Math.min(1, v.meanConf + 0.1)) } });
+    if (failed(4)) { add({ detected: { exercise: 'unknown', confidence: 0.0, reason: 'no branch matched' }, blockers: ['no movement recognised'] }); while (s.length < STAGES.length) s.push(null); return s; }
+    add({ detected: { exercise: v.ex, label: EX[v.ex], confidence: n2(0.6 + v.r2 * 0.39), reason: v.ex === 'muscle_up' ? 'the shoulders finish above the hands' : 'the tracked pair crosses the anchor', runnerUp: v.ex === 'muscle_up' ? 'pull_up' : 'dip' } });
+    add({ model: { exercise: v.ex, confidence: n2(0.62 + v.r3 * 0.37), marginToRunnerUp: n3(0.08 + v.r1 * 0.24), runnerUp: v.ex === 'muscle_up' ? 'pull_up' : 'dip', load: null } });
+    add({ fusion: { exercise: v.ex, status: 'geometry-model-agree', reason: 'geometry and the learned model agree', nan: { status: 'not-applicable', reason: 'no athlete count on this row' } } });
+    add({ signal: { name: v.ex === 'pistol_squat' ? 'hip_height' : 'shoulder_above_bar', amplitude: v.amp, interpolatedFrac: v.interp, prominenceRequired: n3(0.35 * v.amp) } });
+    if (v.reps === 0) { add({ n_candidates: v.candidates, reps: [], rejections: v.candidates, blockers: [KIND_TEXT.noreps[1]] }); while (s.length < STAGES.length) s.push(null); return s; }
+    add({ n_candidates: v.candidates, rescued: v.rescued, reps: Array.from({ length: v.reps }, (_, i) => ({ label: 'r' + (i + 1), startS: n2(i * (v.dur / v.reps)), turnS: n2(i * (v.dur / v.reps) + v.dur / v.reps / 2), endS: n2((i + 1) * (v.dur / v.reps)) })), rejections: Math.max(0, v.candidates - v.reps) });
+    add({ consistency: { amplitudeCV: v.ampCV, tempoCV: v.tempoCV }, metrics: { total_s: n2(v.dur / v.reps), transition_s: n2(0.3 + v.r3 * 0.9), rom: n2(0.6 + v.r1 * 0.5), swing: n2(v.r2 * 0.4) } });
+    add({ sessionScore: v.score, sessionBand: v.score > 80 ? 'strong' : v.score > 62 ? 'solid' : 'developing', n_reps: v.reps, failures: [v.geoVerdict === 'clean' ? 'none' : v.geoVerdict + '_deviation'] });
+    add({ visionVerdict: v.visVerdict, proseSource: v.countedBy ? 'vision' : 'vision', countedBy: v.countedBy });
+    add({ exercise: v.ex, trim: { startS: 0.4, endS: n2(v.dur - 0.4) }, traceId: v.trace, provenance: { commit: '9ff88d5+dirty', poseModelSha: 'a71c4f…' }, blockers: [] });
+    return s;
+  }
+
+  flat(o, pre, out) {
+    out = out || {}; pre = pre || '';
+    if (o == null) return out;
+    Object.keys(o).forEach(k => {
+      const val = o[k];
+      if (val && typeof val === 'object' && !Array.isArray(val)) this.flat(val, pre + k + '.', out);
+      else if (Array.isArray(val)) out[pre + k] = val.length === 0 ? '[]' : '[' + val.length + ' items]';
+      else out[pre + k] = String(val);
+    });
+    return out;
+  }
+
+  jsonTokens(o) {
+    const lines = [];
+    const push = (ind, tk, bg) => lines.push({ tk, bg: bg || 'transparent' });
+    const walk = (val, ind, key, last) => {
+      const pad = '  '.repeat(ind);
+      const kt = key != null ? [{ s: pad + '"' + key + '": ', c: C.s3 }] : [{ s: pad, c: C.n5 }];
+      if (val && typeof val === 'object' && !Array.isArray(val)) {
+        push(ind, kt.concat([{ s: '{', c: C.n5 }]));
+        const ks = Object.keys(val);
+        ks.forEach((k, i) => walk(val[k], ind + 1, k, i === ks.length - 1));
+        push(ind, [{ s: pad + '}' + (last ? '' : ','), c: C.n5 }]);
+      } else if (Array.isArray(val)) {
+        if (val.length && typeof val[0] === 'object') {
+          push(ind, kt.concat([{ s: '[', c: C.n5 }]));
+          val.slice(0, 4).forEach((x, i) => walk(x, ind + 1, null, i === Math.min(4, val.length) - 1));
+          if (val.length > 4) push(ind, [{ s: '  '.repeat(ind + 1) + '… ' + (val.length - 4) + ' more', c: C.n6 }]);
+          push(ind, [{ s: pad + ']' + (last ? '' : ','), c: C.n5 }]);
+        } else {
+          push(ind, kt.concat([{ s: JSON.stringify(val) + (last ? '' : ','), c: C.a3 }]));
+        }
+      } else {
+        const c = typeof val === 'number' ? C.a3 : typeof val === 'boolean' ? C.s4 : val === null ? C.n5 : C.n2;
+        push(ind, kt.concat([{ s: JSON.stringify(val) + (last ? '' : ','), c }]));
+      }
+    };
+    walk(o, 0, null, true);
+    return lines;
+  }
+
+  // ---- actions -----------------------------------------------------------
+  open(i) { this.setState({ view: 'trace', cur: i, sel: 0, tab: 'diff', beam: 100, outShown: true, run: 0 }); }
+  lastLive(v) { const s = this.snapshots(v); let k = 0; s.forEach((x, i) => { if (x) k = i; }); return v.fail >= 0 ? Math.max(0, v.fail) : k; }
+  step(dir) {
+    const v = VIDEOS[this.state.cur]; if (!v) return;
+    const lim = this.lastLive(v);
+    let n = this.state.sel + dir;
+    if (n > lim) n = 0; if (n < 0) n = lim;
+    this.setState({ sel: n, beam: 0, outShown: false });
+    setTimeout(() => this.setState({ beam: 100 }), 40);
+    setTimeout(() => this.setState({ outShown: true }), 260);
+  }
+
+  async ask(text) {
+    const v = VIDEOS[this.state.cur];
+    const st = STAGES[this.state.sel];
+    const snaps = v ? this.snapshots(v) : null;
+    const ctx = v ? {
+      clip: v.name, traceId: v.trace, exercise: v.ex, detectedConfidence: n2(0.6 + v.r2 * 0.39),
+      meanPoseConfidence: v.meanConf, fps: v.fps, duration_s: v.dur, sizeMb: v.sizeMb, codec: v.codec,
+      status: statusOf(v), failedStage: v.fail >= 0 ? STAGES[v.fail].key : null, failureKind: v.kind,
+      repsReported: v.reps, athleteSaysTruth: v.truth, candidates: v.candidates, rescued: v.rescued, countedBy: v.countedBy,
+      athleteFeedback: v.feedback, geometryVerdict: v.geoVerdict, visionVerdict: v.visVerdict,
+      amplitude: v.amp, wristTravel: v.travel, interpolatedFrac: v.interp, stageMs: v.stageMs,
+      selectedStage: st.key, selectedStageFn: st.fn, selectedStageSource: st.src,
+      stageInput: this.state.sel > 0 ? snaps[this.state.sel - 1] : null,
+      stageOutput: snaps ? snaps[this.state.sel] : null,
+      logicVersion: this.state.ver,
+    } : { view: 'shelf', shelfSize: VIDEOS.length, filter: this.state.filter };
+    const sys = 'You are the debugging agent embedded in barrapp\'s video pipeline debugger (repo alektebel/barrapp). '
+      + 'The pipeline is: transport (api/handler.py) -> process_job (server/process.py) -> probe (barra.ingest.probe_video) -> gate -> pose (barra.pose backend) -> classify (barra.classify.classify, geometric vote) -> model (barra.model.model_classify, learned vote) -> fusion (barra.fusion.fuse_detection, final auto label) -> signal (movements.tracking_signal + ingest._clean_signal) -> segment (ingest.segment_reps_verbose, then rescue_reps) -> metrics (barra.metrics.rep_metrics) -> score (barra.quality.score_rep, MIN_REP_QUALITY 0.55) -> vision (server.vision: technique_note, count_from_clip, technique_second_opinion) -> payload (process_job return). '
+      + 'Known thresholds: MAX_BAR_TRAVEL 0.80 torso-lengths, peak prominence 0.35 x amplitude, max_invented_frac 0.4, MIN_CONF 0.5, MIN_SEEN 0.40, MIN_REP_QUALITY 0.55, min_rep_s per movement. '
+      + 'House rule from docs/DEBUGGING.md: a rejection must state the value, the threshold, and where in the clip it looked. '
+      + 'Answer in 2-4 short sentences, plain and specific. Always name the module or function to open next, and quote the number and the threshold when you have them. Never invent a measurement that is not in the context. No headings, no bullet lists unless you list candidate causes.';
+    this.setState(s => ({ msgs: s.msgs.concat([{ role: 'user', text }]), thinking: true, draft: '' }));
+    try {
+      const out = await window.claude.complete({
+        system: sys, max_tokens: 600,
+        messages: [{ role: 'user', content: 'Context JSON:\n' + JSON.stringify(ctx, null, 1) + '\n\nQuestion: ' + text }],
+      });
+      this.setState(s => ({ msgs: s.msgs.concat([{ role: 'assistant', text: (out || '').trim() || 'No answer came back.' }]), thinking: false }));
+    } catch (e) {
+      const fb = v && v.fail >= 0
+        ? 'Offline, so from the trace alone: ' + v.name + ' stopped at ' + STAGES[v.fail].name + ' — ' + KIND_TEXT[v.kind][1] + '. Open ' + STAGES[v.fail].src + '.'
+        : 'I could not reach the model. The trace is still here: open the Evidence tab, find the last reject entry, and compare its value against the threshold printed beside it.';
+      this.setState(s => ({ msgs: s.msgs.concat([{ role: 'assistant', text: fb }]), thinking: false }));
+    }
+  }
+
+  // ---- render values -----------------------------------------------------
+  renderVals() {
+    const st = this.state;
+    const ver = VERSIONS.find(x => x.id === st.ver) || VERSIONS[0];
+    const vals = {
+      isShelf: st.view === 'shelf', isTrace: st.view === 'trace',
+      goShelf: () => this.setState({ view: 'shelf', auto: false }),
+      sprockets: [1, 2, 3, 4, 5, 6, 7],
+      agentOpen: st.agentOpen, agentShut: !st.agentOpen,
+      toggleAgent: () => this.setState(s => ({ agentOpen: !s.agentOpen })),
+      thinking: st.thinking, draft: st.draft,
+      onDraft: e => this.setState({ draft: e.target.value }),
+      onKey: e => { if (e.key === 'Enter' && e.target.value.trim()) this.ask(e.target.value.trim()); },
+      send: () => { if (st.draft.trim()) this.ask(st.draft.trim()); },
+      msgs: st.msgs.map(m => ({
+        text: m.text, align: m.role === 'user' ? 'flex-end' : 'flex-start',
+        bg: m.role === 'user' ? C.a2 : C.surf, fg: m.role === 'user' ? C.a9 : C.ink,
+        bd: m.role === 'user' ? C.a3 : C.div,
+      })),
+      versions: VERSIONS.map(x => ({ id: x.id, label: x.label, bg: x.id === st.ver ? C.a5 : 'transparent', fg: x.id === st.ver ? C.bg : C.ink, pick: () => this.setState({ ver: x.id }) })),
+    };
+
+    // ---- shelf
+    const q = st.query.trim().toLowerCase();
+    const match = (v, f) => {
+      if (f === 'all') return true;
+      if (f === 'flagged') return !!v.feedback;
+      if (f === 'disagree') return v.visVerdict !== v.geoVerdict;
+      if (f === 'rescued') return v.rescued;
+      if (f === 'byvision') return v.countedBy === 'vision';
+      if (f === 'zero') return v.reps === 0;
+      if (f === 'ingest') return v.fail >= 0 && v.fail <= 2;
+      if (f === 'lowconf') return v.meanConf < 0.6;
+      if (f === 'slow') return v.total > 40000;
+      return true;
+    };
+    const base = VIDEOS.filter(v => !q || (v.name + ' ' + v.trace + ' ' + v.athlete + ' ' + v.ex).toLowerCase().includes(q));
+    const filtered = base.filter(v => match(v, st.filter));
+    vals.filters = FILTERS.map(f => {
+      const on = st.filter === f.id;
+      return { label: f.label, n: base.filter(v => match(v, f.id)).length, bg: on ? C.a5 : C.surf, fg: on ? C.bg : C.ink, bd: on ? C.a5 : C.div, pick: () => this.setState({ filter: f.id, shown: 48 }) };
+    });
+    vals.query = st.query;
+    vals.onQuery = e => this.setState({ query: e.target.value, shown: 48 });
+    vals.countLabel = filtered.length + ' of ' + VIDEOS.length + ' clips';
+    vals.hasMore = filtered.length > st.shown;
+    vals.moreLabel = 'show ' + Math.min(48, filtered.length - st.shown) + ' more';
+    vals.more = () => this.setState(s => ({ shown: s.shown + 48 }));
+    vals.stats = [
+      { k: 'clips on the shelf', v: VIDEOS.length, c: C.ink },
+      { k: 'stopped before pose', v: VIDEOS.filter(v => v.fail >= 0 && v.fail <= 3).length, c: C.a7 },
+      { k: 'count disputed', v: VIDEOS.filter(v => v.feedback === 'count' || v.reps !== v.truth).length, c: C.a6 },
+      { k: 'vision ≠ geometry', v: VIDEOS.filter(v => v.visVerdict !== v.geoVerdict).length, c: C.s7 },
+    ];
+    // ---- where the time goes, across the corpus
+    const pct = (arr, p) => { const a = arr.slice().sort((x, y) => x - y); return a[Math.min(a.length - 1, Math.floor(p * a.length))]; };
+    const perStage = STAGES.map((s2, i) => {
+      const all = VIDEOS.map(x => x.stageMs[i]);
+      return { key: s2.key, name: s2.name, p50: pct(all, 0.5), p95: pct(all, 0.95), mean: Math.round(all.reduce((a2, b) => a2 + b, 0) / all.length) };
+    });
+    const medTotal = perStage.reduce((a2, b) => a2 + b.p50, 0);
+    const TIMEC = [C.s5, C.s6, C.s4, C.a6, C.a4, C.s3, C.a5, C.s7, C.a3, C.a7, C.n5];
+    vals.corpusN = VIDEOS.length;
+    const restTotal = medTotal - perStage[3].p50;
+    vals.corpusTotal = (medTotal / 1000).toFixed(1) + 's median · pose alone is ' + (perStage[3].p50 / 1000).toFixed(1) + 's, everything else adds up to ' + restTotal + 'ms';
+    const lg = x => Math.log10(Math.max(1, x) + 1);
+    const lgTotal = perStage.reduce((a2, b) => a2 + lg(b.p50), 0);
+    vals.corpusBars = perStage.map((r, i) => ({
+      w: (lg(r.p50) / lgTotal * 100).toFixed(2) + '%', c: TIMEC[i],
+      fg: i === 3 || i === 9 || i === 6 || i === 0 ? C.bg : C.n9,
+      label: r.name,
+      pick: () => this.setState(s => ({ sortBy: s.sortBy === i ? null : i, shown: 48 })),
+    }));
+    vals.restTotalLabel = restTotal + 'ms total, of which ' + perStage[9].name + ' is ' + Math.round(perStage[9].p50 / restTotal * 100) + '%';
+    vals.restBars = perStage.filter((r, i) => i !== 3).map(r => {
+      const i = perStage.indexOf(r);
+      return {
+        w: (r.p50 / restTotal * 100).toFixed(2) + '%', c: TIMEC[i], fg: i === 9 || i === 6 ? C.bg : C.n9,
+        label: r.p50 / restTotal > 0.08 ? r.name : '',
+        pick: () => this.setState(s => ({ sortBy: s.sortBy === i ? null : i, shown: 48 })),
+      };
+    });
+    vals.corpusRows = perStage.map((r, i) => ({
+      name: r.name, c: TIMEC[i], pc: r.p95 > 8000 ? C.a7 : C.n7,
+      v: (r.p50 > 999 ? (r.p50 / 1000).toFixed(1) + 's' : r.p50 + 'ms') + ' / p95 ' + (r.p95 > 999 ? (r.p95 / 1000).toFixed(1) + 's' : r.p95 + 'ms'),
+    }));
+    if (st.sortBy != null) filtered.sort((a2, b) => b.stageMs[st.sortBy] - a2.stageMs[st.sortBy]);
+
+    const PILL = { ok: [C.s2, C.s9, 'clean'], warn: [C.a2, C.a9, 'suspect'], fail: [C.a6, C.bg, 'stopped'] };
+    vals.shelf = filtered.slice(0, st.shown).map(v => {
+      const s2 = statusOf(v);
+      const hov = st.hover === v.i;
+      const phase = hov ? (st.hoverFrame % 22) / 22 : 0.28;
+      const sk = skeleton(phase, v.ex, v.meanConf, v.seed);
+      const sub = v.fail >= 0 ? KIND_TEXT[v.kind][1]
+        : v.feedback === 'count' ? 'athlete says ' + v.truth + ', pipeline said ' + v.reps
+          : v.feedback === 'exercise' ? 'athlete says this is not ' + EX[v.ex]
+            : v.countedBy === 'vision' ? 'geometry found nothing; two models counted ' + v.reps
+              : v.rescued ? 'the rescue pass produced the count'
+                : v.visVerdict !== v.geoVerdict ? 'vision says ' + v.visVerdict + ', geometry says ' + v.geoVerdict
+                  : v.meanConf < 0.6 ? 'mean landmark confidence ' + v.meanConf : '';
+      return {
+        open: () => this.open(v.i), enter: () => this.setState({ hover: v.i }), leave: () => this.setState({ hover: null }),
+        isHover: hov, skelOp: hov ? 1 : 0.4, segs: sk.segs, pts: sk.pts,
+        plate: v.ex === 'pistol_squat' || v.ex === 'push_up' ? 'linear-gradient(165deg,#56633f,#272e1b)' : 'linear-gradient(165deg,#8c491a,#402310)',
+        pillBg: PILL[s2][0], pillFg: PILL[s2][1], stLabel: PILL[s2][2],
+        flagged: !!v.feedback,
+        playPct: hov ? Math.round(phase * 100) + '%' : '0%',
+        frameLabel: hov ? Math.round(phase * v.dur * v.fps) : '—',
+        name: v.name, exLabel: EX[v.ex], durLabel: v.dur + 's',
+        repLabel: v.reps === 0 ? '0 reps' : v.reps + ' reps',
+        confPct: Math.round(v.meanConf * 100) + '%', confLabel: v.meanConf.toFixed(2),
+        confC: v.meanConf < 0.6 ? C.a5 : C.s5,
+        sub, subC: v.fail >= 0 ? C.a7 : C.n7,
+        timeBars: v.stageMs.map((ms, k) => ({
+          w: (ms / v.total * 100).toFixed(2) + '%',
+          c: ms > perStage[k].p95 ? C.a6 : TIMEC[k],
+          t: STAGES[k].name + ' ' + (ms > 999 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms') + ' · median ' + perStage[k].p50 + 'ms',
+        })),
+        totalLabel: (v.total / 1000).toFixed(1) + 's',
+        totalC: v.total > 40000 ? C.a7 : C.n7,
+        timeNote: (() => {
+          const k = v.stageMs.indexOf(Math.max.apply(null, v.stageMs));
+          const over = v.stageMs.map((ms, i) => ms > perStage[i].p95 ? STAGES[i].name : null).filter(Boolean);
+          return over.length ? over.join(' + ') + ' past p95' : STAGES[k].name + ' ' + Math.round(v.stageMs[k] / v.total * 100) + '%';
+        })(),
+      };
+    });
+
+    // ---- trace
+    const v = st.cur != null ? VIDEOS[st.cur] : null;
+    if (!v) { vals.rail = []; vals.diff = []; vals.jsonLines = []; vals.tabs = []; vals.runs = []; vals.curChips = [];
+      vals.isWhy = false; vals.isTime = false; vals.whyBasis = []; vals.waterfall = []; vals.timeStats = [];
+      vals.whyPose = false; vals.whyBranch = false; vals.whyCands = false; vals.whyComponents = false; vals.whyModels = false;
+      vals.branches = []; vals.cands = []; vals.components = []; vals.models = []; vals.jointRows = []; vals.rawRows = []; vals.posePts = []; vals.poseSegs = []; vals.agentScope = 'the shelf · ' + filtered.length + ' clips'; vals.prompts = [{ label: 'which clips should I look at first?', send: () => this.ask('Given the shelf filters, which clips should I open first and why?') }]; vals.beamW = '100%'; vals.outOp = 1; vals.outTf = 'none'; return vals; }
+
+    const snaps = this.snapshots(v);
+    const live = this.lastLive(v);
+    const sel = Math.min(st.sel, STAGES.length - 1);
+    const S = STAGES[sel];
+    const cur = snaps[sel];
+    const prev = sel > 0 ? snaps[sel - 1] : {};
+    const stFail = v.fail === sel;
+    const dead = cur == null;
+
+    vals.cur = { name: v.name, trace: v.trace, exLabel: EX[v.ex] };
+    vals.curChips = [
+      { k: 'codec', v: v.codec }, { k: 'fps', v: v.fps }, { k: 'dur', v: v.dur + 's' }, { k: 'size', v: v.sizeMb + 'MB' },
+      { k: 'reps', v: v.reps }, { k: 'score', v: v.score == null ? '—' : v.score }, { k: 'total', v: (v.total / 1000).toFixed(1) + 's' },
+    ].map(c => ({ k: c.k, v: String(c.v), bg: C.n2, fg: C.n8 }));
+
+    vals.runs = VERSIONS.map((x, i) => {
+      const on = x.id === st.ver;
+      const delta = i === 0 ? (v.rescued ? '+' + v.reps + ' reps' : v.visVerdict !== v.geoVerdict ? 'verdict split' : 'no change')
+        : i === 1 ? (v.score == null ? 'unscored' : v.score > 70 ? '−3 score' : '+5 score') : 'baseline';
+      return {
+        ver: x.sha + ' ' + x.id, when: i === 0 ? 'today' : i === 1 ? '4 days' : '3 weeks',
+        verdict: v.fail >= 0 ? 'stopped at ' + STAGES[v.fail].name : v.reps + ' reps · ' + (v.score == null ? 'unscored' : v.score),
+        delta, dbg: delta === 'no change' || delta === 'baseline' ? C.n3 : C.a2, dfg: delta === 'no change' || delta === 'baseline' ? C.n8 : C.a8,
+        bg: on ? C.a1 : C.bg, bd: on ? C.a4 : C.div, pick: () => this.setState({ ver: x.id }),
+      };
+    });
+
+    vals.railTotal = (v.total / 1000).toFixed(1) + 's end to end · pose is ' + (v.stageMs[3] / 1000).toFixed(1) + 's of it';
+    vals.prevStage = () => this.step(-1);
+    vals.stepStage = () => this.step(1);
+    vals.toggleAuto = () => this.setState(s => ({ auto: !s.auto }));
+    vals.autoLabel = st.auto ? '⏸ walking' : '↻ walk it';
+    vals.beamW = st.beam + '%';
+    vals.outOp = st.outShown ? 1 : 0;
+    vals.outTf = st.outShown ? 'none' : 'translateY(6px)';
+
+    vals.rail = STAGES.map((s2, i) => {
+      const isSel = i === sel;
+      const isFail = v.fail === i;
+      const isDead = snaps[i] == null;
+      const touched = ver.touched.includes(s2.key);
+      const ms = v.stageMs[i];
+      const skipped = isDead && !isFail;
+      return {
+        name: s2.name, sub: s2.sub, icon: s2.icon,
+        pick: () => { this.setState({ sel: i, beam: 0, outShown: false }); setTimeout(() => this.setState({ beam: 100, outShown: true }), 40); },
+        op: isDead ? 0.32 : 1,
+        bg: isFail ? C.a6 : isSel ? C.a5 : isDead ? C.n3 : C.s3,
+        bd: isSel ? '3px solid ' + C.a8 : '1px solid ' + C.div,
+        sh: isSel ? '0 3px 10px rgba(46,43,37,.22)' : 'none',
+        fg: isFail || isSel ? C.bg : isDead ? C.n6 : C.s9,
+        nameC: isDead ? C.n6 : C.ink,
+        ms: isDead ? '—' : (ms > 999 ? (ms / 1000).toFixed(1) + 's' : ms + 'ms'),
+        msC: ms > 8000 ? C.a7 : C.n6,
+        tag: isFail ? 'stopped' : skipped ? 'never ran' : touched ? 'edited in ' + ver.id : '',
+        tagBg: isFail ? C.a2 : touched && !skipped ? C.s2 : 'transparent',
+        tagFg: isFail ? C.a8 : touched && !skipped ? C.s8 : 'transparent',
+        pipeC: i < sel ? C.a5 : C.n3, pipeOp: i >= live ? 0.3 : 1,
+      };
+    });
+
+    const flatA = this.flat(prev), flatB = this.flat(cur || {});
+    const keys = Array.from(new Set(Object.keys(flatA).concat(Object.keys(flatB))));
+    const rows = keys.map(k => {
+      const a = flatA[k], b = flatB[k];
+      if (a === b) return null;
+      const mark = a === undefined ? '+' : b === undefined ? '−' : '~';
+      return {
+        k, mark, a: a === undefined ? '—' : a, b: b === undefined ? 'dropped' : b,
+        mc: mark === '+' ? C.s6 : mark === '−' ? C.a6 : C.a7,
+        bc: mark === '−' ? C.a7 : C.ink, bw: '700',
+        rowBg: mark === '+' ? 'rgba(225,238,204,.4)' : 'rgba(255,225,208,.4)',
+      };
+    }).filter(Boolean);
+    const same = keys.filter(k => flatA[k] === flatB[k] && flatA[k] !== undefined).slice(0, 4)
+      .map(k => ({ k, mark: '=', a: flatA[k], b: flatA[k], mc: C.n4, bc: C.n6, bw: '400', rowBg: 'transparent' }));
+    vals.diff = dead ? [] : rows.concat(same);
+    vals.diffNote = dead ? 'This stage never ran on this clip — the payload above is what it would have received.'
+      : rows.length + ' key' + (rows.length === 1 ? '' : 's') + ' changed here; ' + (keys.length - rows.length) + ' passed through untouched. Only what a stage writes is its own work.';
+
+    const inKeys = Object.keys(prev || {});
+    const outKeys = Object.keys(cur || {});
+    vals.sel = {
+      pos: 'stage ' + (sel + 1) + ' of ' + STAGES.length, name: S.name, fn: S.fn, sha: ver.sha, source: S.src,
+      ms: dead ? 'did not run' : (v.stageMs[sel] > 999 ? (v.stageMs[sel] / 1000).toFixed(1) + 's' : v.stageMs[sel] + 'ms'),
+      stLabel: stFail ? 'stopped here' : dead ? 'never ran' : 'passed',
+      pillBg: stFail ? C.a6 : dead ? C.n3 : C.s2, pillFg: stFail ? C.bg : dead ? C.n8 : C.s9,
+      hasErr: stFail, errCode: stFail ? KIND_TEXT[v.kind][1] : '', errMsg: stFail ? KIND_TEXT[v.kind][2] : '',
+      inSummary: sel === 0 ? 'the raw upload — ' + v.sizeMb + ' MB, ' + v.codec : inKeys.join(', ') || '—',
+      outSummary: dead ? 'nothing' : outKeys.filter(k => !inKeys.includes(k) || JSON.stringify(prev[k]) !== JSON.stringify(cur[k])).join(', ') || 'passed through unchanged',
+      outC: dead ? C.n6 : stFail ? C.a7 : C.ink, outBd: dead ? C.div : stFail ? C.a4 : C.s4,
+      changeNote: ver.touched.includes(S.key) ? ver.note + ' — this stage moved in ' + ver.id + ', so a difference against the last run is expected here.' : 'Untouched since ' + (S.key === 'quality' ? 'v1.5' : S.key === 'classify' ? 'v1.4' : 'v1.3') + '. A change in its output means its input changed.',
+    };
+
+    const TABS = [{ id: 'diff', label: 'payload diff' }, { id: 'why', label: 'why it did that' }, { id: 'time', label: 'time' }, { id: 'signals', label: 'signals' }, { id: 'evidence', label: 'trace entries' }, { id: 'code', label: 'thresholds' }];
+    vals.tabs = TABS.map(t => ({ label: t.label, bg: st.tab === t.id ? C.a5 : 'transparent', fg: st.tab === t.id ? C.bg : C.ink, pick: () => this.setState({ tab: t.id }) }));
+    vals.isDiff = st.tab === 'diff'; vals.isEvidence = st.tab === 'evidence'; vals.isSignals = st.tab === 'signals'; vals.isCode = st.tab === 'code';
+    vals.isWhy = st.tab === 'why'; vals.isTime = st.tab === 'time';
+
+    // ---- time: per-clip waterfall against the corpus
+    let acc = 0;
+    vals.waterfall = STAGES.map((s2, i) => {
+      const ms = snaps[i] == null && v.fail !== i ? 0 : v.stageMs[i];
+      const x = acc / v.total * 100; acc += ms;
+      const p50 = perStage[i].p50;
+      const ratio = p50 ? ms / p50 : 1;
+      const dead = snaps[i] == null && v.fail !== i;
+      return {
+        name: s2.name, nc: dead ? C.n5 : i === sel ? C.a7 : C.ink,
+        x: x.toFixed(2) + '%', w: Math.max(0.6, ms / v.total * 100).toFixed(2) + '%',
+        c: ms > perStage[i].p95 ? C.a6 : dead ? C.n4 : TIMEC[i],
+        ms: dead ? '—' : (ms > 999 ? (ms / 1000).toFixed(1) + 's' : ms),
+        delta: dead ? '' : (ratio > 1.15 ? '+' + Math.round((ratio - 1) * 100) + '%' : ratio < 0.85 ? '−' + Math.round((1 - ratio) * 100) + '%' : 'at median'),
+        dc: ratio > 1.5 ? C.a7 : ratio > 1.15 ? C.a6 : C.n6,
+        rowBg: i === sel ? 'rgba(255,225,208,.45)' : 'transparent',
+        pick: () => this.setState({ sel: i }),
+      };
+    });
+    const slowest = v.stageMs.indexOf(Math.max.apply(null, v.stageMs));
+    vals.timeStats = [
+      { k: 'end to end', v: (v.total / 1000).toFixed(1) + 's', c: v.total > 40000 ? C.a7 : C.ink },
+      { k: 'slowest stage', v: STAGES[slowest].name, c: C.a7 },
+      { k: 'its share', v: Math.round(v.stageMs[slowest] / v.total * 100) + '%', c: C.ink },
+      { k: 'median clip', v: (medTotal / 1000).toFixed(1) + 's', c: C.n7 },
+    ];
+    vals.timeNote = slowest === 3
+      ? 'Pose is the wall, as always — ' + (v.stageMs[3] / 1000).toFixed(1) + 's for ' + Math.round(v.dur * v.fps) + ' frames. The debug loop does not need it: cached keypoints under out/keypoints/ take a re-run to about 1.3s, and the trace records when it reused them.'
+      : slowest === 9
+        ? 'The vision pass is the wall here — two model calls over ' + '11 stills at 512px. It is best-effort, so a slow endpoint delays the payload but never fails the job.'
+        : 'Nothing dominates this run. If you are chasing latency, sort the shelf by a stage from the band on the shelf page.';
+
+    // ---- interpretability
+    const conf = n2(0.6 + v.r2 * 0.39);
+    const basis = (k, val, rel, thr, pass, note, scale) => {
+      const sc = scale || Math.max(val, thr) * 1.35;
+      return {
+        k, v: String(val), rel, thr: String(thr), tag: pass ? 'clears it' : 'fails it',
+        tagBg: pass ? C.s2 : C.a2, tagFg: pass ? C.s8 : C.a8, vc: pass ? C.s7 : C.a7,
+        barW: Math.min(100, val / sc * 100).toFixed(1) + '%', barC: pass ? C.s5 : C.a5,
+        thrX: Math.min(100, thr / sc * 100).toFixed(1) + '%', note,
+      };
+    };
+    vals.whyPose = false; vals.whyBranch = false; vals.whyCands = false; vals.whyComponents = false; vals.whyModels = false;
+    vals.whyBasis = []; vals.branches = []; vals.cands = []; vals.components = []; vals.models = []; vals.jointRows = []; vals.rawRows = []; vals.posePts = []; vals.poseSegs = [];
+    vals.branchNote = ''; vals.scoreTotal = '—'; vals.poseBtn = st.posePlaying ? '⏸' : '▶';
+    vals.poseScrub = String(Math.round(st.poseFrame / 40 * 100));
+    vals.onScrub = e => this.setState({ poseFrame: Math.round(+e.target.value / 100 * 40), posePlaying: false });
+    vals.togglePose = () => this.setState(s => ({ posePlaying: !s.posePlaying }));
+    vals.poseePlate = v.ex === 'pistol_squat' || v.ex === 'push_up' ? 'linear-gradient(165deg,#56633f,#272e1b)' : 'linear-gradient(165deg,#8c491a,#402310)';
+    vals.poseFrameLabel = 'frame ' + Math.round(st.poseFrame / 40 * v.dur * v.fps) + ' · t ' + (st.poseFrame / 40 * v.dur).toFixed(2) + 's';
+
+    if (S.key === 'pose') {
+      vals.whyClaim = v.fail === 3
+        ? 'It decided nothing — the worker had no backend to ask. Every landmark below is absent, not low-confidence, and that distinction is the whole bug.'
+        : 'It emitted ' + Math.round(v.dur * v.fps) + ' frames of 17 COCO landmarks, each with a visibility score. Mean visibility over the twelve analysis joints was ' + v.meanConf + ', and every gate downstream reads that number rather than the picture.';
+      vals.whyBasis = [
+        basis('mean_confidence', v.meanConf, '≥', 0.6, v.meanConf >= 0.6, 'Below 0.60 no frame is used for anatomy (barra/config.py MIN_MEAN_CONFIDENCE).', 1),
+        basis('frames_above_0_6', n2(Math.min(1, v.meanConf + 0.1)), '≥', 0.4, Math.min(1, v.meanConf + 0.1) >= 0.4, 'Fraction of frames whose mean landmark confidence clears 0.6 — MIN_SEEN in classify.py.', 1),
+        basis('interpolated_frac', v.interp, '≤', 0.4, v.interp <= 0.4, 'max_invented_frac: above this a candidate rep is refused as mostly invented.', 1),
+      ];
+      vals.whyPose = true;
+      const sk = skeleton((st.poseFrame % 40) / 40, v.ex, v.meanConf, v.seed);
+      vals.posePts = sk.pts; vals.poseSegs = sk.segs;
+      const rj = rng(v.seed + st.poseFrame);
+      vals.jointRows = ['l_shoulder', 'r_shoulder', 'l_elbow', 'r_elbow', 'l_wrist', 'r_wrist', 'l_hip', 'r_hip', 'l_knee', 'r_knee', 'l_ankle', 'r_ankle'].map(k => {
+        const c = Math.max(0.05, Math.min(1, v.meanConf + (rj() - 0.5) * 0.5));
+        return { k, v: c.toFixed(2), w: Math.round(c * 100) + '%', c: c < 0.5 ? C.a5 : C.s5, c2: c < 0.5 ? C.a7 : C.n7 };
+      });
+      vals.rawRows = sk.pts.slice(0, 6).map((p, i) => ({
+        s: 'kp[' + String(Math.round(st.poseFrame / 40 * v.dur * v.fps)).padStart(4, ' ') + '][' + String(i).padStart(2, ' ') + '] x=' + (p.x / 100).toFixed(4) + ' y=' + (p.y / 100).toFixed(4) + ' c=' + (p.c === C.a4 ? '0.3' : '0.9') + (rj() * 10).toFixed(0),
+        c: p.c === C.a4 ? C.a3 : C.n2,
+      })).concat([{ s: '… ' + (17 * Math.round(v.dur * v.fps) - 6) + ' more rows in out/keypoints/' + v.name.replace('.mp4', '') + '.parquet', c: C.n6 }]);
+    } else if (S.key === 'classify') {
+      vals.whyClaim = v.fail === 4
+        ? 'It refused to name a movement. No branch matched, so nothing downstream ran — measuring an unknown clip with the wrong geometry produces numbers that look fine and mean nothing.'
+        : 'It called this a ' + EX[v.ex] + ' at confidence ' + conf + ', on geometry rather than on what the athlete tapped. The runner-up was ' + (v.ex === 'muscle_up' ? 'pull_up' : 'dip') + '.';
+      vals.whyBasis = [
+        basis('anchor_travel (wrists)', v.travel, '≤', 0.8, v.travel <= 0.8, 'Are the hands on something fixed? MAX_BAR_TRAVEL in torso-lengths.'),
+        basis('window_seen', n2(Math.min(1, v.meanConf + 0.08)), '≥', 0.4, Math.min(1, v.meanConf + 0.08) >= 0.4, 'MIN_SEEN — a branch will not fire on landmarks it barely saw.', 1),
+        basis('peak_above_hands', n2(0.2 + v.r1 * 0.8), '>', 0.12, 0.2 + v.r1 * 0.8 > 0.12, 'ANCHOR_FIXED — the muscle-up test: do the shoulders finish above the hands.', 1),
+        basis('confidence margin', n2(conf - (0.3 + v.r3 * 0.3)), '>', 0.1, conf - (0.3 + v.r3 * 0.3) > 0.1, 'Distance to the runner-up. A thin margin here is where mislabels live.', 1),
+      ];
+      vals.whyBranch = true;
+      vals.branches = [
+        { name: 'parked body — a hold or a rest, not a set', mark: '×', ev: 'movement ' + v.amp + ' > 0.15', bg: 'transparent', mc: C.n5 },
+        { name: 'hands fixed + shoulders cross the hands → muscle_up', mark: v.ex === 'muscle_up' ? '✓' : '×', ev: 'peak_above_hands ' + n2(0.2 + v.r1 * 0.8), bg: v.ex === 'muscle_up' ? 'rgba(225,238,204,.5)' : 'transparent', mc: v.ex === 'muscle_up' ? C.s7 : C.n5 },
+        { name: 'hands fixed, shoulders stay below → pull_up / toes_to_bar', mark: v.ex === 'pull_up' || v.ex === 'toes_to_bar' ? '✓' : '×', ev: 'knees_toward_bar ' + n2(v.r2), bg: v.ex === 'pull_up' || v.ex === 'toes_to_bar' ? 'rgba(225,238,204,.5)' : 'transparent', mc: v.ex === 'pull_up' || v.ex === 'toes_to_bar' ? C.s7 : C.n5 },
+        { name: 'feet fixed, hands fixed → dip / push_up', mark: v.ex === 'dip' || v.ex === 'push_up' ? '✓' : '×', ev: 'too little seen to split them', bg: v.ex === 'dip' || v.ex === 'push_up' ? 'rgba(225,238,204,.5)' : 'transparent', mc: v.ex === 'dip' || v.ex === 'push_up' ? C.s7 : C.n5 },
+        { name: 'hip_height cycles, one ankle only → pistol_squat', mark: v.ex === 'pistol_squat' ? '✓' : '×', ev: 'ankle_window_seen ' + n2(v.meanConf), bg: v.ex === 'pistol_squat' ? 'rgba(225,238,204,.5)' : 'transparent', mc: v.ex === 'pistol_squat' ? C.s7 : C.n5 },
+      ];
+      vals.branchNote = 'classify() is a geometric decision list — so its reasoning is readable in full. The branch that fired is the one whose evidence cleared its threshold first; the learned model later votes separately, and fusion records whether it accepted geometry or overrode a weak call.';
+    } else if (S.key === 'segment') {
+      vals.whyClaim = v.reps === 0
+        ? 'It found ' + v.candidates + ' candidate turnarounds and kept none. Nothing cleared 0.35 × amplitude, so the honest answer is zero reps with a reason attached.'
+        : 'It kept ' + v.reps + ' of ' + v.candidates + ' candidates' + (v.rescued ? ', and only after the relaxed rescue pass at 0.15 × amplitude' : '') + '. Each rejection below names the value and the threshold it failed.';
+      vals.whyBasis = [
+        basis('amplitude', v.amp, '>', 0.15, v.amp > 0.15, 'The signal has to move at all before peaks mean anything.'),
+        basis('prominence_required', n3(0.35 * v.amp), '≤', v.amp, true, 'Derived from amplitude — which is why a clip containing the walk to the bar sets this too high.'),
+        basis('wrist_travel', v.travel, '≤', 0.8, v.travel <= 0.8, 'MAX_BAR_TRAVEL. Accepted muscle-up reps in the corpus travel 0.14–0.52, so 0.80 sits clear of real reps.'),
+        basis('observed_frac', n2(1 - v.interp), '≥', 0.6, 1 - v.interp >= 0.6, '1 − max_invented_frac. Below it the rep is mostly interpolation.', 1),
+      ];
+      vals.whyCands = true;
+      const rc2 = rng(v.seed + 11);
+      vals.cands = Array.from({ length: Math.max(v.candidates, v.reps + 1) }, (_, i) => {
+        const kept = i < v.reps;
+        const at = n2(v.dur * (0.1 + 0.8 * i / Math.max(1, v.candidates)));
+        const gate = pick(rc2, ['peak too shallow to be a turnaround', 'the hands were not on anything fixed', 'mostly interpolated frames', 'too brief to be a rep', 'overlaps a stronger rep already found']);
+        const ev = gate.indexOf('hands') === 0 || gate.indexOf('the hands') === 0 ? 'travel ' + v.travel + ' > 0.8'
+          : gate.indexOf('interp') > -1 ? 'observed ' + n2(1 - v.interp) + ' < 0.6'
+            : gate.indexOf('brief') > -1 ? 'frames ' + Math.round(3 + rc2() * 8) + ' < ' + Math.round(0.8 * v.fps / 2)
+              : 'prominence ' + n2(rc2() * 0.3 * v.amp) + ' < ' + n3(0.35 * v.amp);
+        return {
+          at: at + 's', why: kept ? 'accepted — turnaround at ' + n2(at + v.dur / Math.max(1, v.reps) / 2) + 's' : gate,
+          ev: kept ? 'prominence ' + n2(0.4 * v.amp + rc2() * 0.3 * v.amp) : ev,
+          tag: kept ? 'rep ' + (i + 1) : 'rejected', tagBg: kept ? C.s2 : C.a2, tagFg: kept ? C.s8 : C.a8,
+          bg: kept ? 'rgba(225,238,204,.4)' : 'rgba(255,225,208,.4)',
+        };
+      });
+    } else if (S.key === 'quality') {
+      vals.whyClaim = v.score == null
+        ? 'It declined to score. A rep whose pose was barely tracked would produce a number with no yardstick behind it, so quality.py returns null rather than a guess.'
+        : 'It scored ' + v.score + ' — the mean of the reps that could be scored, not of the reps that exist. ' + (v.reps > 0 ? v.reps + ' reps in, ' + Math.max(1, v.reps - Math.round(v.interp * v.reps)) + ' complete enough to grade.' : '');
+      vals.whyBasis = [
+        basis('rep_quality', n2(v.meanConf), '≥', 0.55, v.meanConf >= 0.55, 'MIN_REP_QUALITY. Below it the rep is not scored at all, which is why a session can have reps and no score.', 1),
+        basis('amplitude CV', v.ampCV, '≤', 0.25, v.ampCV <= 0.25, 'Set-level consistency — no units, no model, just how even the reps were.', 0.6),
+        basis('tempo CV', v.tempoCV, '≤', 0.3, v.tempoCV <= 0.3, 'The same for duration. Quoted in the prose when it is poor.', 0.6),
+      ];
+      vals.whyComponents = true;
+      const rq = rng(v.seed + 21);
+      const comps = [['range of motion', 0.35], ['lockout / turnaround hold', 0.25], ['tempo control', 0.2], ['body line & swing', 0.2]];
+      let tot = 0;
+      vals.components = comps.map(([name, wt]) => {
+        const val = n2(0.45 + rq() * 0.5);
+        const pts = Math.round(val * wt * 100); tot += pts;
+        return { name, detail: 'weight ' + wt + ' × value ' + val, pts: '+' + pts, pc: C.s7, w: Math.round(val * 100) + '%', bc: C.s5 };
+      });
+      const pen = v.ampCV > 0.25 ? Math.round(v.ampCV * 20) : 0;
+      if (pen) vals.components.push({ name: 'penalty · uneven amplitude', detail: 'amplitudeCV ' + v.ampCV + ' > 0.25', pts: '−' + pen, pc: C.a7, w: Math.round(v.ampCV * 100) + '%', bc: C.a5 });
+      vals.scoreTotal = v.score == null ? 'null' : String(v.score);
+    } else if (S.key === 'vision') {
+      vals.whyClaim = v.countedBy
+        ? 'Geometry found nothing, so two vision models counted from stills instead. That is a weaker answer than a measurement and the payload says so — countedBy: "vision".'
+        : 'It looked at the turning-point stills and gave a verdict independent of the numbers. ' + (v.visVerdict === v.geoVerdict ? 'It agreed with the geometry.' : 'It disagreed with the geometry, which is the more interesting outcome.');
+      vals.whyBasis = [
+        basis('stills sent', Math.min(11, v.reps + 1), '≤', 11, true, 'MAX_STILLS — one per rep up to ten, plus the window\u2019s first frame, each capped at 512px.'),
+        basis('model agreement', v.visVerdict === v.geoVerdict ? 1 : 0, '=', 1, v.visVerdict === v.geoVerdict, 'When two counts land within one of each other the higher is taken; when they split, the lower goes out labelled.', 1),
+      ];
+      vals.whyModels = true;
+      vals.models = [
+        { who: 'geometry (barra)', said: v.geoVerdict, note: 'From the measured metrics only — it never sees the picture.', c: C.ink, bd: C.div },
+        { who: 'glm5.3-flash · primary', said: v.visVerdict, note: 'Owns headline, narrative and nextSession when it answers.', c: v.visVerdict === v.geoVerdict ? C.s7 : C.a7, bd: v.visVerdict === v.geoVerdict ? C.s4 : C.a4 },
+        { who: 'qwen3.8-flash · second', said: v.visVerdict === v.geoVerdict ? v.geoVerdict : pick(rng(v.seed + 3), [v.visVerdict, v.geoVerdict]), note: 'One word, cross-read against the primary. A disagreement is worth more than either agreement.', c: C.n8, bd: C.div },
+      ];
+    } else if (S.key === 'probe' || S.key === 'transport' || S.key === 'constraints') {
+      vals.whyClaim = v.fail === sel
+        ? 'It refused the file: ' + KIND_TEXT[v.kind][1] + '. Nothing was estimated, so no confidence number exists to explain — this is a container fact, not a model opinion.'
+        : 'It accepted the file on container facts alone: ' + v.codec + ', ' + v.fps + ' fps, ' + v.dur + 's, ' + v.sizeMb + ' MB. No model has run yet.';
+      vals.whyBasis = [
+        basis('duration_s', v.dur, '≤', 90, v.dur <= 90, 'A whole-session clip drags the walk to the bar into every statistic downstream.'),
+        basis('duration_s', v.dur, '≥', 2.5, v.dur >= 2.5, 'Shorter than one rep of anything.'),
+        basis('size_mb', v.sizeMb, '≤', 180, v.sizeMb <= 180, 'Worker memory, not quality — a bigger file is transcoded, not refused, above this.'),
+        basis('fps', v.fps, '≥', 20, v.fps >= 20, 'Below 20 fps a turnaround can fall between two frames entirely.'),
+      ];
+    } else {
+      vals.whyClaim = S.key === 'normalise'
+        ? 'It chose ' + (v.ex === 'pistol_squat' ? 'hip_height' : 'shoulder_above_bar') + ' as the one number to track, then filled the gaps. Everything after this reasons about that single series — so a bad choice here is invisible later and fatal.'
+        : S.key === 'metrics'
+          ? 'It turned each rep window into twelve measurements. Every one is a plain geometric quantity with a unit, which is why the prose model is never allowed to touch them.'
+          : 'It assembled the payload and stamped it: trace id, commit, and the pose model hashed rather than named — because mediapipe ships new weights under the same filename.';
+      vals.whyBasis = S.key === 'normalise' ? [
+        basis('paired landmark frac', n2(Math.min(1, v.meanConf + 0.05)), '≥', 0.55, Math.min(1, v.meanConf + 0.05) >= 0.55, 'MIN_PAIRED_FRAC — below it the signal falls back to one side and the asymmetry metrics stop meaning anything.', 1),
+        basis('interpolated_frac', v.interp, '≤', 0.4, v.interp <= 0.4, 'NaN is a real outcome here and is recorded, not hidden.', 1),
+      ] : S.key === 'metrics' ? [
+        basis('rep_quality', n2(v.meanConf), '≥', 0.55, v.meanConf >= 0.55, 'Anything under this is measured but flagged not-plausible.', 1),
+        basis('arm_reach conf', n2(Math.min(1, v.meanConf + 0.06)), '≥', 0.6, Math.min(1, v.meanConf + 0.06) >= 0.6, 'The scale every torso-length figure is divided by.', 1),
+      ] : [
+        basis('prose keys claimed', 3, '=', 3, true, 'A deny-list of three, so a new measurement key can never silently fail to reach the phone.'),
+        basis('blockers', v.fail >= 0 ? 1 : 0, '=', 0, v.fail < 0, 'A visible zero with a reason is a result; a number with no yardstick is not.', 1),
+      ];
+    }
+
+    const ev = [];
+    ev.push({ at: '0ms', mark: '', msg: 'entered ' + S.name, c: C.n5, data: [] });
+    if (S.key === 'segment') {
+      ev.push({ at: v.stageMs[8] + 'ms', mark: '→', msg: 'peak search', c: C.s4, data: [{ k: 'amplitude', v: v.amp, c: C.a3 }, { k: 'prominence_required', v: n3(0.35 * v.amp), c: C.a3 }, { k: 'min_separation_frames', v: Math.round(0.8 * v.fps), c: C.a3 }] });
+      if (v.travel > 0.8) ev.push({ at: v.stageMs[8] + 4 + 'ms', mark: 'x', msg: 'the hands were not on anything fixed', c: C.a4, data: [{ k: 'wrist_travel', v: v.travel, c: C.a3 }, { k: 'max_travel', v: '0.8', c: C.a3 }, { k: 'window_s', v: '[' + n2(v.dur * 0.2) + ', ' + n2(v.dur * 0.45) + ']', c: C.n2 }] });
+      if (v.interp > 0.4) ev.push({ at: v.stageMs[8] + 6 + 'ms', mark: 'x', msg: 'mostly interpolated frames', c: C.a4, data: [{ k: 'observed_frac', v: n2(1 - v.interp), c: C.a3 }, { k: 'min_observed', v: '0.6', c: C.a3 }] });
+      ev.push({ at: v.stageMs[8] + 9 + 'ms', mark: v.reps ? '→' : 'x', msg: v.reps ? 'accepted ' + v.reps + ' of ' + v.candidates + ' candidates' : 'no turnaround stood out from the noise', c: v.reps ? C.s4 : C.a4, data: [] });
+      if (v.rescued) ev.push({ at: v.stageMs[8] + 22 + 'ms', mark: '→', msg: 'rescue pass produced the count', c: C.s4, data: [{ k: 'prominence', v: '0.15 × amplitude', c: C.a3 }, { k: 'standard_blockers', v: '1', c: C.a3 }] });
+    } else if (S.key === 'classify') {
+      ev.push({ at: v.stageMs[4] + 'ms', mark: v.fail === 4 ? 'x' : '→', msg: v.fail === 4 ? 'no branch matched' : (v.ex === 'muscle_up' ? 'the shoulders finish above the hands' : 'the tracked pair crosses the anchor'), c: v.fail === 4 ? C.a4 : C.s4, data: [{ k: 'confidence', v: n2(0.6 + v.r2 * 0.39), c: C.a3 }, { k: 'seen_min', v: '0.4', c: C.a3 }, { k: 'anchor_max', v: '0.12', c: C.a3 }, { k: 'runner_up', v: v.ex === 'muscle_up' ? 'pull_up' : 'dip', c: C.n2 }] });
+    } else if (S.key === 'quality') {
+      ev.push({ at: v.stageMs[10] + 'ms', mark: v.score == null ? 'x' : '→', msg: v.score == null ? 'not scored: too little of the rep was tracked' : 'mean of the reps that could be scored', c: v.score == null ? C.a4 : C.s4, data: [{ k: 'rep_quality', v: n2(v.meanConf), c: C.a3 }, { k: 'min_rep_quality', v: '0.55', c: C.a3 }, { k: 'session_score', v: v.score == null ? 'null' : v.score, c: C.a3 }] });
+    } else if (S.key === 'vision') {
+      ev.push({ at: v.stageMs[11] + 'ms', mark: '→', msg: v.countedBy ? 'used the models\u2019 count' : 'vision second opinion', c: C.s4, data: [{ k: 'verdict', v: v.visVerdict, c: C.n2 }, { k: 'geometry', v: v.geoVerdict, c: C.n2 }, { k: 'agreement', v: v.visVerdict === v.geoVerdict ? 'agree' : 'disagree', c: v.visVerdict === v.geoVerdict ? C.s4 : C.a3 }] });
+    } else if (S.key === 'pose') {
+      ev.push({ at: v.stageMs[3] + 'ms', mark: '→', msg: v.fail === 3 ? 'no pose backend installed' : 'keypoints', c: v.fail === 3 ? C.a4 : C.s4, data: [{ k: 'frames', v: Math.round(v.dur * v.fps), c: C.a3 }, { k: 'mean_confidence', v: v.meanConf, c: C.a3 }, { k: 'frames_above_0_6', v: Math.round(v.dur * v.fps * Math.min(1, v.meanConf + 0.1)), c: C.a3 }] });
+    } else if (stFail) {
+      ev.push({ at: v.stageMs[sel] + 'ms', mark: '!', msg: KIND_TEXT[v.kind][1], c: C.a4, data: [{ k: 'reason', v: v.kind, c: C.n2 }] });
+    } else {
+      ev.push({ at: v.stageMs[sel] + 'ms', mark: '→', msg: dead ? 'never reached' : 'wrote ' + Object.keys(cur || {}).length + ' payload keys', c: dead ? C.n5 : C.s4, data: [] });
+    }
+    vals.evidence = ev;
+
+    const N = 120;
+    const sig = [];
+    const rr = rng(v.seed);
+    const cycles = Math.max(1, v.candidates || 2);
+    for (let i = 0; i < N; i++) {
+      const t = i / (N - 1);
+      const walk = t < 0.12 || t > 0.9;
+      const base2 = walk ? 0.15 + rr() * 0.25 : 0.5 - 0.5 * Math.cos(t * Math.PI * 2 * cycles);
+      sig.push(Math.max(0, Math.min(1, base2 * (v.amp / 1.6) + (rr() - 0.5) * (1 - v.meanConf) * 0.35)));
+    }
+    vals.signalName = v.ex === 'pistol_squat' ? 'hip_height' : 'shoulder_above_bar';
+    vals.sigPts = sig.map((y, i) => (i / (N - 1) * 600).toFixed(1) + ',' + (140 - y * 120).toFixed(1)).join(' ');
+    vals.gateY = (140 - 0.35 * (v.amp / 1.6) * 120).toFixed(1);
+    vals.repBands = Array.from({ length: v.reps }, (_, i) => ({ x: (600 * (0.12 + 0.78 * i / Math.max(1, v.reps))).toFixed(0), w: (600 * 0.78 / Math.max(1, v.reps)).toFixed(0), fill: i % 2 ? 'rgba(225,238,204,.55)' : 'rgba(240,250,225,.55)' }));
+    vals.turnMarks = Array.from({ length: v.reps }, (_, i) => ({ x: (600 * (0.12 + 0.78 * (i + 0.5) / Math.max(1, v.reps))).toFixed(0) }));
+    const cf = [];
+    const rc = rng(v.seed + 5);
+    for (let i = 0; i < N; i++) cf.push(Math.max(0.05, Math.min(1, v.meanConf + (rc() - 0.5) * 0.35 - (i > N * 0.6 && i < N * 0.72 ? 0.4 : 0))));
+    vals.confPts = cf.map((y, i) => (i / (N - 1) * 600).toFixed(1) + ',' + (86 - y * 78).toFixed(1)).join(' ');
+    vals.confGateY = (86 - 0.5 * 78).toFixed(1);
+    vals.dropouts = cf.reduce((acc, y, i) => { if (y < 0.5) { const x = i / (N - 1) * 600; const last = acc[acc.length - 1]; if (last && x - (+last.x + +last.w) < 12) last.w = (x + 5 - +last.x).toFixed(0); else acc.push({ x: x.toFixed(0), w: '6' }); } return acc; }, []);
+    vals.sigStats = [
+      { k: 'amplitude', v: v.amp, c: C.ink }, { k: 'interpolated', v: Math.round(v.interp * 100) + '%', c: v.interp > 0.4 ? C.a7 : C.ink },
+      { k: 'amplitude CV', v: v.ampCV, c: v.ampCV > 0.25 ? C.a7 : C.ink }, { k: 'tempo CV', v: v.tempoCV, c: v.tempoCV > 0.3 ? C.a7 : C.ink },
+    ];
+
+    const CONF = {
+      transport: [['max part size', '8 MB'], ['presign ttl', '900 s'], ['retries', '1']],
+      probe: [['opener', 'cv2.VideoCapture'], ['accepted containers', 'mp4 · mov · webm'], ['reason on failure', 'info["reason"]']],
+      constraints: [['max duration', '90 s'], ['min duration', '2.5 s'], ['max size', '180 MB']],
+      pose: [['backend order', 'BARRA_POSE_BACKEND, then registry'], ['model', 'pose_landmarker_heavy.task'], ['min_pose_detection_confidence', '0.5'], ['min_tracking_confidence', '0.5'], ['topology', 'remapped to COCO17']],
+      classify: [['MIN_CONF', '0.5'], ['MIN_SEEN', '0.40'], ['ANCHOR_FIXED', '0.12'], ['anchor window', 'ANCHOR_WINDOW_S']],
+      model: [['path', 'BARRA_MODEL_PATH, then models/exercise_model.npz'], ['features', 'temporal geometric vector'], ['failure', 'null, never fatal']],
+      fusion: [['strong geometry', 'GEOMETRY_STRONG_MARGIN'], ['model accept', 'MODEL_ACCEPT_CONFIDENCE + margin'], ['override', 'requires strong model or NaN alias support']],
+      normalise: [['signal', vals.signalName], ['MIN_PAIRED_FRAC', '0.55'], ['conf floor', '0.35'], ['NaN policy', 'interpolate, then count it']],
+      segment: [['prominence', '0.35 × amplitude'], ['MAX_BAR_TRAVEL', '0.80 torso'], ['max_invented_frac', '0.4'], ['max_half_rep_s', '4.0'], ['min_rep_s', v.ex === 'muscle_up' ? '0.7' : '0.8'], ['rescue prominence', '0.15 × amplitude']],
+      metrics: [['metric order', '12 keys, METRIC_SPEC'], ['MIN_REP_QUALITY', '0.55'], ['arm_reach min_conf', '0.6']],
+      quality: [['MIN_REP_QUALITY', '0.55'], ['bands', 'developing · solid · strong'], ['complete', 'every graded component measured']],
+      vision: [['primary model', 'glm5.3-flash'], ['second model', 'qwen3.8-flash'], ['stills', 'MAX_STILLS 11 · MAX_WIDTH 512'], ['count rule', 'agree within one → higher count'], ['owns', 'headline · narrative · nextSession']],
+      payload: [['prose keys', 'deny-list of 3'], ['traceId', v.trace], ['provenance', 'commit + pose model sha'], ['store', 'out/traces + TRACES_TABLE']],
+    };
+    vals.config = (CONF[S.key] || []).map(([k, val]) => ({ k, v: val, c: C.a7 }));
+
+    vals.outTitle = sel === STAGES.length - 1 ? 'the payload the phone renders' : 'payload after ' + S.name;
+    vals.outMeta = dead ? 'not produced' : Object.keys(cur).length + ' keys · ' + v.trace;
+    vals.outDot = dead ? C.n5 : stFail ? C.a4 : C.s4;
+    vals.jsonLines = this.jsonTokens(cur || (prev || {}));
+
+    vals.hint = stFail ? KIND_TEXT[v.kind][2]
+      : dead ? 'Everything from here on is unreachable for this clip. The last thing that ran was ' + STAGES[live].name + '.'
+        : S.key === 'segment' && v.reps !== v.truth ? 'The count disagrees with the athlete (' + v.reps + ' vs ' + v.truth + '). Look at the rejected candidates in the trace entries before touching a threshold — a rejection here usually names the walk to the bar.'
+          : S.key === 'vision' && v.visVerdict !== v.geoVerdict ? 'The two verdicts split: vision says ' + v.visVerdict + ', geometry says ' + v.geoVerdict + '. A disagreement is worth more than either agreement — check the stills against the score components.'
+            : v.stageMs[sel] > 8000 ? 'This stage is ' + Math.round(v.stageMs[sel] / v.total * 100) + '% of the run. Cached keypoints would take the loop from ' + (v.total / 1000).toFixed(0) + 's to about 1.3s.'
+              : 'Nothing anomalous here. Compare the diff against the previous run of this clip if you are chasing a regression.';
+
+    vals.agentScope = v.name + ' · ' + S.name + ' · ' + st.ver;
+    vals.askAboutStage = () => { this.setState({ agentOpen: true }); this.ask('What happened at the ' + S.name + ' stage for this clip, and what should I open first?'); };
+    vals.prompts = [
+      { label: 'why this outcome?', send: () => this.ask('Why did the ' + S.name + ' stage produce this output for this clip?') },
+      { label: 'is a threshold wrong?', send: () => this.ask('Is a threshold in this stage wrong for this clip, or is the input bad? Say which and why.') },
+      { label: 'what changed since last run?', send: () => this.ask('What could explain the difference between this run and the previous version of the logic?') },
+    ];
+    return vals;
+  }
+}
+</script>
+</body>
+</html>

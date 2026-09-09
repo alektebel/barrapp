@@ -66,7 +66,7 @@ object ProcessingNotifier {
             .setProgress(STAGES.size, index, false)
             .setContentIntent(openApp(context))
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(ONGOING_ID, notification) }
+        post(context, ONGOING_ID, notification)
     }
 
     /** Replace the ongoing notification with a "finished" one that opens the result. */
@@ -79,7 +79,7 @@ object ProcessingNotifier {
             .setAutoCancel(true)
             .setContentIntent(openApp(context))
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(RESULT_ID, notification) }
+        post(context, RESULT_ID, notification)
     }
 
     /** Replace the ongoing notification with a "failed" one. */
@@ -92,7 +92,7 @@ object ProcessingNotifier {
             .setAutoCancel(true)
             .setContentIntent(openApp(context))
             .build()
-        runCatching { NotificationManagerCompat.from(context).notify(RESULT_ID, notification) }
+        post(context, RESULT_ID, notification)
     }
 
     /** Remove the ongoing notification (upload cancelled, or already replaced). */
@@ -116,6 +116,18 @@ object ProcessingNotifier {
                 .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
+
+    /** The one place a notification is posted. `canPost` is checked first by
+     *  every caller, and the SecurityException the platform can still throw
+     *  (permission revoked between the check and the post) is swallowed:
+     *  a notification is never worth taking the upload down for. */
+    private fun post(context: Context, id: Int, notification: android.app.Notification) {
+        if (!canPost(context)) return
+        try {
+            NotificationManagerCompat.from(context).notify(id, notification)
+        } catch (_: SecurityException) {
+        }
+    }
 
     private fun canPost(context: Context): Boolean =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Reel Room · Video library</title>
+<link rel="stylesheet" href="organic.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="gallery.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="/">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"
+      fill="none" stroke="#f5ead8" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h10"></path></svg></span>
+    The Reel Room
+  </a>
+  <span class="nav-sub">barrapp pipeline</span>
+  <span class="spacer"></span>
+  <div class="nav-links">
+    <a href="/" aria-current="page">Library</a>
+    <a href="/guide">How to debug</a>
+    <a href="/models">Model card</a>
+  </div>
+  <label class="btn btn-primary">Add video<input id="upload" type="file" accept="video/*" multiple hidden></label>
+</nav>
+
+<main>
+  <div class="hero">
+    <p class="kicker">The shelf</p>
+    <h1>Every clip, exactly once.</h1>
+    <p>Keyed on the bytes inside each file, not on its name — so a clip copied into two
+       folders is one plate here, with one debug history. Hover a plate, open it, walk
+       the pipeline left to right.</p>
+  </div>
+
+  <div class="lib-stats" id="stats"></div>
+
+  <div class="toolbar card">
+    <label class="field"><span class="kicker">Find</span>
+      <input id="search" type="search" placeholder="Name, movement, tag or library id…"></label>
+    <label class="field"><span class="kicker">Show</span>
+      <select id="filter">
+        <option value="all">All videos</option>
+        <option value="analyzed">Analysed</option>
+        <option value="new">Never analysed</option>
+        <option value="attention">Needs inspection</option>
+        <option value="copies">Has duplicate files</option>
+      </select></label>
+    <label class="field"><span class="kicker">Order</span>
+      <select id="sort">
+        <option value="added">Newest in library</option>
+        <option value="name">Name</option>
+        <option value="runs">Most runs</option>
+        <option value="duration">Longest</option>
+      </select></label>
+    <span class="spacer"></span>
+    <button id="rescan" class="btn btn-secondary" title="Index videos added to the folders outside this page">Rescan disk</button>
+  </div>
+
+  <p id="status" class="status-line" role="status" aria-live="polite">Loading the library…</p>
+  <div id="gallery" aria-label="Video library"></div>
+</main>
+
+<script src="gallery.js"></script>
+</body>
+</html>

@@ -53,6 +53,13 @@ class KeypointCacheRoundTrip(unittest.TestCase):
         pose = posecache.load_or_estimate(self.video, fallback_fps=24.0)
         self.assertEqual(pose.fps, 24.0)
 
+    def test_tags_keep_pose_models_from_colliding(self):
+        posecache.store(self.video, self.kp, tag="ultralytics")
+        alt = self.kp + 1.0
+        posecache.store(self.video, alt, tag="mediapipe")
+        back = posecache.load(self.video, tag="ultralytics")
+        np.testing.assert_allclose(back[:, :, :2], self.kp[:, :, :2], rtol=1e-5)
+
     def test_fresh_skips_the_cache(self):
         posecache.store(self.video, self.kp)
         with self.assertRaises(SystemExit):

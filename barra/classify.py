@@ -93,6 +93,34 @@ KNEES_UP = 0.10
 HOLD_BAND = 0.20
 HOLD_FRAC = 0.55
 
+# How far apart (vertically, in torso-lengths) the two ankles have to be for a
+# stance to read as split rather than parallel. A parallel squat keeps both feet
+# on the floor and the gap is pose-jitter-small; a split stance plants one foot
+# ahead and one behind, so the ankles sit at different heights and the gap is
+# structural. Measured on a parallel squat the median gap was well under 0.08;
+# a split stance sits clearly above it.
+SPLIT_HEIGHT_MIN = 0.08
+# How high the REAR ankle above the planted front ankle (torso-lengths) before
+# the rear foot is on a bench rather than on the floor. A Bulgarian split squat
+# lifts the rear foot onto a bench (rear ankle well above the front); a plain
+# split squat keeps the rear toe on the floor (rear ankle only slightly higher).
+BULGARIAN_REAR = 0.25
+
+
+# What the number beside a detection actually is. It is not a probability and
+# never was: every branch below computes it as 0.70 plus how far the deciding
+# measurement sits past the threshold it was compared against, capped. So 0.98
+# does not mean "98% likely a muscle-up" - it means the shoulders finished far
+# enough above the hands that no plausible measurement error reaches the
+# pull-up side of the line. Reading it as a probability is how "82% confident"
+# ended up over a clip whose label was never in doubt, and how a 0.70 - a
+# decision made ON the boundary - read as a strong claim rather than a coin
+# toss. The name travels with the number so a consumer cannot mistake it.
+CERTAINTY_KIND = "margin-to-threshold"
+# Below this the deciding measurement sat close enough to its threshold that
+# the runner-up is worth naming. A bound on the margin, not a confidence level.
+CLEAR_MARGIN = 0.65
+
 
 @dataclass
 class Classification:
@@ -101,10 +129,18 @@ class Classification:
     reason: str
     features: dict = field(default_factory=dict)
     runner_up: str | None = None
+    certainty: str = CERTAINTY_KIND
+
+    @property
+    def margin(self) -> float:
+        """The bounded margin, under the name that says what it measures."""
+        return self.confidence
 
     @property
     def certain(self) -> bool:
-        return self.confidence >= 0.65
+        """The deciding measurement is clear of its threshold - NOT a claim
+        about how likely the label is to be right."""
+        return self.confidence >= CLEAR_MARGIN
 
 
 def _travel(points: np.ndarray, ok: np.ndarray, torso: float) -> float:
@@ -138,6 +174,37 @@ def _best_window(points: np.ndarray, ok: np.ndarray, torso: float,
         if t < best[0]:
             best = (t, seen, a, b - 1)
     return best
+
+
+def anchored_mask(points: np.ndarray, ok: np.ndarray, torso: float,
+                  win: int) -> np.ndarray:
+    """Frames lying inside SOME window of `win` frames in which the landmark
+    was seen well enough and barely moved.
+
+    The same question `_best_window` answers with one number, answered per
+    frame: not "was there a stretch where the hands were still" but "is this
+    frame in one". Windows overlap, so the mask reaches the edges of the set
+    rather than clipping its first and last rep.
+
+    `barra.ingest.active_mask` is this function with the movement's anchor
+    chosen for it, and used to be a second copy of this loop.
+    """
+    n = len(points)
+    m = np.zeros(n, dtype=bool)
+    if n == 0:
+        return m
+    if n <= win:
+        m[:] = (_travel(points, ok, torso) <= ANCHOR_FIXED
+                and float(ok.mean()) >= MIN_SEEN)
+        return m
+    step = max(1, win // 10)
+    for a in range(0, n - win + 1, step):
+        b = a + win
+        if float(ok[a:b].mean()) < MIN_SEEN:
+            continue
+        if _travel(points[a:b], ok[a:b], torso) <= ANCHOR_FIXED:
+            m[a:b] = True
+    return m
 
 
 def _parked(a: np.ndarray) -> float:
@@ -187,6 +254,11 @@ def _frac(a: np.ndarray, thresh: float) -> float:
 def _pct(a: np.ndarray, q: float) -> float:
     a = a[np.isfinite(a)]
     return float(np.percentile(a, q)) if a.size else float("nan")
+
+
+def _std(a: np.ndarray) -> float:
+    a = a[np.isfinite(a)]
+    return float(np.std(a)) if a.size > 1 else float("nan")
 
 
 def features(kp: np.ndarray, fps: float = 30.0) -> dict:
@@ -245,6 +317,33 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
     w_win = _best_window(wrist, w_ok, torso, win)
     a_win = _best_window(ankle, a_ok, torso, win)
 
+    # Everything measured RELATIVE TO THE HANDS is measured only where the
+    # hands were on something.
+    #
+    # People walk into frame with their arms at their sides, film the set, and
+    # walk out again. Those standing frames put the shoulders a torso-length
+    # above the wrists - further above them than the top of any muscle-up - so
+    # a percentile taken over the whole clip reads the walk-in, not the set.
+    # On a bar clip with a standing prefix that moved `shoulder_above_hands_p95`
+    # past OVER_BAR and turned a pull-up into a muscle-up; on a clip that is
+    # mostly rest it dragged `hands_overhead_frac` under its gate and the whole
+    # clip fell out as `unknown`.
+    #
+    # Scoping them means adding standing frames to a clip cannot change its
+    # label - tests/test_segmentation_invariants.py holds that as a property.
+    # When no window is anchored at all the whole clip is used, which is honest
+    # rather than empty: those are the clips the anchored gate rejects anyway,
+    # and they have to reach it with numbers rather than with NaN.
+    #
+    # The limit worth stating: this excludes a walk-in, because walking moves
+    # the hands. Somebody standing perfectly still with their arms at their
+    # sides is anchored by this test and still counted, and separating that
+    # from a hang needs a signal this function does not have.
+    on_bar = anchored_mask(wrist, w_ok, torso, win)
+    if int(on_bar.sum()) < max(5, win // 2):
+        on_bar = np.ones(len(kp), dtype=bool)
+    above_clip, above = above, np.where(on_bar, above, np.nan)
+
     # ---- progression geometry: the isometric tracks and the pistol ---------
     # Body line: the shoulder-hip line's angle from vertical, in degrees.
     # 0 = hanging vertical, 90 = horizontal. A front lever or planche is a
@@ -285,18 +384,47 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
     # Single-leg stance (the pistol): one ankle planted under the hip, the
     # other carried forward at hip height. The planted leg's ankle sits below
     # the hip; the free leg's ankle sits well forward and near hip height.
-    # When only one side is confidently seen the planted one is the one whose
-    # ankle is lowest; a two-legged squat keeps BOTH ankles below the hips.
-    l_ankle_below = _pct((hip[:, 1] - kp[:, S.KP_INDEX["left_ankle"], 1]) / torso, 5)
-    r_ankle_below = _pct((hip[:, 1] - kp[:, S.KP_INDEX["right_ankle"], 1]) / torso, 5)
+    # Both feet must be observed to establish the contrast. Image y grows
+    # downward: ankle-minus-hip, not hip-minus-ankle, is positive below the hip.
     l_ok_s = kp[:, S.KP_INDEX["left_ankle"], 2] >= MIN_CONF
     r_ok_s = kp[:, S.KP_INDEX["right_ankle"], 2] >= MIN_CONF
-    one_side_planted = bool(l_ok_s.mean() >= 0.5 or r_ok_s.mean() >= 0.5)
+    both_feet = l_ok_s & r_ok_s & h_ok
+    l_ankle_below = _pct(np.where(both_feet,
+        (kp[:, S.KP_INDEX["left_ankle"], 1] - hip[:, 1]) / torso, np.nan), 50)
+    r_ankle_below = _pct(np.where(both_feet,
+        (kp[:, S.KP_INDEX["right_ankle"], 1] - hip[:, 1]) / torso, np.nan), 50)
+    one_side_planted = bool(both_feet.mean() >= MOSTLY_UNSEEN)
     # The planted side is the one with the ankle lowest; the free side's ankle
     # is carried forward. A pistol has exactly one low ankle.
     l_low = l_ankle_below > 0.05 if np.isfinite(l_ankle_below) else False
     r_low = r_ankle_below > 0.05 if np.isfinite(r_ankle_below) else False
     single_leg_stance = bool(one_side_planted and (l_low != r_low))
+
+    # Split-stance geometry. A split squat (and its Bulgarian variant) plants
+    # one foot ahead and one behind, so the ankles sit at DIFFERENT heights; a
+    # parallel squat keeps both on the floor and the gap is near zero. `split_
+    # ankle_heights` is the median vertical gap between the ankles, in torso-
+    # lengths; `rear_raised` is how far the higher (rear) ankle sits above the
+    # lower (planted front) one, which is what separates Bulgarian (rear foot
+    # on a bench) from a plain split squat (rear toe on the floor).
+    la_y = kp[:, S.KP_INDEX["left_ankle"], 1]
+    ra_y = kp[:, S.KP_INDEX["right_ankle"], 1]
+    la_ok_a = kp[:, S.KP_INDEX["left_ankle"], 2] >= MIN_CONF
+    ra_ok_a = kp[:, S.KP_INDEX["right_ankle"], 2] >= MIN_CONF
+    both_a = la_ok_a & ra_ok_a
+    gap = np.where(both_a, np.abs(la_y - ra_y) / torso, np.nan)
+    front_y = np.where(both_a, np.maximum(la_y, ra_y), np.nan)
+    rear_y = np.where(both_a, np.minimum(la_y, ra_y), np.nan)
+    split_ankle_heights = pct(gap, 50)
+    rear_raised = pct((front_y - rear_y) / torso, 50)
+
+    # Temporal summaries of the movement shape. A clip-level percentile can be
+    # pushed past a threshold by one noisy frame; these preserve how much of
+    # the anchored set actually held the movement's defining condition.
+    shoulder_above_hands_p90 = pct(above, 90)
+    shoulder_above_hands_over_bar_frac = _frac(above, OVER_BAR)
+    shoulder_above_hands_std = _std(above)
+    hip_travel_std = _std(hip_over_ankle)
 
     return {
         "n_frames": int(len(kp)),
@@ -314,15 +442,25 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
                            round(w_win[3] / (fps or 30.0), 2)],
         "ankle_window_travel": a_win[0],
         "ankle_window_seen": a_win[1],
+        # Share of the clip the hands were on something, and so the share of
+        # it the four values below were measured over.
+        "on_bar_frac": float(on_bar.mean()) if len(on_bar) else 0.0,
         # negative = hands above the shoulders, i.e. hanging
         "shoulder_above_hands_p05": pct(above, 5),
         "shoulder_above_hands_p95": pct(above, 95),
-        "hands_overhead_frac": float(np.nanmean(above < -0.05)) if ws.any() else 0.0,
-        "hands_below_frac": float(np.nanmean(above > 0.05)) if ws.any() else 0.0,
+        # Fractions of the frames where the hands WERE SEEN, not of the clip.
+        # Counting unseen frames as "not overhead" quietly charged every
+        # occlusion against the movement being what it is.
+        "hands_overhead_frac": _frac(-above, 0.05),
+        "hands_below_frac": _frac(above, 0.05),
+        # The same two spreads over the whole clip, kept because they are what
+        # a human scrubbing the video sees; nothing decides on them.
+        "shoulder_above_hands_p95_clip": pct(above_clip, 95),
         # How much the shoulders move RELATIVE TO the hands. Large when the
         # hands are on something and the body moves past them; near zero when
         # the arms just hang off a torso that is moving as one piece.
         "arm_articulation": pct(above, 95) - pct(above, 5),
+        "arm_articulation_clip": pct(above_clip, 95) - pct(above_clip, 5),
         "hip_travel": (pct(hip_over_ankle, 95) - pct(hip_over_ankle, 5))
         if np.isfinite(pct(hip_over_ankle, 95)) else float("nan"),
         "torso_tilt": pct(tilt, 50),
@@ -332,7 +470,11 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
         # hands. Both have to be parked for the clip to be a hold: in a knee
         # raise the shoulders barely move, and judging on them alone would call
         # every knee raise a hold.
-        "parked_frac": min([_parked(a) for a in (above, knee_over_hip)
+        # Whole-clip, deliberately, and taken from `above_clip` rather than the
+        # anchored series: this is the test for "nothing happened", and a clip
+        # where nothing happened has no anchored span to speak of. Scoping it
+        # would measure how still the still part was, which is always very.
+        "parked_frac": min([_parked(a) for a in (above_clip, knee_over_hip)
                             if np.isfinite(a).sum() >= 6] or [0.0]),
         "knee_over_hip": float(np.nanmedian(knee_over_hip))
         if np.isfinite(knee_over_hip).any() else float("nan"),
@@ -347,6 +489,12 @@ def features(kp: np.ndarray, fps: float = 30.0) -> dict:
         "single_leg_stance": single_leg_stance,
         "l_ankle_below": l_ankle_below,
         "r_ankle_below": r_ankle_below,
+        "split_ankle_heights": split_ankle_heights,
+        "rear_raised": rear_raised,
+        "shoulder_above_hands_p90": shoulder_above_hands_p90,
+        "shoulder_above_hands_over_bar_frac": shoulder_above_hands_over_bar_frac,
+        "shoulder_above_hands_std": shoulder_above_hands_std,
+        "hip_travel_std": hip_travel_std,
     }
 
 
@@ -536,6 +684,47 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f, runner_up="squat",
         )
 
+    # A split squat is a squat with the feet fore/aft, so BOTH ankles are
+    # planted but sit at different heights. Checked between the pistol and the
+    # squat: a split stance has two low ankles, so it is not a pistol, and its
+    # ankle gap is structural, so one foot is not merely behind the other by
+    # the depth the squat's ankle-midpoint frame would fold into the hips.
+    #
+    # The honest limit: a Bulgarian rear foot on a bench sits near hip height,
+    # which an ankle-height measure can half-read as a pistol's CARRIED leg -
+    # the two are only separable by where the rear ankle is (behind, planted)
+    # rather than how high it is, and that needs a knowable view. So the split
+    # branch requires BOTH ankles below the standing hip (not a carried free
+    # leg); a clip whose rear foot reads as carried is returned as a pistol by
+    # the branch above, and the app should say so rather than guess.
+    if (planted and np.isfinite(f["split_ankle_heights"])
+            and f["split_ankle_heights"] >= SPLIT_HEIGHT_MIN
+            and np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35):
+        rear = f["rear_raised"]
+        if np.isfinite(rear) and rear >= BULGARIAN_REAR:
+            tr.decision("bulgarian_split_squat", "front foot planted, rear foot up on a bench",
+                        split_ankle_heights=f["split_ankle_heights"],
+                        rear_raised=rear, bulgarian_rear=BULGARIAN_REAR,
+                        hip_travel=f["hip_travel"], hip_travel_min=0.35,
+                        confidence=0.74)
+            return Classification(
+                "bulgarian_split_squat", 0.74,
+                f"feet in a split stance with the rear ankle {rear:.2f} "
+                "torso-lengths above the front - a Bulgarian split squat",
+                f, runner_up="split_squat",
+            )
+        tr.decision("split_squat", "front foot planted, rear foot behind, on the floor",
+                    split_ankle_heights=f["split_ankle_heights"],
+                    rear_raised=rear, bulgarian_rear=BULGARIAN_REAR,
+                    hip_travel=f["hip_travel"], hip_travel_min=0.35,
+                    confidence=0.70)
+        return Classification(
+            "split_squat", 0.70,
+            f"feet planted in a split stance with the ankles {f['split_ankle_heights']:.2f} "
+            "torso-lengths apart in height, and the rear ankle on the floor - a split squat",
+            f, runner_up="bulgarian_split_squat",
+        )
+
     if planted and rigid_arms and np.isfinite(f["hip_travel"]) and f["hip_travel"] >= 0.35:
         tr.decision("squat", "feet planted, hips travelling, arms rigid to the torso",
                     hip_travel=f["hip_travel"], hip_travel_min=0.35,
@@ -559,6 +748,34 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 f,
             )
         if below >= BELOW_HANDS_DIP:
+            # A squat filmed with the arms held forward has fixed hands, arms
+            # that articulate, and most of the body below them - which is also,
+            # and exactly, what a dip looks like. The one thing that separates
+            # them is the feet: in a dip they hang and are seen; in a squat they
+            # are planted on the floor, often out of frame. When the feet were
+            # NEVER clearly seen, the geometry cannot tell the two apart, so
+            # this is reported as unknown with the interpretation named, rather
+            # than confidently called a dip (which is what a measured squat
+            # with out-of-frame feet was being reported as).
+            ankle_known = (f.get("ankle_window_seen") is not None
+                           and f["ankle_window_seen"] >= MIN_SEEN)
+            ankle_seen_ok = (f.get("ankle_seen") is not None
+                             and f["ankle_seen"] >= MIN_SEEN)
+            if not planted and not ankle_known and not ankle_seen_ok:
+                tr.reject(
+                    "dip/squat",
+                    "hands fixed, body below them, but the feet were never seen",
+                    body_below_hands=below, planted=planted,
+                    ankle_window_seen=f.get("ankle_window_seen"),
+                    ankle_seen=f.get("ankle_seen"))
+                return Classification(
+                    "unknown", 0.0,
+                    f"hands fixed below the shoulders with {below:.0%} of the body "
+                    "below them, but the feet were never clearly seen - this is a "
+                    "dip (feet hanging) or a squat with the feet out of frame, and "
+                    "a dip is not justified",
+                    f, runner_up="squat",
+                )
             tr.decision("dip", "the legs hang below the hands",
                         body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
             return Classification(
@@ -626,5 +843,7 @@ HUMAN = {
     "front_lever": "Front lever",
     "planche": "Planche",
     "pistol_squat": "Pistol squat",
+    "split_squat": "Split squat",
+    "bulgarian_split_squat": "Bulgarian split squat",
     "unknown": "Not recognised",
 }

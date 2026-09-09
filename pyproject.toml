@@ -22,6 +22,7 @@ dependencies = [
 [project.optional-dependencies]
 mediapipe = ["mediapipe>=0.10"]
 ultralytics = ["ultralytics>=8.3"]
+astra = ["astrapy>=2.0"]
 
 [project.scripts]
 barra = "barra.cli:main"
@@ -35,3 +36,15 @@ packages = ["barra", "barra.pose"]
 
 [tool.setuptools.package-data]
 barra = ["templates/*.j2"]
+
+# The suite runs from `tests/` and nowhere else. `server/vendor/` holds a COPY
+# of this repository, tests included, built for the Lambda package; left to
+# itself pytest walks into it, finds `tests/test_core.py` twice under one
+# module name, and refuses to collect anything - eleven collection errors and
+# no baseline, from a directory that is not even tracked. importlib import mode
+# removes the basename collision as a class of problem rather than this one
+# instance of it.
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["server/vendor", "build", "dist", ".venv", "out", "llm-council"]
+addopts = "--import-mode=importlib"

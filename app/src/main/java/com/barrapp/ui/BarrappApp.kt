@@ -53,6 +53,7 @@ import com.barrapp.data.ActivityLevel
 import com.barrapp.data.Goals
 import com.barrapp.data.Profile
 import com.barrapp.ui.parts.Eyebrow
+import com.barrapp.ui.tracker.TrackerRoot
 import com.barrapp.ui.parts.Panel
 import com.barrapp.ui.parts.Pill
 
@@ -102,7 +103,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
             .safeDrawingPadding()
     ) {
         when (state.screen) {
-            Screen.Home -> NocturneHome(vm)
+            Screen.Home -> TrackerRoot(vm)
             Screen.Privacy -> PrivacyScreen(
                 onAccept = vm::acceptPrivacy,
                 showBack = DeviceId.privacyAccepted(context),
@@ -128,10 +129,11 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onSkip = vm::openHome,
             )
 
-            Screen.Onboarding -> Onboarding(
-                initial = state.profile,
-                onDone = vm::saveProfile,
-                onObjectives = vm::openObjectives,
+            Screen.Onboarding -> com.barrapp.ui.tracker.TrackerOnboarding(
+                initialName = state.profile.name,
+                onComplete = { r ->
+                    vm.saveIntake(r.name, r.activity, r.goal, r.focusExercise)
+                },
             )
 
             Screen.Objectives -> ObjectivesChatScreen(
@@ -161,7 +163,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::openHome,
             )
 
-            Screen.Coach -> NocturneHome(vm)
+            Screen.Coach -> TrackerRoot(vm, com.barrapp.ui.tracker.TrackerTab.COACH)
 
             Screen.Replay -> ReplayScreen(
                 analysis = state.analysis,
@@ -175,7 +177,6 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 onBack = vm::openHome,
             )
 
-            Screen.Home -> NocturneHome(vm)
         }
     }
 }

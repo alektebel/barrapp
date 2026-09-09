@@ -23,8 +23,23 @@ TTL_DAYS = 90
 
 
 def put_trace(record: dict, trace_id: str, job_id: str = "") -> str | None:
-    """Store one trace record. Returns 'dynamodb' or None (disk is handled by
-    the caller, which already knows where its files go)."""
+    """Store one trace record. Returns 'astra', 'dynamodb' or None (disk is
+    handled by the caller, which already knows where its files go).
+
+    Astra becomes the primary trace store when it is configured; the legacy
+    DynamoDB path is kept for a deployment that sets TRACES_TABLE instead.
+    """
+    from .astra_store import AstraStore, configured as astra_configured
+
+    if astra_configured():
+        res = AstraStore().put_trace({
+            "traceId": trace_id, "jobId": job_id or trace_id,
+            "createdAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "payload": json.dumps(record, default=str)[:MAX_PAYLOAD_CHARS],
+        })
+        if res.get("ok"):
+            return "astra"
+
     table = os.environ.get("TRACES_TABLE", "").strip()
     if not table:
         return None
@@ -50,10 +65,19 @@ def put_trace(record: dict, trace_id: str, job_id: str = "") -> str | None:
 
 
 def put_failure(job_id: str, stage: str, error: str) -> str | None:
-    """A record for a job that died before it had a trace of its own."""
+    """A record for a job that died before it had a trace of its own.
+
+    Astra is tried first (an Astra-only deployment must still record worker
+    failures); the legacy DynamoDB path is the fallback when TRACES_TABLE is set.
+    """
+    record = {"jobId": job_id, "stage": stage, "error": error,
+              "kind": "worker-failure"}
+    from .astra_store import AstraStore, configured as astra_configured
+    if astra_configured():
+        res = AstraStore().put_failure(job_id, stage, error)
+        if res.get("ok"):
+            return "astra"
     table = os.environ.get("TRACES_TABLE", "").strip()
     if not table:
         return None
-    return put_trace(
-        {"jobId": job_id, "stage": stage, "error": error,
-         "kind": "worker-failure"}, f"failure-{job_id}", job_id)
+    return put_trace(record, f"failure:{job_id}", job_id)

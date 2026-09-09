@@ -47,6 +47,10 @@ fun SessionScreen(
     onBackToWeek: () -> Unit,
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
+    standard: String = "",
+    checks: List<CheckLine> = emptyList(),
+    vision: List<VisionLine> = emptyList(),
+    visionDisagrees: Boolean = false,
 ) {
     Column(Modifier.fillMaxWidth()) {
         androidx.compose.material3.Text("← Week", style = N.back,
@@ -141,6 +145,8 @@ fun SessionScreen(
             }
         }
 
+        ChecksPanel(standard, checks, vision, visionDisagrees)
+
         if (repsOpen) {
             Column(Modifier.fillMaxWidth().padding(top = 14.dp)) {
                 reps.forEachIndexed { i, rep ->
@@ -209,6 +215,8 @@ private fun RepCard(rep: RepCardData, modifier: Modifier) {
                 }
             }
 
+            ChecksBlock(rep)
+
             if (rep.asides.isNotEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp)
                     .background(Nocturne.fgA(0.1f)))
@@ -224,11 +232,114 @@ private fun RepCard(rep: RepCardData, modifier: Modifier) {
         } else {
             androidx.compose.material3.Text(rep.note, style = N.cardBody,
                 modifier = Modifier.padding(top = 8.dp))
+            // An unscored rep still carries its assessment record - usually
+            // "blocked, and here is why" - which is worth more than the note.
+            ChecksBlock(rep)
+        }
+    }
+}
+
+/** One check across the set: how many reps flagged it, passed it, or could
+ *  not be judged on it. */
+data class CheckLine(val name: String, val flagged: Int, val clean: Int, val blind: Int)
+
+/** What the video model said it saw. Advisory, and labelled so. */
+data class VisionLine(val rep: String, val name: String, val status: String, val text: String)
+
+/**
+ * The set-level facts the verdict rests on: the standard the checks were
+ * applied under, each check's tally across the reps, and - when a vision
+ * model looked - what it said, kept apart from the measurements.
+ */
+@Composable
+fun ChecksPanel(
+    standard: String,
+    checks: List<CheckLine>,
+    vision: List<VisionLine>,
+    visionDisagrees: Boolean,
+) {
+    if (checks.isEmpty() && standard.isBlank() && vision.isEmpty()) return
+    Column(
+        Modifier.fillMaxWidth().padding(top = 11.dp)
+            .background(Nocturne.surface, RoundedCornerShape(8.dp))
+            .border(1.dp, Nocturne.hairline, RoundedCornerShape(8.dp))
+            .padding(14.dp),
+    ) {
+        androidx.compose.material3.Text("WHAT WAS CHECKED", style = N.eyebrowMuted)
+        if (standard.isNotBlank()) {
+            androidx.compose.material3.Text(standard, style = N.cardBody,
+                modifier = Modifier.padding(top = 8.dp))
+        }
+        checks.forEach { c ->
+            Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                androidx.compose.material3.Text(c.name, style = N.asideRow,
+                    modifier = Modifier.weight(1f))
+                val total = c.flagged + c.clean + c.blind
+                val text = when {
+                    c.flagged + c.clean == 0 -> "not checkable · $total"
+                    c.flagged == 0 -> "clean · ${c.clean}/$total"
+                    else -> "flagged · ${c.flagged}/$total" +
+                        if (c.blind > 0) " · ${c.blind} unchecked" else ""
+                }
+                androidx.compose.material3.Text(
+                    text,
+                    style = N.asideValue.copy(
+                        color = when {
+                            c.flagged + c.clean == 0 -> Nocturne.fgA(0.4f)
+                            c.flagged > 0 -> Nocturne.shaky
+                            else -> Nocturne.strong
+                        },
+                    ),
+                )
+            }
+        }
+        if (vision.isNotEmpty() || visionDisagrees) {
+            Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp)
+                .background(Nocturne.fgA(0.1f)))
+            androidx.compose.material3.Text("SEEN ON VIDEO · ADVISORY", style = N.eyebrowMuted)
+            androidx.compose.material3.Text(
+                "A vision model looked at stills of these reps. What it says is " +
+                    "not a measurement and does not change the numbers above.",
+                style = N.cardBody, modifier = Modifier.padding(top = 6.dp))
+            if (visionDisagrees) {
+                androidx.compose.material3.Text(
+                    "It saw a different movement than the one measured. Flagged for review.",
+                    style = N.asideRow.copy(color = Nocturne.shaky),
+                    modifier = Modifier.padding(top = 8.dp))
+            }
+            vision.forEach { v ->
+                Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        androidx.compose.material3.Text(
+                            "${v.rep} · ${v.name} · ${v.status.replace('_', ' ')}",
+                            style = N.asideRow)
+                        if (v.text.isNotBlank()) {
+                            androidx.compose.material3.Text(v.text, style = N.cardBody)
+                        }
+                    }
+                }
+            }
         }
     }
 }
 
 data class RepComponent(val name: String, val weightPct: Int, val value: Int)
+
+/**
+ * One technique check on one rep, as the card shows it.
+ *
+ * `status` is the server's three-valued verdict: `observed` (the error was
+ * seen), `not_observed` (checked, clean), `unobservable` (could not be
+ * checked - and `detail` says why). The card renders all three differently
+ * because "nothing flagged" and "nothing could be checked" are not the same
+ * sentence.
+ */
+data class RepCheck(
+    val name: String,
+    val status: String,
+    val where: String = "",      // "support · 5.8–6.0s"
+    val detail: String = "",     // the number vs the threshold, or the reason
+)
 
 data class RepCardData(
     val title: String,
@@ -243,7 +354,62 @@ data class RepCardData(
     val components: List<RepComponent> = emptyList(),
     val asides: List<Pair<String, String>> = emptyList(),
     val note: String = "",
+    /** Every check the movement defines, flagged ones first. */
+    val checks: List<RepCheck> = emptyList(),
+    /** Non-null when the whole rep was withheld from assessment, with why. */
+    val blocked: String? = null,
 )
+
+private const val OBSERVED = "observed"
+private const val NOT_OBSERVED = "not_observed"
+
+@Composable
+private fun ChecksBlock(rep: RepCardData) {
+    if (rep.checks.isEmpty() && rep.blocked == null) return
+    Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp)
+        .background(Nocturne.fgA(0.1f)))
+    if (rep.blocked != null) {
+        androidx.compose.material3.Text("NOT JUDGED", style = N.eyebrowMuted)
+        androidx.compose.material3.Text(rep.blocked, style = N.cardBody,
+            modifier = Modifier.padding(top = 6.dp))
+        return
+    }
+    val flagged = rep.checks.filter { it.status == OBSERVED }
+    val clean = rep.checks.filter { it.status == NOT_OBSERVED }
+    val blind = rep.checks.filter { it.status != OBSERVED && it.status != NOT_OBSERVED }
+    if (flagged.isNotEmpty()) {
+        androidx.compose.material3.Text("FLAGGED", style = N.eyebrowAccent)
+        flagged.forEach { c ->
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                Column(Modifier.weight(1f)) {
+                    androidx.compose.material3.Text(c.name, style = N.asideRow)
+                    if (c.where.isNotBlank()) {
+                        androidx.compose.material3.Text(c.where, style = N.repTimes)
+                    }
+                }
+                androidx.compose.material3.Text(c.detail, style = N.asideValue)
+            }
+        }
+    }
+    val summary = buildString {
+        append("${flagged.size + clean.size} of ${rep.checks.size} checks made")
+        if (clean.isNotEmpty()) append(" · ${clean.size} clean")
+    }
+    androidx.compose.material3.Text(summary, style = N.repTimes,
+        modifier = Modifier.padding(top = if (flagged.isEmpty()) 0.dp else 10.dp))
+    if (blind.isNotEmpty()) {
+        androidx.compose.material3.Text(
+            "COULD NOT BE CHECKED", style = N.eyebrowMuted,
+            modifier = Modifier.padding(top = 10.dp))
+        blind.forEach { c ->
+            Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
+                androidx.compose.material3.Text(c.name, style = N.asideRow,
+                    modifier = Modifier.weight(1f))
+                androidx.compose.material3.Text(c.detail, style = N.asideValue)
+            }
+        }
+    }
+}
 
 /** The rep's own trace, over the design's dashed rest line (y=33 of 54). */
 @Composable

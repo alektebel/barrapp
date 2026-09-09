@@ -240,6 +240,13 @@ def _route(event):
             "exercise": body.get("exercise") or "auto",
             "createdAt": _now(),
         }
+        # Same contract as local_server.py: declared variant and camera side
+        # travel with the job to process_job. DynamoDB rejects empty strings
+        # in some item shapes, so absent stays absent.
+        for key in ("variant", "view"):
+            value = (body.get(key) or "").strip() if isinstance(body.get(key), str) else ""
+            if value:
+                item[key] = value
         table.put_item(Item=item)
         upload = s3.generate_presigned_url(
             "put_object",

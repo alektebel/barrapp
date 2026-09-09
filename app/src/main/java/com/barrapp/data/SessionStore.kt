@@ -24,6 +24,7 @@ object SessionStore {
     private const val DAYS = "days"
     private const val CHAT = "chat"
     private const val LAST_REVIEW = "last_review_at"
+    private const val FAULTS = "faults"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -125,6 +126,7 @@ object SessionStore {
                 else mapOf(jobId to analysis.traceId),
         )
         write(context, existing.values.sortedByDescending { it.date })
+        recordFaults(context, date, analysis)
     }
 
     /** Drop the whole local calendar.
@@ -135,6 +137,7 @@ object SessionStore {
      *  on the server - a refresh rebuilds this from whoever is signed in now. */
     fun forgetAll(context: Context) {
         write(context, emptyList())
+        prefs(context).edit { remove(FAULTS) }
     }
 
     fun forget(context: Context, jobId: String) {
@@ -192,6 +195,49 @@ object SessionStore {
         score >= Progression.SOLID -> "solid"
         score >= Progression.SHAKY -> "shaky"
         else -> "broken down"
+    }
+
+    // ---- fault ledger ------------------------------------------------------
+    //
+    // The day summary above is enough to draw a calendar, but not enough to
+    // answer "is the elbow flare getting better?" - the question the coach and
+    // progress screens exist to answer. A clip's faults are gone the moment the
+    // analysis is replaced, so the counts are folded into a small per-day ledger
+    // as each job lands.
+    //
+    // Counts, not rep ids: this ledger is read to draw a trend line, never to
+    // re-litigate a single rep. The analysis on the server stays the record for
+    // that.
+
+    /** date -> fault name -> how many reps showed it that day. */
+    fun faults(context: Context): Map<String, Map<String, Int>> {
+        val raw = prefs(context).getString(FAULTS, "{}").orEmpty()
+        val root = runCatching { JSONObject(raw) }.getOrElse { JSONObject() }
+        return root.keys().asSequence().associateWith { date ->
+            val day = root.optJSONObject(date) ?: JSONObject()
+            day.keys().asSequence().associateWith { fault -> day.optInt(fault) }
+        }
+    }
+
+    /** Fold one analysis's measured faults into its day. Counts add up, so a
+     *  second clip on the same day extends the day rather than replacing it. */
+    fun recordFaults(context: Context, date: String, analysis: Analysis) {
+        val counts = mutableMapOf<String, Int>()
+        analysis.reps.forEach { rep ->
+            com.barrapp.repFaults(rep).forEach { counts.merge(it, 1, Int::plus) }
+        }
+        if (counts.isEmpty()) return
+        val existing = faults(context).toMutableMap()
+        val day = existing[date].orEmpty().toMutableMap()
+        counts.forEach { (fault, n) -> day.merge(fault, n, Int::plus) }
+        existing[date] = day
+        val root = JSONObject()
+        // A year of training is a few hundred rows; the ledger is capped at the
+        // last 180 days so it cannot grow without bound on a long-lived phone.
+        existing.entries.sortedByDescending { it.key }.take(180).forEach { (d, m) ->
+            root.put(d, JSONObject(m as Map<*, *>))
+        }
+        prefs(context).edit { putString(FAULTS, root.toString()) }
     }
 
     // ---- coach conversation ----------------------------------------------

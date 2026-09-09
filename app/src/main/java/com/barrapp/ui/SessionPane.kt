@@ -332,7 +332,7 @@ private fun SessionHeader(
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Text(
-                    "${(d.confidence * 100).toInt()}% confident",
+                    d.certaintyLabel,
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -420,10 +420,26 @@ private fun RepCard(rep: RepRow, number: Int) {
                     Modifier.fillMaxWidth().padding(vertical = 2.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
                 ) {
-                    Text(
-                        f.name.replaceFirstChar { it.uppercase() },
-                        style = MaterialTheme.typography.bodySmall,
-                    )
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            f.name.replaceFirstChar { it.uppercase() },
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                        // Where in the rep, and when in the clip: the phase
+                        // the rule is defined on, and the window it fired in.
+                        val where = listOfNotNull(
+                            f.phase.takeIf { it.isNotBlank() }?.replace('_', ' '),
+                            f.intervalS.takeIf { it.size >= 2 }
+                                ?.let { "%.1f–%.1fs".format(it[0], it[1]) },
+                        ).joinToString(" · ")
+                        if (where.isNotBlank()) {
+                            Text(
+                                where,
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                     Text(
                         evidence,
                         fontFamily = FontFamily.Monospace,

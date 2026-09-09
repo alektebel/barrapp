@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Reel Room · How to debug</title>
+<link rel="stylesheet" href="organic.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="guide.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="/">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"
+      fill="none" stroke="#f5ead8" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h10"></path></svg></span>
+    The Reel Room
+  </a>
+  <span class="nav-sub">barrapp pipeline</span>
+  <span class="spacer"></span>
+  <div class="nav-links">
+    <a href="/">Library</a>
+    <a href="/guide" aria-current="page">How to debug</a>
+    <a href="/models">Model card</a>
+  </div>
+</nav>
+
+<main>
+  <div class="hero">
+    <p class="kicker">How to debug this</p>
+    <h1>One clip, ten stages, and the number that decided each one.</h1>
+    <p>The pipeline turns a video into a count, a score and a list of technique faults.
+       When it gets one of those wrong, exactly one stage is responsible. Debugging is
+       walking left to right until the numbers stop matching what you can see in the
+       frame — and every stage below prints the value it measured <em>and</em> the
+       threshold it compared it against, so you can check it instead of believing it.</p>
+    <p id="live" class="live"></p>
+  </div>
+
+  <!-- The pipeline, drawn. The rail in the inspector runs top to bottom in the
+       same order; this is the same walk laid flat so the failure modes fit beside it. -->
+  <section class="section">
+    <h2>The walk</h2>
+    <p class="lead">Each stage consumes what the one before it produced. A wrong answer at
+       stage 3 makes the later measurement stages confidently wrong, so always find the
+       <em>first</em> stage whose output disagrees with the video.</p>
+    <div class="scroll-x">
+      <svg class="walk" viewBox="0 0 1560 232" role="img"
+           aria-label="Twelve pipeline stages left to right: probe, pose, classify, model, fusion, signal, segment, metrics, score, faults, vision, payload — with the typical failure at each.">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M0 0 L10 5 L0 10 z" fill="var(--color-neutral-400)"/>
+          </marker>
+        </defs>
+        <line x1="24" y1="74" x2="1536" y2="74" stroke="var(--color-neutral-300)" stroke-width="2" marker-end="url(#arrow)"/>
+
+        <g class="node" transform="translate(24,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">1</text>
+          <text class="t" x="42" y="118">probe</text>
+          <text class="s" x="42" y="138">does it open?</text>
+          <text class="f" x="42" y="164">fps 0 poisons</text>
+          <text class="f" x="42" y="180">every timing</text>
+        </g>
+        <g class="node" transform="translate(150,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">2</text>
+          <text class="t" x="42" y="118">pose</text>
+          <text class="s" x="42" y="138">17 landmarks</text>
+          <text class="f" x="42" y="164">low confidence</text>
+          <text class="f" x="42" y="180">drops frames</text>
+        </g>
+        <g class="node" transform="translate(276,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-400)"/>
+          <text class="n" x="42" y="80">3</text>
+          <text class="t" x="42" y="118">classify</text>
+          <text class="s" x="42" y="138">which movement</text>
+          <text class="f" x="42" y="164">wrong geometry =</text>
+          <text class="f" x="42" y="180">wrong downstream</text>
+        </g>
+        <g class="node" transform="translate(402,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">4</text>
+          <text class="t" x="42" y="118">model</text>
+          <text class="s" x="42" y="138">learned vote</text>
+          <text class="f" x="42" y="164">low margin =</text>
+          <text class="f" x="42" y="180">not trusted</text>
+        </g>
+        <g class="node" transform="translate(528,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-400)"/>
+          <text class="n" x="42" y="80">5</text>
+          <text class="t" x="42" y="118">fusion</text>
+          <text class="s" x="42" y="138">final label</text>
+          <text class="f" x="42" y="164">override status</text>
+          <text class="f" x="42" y="180">names the reason</text>
+        </g>
+        <g class="node" transform="translate(654,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">6</text>
+          <text class="t" x="42" y="118">signal</text>
+          <text class="s" x="42" y="138">one scalar/frame</text>
+          <text class="f" x="42" y="164">flat trace =</text>
+          <text class="f" x="42" y="180">wrong origin</text>
+        </g>
+        <g class="node" transform="translate(780,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-400)"/>
+          <text class="n" x="42" y="80">7</text>
+          <text class="t" x="42" y="118">segment</text>
+          <text class="s" x="42" y="138">cut into reps</text>
+          <text class="f" x="42" y="164">zero reps: read</text>
+          <text class="f" x="42" y="180">the rejections</text>
+        </g>
+        <g class="node" transform="translate(906,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">8</text>
+          <text class="t" x="42" y="118">metrics</text>
+          <text class="s" x="42" y="138">measure each rep</text>
+          <text class="f" x="42" y="164">implausible =</text>
+          <text class="f" x="42" y="180">dropped, not shown</text>
+        </g>
+        <g class="node" transform="translate(1032,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">9</text>
+          <text class="t" x="42" y="118">score</text>
+          <text class="s" x="42" y="138">weight × value</text>
+          <text class="f" x="42" y="164">one component</text>
+          <text class="f" x="42" y="180">usually does it all</text>
+        </g>
+        <g class="node" transform="translate(1158,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-400)"/>
+          <text class="n" x="42" y="80">10</text>
+          <text class="t" x="42" y="118">faults</text>
+          <text class="s" x="42" y="138">technique rules</text>
+          <text class="f" x="42" y="164">unobservable ≠</text>
+          <text class="f" x="42" y="180">not observed</text>
+        </g>
+        <g class="node" transform="translate(1284,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-neutral-300)"/>
+          <text class="n" x="42" y="80">11</text>
+          <text class="t" x="42" y="118">vision</text>
+          <text class="s" x="42" y="138">advisory check</text>
+          <text class="f" x="42" y="164">skipped without</text>
+          <text class="f" x="42" y="180">an endpoint</text>
+        </g>
+        <g class="node" transform="translate(1410,0)">
+          <circle cx="42" cy="74" r="21" fill="var(--color-accent-2-300)"/>
+          <text class="n" x="42" y="80">12</text>
+          <text class="t" x="42" y="118">payload</text>
+          <text class="s" x="42" y="138">what ships</text>
+        </g>
+      </svg>
+    </div>
+    <p class="lead">The three terracotta stages are the ones that produce a
+       <em>confident wrong answer</em> rather than an error. They are where to look first
+       when nothing crashed but the result is nonsense.
+       <a href="/models">Every constant governing each stage →</a></p>
+  </section>
+
+  <section class="section">
+    <h2>Debug one video, start to finish</h2>
+    <ol class="steps">
+      <li>
+        <h3>Pick the video</h3>
+        <p>On the <a href="/">Library</a>, click a card. Cards are one per <em>video</em>,
+           not one per file — if the same clip sits in three folders you get one card and
+           one history. <b>Debug this →</b> opens it in the inspector with its most recent run.</p>
+      </li>
+      <li>
+        <h3>Run it, or open a run that already exists</h3>
+        <p>Leave <b>movement</b> on <code>auto</code> for the first pass. Press <b>▶ Run</b>.
+           The analysis happens in a separate process — a pose backend can take the
+           interpreter down with it, and a server that died with the backend cannot tell
+           you the backend died. Cached pose is reused; tick <b>Fresh pose</b> only when
+           you are testing the estimator itself, because it costs about a minute.</p>
+      </li>
+      <li>
+        <h3>Walk the rail until the numbers stop matching the frame</h3>
+        <p>Use <b>step into next stage</b> (or <code>]</code> / <code>[</code>) to walk the
+           treatments in order — probe → pose → classify → model → fusion → … → payload. <b>↻ walk it</b>
+           advances on a timer. The left rail lists every treatment this run produced;
+           click one to jump. You are looking for the <em>first</em> stage whose output
+           you can contradict by watching the video — after that, everything is
+           downstream of a mistake.</p>
+      </li>
+      <li>
+        <h3>Read the rejection, not the verdict</h3>
+        <p>Every discarded rep candidate prints the value it measured and the threshold it
+           failed. <code>amplitude 0.11 &lt; min_amplitude 0.15</code> is checkable;
+           “no reps found” is not. If the value looks right and the threshold looks wrong,
+           you have found a tuning problem; if the value looks wrong, the problem is upstream.</p>
+      </li>
+      <li>
+        <h3>Put the claim on the pixels</h3>
+        <p>Click the signal chart to seek. Use <b>− frame / + frame</b> (or the arrow keys)
+           and 0.25× playback to land on the exact frame a rejection names. The skeleton
+           overlay is the pose the pipeline actually measured — if it is on the wrong
+           person or lagging the body, stage 2 is your answer and nothing below it matters.</p>
+      </li>
+      <li>
+        <h3>Change one thing and compare</h3>
+        <p>Force a movement, or re-run after a code change, then pick the earlier run in
+           <b>Compare runs</b>. The diff is rendered through the same renderer as
+           <code>barra explain</code>, so it shows what changed in the <em>run</em>, not in
+           the formatting. A comparison says what moved; it does not say which one is right.</p>
+      </li>
+      <li>
+        <h3>Write down what you saw, and export it</h3>
+        <p><b>Your review</b> is stored in this browser only — timestamps make it useful
+           (“at 22.6–25.2s the athlete is walking, not repping”). <b>Export debug bundle</b>
+           writes the trace, the payload, your note and the selected interval as one JSON
+           file. Export before clearing browser storage.</p>
+      </li>
+    </ol>
+  </section>
+
+  <section class="section">
+    <h2>Symptom → stage</h2>
+    <p class="lead">The short version, for when you already know what is wrong.</p>
+    <div class="scroll-x inset">
+      <table class="table">
+        <thead><tr><th>What you see</th><th>Stage</th><th>Look at</th><th>Try</th></tr></thead>
+        <tbody>
+          <tr><td>Zero reps on a clip full of reps</td><td>5 segment</td>
+              <td>the rejections; each names its value and threshold</td>
+              <td>check amplitude and anchor travel before touching the peak finder</td></tr>
+          <tr><td>Reps counted while the athlete walks</td><td>5 segment</td>
+              <td>anchor travel per candidate</td>
+              <td>seek to the candidate’s window and watch it</td></tr>
+          <tr><td>Confident, wrong movement</td><td>3 classify</td>
+              <td><code>runnerUp</code> and the margin between them</td>
+              <td>force the movement in the toolbar and re-run</td></tr>
+          <tr><td>Numbers look plausible but mean nothing</td><td>3 classify</td>
+              <td>the reference frame the movement selected</td>
+              <td>compare against a forced run of the right movement</td></tr>
+          <tr><td>Flat signal, moving athlete</td><td>4 signal</td>
+              <td>the origin — hip vs wrist</td>
+              <td>a hip origin on a bar movement cancels the motion being measured</td></tr>
+          <tr><td>Skeleton on the wrong person or lagging</td><td>2 pose</td>
+              <td>mean confidence, and the overlay itself</td>
+              <td><b>Fresh pose</b> with a different backend</td></tr>
+          <tr><td>A metric is simply absent</td><td>6 metrics</td>
+              <td>the plausibility band it fell outside</td>
+              <td>a missing measurement is a finding — don’t fill it in</td></tr>
+          <tr><td>Score moved, athlete didn’t</td><td>7 score</td>
+              <td>components and penalties; and provenance</td>
+              <td>compare <code>assessmentVersion</code> between the two runs</td></tr>
+          <tr><td>Fault reported absent when unclear</td><td>8 faults</td>
+              <td>whether it says <em>not observed</em> or <em>unobservable</em></td>
+              <td>read the availability reason — it names the missing measurement</td></tr>
+          <tr><td>Nothing crashed, result is empty</td><td>10 payload</td>
+              <td><code>blockers</code></td>
+              <td>a blocker is the honest empty result; it says which stage stopped</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="section">
+    <h2>Getting videos in</h2>
+    <p class="lead">Three ways, one library. All of them key on the file’s content, so
+       importing the same clip twice never makes a second card.</p>
+    <div class="grid">
+      <article class="card mini">
+        <h3>From this page</h3>
+        <p><b>Add video</b> in the header. Select one file or several. Anything already in
+           the library is reported as a duplicate and discarded rather than copied in
+           again — the reply names the id that already holds those frames.</p>
+      </article>
+      <article class="card mini">
+        <h3>Drop files in a folder</h3>
+        <p>Put clips in <code>data/videos/</code> (or leave them at the repository root, or
+           in <code>server/data/</code>) and press <b>Rescan disk</b>. Unchanged files are
+           not re-hashed, so a rescan of a settled library is instant.</p>
+      </article>
+      <article class="card mini">
+        <h3>From the command line</h3>
+        <pre><code>python tools/debugweb/library.py scan
+python tools/debugweb/library.py add clip.mp4
+python tools/debugweb/library.py list
+python tools/debugweb/library.py set &lt;id&gt; movement=pull_up
+python tools/debugweb/library.py rm &lt;id&gt;</code></pre>
+      </article>
+    </div>
+    <p class="lead">The library lives in <code>out/library.db</code> (SQLite). Its key is the
+       sha256 of the file, its <code>video_copies</code> table records every path those bytes
+       were found at, and <code>rm</code> never touches <code>out/traces/</code> — traces are
+       evidence, and evidence outlives the file it was taken from.</p>
+  </section>
+
+  <section class="section">
+    <h2>Where the evidence lands</h2>
+    <p class="lead">Every run through this tool writes three files under <code>out/traces/</code>,
+       in the project’s own formats — so anything you debug here is replayable on the
+       command line and diffable against a run from the real server.</p>
+    <div class="scroll-x inset">
+      <table class="table">
+        <thead><tr><th>File</th><th>What it is</th><th>Read it with</th></tr></thead>
+        <tbody>
+          <tr><td><code>&lt;traceId&gt;.json</code></td><td>the decision trace: every step, rejection and error, in order</td>
+              <td><code>barra explain --replay</code></td></tr>
+          <tr><td><code>&lt;traceId&gt;.payload.json</code></td><td>the analyzer result — exactly what the phone would receive</td>
+              <td>the inspector’s payload tab</td></tr>
+          <tr><td><code>&lt;traceId&gt;.pose.parquet</code></td><td>the keypoints supplied to that run</td>
+              <td>the skeleton overlay, pinned to that run</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="lead">Older traces predate the pose snapshot and fall back to the current clip
+       cache; the overlay says so when it does. This tool runs the measurement core — not
+       the upload transport, not the remote vision coach, not Android rendering.</p>
+  </section>
+
+  <section class="section">
+    <h2>Checking the tool itself</h2>
+    <pre class="inset"><code>.venv/bin/python tools/debugweb/server.py            # http://127.0.0.1:8091
+.venv/bin/python -m pytest tests/test_debugweb.py -q
+.venv/bin/python tools/debugweb/browser_e2e.py       # real run, real browser</code></pre>
+    <p class="lead">The server binds to 127.0.0.1 and serves local video files; there is
+       nothing to deploy. Three rules it holds to: it never computes an answer — every
+       number shown is read out of a trace or a payload the pipeline produced; runs happen
+       in a subprocess; and its output is the project’s output.</p>
+  </section>
+</main>
+
+<script src="guide.js"></script>
+</body>
+</html>

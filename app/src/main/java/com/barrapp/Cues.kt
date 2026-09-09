@@ -91,10 +91,23 @@ fun improvementCues(analysis: Analysis): List<String> {
     analysis.reps.forEach { rep ->
         repFaults(rep).forEach { counts.merge(it, 1, Int::plus) }
     }
+    // A fault whose verdict depends on a standard nobody declared is still
+    // shown - it was measured - but the cue says so, instead of telling a
+    // kipping set to stop swinging as if strict had been the plan.
+    val variantDependent = analysis.reps
+        .flatMap { it.assessments }
+        .filter { it.observed && it.variantDependent }
+        .map { it.name }
+        .toSet()
     return counts.entries
         .sortedWith(compareByDescending<Map.Entry<String, Int>> { it.value }
             .thenBy { orderOf(it.key) })
-        .mapNotNull { CUES[it.key] }
+        .mapNotNull { e ->
+            CUES[e.key]?.let { cue ->
+                if (e.key in variantDependent) "$cue — judged strict; declare kipping if that was the plan"
+                else cue
+            }
+        }
         .take(3)
 }
 
@@ -124,7 +137,7 @@ private val CUES = mapOf(
     "control" to "Lower under control — don't drop from the top",
     "stall" to "Drive through the sticking point in one arc",
     "poor transition" to "Get through the transition in one movement",
-    "bent arms" to "Straighten the arms at the bottom of every rep",
+    "bent arms" to "Press out to straight arms at the top of every rep",
     "no active hang" to "Straighten the arms between reps — hang, then pull",
     "too fast" to "Slow the pull down — these are being thrown",
     "too deep" to "Stop at ninety degrees — deeper is shoulder, not chest",
@@ -154,6 +167,20 @@ fun repAdvice(rep: RepRow): String? = repFaults(rep).firstOrNull()?.let { CUES[i
  * that cannot see the knees is not evidence of good knees.
  */
 fun unmeasuredNote(rep: RepRow): String? {
+    // A rep withheld from assessment altogether: no fault list is a verdict here.
+    rep.assessmentBlocked?.let { return "This rep was not judged — $it." }
+    // Measurement version 2 ships every check with its verdict; name the
+    // ones that could not be made, grouped by why.
+    if (rep.assessments.isNotEmpty()) {
+        val blind = rep.unobservable
+        if (blind.isEmpty()) return null
+        val byReason = blind.groupBy { it.reasonLabel().ifBlank { "not tracked" } }
+        val parts = byReason.entries.map { (why, rows) ->
+            rows.joinToString(", ") { it.name } + " ($why)"
+        }
+        return "Not judged: " + parts.joinToString("; ") +
+            " — ${rep.checked} of ${rep.assessments.size} checks were made."
+    }
     if (rep.viewBlocked.isNotEmpty()) {
         return "Some checks need a different camera angle — " +
             "${rep.viewBlocked.size} of them were not judged from this one."
@@ -174,9 +201,25 @@ fun unmeasuredNote(rep: RepRow): String? {
 fun improvementLines(analysis: Analysis): List<String> {
     val cues = improvementCues(analysis)
     if (cues.isNotEmpty()) return cues
-    return listOf(
-        if (analysis.reps.isEmpty())
-            "Nothing to flag — barra could not measure a rep in this clip."
-        else "Nothing flagged — the set measured clean.",
-    )
+    if (analysis.reps.isEmpty()) {
+        return listOf("Nothing to flag — barra could not measure a rep in this clip.")
+    }
+    // "Clean" is a claim about checks that were made. With the structured
+    // assessment we know how many were: none made means nothing was judged.
+    val checks = analysis.checks
+    if (checks.isNotEmpty()) {
+        val made = checks.sumOf { it.observed + it.notObserved }
+        val blind = checks.sumOf { it.unobservable }
+        if (made == 0) {
+            return listOf("Nothing flagged — but no check could be made on this clip " +
+                "($blind left unjudged). Film closer, side-on, with the whole body in frame.")
+        }
+        if (blind > 0) {
+            return listOf(
+                "Nothing flagged on the checks that were made.",
+                "$blind check${if (blind == 1) "" else "s"} could not be made from this footage.",
+            )
+        }
+    }
+    return listOf("Nothing flagged — the set measured clean.")
 }

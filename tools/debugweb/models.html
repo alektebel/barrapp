@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>The Reel Room · Model card</title>
+<link rel="stylesheet" href="organic.css">
+<link rel="stylesheet" href="library.css">
+<link rel="stylesheet" href="models.css">
+</head>
+<body>
+
+<nav class="nav">
+  <a class="nav-brand" href="/">
+    <span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16"
+      fill="none" stroke="#f5ead8" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 6h16M4 12h16M4 18h10"></path></svg></span>
+    The Reel Room
+  </a>
+  <span class="nav-sub">barrapp pipeline</span>
+  <span class="spacer"></span>
+  <div class="nav-links">
+    <a href="/">Library</a>
+    <a href="/guide">How to debug</a>
+    <a href="/models" aria-current="page">Model card</a>
+  </div>
+</nav>
+
+<main>
+  <div class="hero">
+    <p class="kicker">What the predictions are made of</p>
+    <h1>Geometry is still the first witness. The learned model is the second.</h1>
+    <p>This pipeline's movement labels start from geometric rules compared against constants
+       fixed before any clip was seen. A learned second opinion and detector fusion now run in
+       auto mode: strong geometry is not silently overridden, and a weak call can be corrected
+       only when the learned detector has enough confidence and margin. This page reads the
+       modules at request time — including the constants, model path, fusion thresholds,
+       provenance, and source comments explaining each value. A value here is the value your
+       next run will use.</p>
+  </div>
+
+  <div class="lib-stats" id="stats"></div>
+
+  <div class="toolbar card">
+    <label class="field"><span class="kicker">Find a constant, rule or metric</span>
+      <input id="search" type="search" placeholder="swing_torso, lockout, momentum, tempo…"></label>
+    <span class="spacer"></span>
+    <a class="btn btn-secondary" href="/api/model" target="_blank" rel="noopener">Raw JSON</a>
+  </div>
+
+  <p id="status" class="status-line" role="status" aria-live="polite">Reading the modules…</p>
+  <div id="body"></div>
+</main>
+
+<script src="models.js"></script>
+</body>
+</html>

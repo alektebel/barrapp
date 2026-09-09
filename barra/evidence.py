@@ -51,20 +51,48 @@ VIEW_BLOCKED = "view-blocked"
 
 MIN_CONF = 0.5
 
+# --- availability reasons (the assessment contract, plan section 3) ----------
+# Why a check could not be made. One of these travels with every unobservable
+# assessment so the client can say WHICH kind of missing it is.
+TRACKING_LOSS = "tracking loss"
+UNSUITABLE_VIEW = "unsuitable view"
+UNSUPPORTED_VARIANT = "unsupported variant"
+INSUFFICIENT_EVIDENCE = "insufficient temporal evidence"
+NOT_APPLICABLE = "not applicable to this movement"
+
 
 @dataclass(frozen=True)
 class Measure:
-    """One primitive, with the reason it is or is not usable."""
+    """One primitive, with the reason it is or is not usable.
+
+    `phase` and `window` say WHERE in the rep the number came from - a
+    whole-rep summary carries `phase="rep"` and the rep's own bounds, a
+    top-of-rep elbow angle carries `phase="support"` and the few frames
+    around it. `coverage` is the share of that window in which the joints
+    the number needs were actually seen; below `min_coverage` the number is
+    withheld, because a short visible fragment cannot stand in for a fully
+    tracked phase.
+    """
     name: str
     value: float | None
     state: str
     robustness: str = SCALED
     plane: str = ""          # "sagittal" | "frontal" | "" (no plane needed)
     unit: str = ""
+    phase: str = "rep"
+    window: tuple[int, int] | None = None   # inclusive frames
+    coverage: float | None = None           # share of the window observed
+    reason: str = ""                        # why not usable, when it is not
 
     @property
     def usable(self) -> bool:
         return self.state == MEASURED
+
+    def interval_s(self, fps: float) -> list[float] | None:
+        if self.window is None:
+            return None
+        fps = max(float(fps), 1.0)
+        return [round(self.window[0] / fps, 2), round(self.window[1] / fps, 2)]
 
 
 @dataclass(frozen=True)
@@ -134,15 +162,53 @@ class Evidence:
 
     # -- building ------------------------------------------------------------
     def add(self, name: str, value, robustness: str = SCALED,
-            plane: str = "", unit: str = "") -> "Evidence":
+            plane: str = "", unit: str = "", phase: str = "rep",
+            window: tuple[int, int] | None = None,
+            coverage: float | None = None,
+            reason: str = "",
+            seen: int | None = None) -> "Evidence":
+        """Record one primitive. The state is decided here and nowhere else:
+
+        * no finite value            -> unmeasured (tracking loss, or the
+                                        geometry could not produce it)
+        * too little of the window
+          actually observed          -> unmeasured (insufficient evidence)
+        * a plane the camera cannot
+          support                    -> view-blocked
+        * otherwise                  -> measured
+        """
+        from .config import THRESHOLDS
+
         v = _finite(value)
+        cov = _finite(coverage)
+        # Tracked frames behind the value. Derived from the window unless the
+        # caller knows better - a duration such as the transition IS the width
+        # of its window, so a 2-frame crossing is a fast transition that was
+        # seen, not a measurement with too few samples; its evidence is the
+        # tracked lift it was cut from.
+        if seen is None:
+            seen = (None if cov is None or window is None
+                    else int(round(cov * (int(window[1]) - int(window[0]) + 1))))
         if v is None:
             state = UNMEASURED
+            reason = reason or TRACKING_LOSS
+        elif cov is not None and cov < THRESHOLDS.min_phase_coverage:
+            state = UNMEASURED
+            reason = (f"{INSUFFICIENT_EVIDENCE}: {cov:.0%} of the {phase} window "
+                      f"was tracked, {THRESHOLDS.min_phase_coverage:.0%} needed")
+        elif seen is not None and seen < THRESHOLDS.min_phase_samples:
+            state = UNMEASURED
+            reason = (f"{INSUFFICIENT_EVIDENCE}: {seen} tracked frame(s) in the "
+                      f"{phase} window, {THRESHOLDS.min_phase_samples} needed")
         elif plane and not self.view.shows(plane):
             state = VIEW_BLOCKED
+            reason = f"{UNSUITABLE_VIEW}: {plane} quantity, camera {self.view.bin.lower()}"
         else:
             state = MEASURED
-        self._m[name] = Measure(name, v, state, robustness, plane, unit)
+            reason = ""
+        win = None if window is None else (int(window[0]), int(window[1]))
+        self._m[name] = Measure(name, v, state, robustness, plane, unit,
+                                phase, win, cov, reason)
         return self
 
     def add_all(self, values: dict, robustness: str = SCALED, **kw) -> "Evidence":
@@ -152,7 +218,11 @@ class Evidence:
 
     # -- reading -------------------------------------------------------------
     def get(self, name: str) -> Measure:
-        return self._m.get(name, Measure(name, None, UNMEASURED))
+        return self._m.get(name, Measure(name, None, UNMEASURED, reason=TRACKING_LOSS))
+
+    def reason(self, name: str) -> str:
+        """Why `name` cannot be read, or "" when it can."""
+        return self.get(name).reason
 
     def measured(self, name: str) -> bool:
         return self.get(name).usable
@@ -177,6 +247,19 @@ class Evidence:
 
     def states(self) -> dict:
         return {n: m.state for n, m in self._m.items()}
+
+    def windows(self, fps: float) -> dict:
+        """Where each primitive was read: phase, seconds and coverage. This is
+        what makes a fired rule reproducible from its trace."""
+        out = {}
+        for n, m in self._m.items():
+            out[n] = {"phase": m.phase, "intervalS": m.interval_s(fps),
+                      "coverage": (None if m.coverage is None
+                                   else round(float(m.coverage), 3)),
+                      "state": m.state}
+            if m.reason:
+                out[n]["reason"] = m.reason
+        return out
 
     @classmethod
     def from_values(cls, values: dict, track: str = "",
@@ -218,10 +301,12 @@ PRIMITIVES: dict[str, tuple[str, str, str]] = {
     "hang_pct": (SCALED, "", "% of reach"),
     "squat_depth": (SCALED, "", "torso"),
     "pistol_depth": (SCALED, "", "torso"),
+    "split_depth": (SCALED, "", "torso"),
     "turn_speed": (SCALED, "", "torso/s"),
     # joint angles
     "start_elbow_deg": (SCALED, "", "deg"),
     "bottom_elbow_deg": (SCALED, "", "deg"),
+    "top_elbow_deg": (SCALED, "", "deg"),
     "arms_straight_frac": (SCALED, "", ""),
     "legs_straight_frac": (SCALED, "", ""),
     "body_line_deg": (SCALED, "", "deg"),
@@ -279,10 +364,6 @@ def _both_sides(kp: np.ndarray, joint: str) -> np.ndarray:
         return np.where(count > 0, total / np.maximum(count, 1), np.nan)
 
 
-def _window(n: int, centre: int, half: int) -> slice:
-    return slice(max(0, centre - half), min(n, centre + half + 1))
-
-
 def _med(a: np.ndarray) -> float:
     a = np.asarray(a, dtype=float)
     a = a[np.isfinite(a)]
@@ -309,6 +390,29 @@ def hip_above_ankle(kp: np.ndarray, torso: float) -> np.ndarray:
     ok = np.minimum(pair_confidence(kp, "left_hip", "right_hip"),
                     pair_confidence(kp, "left_ankle", "right_ankle")) >= MIN_CONF
     out = (ankle[:, 1] - hip[:, 1]) / torso
+    return np.where(ok, out, np.nan)
+
+
+def hip_above_lower_ankle(kp: np.ndarray, torso: float) -> np.ndarray:
+    """Hip height above the LOWER of the two ankles, in torso-lengths, per frame.
+
+    An ankle-midpoint frame is the wrong reference for a split squat: the rear
+    foot is behind and, in the Bulgarian variant, up on a bench, so the
+    midpoint sits between the planted front foot and an elevated rear ankle and
+    reports a depth nobody reached. The planted foot is the LOWER one (image y
+    grows downward), so depth is referenced to whichever ankle is lower - the
+    foot actually bearing the stance.
+    """
+    hip = midpoint(kp, "left_hip", "right_hip")
+    la = kp[:, S.KP_INDEX["left_ankle"], 1]
+    ra = kp[:, S.KP_INDEX["right_ankle"], 1]
+    ok = (np.minimum(pair_confidence(kp, "left_hip", "right_hip"),
+                     np.minimum(pair_confidence(kp, "left_ankle", "right_ankle"),
+                                pair_confidence(kp, "right_ankle", "right_ankle")))
+          >= MIN_CONF)
+    low = np.maximum(np.where(np.isfinite(la), la, -np.inf),
+                     np.where(np.isfinite(ra), ra, -np.inf))
+    out = (low - hip[:, 1]) / torso
     return np.where(ok, out, np.nan)
 
 
@@ -383,89 +487,171 @@ def turn_speed(signal, turn: int, fps: float, half_s: float = 0.15) -> float:
 # ---------------------------------------------------------------------------
 # The record itself
 # ---------------------------------------------------------------------------
+def _coverage(a: np.ndarray) -> float:
+    """Share of a window's samples that are finite - the joints were seen."""
+    a = np.asarray(a, dtype=float)
+    return float(np.mean(np.isfinite(a))) if a.size else 0.0
+
+
+def _observed(valid, sl: slice) -> float | None:
+    """Share of `sl` the pose estimator actually observed, from the validity
+    mask the segmenter built; None when no mask was supplied."""
+    if valid is None:
+        return None
+    v = np.asarray(valid, dtype=bool)[sl]
+    return float(v.mean()) if v.size else 0.0
+
+
 def rep_evidence(metrics: dict, arm: float, signal, start: int, turn: int,
                  end: int, fps: float, movement, kp: np.ndarray | None = None,
                  view: View = UNKNOWN_VIEW,
-                 median_concentric_s: float | None = None) -> Evidence:
+                 median_concentric_s: float | None = None,
+                 valid=None) -> Evidence:
     """Everything the fault predicates for one rep are allowed to read.
 
     `metrics` is barra.metrics.rep_metrics' values dict; `kp` the clip's
     keypoints, without which the joint-angle and body-line primitives simply do
     not exist - and are recorded as unmeasured rather than assumed healthy.
+    `valid` is the segmenter's per-frame "actually observed" mask; with it,
+    signal-derived primitives carry the coverage of the phase they were read
+    from and are withheld when too little of that phase was seen.
+
+    Every primitive is stamped with the phase it was read from and the frames
+    of that phase (barra/phases.py), so a fired rule can be reproduced from
+    the trace and a whole-rep summary is never dressed up as a precise onset.
     """
     from .config import THRESHOLDS
+    from .phases import HAS_TRANSITION, ascent_signal, rep_phases, transition_band
 
     ev = Evidence(track=movement.name, view=view)
     wrist_origin = movement.origin == "wrist"
+    ph = rep_phases(movement, start, turn, end, fps)
+    rep_w = (ph["rep"].start, ph["rep"].end)
+    lift, lower = ph["lifting"], ph["lowering"]
+    lift_w, lower_w = (lift.start, lift.end), (lower.start, lower.end)
+    rep_cov = _observed(valid, ph["rep"].as_slice())
+    lift_cov = _observed(valid, lift.as_slice())
 
-    for key in ("concentric_s", "eccentric_s", "total_s", "tempo_ratio",
-                "transition_s", "top_hold_s", "rom", "peak_height",
+    def _spec(key):
+        return PRIMITIVES.get(key, (SCALED, "", ""))
+
+    # Whole-rep timing. `concentric_s` belongs to the lifting phase and
+    # `eccentric_s` to the lowering one; the ratio and total are whole-rep.
+    ev.add("concentric_s", metrics.get("concentric_s"), *_spec("concentric_s"),
+           phase="lifting", window=lift_w, coverage=lift_cov)
+    ev.add("eccentric_s", metrics.get("eccentric_s"), *_spec("eccentric_s"),
+           phase="lowering", window=lower_w,
+           coverage=_observed(valid, lower.as_slice()))
+    for key in ("total_s", "tempo_ratio", "top_hold_s", "rom", "peak_height",
                 "start_depth"):
-        spec = PRIMITIVES.get(key, (SCALED, "", ""))
-        ev.add(key, metrics.get(key), spec[0], spec[1], spec[2])
+        ev.add(key, metrics.get(key), *_spec(key), phase="rep", window=rep_w,
+               coverage=rep_cov)
+
+    # The transition exists only for movements that pass through the bar
+    # plane. Everywhere else it is not unmeasured - it is not a thing.
+    if movement.name in HAS_TRANSITION:
+        # Read from the frames in the bar-plane band, not the whole lift, so
+        # the window the trace prints is the crossing itself. A lift that
+        # never reached the band has a transition of 0 s over an empty window,
+        # which is reported as such rather than as the lift.
+        band = transition_band(signal, ph, THRESHOLDS.bar_plane_band)
+        trans_w = (band.start, band.end) if band is not None else lift_w
+        trans_cov = _observed(valid, band.as_slice()) if band is not None else lift_cov
+        ev.add("transition_s", metrics.get("transition_s"), *_spec("transition_s"),
+               phase="transition", window=trans_w, coverage=trans_cov,
+               seen=(None if lift_cov is None else int(round(lift_cov * lift.frames))))
+    else:
+        ev.add("transition_s", None, *_spec("transition_s"), phase="transition",
+               reason=NOT_APPLICABLE)
 
     # Swing is body travel measured against the movement's origin. On a
     # hip-origin track the origin IS the hips, so the quantity is the hips'
     # distance from themselves - identically zero, and "momentum" could never
     # fire. Not measuring it is the truth; a 0.0 would be a claim.
     if wrist_origin:
-        ev.add("swing", metrics.get("swing"), SCALED, "", "torso")
+        ev.add("swing", metrics.get("swing"), SCALED, "", "torso",
+               phase="rep", window=rep_w, coverage=rep_cov)
     else:
-        ev.add("swing", None, SCALED, "", "torso")
+        ev.add("swing", None, SCALED, "", "torso", reason=NOT_APPLICABLE)
 
     # Lockout and hang are shares of the athlete's own reach, and reach is an
-    # arm - so they mean something only when the origin is the hands.
+    # arm - so they mean something only when the origin is the hands. The
+    # lockout is read at the top of the rep, the hang at its start.
     if wrist_origin and _finite(arm) and (arm or 0) > 0:
         peak, depth = _finite(metrics.get("peak_height")), _finite(metrics.get("start_depth"))
         ev.add("lockout_pct", None if peak is None else peak / arm * 100.0,
-               SCALED, "", "% of reach")
+               SCALED, "", "% of reach", phase="support",
+               window=(ph["support"].start, ph["support"].end),
+               coverage=_observed(valid, ph["support"].as_slice()))
         ev.add("hang_pct", None if depth is None else depth / arm * 100.0,
-               SCALED, "", "% of reach")
+               SCALED, "", "% of reach", phase="setup",
+               window=(ph["setup"].start, ph["setup"].end),
+               coverage=_observed(valid, ph["setup"].as_slice()))
     else:
-        ev.add("lockout_pct", None, SCALED, "", "% of reach")
-        ev.add("hang_pct", None, SCALED, "", "% of reach")
+        why = NOT_APPLICABLE if not wrist_origin else "arm reach could not be measured"
+        ev.add("lockout_pct", None, SCALED, "", "% of reach", phase="support", reason=why)
+        ev.add("hang_pct", None, SCALED, "", "% of reach", phase="setup", reason=why)
 
     # Share of the ascent that made no progress - the smoothness component's
     # read-out, recomputed here so the fault and the score cannot disagree.
-    ev.add("stalled_frac", _stalled_frac(signal, start, turn,
-                                         THRESHOLDS.stall_rate), INVARIANT)
+    # Read on the LIFTING phase, whichever half of the rep that is.
+    ev.add("stalled_frac",
+           _stalled_frac(ascent_signal(signal, movement), lift.start, lift.end,
+                         THRESHOLDS.stall_rate),
+           INVARIANT, phase="lifting", window=lift_w, coverage=lift_cov)
 
     # How much of the tracked travel this rep actually covered, independent of
     # which end of it the movement starts from (a dip and a pull-up disagree
     # about that, and `rom` only answers for the ascending one).
-    ev.add("travel", _travel(signal, start, end), SCALED, "", "torso")
-    ev.add("turn_speed", turn_speed(signal, turn, fps), SCALED, "", "torso/s")
+    ev.add("travel", _travel(signal, start, end), SCALED, "", "torso",
+           phase="rep", window=rep_w, coverage=rep_cov)
+    turn_phase = ph.get("turnaround", ph["support"])
+    ev.add("turn_speed", turn_speed(signal, turn, fps), SCALED, "", "torso/s",
+           phase=turn_phase.name, window=(turn_phase.start, turn_phase.end),
+           coverage=_observed(valid, turn_phase.as_slice()))
 
     # A rep thrown rather than pulled: its concentric against the set's own
     # median, so it is a comparison within one athlete on one day - no
     # absolute seconds, nothing that depends on the camera.
     conc = _finite(metrics.get("concentric_s"))
     if conc is not None and _finite(median_concentric_s) and median_concentric_s:
-        ev.add("fast_ratio", conc / median_concentric_s, INVARIANT)
+        ev.add("fast_ratio", conc / median_concentric_s, INVARIANT,
+               phase="lifting", window=lift_w, coverage=lift_cov)
     else:
-        ev.add("fast_ratio", None, INVARIANT)
+        ev.add("fast_ratio", None, INVARIANT, phase="lifting",
+               reason="no set median to compare against")
 
     if kp is None:
-        for key in ("start_elbow_deg", "bottom_elbow_deg", "arms_straight_frac",
-                    "legs_straight_frac", "squat_depth", "hip_sag",
-                    "torso_lean", "knee_valgus", "heel_rise"):
-            spec = PRIMITIVES.get(key, (SCALED, "", ""))
-            ev.add(key, None, spec[0], spec[1], spec[2])
+        for key in ("start_elbow_deg", "bottom_elbow_deg", "top_elbow_deg",
+                    "arms_straight_frac", "legs_straight_frac", "squat_depth",
+                    "hip_sag", "torso_lean", "knee_valgus", "heel_rise"):
+            ev.add(key, None, *_spec(key), reason=TRACKING_LOSS)
         return ev
 
     torso = robust_torso(kp)
     n = len(kp)
-    seg = slice(start, min(end + 1, n))
-    half = max(1, int(round(0.10 * max(fps, 1.0))))
+    seg = ph["rep"].as_slice()
 
     elbow = _both_sides(kp, "elbow")
     knee = _both_sides(kp, "knee")
-    ev.add("start_elbow_deg", _med(elbow[_window(n, start, half)]),
-           SCALED, "", "deg")
-    ev.add("bottom_elbow_deg", _med(elbow[_window(n, turn, half)]),
-           SCALED, "", "deg")
-    ev.add("arms_straight_frac", _frac_at_least(elbow[seg], THRESHOLDS.straight_arm))
-    ev.add("legs_straight_frac", _frac_at_least(knee[seg], THRESHOLDS.straight_leg))
+
+    def _angle_at(name: str, series: np.ndarray, phase_name: str) -> None:
+        p = ph[phase_name]
+        win = series[p.as_slice()]
+        ev.add(name, _med(win), SCALED, "", "deg", phase=phase_name,
+               window=(p.start, p.end), coverage=_coverage(win))
+
+    # The elbow at the rep's start (the hang, or the lockout before lowering),
+    # at the bottom of the rep, and at its top - each from the phase window it
+    # names, not from a hand-rolled offset.
+    _angle_at("start_elbow_deg", elbow, "setup")
+    _angle_at("bottom_elbow_deg", elbow,
+              "turnaround" if "turnaround" in ph else "setup")
+    _angle_at("top_elbow_deg", elbow, "support")
+    ev.add("arms_straight_frac", _frac_at_least(elbow[seg], THRESHOLDS.straight_arm),
+           phase="rep", window=rep_w, coverage=_coverage(elbow[seg]))
+    ev.add("legs_straight_frac", _frac_at_least(knee[seg], THRESHOLDS.straight_leg),
+           phase="rep", window=rep_w, coverage=_coverage(knee[seg]))
 
     # Squat depth against this rep's own standing height, measured hip-over-
     # ankle. Vertical, so it does not care where the camera stands.
@@ -474,17 +660,59 @@ def rep_evidence(metrics: dict, arm: float, signal, start: int, turn: int,
     bottom = _pct(hoa, 5)
     ev.add("squat_depth",
            (stand - bottom) if np.isfinite(stand) and np.isfinite(bottom) else None,
-           SCALED, "", "torso")
+           SCALED, "", "torso", phase="rep", window=rep_w, coverage=_coverage(hoa))
+
+    # Split-squat depth against the PLANTED FRONT ankle - the ankle-midpoint
+    # frame above folds the elevated rear foot into the reference and inflates
+    # the depth. Only the split-squat family reads this, but it is computed for
+    # any hip-origin descending rep so the primitive is never measured on one
+    # movement from a frame built for another.
+    if movement.name in ("split_squat", "bulgarian_split_squat"):
+        hoa_split = hip_above_lower_ankle(kp, torso)[seg]
+        stand_s = _pct(hoa_split, 90)
+        bottom_s = _pct(hoa_split, 5)
+        ev.add("split_depth",
+               (stand_s - bottom_s) if np.isfinite(stand_s) and np.isfinite(bottom_s) else None,
+               SCALED, "", "torso", phase="rep", window=rep_w,
+               coverage=_coverage(hoa_split))
+    else:
+        ev.add("split_depth", None, SCALED, "", "torso", phase="rep",
+               reason=NOT_APPLICABLE)
 
     sag = hip_line_offset(kp, torso)[seg]
-    ev.add("hip_sag", _pct(sag, 90), PLANAR, "sagittal", "torso")
-    ev.add("heel_rise", planted_ankle_rise(kp, torso, seg), PLANAR, "sagittal", "torso")
+    ev.add("hip_sag", _pct(sag, 90), PLANAR, "sagittal", "torso",
+           phase="rep", window=rep_w, coverage=_coverage(sag))
+    ankle_cov = _ankle_coverage(kp, seg)
+    ev.add("heel_rise", planted_ankle_rise(kp, torso, seg), PLANAR, "sagittal", "torso",
+           phase="rep", window=rep_w, coverage=ankle_cov)
 
     lean = ((midpoint(kp, "left_hip", "right_hip")[:, 0]
              - midpoint(kp, "left_shoulder", "right_shoulder")[:, 0]) / torso)[seg]
-    ev.add("torso_lean", _pct(lean, 90), PLANAR, "sagittal", "torso")
-    ev.add("knee_valgus", _knee_valgus(kp, torso, seg), PLANAR, "frontal", "torso")
+    lean_ok = (np.minimum(pair_confidence(kp, "left_hip", "right_hip"),
+                          pair_confidence(kp, "left_shoulder", "right_shoulder"))
+               >= MIN_CONF)[seg]
+    ev.add("torso_lean", _pct(np.where(lean_ok, lean, np.nan), 90), PLANAR, "sagittal",
+           "torso", phase="rep", window=rep_w, coverage=float(np.mean(lean_ok)) if lean_ok.size else 0.0)
+    ev.add("knee_valgus", _knee_valgus(kp, torso, seg), PLANAR, "frontal", "torso",
+           phase="rep", window=rep_w, coverage=_knee_coverage(kp, seg))
     return ev
+
+
+def _ankle_coverage(kp: np.ndarray, seg: slice) -> float:
+    best = 0.0
+    for side in ("left", "right"):
+        ok = kp[seg, S.KP_INDEX[f"{side}_ankle"], 2] >= MIN_CONF
+        best = max(best, float(ok.mean()) if ok.size else 0.0)
+    return best
+
+
+def _knee_coverage(kp: np.ndarray, seg: slice) -> float:
+    best = 0.0
+    for side in ("left", "right"):
+        ok = (_ok(kp, f"{side}_knee") & _ok(kp, f"{side}_hip")
+              & _ok(kp, f"{side}_ankle"))[seg]
+        best = max(best, float(ok.mean()) if ok.size else 0.0)
+    return best
 
 
 def _frac_at_least(a: np.ndarray, thresh: float) -> float:
@@ -500,17 +728,8 @@ def _travel(signal, start: int, end: int) -> float:
 
 
 def _stalled_frac(signal, start: int, turn: int, stall_rate: float) -> float:
-    if signal is None:
-        return float("nan")
-    seg = np.asarray(signal, dtype=float)[start:turn + 1]
-    if seg.size < 6:
-        return float("nan")
-    step = np.diff(seg)
-    total = seg[-1] - seg[0]
-    if not np.isfinite(total) or total <= 1e-9:
-        return float("nan")
-    mean_rate = total / step.size
-    return float(np.mean(step < stall_rate * mean_rate))
+    from .quality import stalled_fraction
+    return stalled_fraction(signal, start, turn, stall_rate)
 
 
 def _knee_valgus(kp: np.ndarray, torso: float, seg: slice) -> float:

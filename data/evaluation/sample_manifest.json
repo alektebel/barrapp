@@ -1,0 +1,134 @@
+{
+  "schema": 1,
+  "version": "2026-09-08.1",
+  "note": "Reviewed labels for the eight root-level sample clips. Every field records HOW it was reviewed: `contact-sheet` means sparse stills were inspected (docs/TECHNIQUE-PIPELINE-IMPLEMENTATION-PLAN.md, section 2); `unreviewed` means the value is a pipeline output kept as a suggestion, never as ground truth. Per-error intervals are given only where a reviewer marked one. Existing model outputs are annotation suggestions.",
+  "labels": {
+    "movement": "one of barra.movements.MOVEMENTS, or `unknown` for a clip that shows no supported movement",
+    "reps": "reviewed completed repetitions, or null when not reviewed",
+    "errors": "[{errorId, rep, intervalS, status}] from the rule registry; empty when unreviewed",
+    "forbidden": "[{errorId, why}] checks that must not fire on this clip",
+    "phaseScoped": "[{errorId, phase, maxWindowS, why}] checks that may fire only from the named phase, over a window no longer than maxWindowS",
+    "notReps": "[{intervalS, why}] intervals that must not be retained as repetitions",
+    "unobservable": "checks a reviewer judged impossible from this footage, with the reason",
+    "view": "SAGITTAL | OBLIQUE | FRONTAL | UNKNOWN, as reviewed",
+    "reviewerConfidence": "high | medium | low",
+    "reviewMethod": "contact-sheet | frame-by-frame | unreviewed"
+  },
+  "clips": [
+    {
+      "file": "VID-20260827-WA0010.mp4",
+      "movement": "muscle_up",
+      "variant": "unspecified",
+      "reps": 2,
+      "role": "positive",
+      "view": "UNKNOWN",
+      "reviewMethod": "contact-sheet",
+      "reviewerConfidence": "medium",
+      "errors": [],
+      "unobservable": [],
+      "phaseScoped": [
+        {"errorId": "muscle_up.incomplete_support_extension", "phase": "support", "maxWindowS": 0.5, "why": "whole-rep arm-straightness labelled the normal elbow flexion of the pull as a fault; the check may fire, but only from the support window at the top, and the payload must say so. Whether the top was in fact locked out has not been reviewed frame by frame - the contact sheet is not enough to assert it."}
+      ],
+      "notes": "Two completed muscle-ups. Baseline fired the whole-rep bent-arms rule on both."
+    },
+    {
+      "file": "VID-20260827-WA0011.mp4",
+      "movement": "knee_raise",
+      "variant": "unspecified",
+      "reps": null,
+      "role": "positive",
+      "view": "UNKNOWN",
+      "reviewMethod": "unreviewed",
+      "reviewerConfidence": "low",
+      "errors": [],
+      "unobservable": [],
+      "notes": "Hanging knee raises under camera rotation. Recognition should be preserved; the count has not been reviewed frame by frame."
+    },
+    {
+      "file": "VID-20260827-WA0012.mp4",
+      "movement": "muscle_up",
+      "variant": "unspecified",
+      "reps": null,
+      "role": "difficult-visibility",
+      "view": "UNKNOWN",
+      "reviewMethod": "unreviewed",
+      "reviewerConfidence": "low",
+      "errors": [],
+      "unobservable": [],
+      "notes": "Night footage. Retained as a visibility case; count unreviewed."
+    },
+    {
+      "file": "VID-20260827-WA0014.mp4",
+      "movement": "muscle_up",
+      "variant": "unspecified",
+      "reps": null,
+      "role": "false-retained-rep",
+      "view": "UNKNOWN",
+      "reviewMethod": "contact-sheet",
+      "reviewerConfidence": "high",
+      "errors": [],
+      "unobservable": [],
+      "notReps": [
+        {"intervalS": [22.61, 25.16], "why": "standing and walking around the rig; the shoulders rest 0.86 torso-lengths above the hands, which is not a hang"}
+      ],
+      "notes": "The interval 22.61-25.16 s must not be retained as a measured muscle-up. Recovery of true reps is assessed separately and must not come from relaxing the hand gate."
+    },
+    {
+      "file": "VID-20260827-WA0017.mp4",
+      "movement": "unknown",
+      "variant": "unspecified",
+      "reps": 0,
+      "role": "negative-control",
+      "view": "UNKNOWN",
+      "reviewMethod": "contact-sheet",
+      "reviewerConfidence": "medium",
+      "errors": [],
+      "unobservable": [],
+      "notes": "Static / inverted hold. No repetition may be counted."
+    },
+    {
+      "file": "VID-20260827-WA0018.mp4",
+      "movement": "unknown",
+      "variant": "unspecified",
+      "reps": 0,
+      "role": "abstention",
+      "view": "UNKNOWN",
+      "reviewMethod": "unreviewed",
+      "reviewerConfidence": "low",
+      "errors": [],
+      "unobservable": [],
+      "notes": "Poor hand visibility. Abstention is the expected result unless new evidence supports recognition."
+    },
+    {
+      "file": "VID-20260827-WA0019.mp4",
+      "movement": null,
+      "variant": "unspecified",
+      "reps": null,
+      "role": "attempt-or-swing",
+      "view": "UNKNOWN",
+      "reviewMethod": "contact-sheet",
+      "reviewerConfidence": "low",
+      "errors": [],
+      "unobservable": [],
+      "notes": "Attempt/swing footage needing temporal review. Neither a completed pull-up nor an unknown label is asserted here; the movement label is left null so it does not enter the confusion matrix."
+    },
+    {
+      "file": "VID-20260827-WA0020.mp4",
+      "movement": "push_up",
+      "variant": "unspecified",
+      "reps": 19,
+      "role": "positive",
+      "view": "UNKNOWN",
+      "reviewMethod": "contact-sheet",
+      "reviewerConfidence": "medium",
+      "errors": [],
+      "unobservable": [
+        {"errorId": "push_up.hip_sag", "why": "the viewpoint is not knowable, so the sagittal hip line cannot be judged"}
+      ],
+      "forbidden": [
+        {"errorId": "push_up.lift_stall", "why": "the baseline fired stall on 17 of 19 smooth repetitions with the phases reversed; a genuine mid-lift pause must still fire, but the set as filmed is continuous", "reviewMethod": "contact-sheet", "reviewerConfidence": "medium"}
+      ],
+      "notes": "Nineteen push-ups. The baseline's phase timing was reversed (concentric/eccentric)."
+    }
+  ]
+}

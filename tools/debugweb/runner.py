@@ -14,9 +14,12 @@ becomes a returncode the parent reports, next to the stage it had reached.
 
 Everything it produces goes where the rest of the project already puts it:
 the trace to ``out/traces/<id>.json``, in the one format ``barra explain
---replay`` reads, and the payload beside it. Nothing here re-implements a
-threshold or a decision - a debug tool that computes its own answer is
-debugging itself.
+--replay`` reads, and the payload beside it. The debug tool calls
+``process_job``, not only ``analyze_clip``, so the web runner exercises the
+same production path that the uploaded server will exercise: learned model,
+fusion, provenance, optional vision, and report assembly. Nothing here
+re-implements a threshold or a decision - a debug tool that computes its own
+answer is debugging itself.
 """
 from __future__ import annotations
 
@@ -47,6 +50,7 @@ def main() -> int:
     exercise = spec.get("exercise") or "auto"
     fresh = bool(spec.get("fresh"))
     backend = spec.get("backend") or ""
+    run_id = spec.get("runId") or status.stem
 
     state = {"state": "running", "stage": "starting", "clip": clip.name,
              "traceId": None, "error": None}
@@ -59,37 +63,43 @@ def main() -> int:
     try:
         from barra.config import PATHS
         from barra.posecache import load_or_estimate
-        from barra.trace import Trace, new_id
-        from process import analyze_clip
+        from process import process_job
 
-        tr = Trace(new_id(clip.name), clip.name,
-                   source="debugweb", clip=str(clip),
-                   exercise_requested=exercise)
-        state["traceId"] = tr.id
-        _write(status, **state)
-
-        tr.stage("pose")
         stage("estimating the pose")
         order = [backend] if backend else None
-        pose = load_or_estimate(clip, fresh=fresh, trace=tr, order=order,
-                                write_cache=True)
+        pose = load_or_estimate(clip, fresh=fresh, order=order,
+                                write_cache=True, cache_tag=backend or None)
         state["poseSource"] = pose.source
         _write(status, **state)
 
-        payload = analyze_clip(clip, exercise=exercise,
-                               session=date.today().isoformat(),
-                               trace=tr, on_stage=stage, pose=pose)
-        payload["traceId"] = tr.id
+        job = {
+            "id": f"debugweb-{run_id}",
+            "exercise": exercise,
+            "session": date.today().isoformat(),
+        }
+        payload = process_job(job, clip, on_stage=stage, pose=pose)
+        trace_id = payload.get("traceId") or f"debugweb-{run_id}"
+        payload["traceId"] = trace_id
 
         traces = PATHS.o("traces")
         traces.mkdir(parents=True, exist_ok=True)
-        tr.write(traces / f"{tr.id}.json")
-        (traces / f"{tr.id}.payload.json").write_text(json.dumps(payload, indent=2))
+        from barra.ingest import keypoints_to_frame
+        keypoints_to_frame(pose.keypoints).to_parquet(traces / f"{trace_id}.pose.parquet", index=False)
+        (traces / f"{trace_id}.payload.json").write_text(json.dumps(payload, indent=2))
 
-        state.update(state="done", stage="done",
+        reject_count = error_count = 0
+        try:
+            tr = json.loads((traces / f"{trace_id}.json").read_text())
+            counts = tr.get("counts") or {}
+            reject_count = int(counts.get("reject") or 0)
+            error_count = int(counts.get("error") or 0)
+        except Exception:  # noqa: BLE001 - status counters are diagnostics only
+            pass
+
+        state.update(state="done", stage="done", traceId=trace_id,
                      reps=payload.get("n_reps"),
                      exercise=payload.get("exercise"),
-                     rejections=len(tr.rejections), errors=len(tr.errors))
+                     rejections=reject_count, errors=error_count)
         _write(status, **state)
         return 0
     except Exception as exc:  # noqa: BLE001 - the parent needs the reason, not a stack

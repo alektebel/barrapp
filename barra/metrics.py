@@ -25,7 +25,7 @@ subject's own within-session spread.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import pandas as pd
@@ -147,6 +147,10 @@ class RepMetrics:
     values: dict[str, float]
     quality: dict[str, float]
     problems: list[str]
+    # The phase table the values were read from, with the transition narrowed
+    # to the frames in the bar-plane band. Callers report THIS, not a table
+    # they rebuilt, so the payload's phases are the ones that were measured.
+    phases: dict = field(default_factory=dict)
 
     @property
     def plausible(self) -> bool:
@@ -193,32 +197,54 @@ def _series(kp: np.ndarray, movement: Movement) -> dict[str, np.ndarray]:
 def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
                 movement: Movement, anatomy: dict | None = None,
                 trace=None, label: str = "") -> RepMetrics:
+    from .phases import HAS_TRANSITION, rep_phases, transition_band
+
     s = _series(kp, movement)
-    sl = slice(start, end + 1)
-    up = slice(start, turn + 1)
+    fps = max(float(fps), 1.0)
+    phases = rep_phases(movement, start, turn, end, fps)
+    sl = phases["rep"].as_slice()
+    # The lifting phase, wherever the movement puts it: start..turn when the
+    # rep ascends first, turn..end when it descends first. Read from the phase
+    # table rather than re-derived, so every duration below agrees with the
+    # fault layer about which half of the rep is which.
+    up = phases["lifting"].as_slice()
 
     above = s["shoulder_above"][sl]
     conf = s["conf"][sl]
     n = max(len(above), 1)
-    fps = max(float(fps), 1.0)
 
     peak = float(np.nanmax(above)) if n else np.nan
     begin = float(above[0]) if n else np.nan
 
-    # Transition: time the shoulders spend crossing the plane of the bar. On a
-    # muscle-up this is the part that fails, and it is pure timing, so it is
-    # comparable across sessions filmed however you like.
-    band = 0.15
-    crossing = np.abs(s["shoulder_above"][up]) <= band
-    transition_s = float(crossing.sum()) / fps
+    # Transition: time the shoulders spend crossing the plane of the bar during
+    # the lift. On a muscle-up this is the part that fails, and it is pure
+    # timing, so it is comparable across sessions filmed however you like. It
+    # exists only for movements that pass through the bar plane; a push-up's
+    # shoulders "crossing the bar" is a measurement of nothing, and used to be
+    # reported as one.
+    from .config import THRESHOLDS
+    band = THRESHOLDS.bar_plane_band
+    if movement.name in HAS_TRANSITION:
+        crossing = np.abs(s["shoulder_above"][up]) <= band
+        transition_s = float(crossing.sum()) / fps
+        # The phase table names the transition with the whole lift as its
+        # outer bound; narrow it to the frames actually in the band so the
+        # trace and payload report the crossing, not the search window.
+        narrowed = transition_band(s["shoulder_above"], phases, band)
+        if narrowed is not None:
+            phases["transition"] = narrowed
+        else:
+            phases.pop("transition", None)
+    else:
+        transition_s = float("nan")
 
     # Time spent near lockout, as a fraction of the rep's own amplitude, so a
     # shallow rep is not credited with a long hold.
     hold_gate = begin + 0.85 * (peak - begin) if np.isfinite(peak) else np.inf
     top_hold_s = float((above >= hold_gate).sum()) / fps
 
-    concentric_s = max(turn - start, 1) / fps
-    eccentric_s = max(end - turn, 1) / fps
+    concentric_s = max(phases["lifting"].frames - 1, 1) / fps
+    eccentric_s = max(phases["lowering"].frames - 1, 1) / fps
 
     lateral = s["hip_lateral"][sl]
     lateral = lateral[np.isfinite(lateral)]
@@ -260,14 +286,16 @@ def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
     from .trace import NullTrace
     tr = trace or NullTrace()
     tr.stage("metrics")
+    from .phases import phases_as_dict
     tr.step(f"measured {label or 'rep'}", frames=[start, turn, end],
             window_s=[round(start / fps, 2), round(end / fps, 2)],
+            phases_s=phases_as_dict(phases, fps),
             arm_reach=arm, ruler_usable=usable_reference(arm), **values)
     tr.step(f"pose quality {label or 'rep'}", **quality)
     for problem in problems:
         tr.reject(label or "rep", problem, arm_reach=arm,
                   limit=arm * PLAUSIBILITY_MARGIN if np.isfinite(arm) else None)
-    return RepMetrics(values, quality, problems)
+    return RepMetrics(values, quality, problems, phases)
 
 
 def compute_all(reps: pd.DataFrame, keypoints_of,

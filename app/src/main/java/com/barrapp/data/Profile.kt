@@ -14,8 +14,17 @@ data class Profile(
     val age: Int = 0,
     val activity: ActivityLevel = ActivityLevel.Unset,
 ) {
+    /**
+     * Enough to open the app.
+     *
+     * Age used to be required. The redesigned intake does not ask for it —
+     * nothing in the measurement reads it, and the one thing that shapes the
+     * app, how often you train, is asked directly. It stays on the model
+     * because the objectives chat can still capture it, but a profile without
+     * it is complete.
+     */
     val complete: Boolean
-        get() = name.isNotBlank() && age in 10..100 && activity != ActivityLevel.Unset
+        get() = name.isNotBlank() && activity != ActivityLevel.Unset
 
     val firstName: String
         get() = name.trim().substringBefore(' ').ifBlank { "there" }

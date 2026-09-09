@@ -96,9 +96,11 @@ After deploy: copy the `ApiUrl` output into §2 steps. For Play release also set
 
 Phone `POST /v1/jobs` → `PUT` clip to S3 presigned URL → `POST submit` →
 API Lambda invokes worker → worker downloads clip from S3, runs
-`process_job()` (probe → MediaPipe pose → geometric classify → rep
-segmentation → per-rep metrics → quality score → report), writes result JSON
-to DynamoDB → phone polls `GET /v1/jobs/{id}`.
+`process_job()` (probe → pose backend selected by `BARRA_POSE_BACKEND`, default
+MediaPipe when available → geometric classify → learned model vote → detector
+fusion → rep segmentation → per-rep metrics → quality score → optional vision
+advice → report), writes result JSON to DynamoDB → phone polls
+`GET /v1/jobs/{id}`.
 
 Per-clip pipeline detail: see `server/process.py:process_job()` and
 `docs/CORE.md` ("How it decides"). Every run writes a trace id

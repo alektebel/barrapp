@@ -123,7 +123,9 @@ fun DiagnosticsScreen(
                         Eyebrow("Produced by")
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            p.summary,
+                            p.summary +
+                                if (latest.measurementVersion > 0)
+                                    " · measurement v${latest.measurementVersion}" else "",
                             fontFamily = FontFamily.Monospace,
                             style = MaterialTheme.typography.bodySmall,
                         )

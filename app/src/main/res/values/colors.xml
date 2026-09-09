@@ -22,4 +22,7 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <!-- Tk.bg. Kept in step with com/barrapp/ui/theme/Tracker.kt by hand:
+         one is the window behind Compose, the other is what Compose paints. -->
+    <color name="tracker_bg">#FF0B0B12</color>
 </resources>

@@ -24,6 +24,7 @@ instead of paying for pose again.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -44,13 +45,22 @@ class CachedPose:
     source: str = ""            # backend name, or "cache"
 
 
-def cache_path(video: Path) -> Path:
-    return PATHS.o(S.P_KEYPOINTS, f"{Path(video).stem}.parquet")
+def _slug(value: str | None) -> str:
+    """Filesystem-safe cache namespace for model/backend ids."""
+    if not value:
+        return ""
+    return re.sub(r"[^A-Za-z0-9._-]+", "_", value).strip("_")
 
 
-def load(video: Path) -> np.ndarray | None:
+def cache_path(video: Path, tag: str | None = None) -> Path:
+    slug = _slug(tag)
+    stem = f"{Path(video).stem}--{slug}" if slug else Path(video).stem
+    return PATHS.o(S.P_KEYPOINTS, f"{stem}.parquet")
+
+
+def load(video: Path, tag: str | None = None) -> np.ndarray | None:
     """The keypoints written by an earlier run, or None."""
-    path = cache_path(video)
+    path = cache_path(video, tag=tag)
     if not path.exists():
         return None
     try:
@@ -63,12 +73,12 @@ def load(video: Path) -> np.ndarray | None:
         return None
 
 
-def store(video: Path, keypoints: np.ndarray) -> Path | None:
+def store(video: Path, keypoints: np.ndarray, tag: str | None = None) -> Path | None:
     """Write keypoints in the schema `barra ingest` uses, so the two agree."""
     try:
         from .ingest import keypoints_to_frame
 
-        path = cache_path(video)
+        path = cache_path(video, tag=tag)
         path.parent.mkdir(parents=True, exist_ok=True)
         keypoints_to_frame(keypoints).to_parquet(path, index=False)
         return path
@@ -128,11 +138,16 @@ def estimate(video: Path, order: list[str] | None = None, trace=None) -> CachedP
 def load_or_estimate(video: Path, fresh: bool = False, trace=None,
                      order: list[str] | None = None,
                      write_cache: bool = False,
-                     fallback_fps: float = 0.0) -> CachedPose:
+                     fallback_fps: float = 0.0,
+                     cache_tag: str | None = None) -> CachedPose:
     """Cached keypoints when they exist, otherwise a fresh estimate.
 
     `fresh` skips the cache. `write_cache` stores a fresh estimate for the next
     run - off by default so a caller cannot fill `out/` without meaning to.
+
+    `cache_tag` namespaces the cache by pose model/backend when the caller needs
+    an A/B run to avoid reusing keypoints from a different estimator. With no
+    tag the historic path remains `<stem>.parquet`, so old caches still work.
 
     `fallback_fps` is the frame rate to report for a CACHE HIT, because the
     keypoint table stores frames and not a frame rate. It defaults to 0.0 -
@@ -146,9 +161,9 @@ def load_or_estimate(video: Path, fresh: bool = False, trace=None,
     """
     tr = trace or NullTrace()
     if not fresh:
-        keypoints = load(video)
+        keypoints = load(video, tag=cache_tag)
         if keypoints is not None:
-            path = cache_path(video)
+            path = cache_path(video, tag=cache_tag)
             tr.step("keypoints reused from an earlier run", path=str(path),
                     written=path.stat().st_mtime, frames=int(len(keypoints)),
                     note="pass --fresh to re-run pose estimation")
@@ -156,7 +171,7 @@ def load_or_estimate(video: Path, fresh: bool = False, trace=None,
 
     pose = estimate(video, order=order, trace=tr)
     if write_cache:
-        stored = store(video, pose.keypoints)
+        stored = store(video, pose.keypoints, tag=cache_tag)
         if stored is not None:
             tr.step("keypoints cached", path=str(stored),
                     frames=int(len(pose.keypoints)))

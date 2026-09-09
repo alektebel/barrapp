@@ -51,18 +51,20 @@ data class BandColors(
     val unmeasured: Color,
 )
 
+/**
+ * Band colours, in the Calisthenics Progress Tracker palette.
+ *
+ * Both themes resolve to the same values now: the app renders dark only, and a
+ * band that changed hue between two "themes" would mean a rep looked
+ * different for a reason that has nothing to do with the rep. `unmeasured` is
+ * the muted grey on purpose and is never a score colour.
+ */
 val DarkBands = BandColors(
-    strong = Color(0xFF62C097),
-    solid = Color(0xFF74B4DE),
-    shaky = Color(0xFFD4A257),
-    broken = Color(0xFFC96A5B),
-    unmeasured = Color(0xFF3F424D),
+    strong = Tk.teal,
+    solid = Tk.primary,
+    shaky = Tk.amber,
+    broken = Tk.rose,
+    unmeasured = Tk.muted,
 )
 
-val LightBands = BandColors(
-    strong = Color(0xFF3E9E77),
-    solid = Color(0xFF4A8FBC),
-    shaky = Color(0xFFB3822F),
-    broken = Color(0xFFA9503F),
-    unmeasured = Color(0xFFC4C4CE),
-)
+val LightBands = DarkBands

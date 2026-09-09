@@ -101,10 +101,30 @@ PISTOL_SQUAT = Movement(
     signal="hip_height", min_rep_s=0.8, turn_label="bottom",
     aliases=("pistol", "pistolsquat", "pistol-squat", "one_leg_squat"),
 )
+# A split squat is a squat in a split stance: the front foot planted flat, the
+# rear foot behind it (Bulgarian: up on a bench; plain: toe on the floor). The
+# hips descend through the same path as a squat, and depth is referenced to the
+# PLANTED front ankle - the rear foot being elevated is exactly the point, so
+# an ankle-midpoint frame would measure the wrong reference and report a
+# depth no-one performed. Both share one profile; what separates them is how
+# high the rear ankle is, which is a classifier detail, not a different track.
+SPLIT_SQUAT = Movement(
+    name="split_squat", origin="hip", direction="descending",
+    signal="hip_height", min_rep_s=0.8, turn_label="bottom",
+    aliases=("split-squat", "splitsquat", "rear_foot_split_squat",
+             "static_lunge", "lunge_split_squat"),
+)
+BULGARIAN_SPLIT_SQUAT = Movement(
+    name="bulgarian_split_squat", origin="hip", direction="descending",
+    signal="hip_height", min_rep_s=0.8, turn_label="bottom",
+    aliases=("bulgarian-split-squat", "bulgariansplitsquat", "bss",
+             "bulgarian_squat", "sentadilla_bulgara", "sentadillas_bulgaras",
+             "búlgaro", "bulgarian split squat"),
+)
 
 MOVEMENTS = {m.name: m for m in (
     SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP,
-    FRONT_LEVER, PLANCHE, PISTOL_SQUAT,
+    FRONT_LEVER, PLANCHE, PISTOL_SQUAT, SPLIT_SQUAT, BULGARIAN_SPLIT_SQUAT,
 )}
 _ALIASES = {a: m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
 

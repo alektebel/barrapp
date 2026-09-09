@@ -150,6 +150,12 @@ class Handler(BaseHTTPRequestHandler):
                 # that omits the field does not get squat geometry applied to a
                 # muscle-up, which produces numbers that look fine and mean nothing.
                 "exercise": body.get("exercise") or "auto",
+                # Declared, never inferred: the technique variant (strict /
+                # kipping / tuck ...) selects which checks apply, and the camera
+                # side overrides the estimated view. process_job validates
+                # both; an unknown variant is reported back as unspecified.
+                "variant": (body.get("variant") or "").strip() or None,
+                "view": (body.get("view") or "").strip() or None,
                 "createdAt": _now(),
                 "result": None,
                 "error": None,

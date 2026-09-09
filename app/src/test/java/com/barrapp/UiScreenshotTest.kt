@@ -22,7 +22,14 @@ import com.barrapp.ui.LadderLine
 import com.barrapp.ui.LadderScreen
 import com.barrapp.ui.LadderStep
 import com.barrapp.ui.LastSessionCard
+import com.barrapp.ui.CheckLine
+import com.barrapp.ui.RepCardData
+import com.barrapp.ui.RepCheck
+import com.barrapp.ui.RepComponent
+import com.barrapp.ui.SessionScreen
+import com.barrapp.ui.VisionLine
 import com.barrapp.ui.WeekBar
+import androidx.compose.foundation.verticalScroll
 import com.barrapp.ui.WeekScreen
 import com.barrapp.ui.theme.Nocturne
 import org.junit.Rule
@@ -51,10 +58,28 @@ class UiScreenshotTest {
     @get:Rule
     val rule = createAndroidComposeRule<ComponentActivity>()
 
+    /**
+     * Draws the decor view straight onto a software bitmap.
+     *
+     * `captureToImage()` goes through PixelCopy and a forced redraw, and that
+     * redraw never completes under Robolectric here - every test in this class
+     * failed with `ComposeTimeoutException: Condition still not satisfied
+     * after 2000 ms`, so the screenshots this file exists to produce were
+     * never produced. Drawing the view gives the same picture without the
+     * round trip. (Same helper as [TrackerScreenshotTest.snap].)
+     *
+     * The output path is relative to the module, which is where Gradle runs
+     * the unit tests from; the old "app/build/..." was relative to the repo
+     * root and only worked when the test was run by hand.
+     */
     private fun snap(name: String) {
         rule.waitForIdle()
-        val img = rule.onRoot().captureToImage().asAndroidBitmap()
-        val dir = File("app/build/screenshots").apply { mkdirs() }
+        val view = rule.activity.window.decorView
+        val img = Bitmap.createBitmap(
+            view.width.coerceAtLeast(1), view.height.coerceAtLeast(1), Bitmap.Config.ARGB_8888,
+        )
+        rule.runOnUiThread { view.draw(android.graphics.Canvas(img)) }
+        val dir = File("build/screenshots").apply { mkdirs() }
         val out = File(dir, "$name.png")
         out.outputStream().use { img.compress(Bitmap.CompressFormat.PNG, 100, it) }
         println("screenshot: ${out.absolutePath} (${img.width}x${img.height})")
@@ -87,6 +112,73 @@ class UiScreenshotTest {
             }
         }
         snap("week")
+    }
+
+    /** The session page under measurement version 2: the standard, the
+     *  per-check tally, a vision advisory, and rep cards with every status. */
+    @Test
+    fun session() {
+        rule.setContent {
+            BarrappTheme(darkTheme = true) {
+                androidx.compose.foundation.layout.Column(
+                    androidx.compose.ui.Modifier
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                ) {
+                    SessionScreen(
+                        eyebrow = "8 Sep · Muscle-up",
+                        verdict = "Solid set.\nFix the stall.",
+                        subtitle = "3 reps over a 14-second working set.",
+                        score = 64, scoreBand = "solid", bandColor = Nocturne.solid,
+                        cues = listOf(
+                            "Press out to straight arms at the top of every rep",
+                            "Pull both elbows over together",
+                        ),
+                        onWatchReplay = {},
+                        reps = listOf(
+                            RepCardData(
+                                title = "Muscle up", chip = "solid", chipColor = Nocturne.solid,
+                                score = "68", scoreColor = Nocturne.solid, measured = true,
+                                times = "5.0s – 7.1s",
+                                trace = listOf(0.1f, 0.3f, 0.7f, 1f, 0.9f, 0.4f, 0.1f),
+                                traceColor = Nocturne.solid,
+                                components = listOf(RepComponent("Range", 40, 82),
+                                    RepComponent("Control", 30, 61)),
+                                checks = listOf(
+                                    RepCheck("Bent arms at the top", "observed",
+                                        "support · 5.8–6.0s", "141 deg, needs 160 deg"),
+                                    RepCheck("One arm over first", "not_observed",
+                                        "transition · 5.4–5.6s", "0.04, limit 0.15"),
+                                    RepCheck("Excessive swing", "unobservable", "",
+                                        "needs a different camera angle"),
+                                ),
+                            ),
+                            RepCardData(
+                                title = "Muscle up", chip = "unmeasured",
+                                chipColor = Nocturne.nothing, score = null, scoreColor = null,
+                                measured = false,
+                                note = "Wrists left the frame.",
+                                blocked = "Withheld from the technique checks: " +
+                                    "pose implausible for 40% of the rep.",
+                            ),
+                        ),
+                        runLine = "run 260908-abc · build 1a2b3c · pose_landmarker_lite · measurement v2",
+                        onBackToWeek = {}, repsOpen = true, onToggleReps = {},
+                        standard = "Judged to the strict standard you declared.",
+                        checks = listOf(
+                            CheckLine("Bent arms at the top", 2, 1, 0),
+                            CheckLine("One arm over first", 0, 3, 0),
+                            CheckLine("Excessive swing", 0, 0, 3),
+                        ),
+                        vision = listOf(
+                            VisionLine("Rep 2", "bent arms at the top", "observed",
+                                "Elbows visibly bent at the top still."),
+                        ),
+                        visionDisagrees = false,
+                    )
+                }
+            }
+        }
+        snap("session")
     }
 
     @Test

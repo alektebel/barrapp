@@ -43,6 +43,9 @@ data class UiState(
     val pane: Pane = Pane.Session,
     val profile: Profile = Profile(),
     val days: List<DayEntry> = emptyList(),
+    /** date -> fault -> reps that showed it, the ledger the coach and progress
+     *  screens read to say whether a fault is getting better. */
+    val faults: Map<String, Map<String, Int>> = emptyMap(),
     val jobs: List<Job> = emptyList(),
     val selectedDate: String? = null,
     val current: Job? = null,
@@ -135,6 +138,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 profile = profile,
                 goals = GoalsStore.load(app),
                 days = SessionStore.days(app),
+                faults = SessionStore.faults(app),
                 chat = SessionStore.chat(app),
                 works = WorkStore.all(app),
                 weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
@@ -172,7 +176,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     val fresh = jobs.filter { it.id !in known && it.result != null }
                     fresh.forEach { SessionStore.record(app, it.id, it.result!!) }
                     if (fresh.isNotEmpty()) {
-                        _state.update { it.copy(days = SessionStore.days(app)) }
+                        _state.update { it.copy(days = SessionStore.days(app),
+                            faults = SessionStore.faults(app)) }
                     }
                 }
         }
@@ -224,6 +229,25 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             it.copy(screen = if (profile.complete) Screen.Home else Screen.Onboarding)
         }
         if (profile.complete) refresh()
+    }
+
+    /**
+     * The redesigned intake, saved in one go.
+     *
+     * The four answers land in the two places that already own them — the name
+     * and the training frequency on the profile, the goal and the focus
+     * movement in the goals store — so nothing else in the app has to learn a
+     * new shape to read them.
+     */
+    fun saveIntake(name: String, activity: ActivityLevel, goal: String, focusExercise: String) {
+        val app = getApplication<Application>()
+        val profile = _state.value.profile.copy(name = name, activity = activity)
+        ProfileStore.save(app, profile)
+        val goals = Goals(goal = goal, focusExercise = focusExercise)
+        GoalsStore.save(app, goals)
+        WeeklyReviewWorker.schedule(app)
+        _state.update { it.copy(profile = profile, goals = goals, screen = Screen.Home) }
+        refresh()
     }
 
     fun saveProfile(profile: Profile) {
@@ -401,6 +425,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         it.copy(
                             jobs = jobs,
                             days = SessionStore.days(app),
+                faults = SessionStore.faults(app),
                             weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
                             error = null,
                         )
@@ -428,7 +453,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     /** A clip picked anywhere lands here. The clip is copied onto the phone
      *  FIRST, because a camera's content uri can expire before the upload
      *  finishes, and a work that cannot be retried is not in a queue at all. */
-    fun upload(uri: Uri?) {
+    fun upload(uri: Uri?, variant: String = "", view: String = "") {
         val video = uri ?: return
         val app = getApplication<Application>()
         val workId = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
@@ -449,9 +474,19 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 status = if (kept) WorkStore.STATUS_WAITING else WorkStore.STATUS_FAILED,
                 clipPath = dest.absolutePath,
                 error = if (kept) null else "The clip could not be kept on the phone.",
+                // The server's vocabularies: variants are lower_snake
+                // (strict, kipping, full, tuck, straddle); viewpoint bins are
+                // upper (SAGITTAL, FRONTAL, OBLIQUE). Anything else comes back
+                // as unspecified / UNKNOWN with the word kept beside it.
+                variant = variant.trim().lowercase(),
+                view = view.trim().uppercase(),
                 log = buildList {
+                    val declared = listOfNotNull(
+                        variant.takeIf { it.isNotBlank() }?.let { "$it standard declared" },
+                        view.takeIf { it.isNotBlank() }?.let { "camera $it" },
+                    )
                     add(WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.INFO,
-                        "clip added to the queue"))
+                        (listOf("clip added to the queue") + declared).joinToString(" · ")))
                     if (!kept) add(WorkStore.Entry(System.currentTimeMillis(),
                         WorkStore.Level.ERROR, "the clip could not be read or kept"))
                 },
@@ -646,7 +681,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             // work with nothing in flight asks for a fresh job.
             val resuming = work.jobId.isNotBlank() && work.uploadId.isNotBlank()
             val jobId = if (resuming) work.jobId else withRetry("creating the job", work.id) {
-                withContext(Dispatchers.IO) { api.createJob("auto") }
+                withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
             }.job.id
             update { it.copy(jobId = jobId, status = WorkStore.STATUS_SENDING,
                 stage = "sending the clip") }
@@ -730,6 +765,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                                     selectedDate = j.result?.sessionDate
                                         ?: SessionStore.today(),
                                     days = SessionStore.days(app),
+                faults = SessionStore.faults(app),
                                     weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
                                     error = null,
                                 )
@@ -861,6 +897,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                             current = null,
                             analysis = null,
                             days = SessionStore.days(app),
+                faults = SessionStore.faults(app),
                             selectedDate = null,
                         )
                     }

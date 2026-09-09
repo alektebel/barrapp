@@ -16,7 +16,7 @@ import numpy as np
 
 from . import schema as S
 from .classify import _angle, _frac, _pct
-from .faults_taxonomy import HORIZONTAL, classify_failures
+from .faults_taxonomy import HORIZONTAL
 from .movements import midpoint, pair_confidence, robust_torso
 
 MIN_HOLD_S = 0.6          # a hold shorter than this is not a hold
@@ -93,12 +93,20 @@ def _holds_signal(kp: np.ndarray) -> np.ndarray:
 
 
 def hold_attempts(kp: np.ndarray, fps: float, movement,
-                  trace=None) -> list[dict]:
+                  trace=None, variant: str = "unspecified") -> list[dict]:
     """The hold attempts in a clip, each as a rep-shaped observation.
 
     An attempt is a contiguous run where the body line is held at or past the
-    horizontal band. Sustains shorter than MIN_HOLD_S are not attempts.
+    horizontal band. Sustains shorter than MIN_HOLD_S are not attempts - a
+    transient horizontal posture is not a hold, and the segmenter's sustained
+    requirement is what separates the two.
+
+    `variant` is the DECLARED variant (full / tuck / straddle) or unspecified.
+    Rules written for another variant are left out of the assessment.
     """
+    from .evidence import Evidence
+    from .phases import hold_phases, phases_as_dict
+    from .rules import assess
     from .trace import NullTrace
     tr = trace or NullTrace()
     body = _holds_signal(kp)
@@ -121,10 +129,28 @@ def hold_attempts(kp: np.ndarray, fps: float, movement,
         if (j - i) / fps >= MIN_HOLD_S:
             vals = _hold_metrics(kp, i, j - 1, fps)
             track = movement.name
+            label = f"h{len(attempts) + 1}"
+            ph = hold_phases(i, j - 1, fps)
+            ev = Evidence(track=track)
+            for key, value in vals.items():
+                ev.add(key, value, phase="hold", window=(i, j - 1))
+            assessments = assess(track, ev, variant)
             attempts.append({
-                "label": f"h{len(attempts) + 1}",
+                "label": label,
                 "startS": round(i / fps, 2),
                 "endS": round(j / fps, 2),
+                "phases": phases_as_dict(ph, fps),
+                "assessments": [a.as_dict(label, fps) for a in assessments],
+                "assessmentBlocked": None,
+                "faults": [{"name": a.rule.name, "primitive": a.rule.primitive,
+                            "value": None if a.value is None else round(float(a.value), 4),
+                            "threshold": round(float(a.rule.threshold), 4),
+                            "comparison": a.rule.comparison, "unit": "",
+                            "class": "SCALED", "errorId": a.rule.id,
+                            "phase": "hold"}
+                           for a in assessments if a.fired],
+                "unmeasured": ev.unmeasured(),
+                "viewBlocked": ev.view_blocked(),
                 "metrics": [
                     {"name": "Sustain", "value": f"{vals['sustain_s']:.2f} s",
                      "class": "INVARIANT", "key": "sustain_s"},
@@ -135,7 +161,7 @@ def hold_attempts(kp: np.ndarray, fps: float, movement,
                     {"name": "Straight legs", "value": f"{vals['legs_straight_frac']:.0%}",
                      "class": "SCALED", "key": "legs_straight_frac"},
                 ],
-                "failures": classify_failures(track, vals),
+                "failures": [a.rule.name for a in assessments if a.fired],
                 "plausible": True,
                 "problems": [],
                 "score": None,
@@ -152,8 +178,30 @@ def hold_attempts(kp: np.ndarray, fps: float, movement,
 
     tr.step("hold attempts", n=len(attempts),
             attempts=[{"startS": a["startS"], "endS": a["endS"],
-                       "failures": a["failures"]} for a in attempts])
+                       "failures": a["failures"],
+                       "assessments": a["assessments"]} for a in attempts])
     return attempts
+
+
+def hold_assessments(attempts: list[dict]) -> list[list]:
+    """The Assessment objects behind each attempt's rows, rebuilt for the
+    clip-level roll-up. Attempts carry dicts (the payload shape); the summary
+    wants the objects, so the rows are re-read through the registry."""
+    from .rules import Assessment, rule_by_id
+
+    out = []
+    for att in attempts:
+        rows = []
+        for row in att.get("assessments") or []:
+            rule = rule_by_id(row.get("errorId", ""))
+            if rule is None:
+                continue
+            ev = row.get("evidence") or {}
+            rows.append(Assessment(rule, row.get("status", "unobservable"),
+                                   ev.get("value"), "",
+                                   (row.get("availability") or {}).get("detail", "")))
+        out.append(rows)
+    return out
 
 
 def clip_failures(reps: list[dict]) -> dict[str, int]:

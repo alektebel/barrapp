@@ -155,6 +155,28 @@ def control_penalty(values: dict) -> tuple[float, str]:
     )
 
 
+def stalled_fraction(signal, start: int, turn: int, rate: float = STALL_RATE) -> float:
+    """Low-progress steps inside the working travel, excluding endpoint easing.
+
+    The outer 10% of displacement belongs to leaving rest and turning around.
+    It is not an ascent stall. Interior pauses and reversals still count; the
+    denominator remains the full phase duration so the fraction is interpretable.
+    """
+    if signal is None:
+        return float("nan")
+    seg = np.asarray(signal, dtype=float)[start:turn + 1]
+    if len(seg) < 6 or not np.isfinite(seg).all():
+        return float("nan")
+    total = seg[-1] - seg[0]
+    if total <= 1e-9:
+        return float("nan")
+    steps = np.diff(seg)
+    progress = ((seg[:-1] + seg[1:]) / 2 - seg[0]) / total
+    edge = THRESHOLDS.stall_edge_fraction
+    interior = (progress > edge) & (progress < 1 - edge)
+    return float(np.mean(interior & (steps < rate * total / len(steps))))
+
+
 def smoothness_component(signal: np.ndarray, start: int, turn: int) -> tuple[float, str]:
     """How much of the ascent was spent not going anywhere.
 
@@ -192,7 +214,7 @@ def smoothness_component(signal: np.ndarray, start: int, turn: int) -> tuple[flo
 
     # Reported rather than scored: a plain stalled-frame count is what a person
     # reads, even though scoring on it is what quantised the component.
-    stalled = float(np.mean(step < STALL_RATE * mean_rate))
+    stalled = stalled_fraction(signal, start, turn)
     return evenness, (
         "paced evenly through the ascent" if evenness >= 0.95
         else (f"{stalled:.0%} of the ascent made no progress" if stalled >= 0.05

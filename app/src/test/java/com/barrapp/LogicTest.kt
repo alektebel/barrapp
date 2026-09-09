@@ -1,9 +1,14 @@
 package com.barrapp
 
 import com.barrapp.data.ActivityLevel
+import com.barrapp.data.Analysis
+import com.barrapp.data.Assessment
 import com.barrapp.data.DayEntry
+import com.barrapp.data.MeasuredFault
 import com.barrapp.data.MovementDay
 import com.barrapp.data.Profile
+import com.barrapp.data.RepRow
+import com.barrapp.data.Variant
 import com.barrapp.notify.ReviewText
 
 /**
@@ -49,8 +54,13 @@ object LogicTest {
     private fun profileRules() {
         check("first name is the first word", profile.firstName == "Diego")
         check("blank name falls back", Profile().firstName == "there")
-        check("incomplete profile is detected", !Profile("Diego", 0, ActivityLevel.Regular).complete)
-        check("age must be plausible", !Profile("Diego", 4, ActivityLevel.Regular).complete)
+        // The redesigned intake asks for a name and how often you train, and
+        // nothing else gates opening the app. Age is still on the model - the
+        // objectives chat can capture it - but a profile without one is
+        // complete, so this no longer requires it.
+        check("a nameless profile is incomplete", !Profile("", 30, ActivityLevel.Regular).complete)
+        check("an unset activity level is incomplete", !Profile("Diego", 30, ActivityLevel.Unset).complete)
+        check("age is not required", Profile("Diego", 0, ActivityLevel.Regular).complete)
         check("complete profile is complete", profile.complete)
         check("rep target rises with training", 
             Profile("A", 30, ActivityLevel.New).repTarget < Profile("A", 30, ActivityLevel.Daily).repTarget)
@@ -337,15 +347,229 @@ object LogicTest {
     }
 
     @JvmStatic
-    fun main(args: Array<String>) {
+    /**
+     * Measurement version 2: every check arrives with a three-valued verdict,
+     * and the page has to keep "checked and clean" apart from "could not be
+     * checked". These pin the wording the session page derives from it.
+     */
+    private fun assessmentRules() {
+        fun rep(vararg a: Assessment, blocked: String? = null) = RepRow(
+            session = "s", label = "muscle_up", transitionS = "", totalS = "", cls = "rep",
+            startS = 5.0, endS = 7.0, score = 70, band = "solid",
+            faults = a.filter { it.observed }.map {
+                MeasuredFault(it.name, value = it.value, threshold = it.threshold,
+                    comparison = it.comparison, unit = it.unit, errorId = it.errorId,
+                    phase = it.phase, intervalS = it.intervalS)
+            },
+            assessments = a.toList(), assessmentBlocked = blocked,
+        )
+        val bent = Assessment("muscle_up.incomplete_support_extension", "bent arms at the top",
+            "support", Assessment.OBSERVED, intervalS = listOf(5.8, 6.0),
+            value = 141.0, threshold = 160.0, comparison = "<", unit = "deg")
+        val clean = Assessment("muscle_up.chicken_wing", "one arm over first", "transition",
+            Assessment.NOT_OBSERVED, value = 0.04, threshold = 0.15, comparison = ">")
+        val blind = Assessment("muscle_up.excessive_swing", "excessive swing", "lifting",
+            Assessment.UNOBSERVABLE, reason = "unsuitable view: needs SAGITTAL")
+        val swing = Assessment("pull_up.body_swing", "momentum", "lifting",
+            Assessment.OBSERVED, value = 0.3, threshold = 0.2, comparison = ">",
+            variantDependent = true)
+
+        val checks = com.barrapp.ui.repChecks(rep(blind, clean, bent))
+        check("flagged checks come first", checks.first().name == "Bent arms at the top",
+            checks.map { it.name }.toString())
+        check("a flagged check says where and when",
+            checks.first().where == "support · 5.8–6.0s", checks.first().where)
+        check("a flagged check carries the number against the limit",
+            checks.first().detail == "141 deg, needs 160 deg", checks.first().detail)
+        check("an unobservable check has no window and says why",
+            checks.last().where.isBlank() && checks.last().detail == "needs a different camera angle",
+            checks.last().toString())
+        check("a clean check keeps its evidence",
+            checks[1].status == Assessment.NOT_OBSERVED && checks[1].detail == "0.04, limit 0.15",
+            checks[1].toString())
+        check("a variant-dependent flag says the standard was not declared",
+            com.barrapp.ui.repChecks(rep(swing)).single().name.endsWith("(variant not declared)"))
+
+        // Older payloads: no assessments, so the faults stand in and the
+        // page still lists what was flagged rather than going blank.
+        val old = rep(bent).copy(assessments = emptyList())
+        check("a v1 rep falls back to its faults",
+            com.barrapp.ui.repChecks(old).single().status == Assessment.OBSERVED)
+        check("a blocked rep is not a clean rep",
+            unmeasuredNote(rep(blocked = "implausible pose")) == "This rep was not judged — implausible pose.",
+            unmeasuredNote(rep(blocked = "implausible pose")).orEmpty())
+
+        fun analysis(v: Variant, version: Int = 2, vararg reps: RepRow) = Analysis(
+            headline = "", narrative = "", sessions = emptyList(), reps = reps.toList(),
+            blockers = emptyList(), nextSession = "", exercise = "pull_up",
+            variant = v, measurementVersion = version,
+        )
+        check("a declared standard is named",
+            com.barrapp.ui.standardLine(analysis(Variant("strict", "declared"), 2, rep(swing)))
+                == "Judged to the strict standard you declared.")
+        check("an undeclared standard is only mentioned when a check depends on it",
+            com.barrapp.ui.standardLine(analysis(Variant(), 2, rep(clean))).isBlank() &&
+                com.barrapp.ui.standardLine(analysis(Variant(), 2, rep(swing))).startsWith("No standard declared"))
+        check("a declaration the movement does not define is called out",
+            com.barrapp.ui.standardLine(analysis(Variant(declared = "tuck"), 2, rep(swing)))
+                .contains("not a standard for a pull up"))
+        check("an older run claims nothing about a standard",
+            com.barrapp.ui.standardLine(analysis(Variant("strict", "declared"), 0, rep(swing))).isBlank())
+        check("a variant-dependent cue says which standard it assumed",
+            improvementCues(analysis(Variant(), 2, rep(swing))).single()
+                .endsWith("judged strict; declare kipping if that was the plan"),
+            improvementCues(analysis(Variant(), 2, rep(swing))).toString())
+        check("a declared-strict cue is plain",
+            improvementCues(analysis(Variant("strict", "declared"), 2,
+                rep(swing.copy(variantDependent = false)))).single() == "Stop the swing — pull strict, no momentum")
+    }
+
+    /** Runs every rule set once; returns the number of failed checks. */
+
+    // ---- the redesign's derived furniture ---------------------------------
+    //
+    // Streak, XP, level and badges look like decoration but are claims about
+    // the athlete's training, and the whole point of deriving them rather than
+    // shipping the mockup's literals is that they must be right. These rules
+    // pin the arithmetic and, above all, pin the empty case: a phone that has
+    // measured nothing must show nothing.
+
+    private fun gamificationRules() {
+        val cal = { iso: String ->
+            java.util.Calendar.getInstance().apply {
+                set(iso.take(4).toInt(), iso.drop(5).take(2).toInt() - 1, iso.takeLast(2).toInt())
+            }
+        }
+        val today = cal("2026-09-08")
+
+        check("no training means no streak", Gamification.streak(emptyList(), today) == 0)
+        check("nothing measured means nothing earned",
+            Gamification.standing(emptyList()).let { it.empty && it.level == 1 && it.totalXp == 0 })
+
+        val run = listOf(
+            day("2026-09-08", 6, 70), day("2026-09-07", 5, 60), day("2026-09-06", 4, 55),
+        )
+        check("consecutive days are a streak", Gamification.streak(run, today) == 3)
+        check("a gap ends the streak",
+            Gamification.streak(run + day("2026-09-04", 5, 60), today) == 3)
+        // A streak that ended yesterday is still alive: today is not over.
+        check("yesterday still counts",
+            Gamification.streak(listOf(day("2026-09-07", 5, 60)), today) == 1)
+        check("a streak that ended two days ago is over",
+            Gamification.streak(listOf(day("2026-09-06", 5, 60)), today) == 0)
+
+        // XP: score/5 per verified rep, plus 50 a day. One day, 6 reps at 70
+        // with all six verified is 6*14 + 50 = 134.
+        val oneDay = listOf(
+            day("2026-09-08", 6, 70).copy(byMovement = mapOf(
+                "pull_up" to MovementDay("pull_up", "Pull-up", reps = 6, verified = 6,
+                    scoreSum = 420)))
+        )
+        check("XP follows verified reps and days",
+            Gamification.standing(oneDay).totalXp == 134,
+            "${Gamification.standing(oneDay).totalXp}")
+        check("a level's cost rises", Gamification.levelCost(2) > Gamification.levelCost(1))
+        check("XP inside a level never exceeds its cost",
+            Gamification.standing(oneDay).let { it.xp < it.maxXp })
+
+        val week = Gamification.week(run, today)
+        check("the week is Monday to Sunday", week.size == 7 && week.first().label == "L")
+        check("exactly one day is today", week.count { it.today } == 1)
+        // 8 September 2026 is a Tuesday, so the Monday-to-Sunday week holds the
+        // 7th and the 8th; the 6th is the previous Sunday and stays out of it.
+        check("only this week's measured days are marked done",
+            week.count { it.done } == 2, "${week.count { it.done }}")
+        check("the week strip does not reach into last week",
+            week.none { it.date == "2026-09-06" })
+
+        val badges = Gamification.badges(emptyList(), null)
+        check("no training unlocks no badge", badges.none { it.unlocked })
+        check("the badge row is four wide", badges.size == 4)
+
+        // The mission never asks for more than the standard, and never claims
+        // reps that were not measured today.
+        val mission = Gamification.mission(run, Profile("A", 30, ActivityLevel.Regular),
+            "pull_up", "codos dentro", today)
+        check("the mission counts only today", mission.doneReps == 6)
+        check("the mission has a target", mission.targetReps > 0)
+        check("mission progress is bounded", mission.fraction in 0f..1f)
+    }
+
+    private fun faultTrendRules() {
+        val today = java.util.Calendar.getInstance().apply {
+            set(2026, 8, 8) // 8 September 2026
+        }
+        val ledger = mapOf(
+            // this window
+            "2026-09-01" to mapOf("momentum" to 3, "lockout" to 1),
+            "2026-08-20" to mapOf("momentum" to 2),
+            // the window before
+            "2026-08-01" to mapOf("momentum" to 9),
+        )
+        val rows = FaultTrend.rows(ledger, windowDays = 28, today = today)
+        val momentum = rows.first { it.fault == "momentum" }
+        check("the recent window is summed", momentum.count == 5, "${momentum.count}")
+        check("the previous window is the comparison", momentum.previous == 9)
+        check("a falling count is improvement", momentum.improving && momentum.delta == -4)
+        check("improvement is a percentage of the previous window",
+            momentum.improvementPct == 44, "${momentum.improvementPct}")
+        check("worst first", rows.first().fault == "momentum")
+        val lockout = rows.first { it.fault == "lockout" }
+        check("no previous window means no percentage", lockout.improvementPct == null)
+        check("an empty ledger has no rows", FaultTrend.rows(emptyMap()).isEmpty())
+    }
+
+    private fun spanishCueRules() {
+        // Every fault the cue table can name must have a Spanish name, or the
+        // redesigned screens fall back to a raw measurement key in front of a
+        // Spanish-speaking athlete.
+        val named = listOf(
+            "momentum", "lockout", "dead hang", "control", "stall", "poor transition",
+            "bent arms", "no active hang", "too fast", "too deep", "bounce at bottom",
+            "poor range of motion", "sagging hips", "uncontrolled descent", "knee valgus",
+            "heel raise", "leaning back", "arm swing", "piked hips", "piked body",
+            "bent knees", "poor scapular retraction", "poor scapular protraction",
+        )
+        check("every measured fault has a Spanish name",
+            named.all { faultEs(it) != it.replaceFirstChar { c -> c.uppercase() } },
+            named.filter { faultEs(it) == it.replaceFirstChar { c -> c.uppercase() } }.toString())
+        check("every measured fault has a Spanish cue",
+            named.all { cueEs(it) != null },
+            named.filter { cueEs(it) == null }.toString())
+        check("an unknown fault falls back to its own name rather than vanishing",
+            faultEs("something new") == "Something new")
+        check("ladder movements are named in Spanish",
+            Progression.LADDER.keys.all { movementEs(it) != it })
+    }
+
+    fun runAll(): Int {
+        failures = 0
+        checks = 0
         profileRules()
         coachRules()
         reviewRules()
         traceRules()
         weeklyReportRules()
         progressionRules()
+        assessmentRules()
+        gamificationRules()
+        faultTrendRules()
+        spanishCueRules()
         println(if (failures == 0) "OK  $checks checks passed"
                 else "FAILED  $failures of $checks checks")
-        if (failures > 0) kotlin.system.exitProcess(1)
+        return failures
+    }
+
+    @JvmStatic
+    fun main(args: Array<String>) {
+        if (runAll() > 0) kotlin.system.exitProcess(1)
+    }
+}
+
+/** The same checks under Gradle's `testDebugUnitTest`, so they run in CI too. */
+class LogicTestSuite {
+    @org.junit.Test
+    fun everyRuleHolds() {
+        org.junit.Assert.assertEquals("logic checks failed (see stdout)", 0, LogicTest.runAll())
     }
 }

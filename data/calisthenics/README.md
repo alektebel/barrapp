@@ -15,8 +15,11 @@ Open-licensed clips across the movements barra can verify plus the barbell
 | back_lever | 6 | human_flag | 6 |
 | bench_press | 4 | deadlift | 10 |
 | barbell_squat | 8 | | |
+| bulgarian_split_squat | 1 | split_squat | 1 |
 
-115 clips total (only short, ≤180s clips are kept; each is normalised to 720p).
+168 clips total (only short, ≤180s clips are kept; each is normalised to 720p).
+The split-squat family was added so the first exercise-type model
+(`docs/MODEL.md`) has labelled clips for the movimientos the app now offers.
 
 ## How much is available (measurement, 2026-09-07)
 

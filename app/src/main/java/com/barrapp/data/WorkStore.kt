@@ -35,6 +35,11 @@ data class Work(
     val partSize: Long = 0,     // bytes per part, fixed at start
     val uploadedParts: List<PartMark> = emptyList(),
     val log: List<WorkStore.Entry> = emptyList(),
+    /** What the athlete DECLARED about the set before picking the clip: the
+     *  technique standard (strict / kipping / ...) and the camera side. Sent
+     *  with the job, blank when not declared; the server never infers them. */
+    val variant: String = "",
+    val view: String = "",
 ) {
     val active: Boolean
         get() = status in setOf(
@@ -98,6 +103,8 @@ object WorkStore {
                 clipPath = o.optString("clipPath"),
                 uploadId = o.optString("uploadId"),
                 partSize = o.optLong("partSize"),
+                variant = o.optString("variant"),
+                view = o.optString("view"),
                 uploadedParts = (o.optJSONArray("uploadedParts") ?: JSONArray())
                     .let { arr ->
                         (0 until arr.length()).mapNotNull { j ->
@@ -137,6 +144,7 @@ object WorkStore {
                 .put("error", w.error.orEmpty()).put("traceId", w.traceId)
                 .put("clipPath", w.clipPath)
                 .put("uploadId", w.uploadId).put("partSize", w.partSize)
+                .put("variant", w.variant).put("view", w.view)
                 .put("uploadedParts", parts).put("log", log))
         }
         file(context).writeText(arr.toString())

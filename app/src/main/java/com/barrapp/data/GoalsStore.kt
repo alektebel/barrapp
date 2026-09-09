@@ -11,12 +11,14 @@ object GoalsStore {
     private const val PREFS = "barrapp_goals"
     private const val GOAL = "goal"
     private const val FOCUS = "focus_exercise"
+    private const val LOAD_KG = "load_kg"
 
     fun load(context: Context): Goals {
         val p = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         return Goals(
             goal = p.getString(GOAL, "").orEmpty(),
             focusExercise = p.getString(FOCUS, "").orEmpty(),
+            loadKg = p.getString(LOAD_KG, null)?.toDoubleOrNull() ?: 0.0,
         )
     }
 
@@ -24,6 +26,7 @@ object GoalsStore {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit {
             putString(GOAL, goals.goal)
             putString(FOCUS, goals.focusExercise)
+            putString(LOAD_KG, goals.loadKg.toString())
         }
     }
 }

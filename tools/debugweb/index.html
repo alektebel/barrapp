@@ -1,52 +1,110 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>barra · pipeline debug</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>barra · pipeline debugger</title>
+<link rel="stylesheet" href="organic.css">
 <link rel="stylesheet" href="app.css">
+</head>
+<body>
 
-<div id="top">
-  <select id="clip" title="clips in ., data/videos and server/data"></select>
-  <select id="exercise" title="force a movement instead of detecting one">
-    <option value="auto">auto</option>
-    <option>muscle_up</option><option>pull_up</option><option>dip</option>
-    <option>push_up</option><option>squat</option><option>pistol_squat</option>
-    <option>knee_raise</option><option>front_lever</option><option>planche</option>
-  </select>
-  <select id="backend" title="pose backend"></select>
-  <label><input type="checkbox" id="fresh"> fresh</label>
-  <button id="run" class="primary">▶ Run</button>
-  <span id="status">idle</span>
-  <span class="sp"></span>
-  <select id="trace" title="traces on disk, newest first"></select>
-  <button id="diff" title="diff this trace against the one before it">⇄ diff</button>
-</div>
-
-<div id="main">
-  <div id="rail"></div>
-
-  <div id="centre">
-    <div class="card">
-      <h3 id="clip-title">clip</h3>
-      <div id="stage-wrap">
-        <video id="video" controls preload="metadata"></video>
-        <canvas id="overlay"></canvas>
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#f5ead8"
+             stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 6h16M4 12h16M4 18h10"></path>
+        </svg>
       </div>
-      <canvas id="chart"></canvas>
-      <div id="legend">
-        <span style="color:var(--accent)">tracking signal</span>
-        <span style="color:var(--ok)">accepted rep</span>
-        <span style="color:var(--warn)">rejected candidate</span>
-        <span style="color:#8a6bd1">apex p97 / rest p15</span>
-        <span style="color:var(--faint)">turnaround gate</span>
-      </div>
+      <a href="/" class="btn btn-secondary">← All videos</a>
+      <div class="brand-name">The Reel Room</div>
+      <div class="brand-sub">barrapp pipeline</div>
+      <div class="sp"></div>
+      <a href="/guide" class="btn btn-ghost" title="How to debug this pipeline">How to debug</a>
+      <a href="/models" class="btn btn-ghost" title="Every constant the prediction path reads">Model card</a>
     </div>
 
-    <div class="card">
-      <h3 id="entries-title">evidence</h3>
-      <div class="body" id="entries"></div>
+    <div class="controls">
+      <select id="clip" class="input" title="every video in the library, one entry each"></select>
+      <select id="exercise" class="input" title="force a movement instead of detecting one">
+        <option value="auto">auto</option>
+        <option>muscle_up</option><option>pull_up</option><option>dip</option>
+        <option>push_up</option><option>squat</option><option>pistol_squat</option>
+        <option>knee_raise</option><option>front_lever</option><option>planche</option>
+      </select>
+      <select id="backend" class="input" title="Pose backend used when Fresh is selected or there is no cache"></select>
+      <label class="checkbox"><input type="checkbox" id="fresh"> Fresh pose (slow)</label>
+      <button id="run" class="btn btn-primary">▶ Run</button>
+      <button id="cancel" class="btn btn-secondary" disabled>Stop run</button>
+      <label class="btn btn-secondary" title="content already in the library is not added twice">Add video<input id="upload" type="file" accept="video/*" hidden></label>
+      <span id="status" class="status" role="status" aria-live="polite">idle</span>
+    </div>
+
+    <div class="controls second">
+      <select id="trace" class="input" title="traces on disk, newest first"></select>
+      <select id="baseline" class="input" aria-label="Compare against run"></select>
+      <button id="export" class="btn btn-secondary">Export debug bundle</button>
+      <button id="diff" class="btn btn-secondary" title="compare this trace against a run of the same clip">Compare runs</button>
     </div>
   </div>
 
-  <div id="right"></div>
-</div>
+  <div id="main">
+    <div id="rail"></div>
+
+    <div id="centre">
+      <div class="panel head">
+        <div class="clip-head">
+          <div class="kicker" id="clip-kicker">a trace</div>
+          <h2 id="clip-name">clip</h2>
+          <div class="chips" id="clip-chips"></div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="kicker">video · the skeleton the pipeline measured</div>
+        <div class="inset">
+          <div id="stage-wrap">
+            <video id="video" controls preload="metadata"></video>
+            <canvas id="overlay"></canvas>
+          </div>
+          <div class="controls playback">
+            <button id="previous-frame" class="btn btn-secondary" title="Left arrow">− frame</button>
+            <button id="next-frame" class="btn btn-secondary" title="Right arrow">+ frame</button>
+            <label>Speed <select id="speed" aria-label="Playback speed"><option>0.25</option><option>0.5</option><option selected>1</option><option>2</option></select>×</label>
+            <label><input id="skeleton" type="checkbox" checked> Skeleton</label>
+            <label><input id="loop" type="checkbox"> Loop selection</label>
+            <output id="playhead">0.00s</output>
+          </div>
+          <p id="media-status" class="hint" role="status"></p>
+          <div id="rep-nav" class="controls" aria-label="Repetition navigation"></div>
+          <canvas id="chart" title="the tracking signal, and the lines it had to clear"></canvas>
+          <div id="legend">
+            <span class="lg lg-ok">tracking signal</span>
+            <span class="lg lg-accepted">accepted rep</span>
+            <span class="lg lg-reject">rejected candidate</span>
+            <span class="lg lg-apex">apex p97 / rest p15</span>
+            <span class="lg">signal preview is downsampled · exact windows are in the evidence</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="kicker">Your review · saved in this browser</div>
+        <label for="review">Record a missed rep, wrong movement or incorrect warning. Include timestamps.</label>
+        <textarea id="review" rows="3" placeholder="At 22.6–25.2s the athlete is walking, not performing a rep."></textarea>
+        <span id="review-status" class="hint" role="status"></span>
+      </div>
+      <details class="panel"><summary>Run log</summary><pre id="run-log">No run started in this session.</pre></details>
+      <div class="panel evidence">
+        <div class="kicker" id="entries-title">evidence</div>
+        <div class="inset" id="entries"></div>
+      </div>
+    </div>
+
+    <div id="right"></div>
+  </div>
 
 <script src="app.js"></script>
+</body>
+</html>

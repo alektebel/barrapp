@@ -49,8 +49,8 @@ def test_nan_is_unmeasured_not_zero():
 
 def test_bent_arms_can_actually_fire_now():
     """It could not before: the key was defaulted to 1.0 and never produced."""
-    clean = Evidence.from_values({"arms_straight_frac": 0.9}, track="muscle_up")
-    bent = Evidence.from_values({"arms_straight_frac": 0.2}, track="muscle_up")
+    clean = Evidence.from_values({"top_elbow_deg": 175}, track="muscle_up")
+    bent = Evidence.from_values({"top_elbow_deg": 120}, track="muscle_up")
     assert "bent arms" not in classify_failures("muscle_up", clean)
     assert "bent arms" in classify_failures("muscle_up", bent)
 

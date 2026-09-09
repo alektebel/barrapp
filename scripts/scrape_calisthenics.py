@@ -111,6 +111,27 @@ TRICKS: dict[str, dict] = {
         "yt": ["barbell back squat", "barbell squat form"],
         "commons": ["barbell squat filetype:video"],
     },
+    "split_squat": {
+        "yt": ["split squat form", "static lunge split squat"],
+        "commons": ["split squat exercise filetype:video", "lunges filetype:video"],
+    },
+    "bulgarian_split_squat": {
+        "yt": ["bulgarian split squat", "bulgarian split squat form"],
+        "commons": ["bulgarian split squat filetype:video",
+                    "rear foot elevated split squat filetype:video"],
+    },
+    "weighted_pull_up": {
+        "yt": ["weighted pull up form", "weighted pull up"],
+        "commons": ["weighted pull up filetype:video", "weighted pull-up filetype:video"],
+    },
+    "weighted_dip": {
+        "yt": ["weighted dip form", "weighted dips"],
+        "commons": ["weighted dip filetype:video"],
+    },
+    "weighted_squat": {
+        "yt": ["weighted bulgarian split squat", "weighted split squat"],
+        "commons": ["weighted squat filetype:video"],
+    },
 }
 
 VIDEO_EXTS = (".mp4", ".webm", ".ogv", ".ogg", ".mov", ".mkv")
@@ -150,6 +171,11 @@ TRICK_KEYWORDS: dict[str, list[str]] = {
     "bench_press": ["bench press", "bench-press"],
     "deadlift": ["deadlift"],
     "barbell_squat": ["back squat", "barbell squat"],
+    "split_squat": ["split squat"],
+    "bulgarian_split_squat": ["bulgarian split squat", "b\u00falgar"],
+    "weighted_pull_up": ["weighted pull up", "weighted pull-up"],
+    "weighted_dip": ["weighted dip"],
+    "weighted_squat": ["weighted split squat"],
 }
 
 
@@ -178,6 +204,11 @@ CHANNEL_KEYWORDS: dict[str, list[str]] = {
     "bench_press": ["bench press"],
     "deadlift": ["deadlift", "sumo deadlift"],
     "barbell_squat": ["back squat", "barbell squat"],
+    "split_squat": ["split squat"],
+    "bulgarian_split_squat": ["bulgarian split squat", "b\u00falgar"],
+    "weighted_pull_up": ["weighted pull up", "weighted pull-up"],
+    "weighted_dip": ["weighted dip"],
+    "weighted_squat": ["weighted split squat"],
 }
 
 

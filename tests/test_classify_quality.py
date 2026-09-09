@@ -122,6 +122,16 @@ def squat_clip(n_reps=3, fpr=60, seed=0):
 
 
 class TestClassifier(unittest.TestCase):
+    def test_pistol_uses_visible_ankles_with_image_y_sign(self):
+        kp = squat_clip()
+        # Left foot is carried at hip level; right foot remains on the floor.
+        kp[:, S.KP_INDEX["left_ankle"], 1] = kp[:, S.KP_INDEX["left_hip"], 1]
+        self.assertEqual(classify(kp).exercise, "pistol_squat")
+        hidden = kp.copy()
+        hidden[:, S.KP_INDEX["left_ankle"], 2] = 0
+        self.assertFalse(features(hidden)["single_leg_stance"],
+                         "an unseen foot cannot establish single-leg support")
+
     def test_muscle_up_when_the_shoulders_clear_the_bar(self):
         c = classify(bar_clip(clearance=0.5))
         self.assertEqual(c.exercise, "muscle_up")

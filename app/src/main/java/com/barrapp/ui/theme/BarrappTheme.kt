@@ -18,42 +18,47 @@ import androidx.compose.ui.unit.sp
 import com.barrapp.R
 
 /**
- * Nocturne, ported literally from the browser prototype.
+ * The legacy screens' token set, repointed at the Calisthenics Progress
+ * Tracker palette.
  *
- * Every colour, size, line-height, letter-spacing and dash pattern here is a
- * value from the design, already resolved. Nothing is rounded, harmonised or
- * reinterpreted; odd values (9dp gaps, 2.6 strokes, 46x42 buttons) are the
- * design's own and stay.
+ * These names came from the earlier Nocturne prototype and are still read by
+ * the screens that survived the redesign as sub-pages — the session detail,
+ * the calendar, the ladder, the coach chat. Rather than restyle each of them
+ * by hand, every token here now resolves to its counterpart in [Tk], so a
+ * sub-page opened from the new shell sits on the same ground, in the same
+ * accent, with the same band colours as the page that opened it.
  *
- * The one declared platform gap: the nav bar's `backdrop-filter: blur(12px)`
- * has no portable Compose equivalent, so the bar renders as a solid
- * #232532 at 0.92 alpha instead of a true backdrop blur.
+ * The names are deliberately unchanged: renaming them would touch a thousand
+ * call sites to say the same thing.
+ *
+ * Declared platform gap, inherited: the nav bar's `backdrop-filter: blur` has
+ * no portable Compose equivalent and renders as a solid fill.
  */
 object Nocturne {
-    val background = Color(0xFF161826)
-    val surface = Color(0xFF232532)
-    val dim = Color(0xFF292B31)
-    val hairline = Color(0xFF3F424D)
-    val accent = Color(0xFF9184D9)
-    val accentDeep = Color(0xFF5D5294)
-    val accentText = Color(0xFFD2CEFD)
-    val fg = Color(0xFFE9E9ED)
+    val background = Tk.bg
+    val surface = Tk.surface
+    val dim = Tk.card
+    val hairline = Tk.border
+    val accent = Tk.primary
+    val accentDeep = Color(0xFF5B45C9)      // the accent, one step down
+    val accentText = Tk.primaryLight
+    val fg = Tk.ink
 
     // measurement encoding — how the rep went; never the accent
-    val strong = Color(0xFF62C097)
-    val solid = Color(0xFF74B4DE)
-    val shaky = Color(0xFFD4A257)
-    val nothing = Color(0xFF595D6C)
+    val strong = Tk.teal
+    val solid = Tk.primary
+    val shaky = Tk.amber
+    val nothing = Tk.muted
 
-    val deep = Color(0xFF423A6A)          // earned chip / user bubble ground
-    val onDeep = Color(0xFFF5F4FF)
-    val muted = Color(0xFF9397AB)         // unmeasured chip text
+    val deep = Tk.card                      // earned chip / user bubble ground
+    val onDeep = Tk.ink
+    val muted = Tk.muted                    // unmeasured chip text
 
-    // rgba(233,233,237, a) — kept as alpha multiplications, never pre-baked
+    // rgba(240,238,255, a) — kept as alpha multiplications, never pre-baked
     fun fgA(alpha: Float) = fg.copy(alpha = alpha)
 
-    val navFill = surface.copy(alpha = 0.92f)   // the declared backdrop-gap stand-in
-    val dropShadow = Color(0, 0, 0, 140)        // 0 10px 30px rgba(0,0,0,.55)
+    val navFill = surface.copy(alpha = 0.92f)
+    val dropShadow = Color(0, 0, 0, 140)
 }
 
 /** Inter, weights 400/500/600, bundled — never a substitution. */
@@ -176,7 +181,7 @@ fun BarrappTheme(content: @Composable () -> Unit) {
             surfaceVariant = Nocturne.surface,
             onSurfaceVariant = Nocturne.fgA(0.6f),
             outline = Nocturne.hairline,
-            error = Nocturne.shaky,
+            error = Tk.rose,
         ),
         typography = BarrappTypography,
     ) { content() }

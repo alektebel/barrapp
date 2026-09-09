@@ -27,6 +27,10 @@ data class Analysis(
     val nextSession: String,
     val exercise: String = "",
     val detected: Detected? = null,
+    /** The first learned model's verdict and load estimate, shipped beside the
+     *  geometric [detected] as a second opinion - never a replacement. Null
+     *  when the server had no trained model (or it had no classes). */
+    val model: ModelVerdict? = null,
     /** The stretch of the clip that is actually the exercise, in seconds. */
     val trim: Trim? = null,
     val sessionDate: String = "",
@@ -42,6 +46,20 @@ data class Analysis(
     /** What produced these numbers. A score that moved because the build moved
      *  is not a score that moved because the athlete did. */
     val provenance: Provenance? = null,
+    /** The declared variant the checks were applied under. */
+    val variant: Variant = Variant(),
+    /** Version of the measurement semantics (phases, thresholds, rule ids).
+     *  0 for payloads that predate the structured assessment. Results with
+     *  different versions are not comparable rep for rep. */
+    val measurementVersion: Int = 0,
+    /** Per check, how many reps observed it, were checked clean, or could
+     *  not be checked. The whole-clip view of the assessments. */
+    val checks: List<CheckSummary> = emptyList(),
+    /** Validated observations from the optional vision pass. Advisory. */
+    val visionObservations: List<VisionObservation> = emptyList(),
+    /** True when the vision model saw a different movement than the
+     *  geometry labelled - flagged for review, never applied. */
+    val visionDisagreesOnMovement: Boolean = false,
 )
 
 data class Provenance(
@@ -56,19 +74,63 @@ data class Provenance(
             .filter { it.isNotBlank() }.joinToString(" · ")
 }
 
+/**
+ * What the server decided this clip shows, and how clear the call was.
+ *
+ * `confidence` is NOT a probability. The server computes it as how far the
+ * measurement that decided the label sits past the threshold it was compared
+ * against, bounded - which is why it ships `certainty` naming the kind. This
+ * screen used to render it as "82% confident", a claim the pipeline never
+ * made and cannot make: it holds no model of how often it is right.
+ */
 data class Detected(
     val exercise: String,
     val label: String,
     val confidence: Double,
     val reason: String,
     val runnerUp: String? = null,
+    val certainty: String = MARGIN_TO_THRESHOLD,
 ) {
-    val certain: Boolean get() = confidence >= 0.65
+    /** The deciding measurement is clear of its threshold. Not "probably right". */
+    val certain: Boolean get() = confidence >= CLEAR_MARGIN
+
+    /** How to say the number without claiming more than was measured. */
+    val certaintyLabel: String
+        get() = if (certainty == MARGIN_TO_THRESHOLD)
+            "${(confidence * 100).toInt()}% clear of the boundary"
+        else "${(confidence * 100).toInt()}% confident"
+
+    companion object {
+        const val MARGIN_TO_THRESHOLD = "margin-to-threshold"
+        const val CLEAR_MARGIN = 0.65
+    }
 }
 
 data class Trim(val startS: Double, val endS: Double) {
     val lengthS: Double get() = (endS - startS).coerceAtLeast(0.0)
 }
+
+/** The first learned model's verdict on a clip, besides the geometric one. */
+data class ModelVerdict(
+    val classification: ModelClassification? = null,
+    val load: LoadEstimate? = null,
+)
+
+data class ModelClassification(
+    val exercise: String,
+    val confidence: Double,
+    val runnerUp: String? = null,
+    val marginToRunnerUp: Double = 0.0,
+    val probabilities: Map<String, Double> = emptyMap(),
+    val modelVersion: String = "",
+)
+
+/** What the athlete was carrying, and how that estimate should be read. */
+data class LoadEstimate(
+    val kg: Double = 0.0,
+    val estimated: Boolean = false,
+    val note: String = "",
+)
 
 data class SessionRow(
     val date: String,
@@ -115,6 +177,13 @@ data class MeasuredFault(
     val comparison: String = "",
     val unit: String = "",
     val cls: String = "",
+    /** Stable, movement-scoped id ("muscle_up.incomplete_lockout"). Empty on
+     *  payloads older than measurement version 2. */
+    val errorId: String = "",
+    /** The phase the primitive was read in (setup, lifting, support...). */
+    val phase: String = "",
+    /** [start, end] seconds in the source video of that phase window. */
+    val intervalS: List<Double> = emptyList(),
 ) {
     /** "76% of reach, needs 85" - the number, never re-derived here. */
     fun evidence(): String {
@@ -170,6 +239,108 @@ data class RepRow(
     /** Measurements the camera angle cannot support - knee valgus needs a
      *  frontal view, a sagging hip line a side-on one. */
     val viewBlocked: List<String> = emptyList(),
+    /**
+     * Every check the movement defines, with its verdict: observed,
+     * not_observed or unobservable (and why). `faults` is the observed
+     * subset; this is the population it was drawn from, so an empty fault
+     * list can be told apart from a rep nothing could be checked on.
+     * Empty on payloads older than measurement version 2.
+     */
+    val assessments: List<Assessment> = emptyList(),
+    /** Phase name -> [start, end] seconds in the source video. */
+    val phases: Map<String, List<Double>> = emptyMap(),
+    /** Non-null when the whole rep was withheld from assessment - an
+     *  implausible pose, too little tracking - with the reason. */
+    val assessmentBlocked: String? = null,
+) {
+    val checked: Int get() = assessments.count { it.status != Assessment.UNOBSERVABLE }
+    val unobservable: List<Assessment> get() = assessments.filter { it.status == Assessment.UNOBSERVABLE }
+}
+
+/**
+ * One rule applied to one rep: the verdict and the evidence behind it.
+ *
+ * `status` is three-valued on purpose. `not_observed` is a check that was
+ * made and came back clean; `unobservable` is a check that could not be made
+ * - the camera angle, too little of the phase tracked, a joint never seen -
+ * and must never be rendered as a pass.
+ */
+data class Assessment(
+    val errorId: String,
+    val name: String,
+    val phase: String,
+    val status: String,
+    val intervalS: List<Double> = emptyList(),
+    val value: Double? = null,
+    val threshold: Double = 0.0,
+    val comparison: String = "",
+    val unit: String = "",
+    /** Why it could not be checked, when `status` is unobservable. */
+    val reason: String = "",
+    val reasonDetail: String = "",
+    /** The verdict depends on a variant (strict / kipping) nobody declared. */
+    val variantDependent: Boolean = false,
+    /** "geometry" for the measured pipeline; "vision-advisory" rows never
+     *  arrive here - they live in Analysis.visionObservations. */
+    val source: String = SOURCE_GEOMETRY,
+) {
+    val observed: Boolean get() = status == OBSERVED
+
+    /** Plain words for the availability reason. */
+    fun reasonLabel(): String = when {
+        reason.startsWith("unsuitable view") -> "needs a different camera angle"
+        reason.startsWith("insufficient temporal evidence") -> "too little of this phase was tracked"
+        reason.startsWith("unsupported variant") -> "depends on the variant"
+        reason.startsWith("not applicable") -> "not defined for this movement"
+        reason.startsWith("tracking loss") -> "the joints it needs were lost by the tracker"
+        reason.startsWith("missing primitive") -> "no measurement of this in the clip"
+        reason.isNotBlank() -> "not tracked"
+        else -> ""
+    }
+
+    companion object {
+        const val OBSERVED = "observed"
+        const val NOT_OBSERVED = "not_observed"
+        const val UNOBSERVABLE = "unobservable"
+        const val SOURCE_GEOMETRY = "geometry"
+    }
+}
+
+/**
+ * What the vision model said it saw, validated server-side against the
+ * request it was sent. Advisory: it is shown beside the measured rows and
+ * never counted as a fault.
+ */
+data class VisionObservation(
+    val rep: String,
+    val errorId: String,
+    val name: String,
+    val phase: String,
+    val status: String,
+    val description: String,
+    val frames: List<String> = emptyList(),
+)
+
+/** The declared technique variant, or unspecified. Never inferred. */
+data class Variant(
+    val name: String = UNSPECIFIED,
+    val source: String = "none",
+    /** A declaration the server did not recognise, kept so the user can see
+     *  their word was not applied. */
+    val declared: String? = null,
+) {
+    val isSpecified: Boolean get() = name != UNSPECIFIED
+    companion object { const val UNSPECIFIED = "unspecified" }
+}
+
+/** Clip-level roll-up of one check across the reps. */
+data class CheckSummary(
+    val errorId: String,
+    val name: String,
+    val phase: String,
+    val observed: Int,
+    val notObserved: Int,
+    val unobservable: Int,
 )
 
 /**
@@ -252,6 +423,9 @@ data class Goals(
     val activity: String = "",
     val goal: String = "",
     val focusExercise: String = "",
+    /** Added load (kg) the athlete trains with, when they capture it. The
+     *  model's load estimate is a stocktake, never an override of this. */
+    val loadKg: Double = 0.0,
 ) {
     fun merge(other: Goals): Goals = Goals(
         name = other.name.ifBlank { name },
@@ -259,5 +433,6 @@ data class Goals(
         activity = other.activity.ifBlank { activity },
         goal = other.goal.ifBlank { goal },
         focusExercise = other.focusExercise.ifBlank { focusExercise },
+        loadKg = if (other.loadKg > 0.0) other.loadKg else loadKg,
     )
 }

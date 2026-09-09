@@ -49,6 +49,46 @@ uv pip install -e ".[mediapipe]"
 python -m unittest discover -s tests      # 137 invariant tests
 ```
 
+## Batch-evaluating the pipeline against a vision model
+
+`scripts/pipeline_eval.py` runs every scraped clip through the measurement
+pipeline, keeps each clip's intermediate state and the program/model that
+produced it (`barra-pipeline-eval` in DynamoDB, traces in `TRACES_TABLE`,
+payloads/traces/stills on disk under `out/pipeline-eval/`), and asks a
+nan.builders multimodal model what it *sees* — an independent label from the
+pixels, to check the geometry against. It is how "how many does it get wrong"
+is answered with evidence, not a guess:
+
+```bash
+BARRA_POSE_BACKEND=ultralytics python scripts/pipeline_eval.py \
+    --tricks squat,push_up,dip --per-trick 3
+```
+
+Results and the improvements it drove (squat/dip abstention, model retrained on
+the corpus) are in [`docs/PIPELINE-EVAL.md`](docs/PIPELINE-EVAL.md).
+
+## The exercise catalogue, and the first learned model
+
+The app's exercise catalogue (`data/exercises/catalog.json`, loaded by
+`barra/exercises.py`) names the gym's common movements and, for each, the five
+mistakes a coach corrects most. The split it keeps is the one the whole tool is
+built on: a `measurable` row names a real `ruleId` barra reports from footage;
+a `catalog-only` row (rows, curls, machines) is teaching content, honestly
+marked, never reported as a measurement. `sentadilla búlgara`
+(`bulgarian_split_squat`) and `split_squat` are measurable.
+
+Alongside the geometric classifier there is now a first **learned** model
+(`barra/model.py`, documented in [`docs/MODEL.md`](docs/MODEL.md)) that
+classifies the exercise type and estimates added load from the same clip
+features. It is a second opinion, never a replacement: the server ships both,
+and the model's load estimate says "baseline" when it has no labelled data
+(barra cannot see weight in a 2D pose; the athlete captures it).
+
+```bash
+python scripts/train_model.py --no-live           # retrain on cached keypoints
+python scripts/train_model.py                     # retrain, posing new clips
+```
+
 ## Does it recognise the right movement?
 
 Seven of the eight sample clips, checked by watching each one and comparing
@@ -77,6 +117,30 @@ barra validate-quality              # the verdict on the clips you have
 Currently it fails, for reasons worth reading before trusting any score:
 [`docs/QUALITY.md`](docs/QUALITY.md).
 
+## What it says about technique, and what it refuses to say
+
+Every technique error is a rule in `barra/rules.py` with a stable id
+(`muscle_up.incomplete_support_extension`), the phase it is read in, the
+primitive and the threshold. For each rep the payload carries every rule's
+verdict — `observed`, `not_observed`, or `unobservable` with the reason (camera
+angle, too little of the phase tracked, a joint never seen) — so an empty fault
+list can be told apart from a rep nothing could be checked on. The phone
+renders that distinction rather than "clean".
+
+Payloads carry `measurementVersion` (currently 2). The phase semantics and the
+stall rule changed between 1 and 2, so a score from an older payload is not
+comparable rep for rep with a new one; `provenance.measurement` names the
+conventions in force. The evaluation runner replays the sample clips and diffs
+them against the saved baseline:
+
+```bash
+python scripts/evaluate_technique_pipeline.py --mode cached   # fixed keypoints
+python scripts/evaluate_technique_pipeline.py --mode fresh VID-....mp4   # real pose
+```
+
+Plan, results and what is still open:
+[`docs/TECHNIQUE-PIPELINE-IMPLEMENTATION-PLAN.md`](docs/TECHNIQUE-PIPELINE-IMPLEMENTATION-PLAN.md).
+
 ## When a number looks wrong
 
 Every stage records what it measured, what it required, and where in the clip
@@ -91,3 +155,16 @@ The trace id shown in the app's Diagnostics screen is the same id the server
 logged and the same one on disk, so you are never guessing which run you are
 looking at. How the chain fits together, and the two real defects it has
 already caught: [`docs/DEBUGGING.md`](docs/DEBUGGING.md).
+
+To see it on the video instead of in ASCII — skeleton over the pixels, the
+signal, and every rejection at the second it happened — open the browser
+debugger:
+
+```bash
+python tools/debugweb/server.py      # -> http://127.0.0.1:8091
+```
+
+It reads only traces the pipeline wrote, so anything it shows is the pipeline's
+own answer, not the tool's. Its guide, and the local/AWS end-to-end checks that
+prove the whole `upload → measure → JSON` path:
+[`tools/debugweb/README.md`](tools/debugweb/README.md).

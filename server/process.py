@@ -16,6 +16,8 @@ from barra.evidence import declared_view, estimate_view, rep_evidence
 from barra.faults_taxonomy import classify_faults
 from barra.holds import clip_failures, hold_attempts
 from barra.recommend import recommend_for_payload
+from barra.rules import (ASSESSMENT_VERSION, OBSERVED, assess,
+                         normalise_variant, summarise)
 
 from barra.frames import technique_artifacts
 from barra.tracestore import put_trace
@@ -72,12 +74,13 @@ def _num(value) -> str:
     return f"{x:.2f}"
 
 
-def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
+def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
     """Measure one clip and return the payload the phone renders.
 
     `on_stage`, when given, receives a short human phrase at each step that
-    can take time, for the phone's work list."""
-    """Measure one clip and return the payload the phone renders.
+    can take time, for the phone's work list. `pose`, when given, is supplied to
+    `analyze_clip` unchanged; the debugging tool uses it to reuse the keypoint
+    cache while still running the production post-analysis path.
 
     `exercise` may be omitted or "auto": the clip is then classified from its
     own geometry rather than from what the athlete remembered to tap.
@@ -108,7 +111,9 @@ def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     metrics = analyze_clip(video_path, requested, session=job.get("session"),
                            trace=trace, on_stage=_stage,
                            visual_count=_visual_count,
-                           declared_bin=job.get("view"))
+                           declared_bin=job.get("view"),
+                           variant=job.get("variant"),
+                           pose=pose)
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -131,11 +136,27 @@ def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     artifacts = technique_artifacts(video_path, report, artifacts_root,
                                     str(report.get("traceId") or job.get("id") or "job"))
     if trace is not None and (artifacts.clip or artifacts.stills):
+        # The selected timestamps, reps and phases, so the request the model
+        # saw can be rebuilt from the trace.
         trace.step("technique artifacts", **artifacts.as_trace_data())
-    note = technique_note(artifacts)
+    # The vision model is handed the measured report - movement, variant,
+    # boundaries, per-rep checks and what could not be checked - not just the
+    # pictures. Its observations come back validated against that report and
+    # are kept as advisory, separately sourced rows: they never overwrite the
+    # geometric movement, the count or a score.
+    note = technique_note(artifacts, report)
     if note is not None:
         report.update(note)
         report["proseSource"] = "vision"
+        if trace is not None:
+            trace.step("vision observations",
+                       kept=len(note.get("visionObservations") or []),
+                       validation=note.get("visionValidation"),
+                       movement=note.get("visionMovement"))
+            if (note.get("visionMovement") or {}).get("review"):
+                trace.note("vision disagrees with the geometric movement label",
+                           geometry=report.get("exercise"),
+                           vision=note["visionMovement"].get("label"))
         # Key moment 2, second opinion: the same stills, a different model,
         # one word. A disagreement is worth more than either agreement.
         second = technique_second_opinion(artifacts)
@@ -150,6 +171,8 @@ def process_job(job: dict, video_path: Path, on_stage=None) -> dict:
     if trace is not None:
         report["traceId"] = trace.id
         report["provenance"] = _provenance()
+        if isinstance(report["provenance"], dict):
+            report["provenance"]["poseBackendUsed"] = report.get("poseBackend")
         _write_trace(trace, str(job.get("id") or ""))
         print(f"[barra] job={job.get('id')} trace={trace.id} "
               f"exercise={report.get('exercise')} reps={report.get('n_reps')} "
@@ -208,7 +231,7 @@ def _write_trace(trace, job_id: str = "") -> None:
 
 
 def _measure_hold(pose, fps: float, movement, session: str | None,
-                  detected: dict, tr, _stage) -> dict:
+                  detected: dict, tr, _stage, variant: dict | None = None) -> dict:
     """One clip of a lever or planche: measure the hold, not the reps.
 
     A hold is measured as one observation per attempt - sustain time, body
@@ -217,8 +240,10 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
     """
     from barra.holds import clip_failures, hold_attempts
 
+    variant = variant or normalise_variant(movement.name, None)
     _stage("measuring the hold")
-    reps = hold_attempts(pose.keypoints, fps, movement, trace=tr)
+    reps = hold_attempts(pose.keypoints, fps, movement, trace=tr,
+                         variant=variant["name"])
     failures = clip_failures(reps)
     duration_s = round(len(pose.keypoints) / max(fps, 1.0), 2)
 
@@ -231,10 +256,13 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
         }
 
     rec = recommend_for_payload({"track": movement.name, "failures": failures})
+    from barra.holds import hold_assessments
+    checks = summarise(hold_assessments(reps))
     return {
         "exercise": movement.name,
         "track": movement.name,
         "detected": detected,
+        "variant": variant,
         "failures": failures,
         "recommendation": rec,
         "n_reps": len(reps),
@@ -250,6 +278,8 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
         "session": session or date.today().isoformat(),
         "sessionScore": None,
         "sessionBand": "unmeasured",
+        "measurementVersion": ASSESSMENT_VERSION,
+        "assessment": checks,
         "sessions": [{"date": session or date.today().isoformat(),
                       "reps": len(reps), "note": "hold"}],
         "nextSession": (
@@ -269,6 +299,7 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
     base = {
         "exercise": exercise,
         "detected": None,
+        "variant": {"name": "unspecified", "source": "none"},
         "n_reps": 0,
         "n_candidates": 0,
         "fps": 0.0,
@@ -277,6 +308,10 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
         "session": date.today().isoformat(),
         "sessionScore": None,
         "sessionBand": "unmeasured",
+        "measurementVersion": ASSESSMENT_VERSION,
+        # No rep, so no check was made. An empty list under `checks` is the
+        # statement that nothing was assessed, not that everything passed.
+        "assessment": {"version": ASSESSMENT_VERSION, "checks": []},
         "sessions": [],
         "reps": [],
         "blockers": blockers,
@@ -288,7 +323,8 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
 def analyze_clip(video_path: Path, exercise: str = "auto",
                  session: str | None = None, trace=None, on_stage=None,
                  visual_count=None, pose=None,
-                 declared_bin: str | None = None) -> dict:
+                 declared_bin: str | None = None,
+                 variant: str | None = None) -> dict:
     """Measure one clip. `on_stage`, when given, is called with a short human
     phrase at each step that can take real time, so a waiting phone can say
     where the work is. `visual_count`, when given, is the last resort for a
@@ -299,7 +335,10 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     barra/posecache.py instead of paying 78 seconds for a second opinion on
     frames that have not changed. `declared_bin` is the viewpoint the session
     row states (SAGITTAL / OBLIQUE / FRONTAL); given one, the planar faults
-    trust it instead of the single-clip estimator."""
+    trust it instead of the single-clip estimator. `variant` is the technique
+    variant the athlete DECLARED (strict / kipping, full / tuck / straddle);
+    it is never inferred from a posture, and rules written for a different
+    standard are left out rather than fired."""
     def _stage(name: str) -> None:
         if on_stage is None:
             return
@@ -370,10 +409,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
     pose_error = None
+    pose_backend = getattr(pose, "source", "caller") if pose is not None else None
     if pose is None:
         for name in order:
             try:
                 pose = get_backend(name).estimate(video_path)
+                pose_backend = name
                 tr.step("pose backend", backend=name)
                 break
             except Exception as exc:  # noqa: BLE001 - the next backend may still work
@@ -383,38 +424,103 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         reason = str(pose_error) if pose_error else "unknown"
         return _empty(exercise, [f"Pose estimation failed: {reason}"])
     fps = pose.fps or info["fps"] or 30.0
+    # A caller building a feature corpus may want the just-estimated keypoints
+    # kept without running the whole pipeline twice. BARRA_WRITE_POSE=1 caches
+    # them (barra/posecache.store writes the same schema `barra ingest` reads),
+    # so a second pass can featurize them offline - and a POSED-but-unmeasured
+    # clip contributes its keypoints to the model's training set even when the
+    # geometric pass declined to count a rep.
+    if os.environ.get("BARRA_WRITE_POSE") == "1":
+        try:
+            from pathlib import Path as _Path
+            from barra.posecache import store as _store_pose
+            weights = getattr(pose, "weights", None)
+            tag = pose_backend or "pose"
+            if weights:
+                tag = f"{tag}:{_Path(str(weights)).name}"
+            _store_pose(video_path, pose.keypoints, tag=tag)
+        except Exception as _cue:  # noqa: BLE001 - caching must never fail the analysis
+            tr.step("pose cache write skipped", reason=str(_cue))
 
     # Detect the movement from the clip itself. A movement the athlete named is
     # respected, but the detection still runs so the phone can say when the two
     # disagree - measuring a muscle-up with squat geometry produces numbers that
     # look fine and mean nothing.
-    tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps))
+    tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps),
+            backend=pose_backend)
     _stage("recognising the movement")
     detection = classify(pose.keypoints, tr, fps=fps)
     detected = {
         "exercise": detection.exercise,
         "label": HUMAN.get(detection.exercise, detection.exercise),
         "confidence": round(float(detection.confidence), 2),
+        # What that number is. It is a bounded distance from the measurement
+        # that decided the label to the threshold it was compared against, not
+        # a probability, and the phone renders it as one or the other on the
+        # strength of this field rather than on a guess about the pipeline.
+        "certainty": detection.certainty,
         "reason": detection.reason,
         "runnerUp": detection.runner_up,
     }
+    # The first learned model runs alongside the geometric classifier. It is a
+    # second opinion, never a replacement: `detected` stays the interpretable,
+    # verified answer, and `model` says what the model thinks and - with the
+    # load estimate - what it thinks the athlete is carrying. When no trained
+    # model is present (or it has no classes) this is null, and the phone says
+    # nothing rather than improvise.
+    model_out = None
+    tr.stage("model")
+    try:
+        from barra.model import load_default, model_classify, model_load
+        _model = load_default()
+        if _model is not None and _model.classes:
+            _feat = getattr(detection, "features", None) or {}
+            model_out = {
+                "classification": model_classify(_model, _feat),
+                "load": model_load(_model, _feat),
+            }
+    except Exception:  # noqa: BLE001 - a model failure must not sink the analysis
+        model_out = None
     chosen = exercise
     if exercise in ("", "auto", None):
-        if detection.exercise == "unknown":
+        fusion = None
+        tr.stage("fusion")
+        try:
+            from barra.fusion import fuse_detection
+            fusion = fuse_detection(detected, (model_out or {}).get("classification"))
+            tr.step("fusion", **fusion)
+        except Exception as exc:  # noqa: BLE001 - fusion is an improvement, not a requirement
+            tr.error("could not fuse detector votes", reason=str(exc)[:200])
+        detected["fusion"] = fusion
+        final = (fusion or {}).get("exercise") or detection.exercise
+        if final == "unknown":
             return _empty("auto", [detection.reason], detected=detected,
                           duration_s=round(float(info.get("duration_s") or 0), 2))
-        chosen = detection.exercise
+        chosen = final
+        if chosen != detection.exercise:
+            detected["exercise"] = chosen
+            detected["label"] = HUMAN.get(chosen, chosen)
+            detected["reason"] = (fusion or {}).get("reason") or detected["reason"]
+            detected["certainty"] = "detector-fusion"
+            detected["runnerUp"] = detection.exercise if detection.exercise != "unknown" else detected.get("runnerUp")
 
     try:
         movement = resolve(chosen)
     except SystemExit as exc:
         return _empty(chosen, [str(exc)], detected=detected)
 
+    # The declared variant, labelled as declared - or unspecified. A variant
+    # the movement does not define is not accepted, so a typo cannot switch
+    # on the fault taxonomy of a different standard.
+    variant_info = normalise_variant(movement.name, variant)
+    tr.step("variant", **variant_info)
+
     # A front lever or planche is a hold, not a set of repetitions. The rep
     # segmenter counts turnarounds and would find nothing; measure the hold
     # instead - sustain time, body line, and the failure types it shows.
     if movement.is_hold:
-        return _measure_hold(pose, fps, movement, session, detected, tr, _stage)
+        return _measure_hold(pose, fps, movement, session, detected, tr, _stage,
+                             variant=variant_info)
 
     _stage("finding the reps")
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
@@ -444,9 +550,18 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         except Exception as exc:  # noqa: BLE001 - a fallback never fails a job
             tr.error("the vision count fell over", reason=str(exc)[:200])
             vision_count = None
+        # A disagreement between the two models is a result, not a lower
+        # bound: it is recorded, and no count is claimed from it.
+        if vision_count is not None and (not vision_count.get("usable", True)
+                                         or vision_count.get("reps") is None):
+            tr.reject("vision count", vision_count.get("agreement", "unusable"),
+                      models=vision_count.get("models"),
+                      range=vision_count.get("range"))
+            vision_count = None
         if vision_count is not None:
             tr.decision("vision count", "used the models' count",
                         reps=int(vision_count["reps"]),
+                        range=vision_count.get("range"),
                         models=vision_count["models"])
 
     session = session or date.today().isoformat()
@@ -495,26 +610,35 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     tr.step("viewpoint", **view.as_dict())
 
     # The set's own median concentric, so "too fast" compares this athlete's
-    # reps with each other rather than with a number someone chose.
-    concentrics = sorted(max(turn - start, 1) / fps for start, turn, _ in found)
+    # reps with each other rather than with a number someone chose. The lift
+    # is whichever half of the rep the movement profile says it is.
+    from barra.phases import ascent, ascent_signal, phases_as_dict, rep_phases
+    concentrics = sorted(max(b - a, 1) / fps
+                         for a, b in (ascent(movement, s, t, e) for s, t, e in found))
     median_concentric = (concentrics[len(concentrics) // 2] if concentrics else None)
+    lift_signal = ascent_signal(signal, movement)
 
     _stage("scoring the reps")
     rep_amplitudes: list[float] = []
     rep_durations: list[float] = []
+    per_rep_assessments = []
     for i, (start, turn, end) in enumerate(found):
+        label = f"r{i + 1}"
         if 0 <= start < len(signal) and 0 <= turn < len(signal):
             rep_amplitudes.append(float(signal[turn] - min(signal[start], signal[end])))
         rep_durations.append((end - start) / fps)
         measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement,
-                               trace=tr, label=f"r{i + 1}")
+                               trace=tr, label=label)
+        # The phases as measured - metrics narrows the muscle-up's transition
+        # to the frames in the bar plane; the raw table has the whole lift.
+        phases = measured.phases or rep_phases(movement, start, turn, end, fps)
         lines = []
         for key in _METRIC_ORDER:
-            cls, label, unit, _ = METRIC_SPEC[key]
+            cls, mlabel, unit, _ = METRIC_SPEC[key]
             value = _num(measured.values.get(key))
             if not value:
                 continue
-            lines.append({"name": label, "value": f"{value} {unit}", "class": cls, "key": key})
+            lines.append({"name": mlabel, "value": f"{value} {unit}", "class": cls, "key": key})
         plausible = measured.plausible and measured.quality.get("rep", 0) >= MIN_REP_QUALITY
         if plausible:
             usable += 1
@@ -522,12 +646,13 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             extra_blockers.extend(measured.problems)
         transition = next((m["value"] for m in lines if m["key"] == "transition_s"), "")
         total = next((m["value"] for m in lines if m["key"] == "total_s"), "")
+        lift_a, lift_b = ascent(movement, start, turn, end)
         q = score_rep(
-            measured.values, arm, signal, start, turn,
+            measured.values, arm, lift_signal, lift_a, lift_b,
             plausible=measured.plausible,
             rep_quality=measured.quality.get("rep", 0.0),
             min_rep_quality=MIN_REP_QUALITY,
-            trace=tr, label=f"r{i + 1}",
+            trace=tr, label=label,
         )
         if q.score is not None:
             scores.append(q.score)
@@ -535,24 +660,45 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # phone can say WHAT was wrong rather than only how far from "perfect".
         ev = rep_evidence(measured.values, arm, signal, start, turn, end, fps,
                           movement, kp=pose.keypoints, view=view,
-                          median_concentric_s=median_concentric)
-        rep_faults = classify_faults(movement.name, ev)
+                          median_concentric_s=median_concentric, valid=_valid)
+        # A rep whose pose is not physically possible, or that was barely
+        # tracked, gets no fault labels - not because it was clean, but
+        # because nothing about it can be asserted. The score was already
+        # withheld on these; the faults used to fire regardless, which put an
+        # authoritative label on a measurement the same code had just called
+        # unusable.
+        blocked = ""
+        if not measured.plausible:
+            blocked = "the pose estimate is not physically possible: " + \
+                      "; ".join(measured.problems)
+        elif measured.quality.get("rep", 0) < MIN_REP_QUALITY:
+            blocked = (f"too little of the rep was tracked "
+                       f"(quality {measured.quality.get('rep', 0):.2f} < {MIN_REP_QUALITY})")
+        assessments = assess(movement.name, ev, variant_info["name"], blocked=blocked)
+        per_rep_assessments.append(assessments)
+        rep_faults = ([] if blocked else
+                      classify_faults(movement.name, ev, variant_info["name"], fps))
         rep_failures = [f.name for f in rep_faults]
+        assessment_rows = [a.as_dict(label, fps) for a in assessments]
         # The one decision in the chain that recorded no evidence. Every other
         # stage prints the number it measured next to the threshold it had to
         # clear (docs/DEBUGGING.md); the fault layer printed only its verdict,
         # so "why did it not say dead hang" had no answer in the trace. Now the
-        # primitives it read are printed with their state, and a primitive that
-        # is unmeasured or blocked by the viewpoint is a fault that could not
-        # have fired rather than one the rep passed.
-        tr.step(f"failure classification r{i + 1}",
-                track=movement.name, failures=rep_failures,
+        # primitives it read are printed with their state and the phase window
+        # they were read from, and every rule's verdict - observed, not
+        # observed, or unobservable and why - is recorded beside them.
+        tr.step(f"failure classification {label}",
+                track=movement.name, variant=variant_info["name"],
+                failures=rep_failures, blocked=blocked or None,
                 faults=[f.as_dict() for f in rep_faults],
-                evidence=ev.as_dict(), unmeasured=ev.unmeasured(),
+                evidence=ev.as_dict(), windows=ev.windows(fps),
+                phases_s=phases_as_dict(phases, fps),
+                assessments=assessment_rows,
+                unmeasured=ev.unmeasured(),
                 view_blocked=ev.view_blocked(), view=view.as_dict())
         reps.append({
             "session": session,
-            "label": f"r{i + 1}",
+            "label": label,
             "rescued": rescued,
             "failures": rep_failures,
             # The structured contract the phone renders: each fired fault with
@@ -561,6 +707,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             # expression from human-readable prose, so a copy edit could switch
             # fault detection off on every device at once.
             "faults": [f.as_dict() for f in rep_faults],
+            # Every applicable rule, with its verdict. `faults` is the
+            # observed subset; this is the whole population it was drawn
+            # from, so an empty fault list can be told from a blocked one.
+            "assessments": assessment_rows,
+            "phases": phases_as_dict(phases, fps),
+            "assessmentBlocked": blocked or None,
             "unmeasured": ev.unmeasured(),
             "viewBlocked": ev.view_blocked(),
             "transition_s": transition.replace(" s", ""),
@@ -640,11 +792,24 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     clip_faults = clip_failures(reps)
     rec = recommend_for_payload({"track": movement.name, "failures": clip_faults})
+    checks = summarise(per_rep_assessments)
+    tr.step("assessment summary", **checks)
     return {
         "exercise": movement.name,
         "track": movement.name,
         "detected": detected,
+        "model": model_out,
+        "variant": variant_info,
         "failures": clip_faults,
+        # Per errorId: reps observed / checked clean / could not be checked.
+        # The clip-level counterpart of reps[].assessments; `failures` above
+        # is its observed column only.
+        "assessment": checks,
+        "measurementVersion": ASSESSMENT_VERSION,
+        # Which estimator made the keypoints. `provenance.poseModel` describes
+        # the default model file, which is not the same thing once a backend
+        # has fallen over and the next one produced the numbers.
+        "poseBackend": pose_backend,
         "recommendation": rec,
         "n_reps": usable if found else (vision_count["reps"] if vision_count else 0),
         "n_candidates": len(found),

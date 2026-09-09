@@ -84,7 +84,35 @@ def stamp(include_model: bool = True) -> dict:
     }
     if include_model:
         out["poseModel"] = pose_model()
+    out["measurement"] = measurement_semantics()
     return out
+
+
+@lru_cache(maxsize=1)
+def measurement_semantics() -> dict:
+    """The conventions that change what a number MEANS on an unchanged clip.
+
+    A score that moved because the stall count stopped counting the turnaround
+    is not a score that moved because the athlete did. These are stamped beside
+    the code version so a historical payload can be recognised as
+    non-comparable rather than silently compared.
+    """
+    try:
+        from .config import THRESHOLDS
+        from .rules import ASSESSMENT_VERSION
+
+        return {
+            "assessmentVersion": ASSESSMENT_VERSION,
+            "phaseSemantics": "lifting/lowering from the movement profile "
+                              "(barra/phases.py); descending-first movements "
+                              "are assessed on the return ascent",
+            "stallEdgeFraction": THRESHOLDS.stall_edge_fraction,
+            "stallRate": THRESHOLDS.stall_rate,
+            "minPhaseCoverage": THRESHOLDS.min_phase_coverage,
+            "restSideTolerance": THRESHOLDS.rest_side_tolerance,
+        }
+    except Exception as exc:  # noqa: BLE001 - provenance must never fail a job
+        return {"error": f"measurement semantics unavailable: {exc}"}
 
 
 def line() -> str:

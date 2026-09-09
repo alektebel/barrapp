@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Release: HTTPS only. The debug source set (src/debug/res/xml) replaces
+     this file with one that allows cleartext, for a LAN server. Keeping the
+     LAN addresses out of here means a release build cannot be pointed at a
+     plain-HTTP host by anything, including a mistake in gradle.properties. -->
 <network-security-config>
     <base-config cleartextTrafficPermitted="false" />
-    <!-- Debug: allow cleartext to the LAN server. Release keeps the base-config deny. -->
-    <domain-config cleartextTrafficPermitted="true">
-        <domain includeSubdomains="false">192.168.1.18</domain>
-        <domain includeSubdomains="false">192.168.1.120</domain>
-        <domain includeSubdomains="false">10.0.2.2</domain>
-    </domain-config>
 </network-security-config>

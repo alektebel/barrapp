@@ -161,13 +161,15 @@ The decisions worth arguing about, and why they went the way they did:
 - **The null is leave-one-out.** Each held-out reference rep is scored against
   a template rebuilt without it. A rep that helped build its own template
   would score too well and the null would come out fraudulently tight.
-- **Movements are recognised geometrically, never learned.** There are no
-  labelled clips to train on, and a learned classifier would fail silently on
-  the first movement it had not seen; these rules fail loudly and every one can
-  be checked by hand against a still frame. The vocabulary is squat, pull-up,
-  muscle-up, hanging knee raise, dip and push-up, separated by where the hands
-  are, whether they stay there, and what moves relative to them. Anything else
-  is `unknown`, which is a result rather than a failure.
+- **Movements are recognised geometrically first, with a learned second opinion.**
+  The primary detector is a set of explicit rules that can be checked by hand
+  against a still frame. A small learned model now votes over the same feature
+  vector, and `barra/fusion.py` accepts that vote only under stated confidence
+  and margin conditions. Strong geometry is not silently overridden. The
+  vocabulary is squat, pull-up, muscle-up, hanging knee raise, dip and push-up,
+  separated by where the hands are, whether they stay there, and what moves
+  relative to them. Anything else is `unknown`, which is a result rather than a
+  failure.
 - **A missing measurement never satisfies a condition.** "Measured and false"
   and "never measured" are different facts. Collapsing them into one boolean
   let a NaN satisfy `not articulated` and reported a muscle-up as a squat — see

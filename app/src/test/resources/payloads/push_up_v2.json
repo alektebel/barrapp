@@ -1,0 +1,6619 @@
+{
+  "exercise": "push_up",
+  "track": "push_up",
+  "detected": {
+    "exercise": "push_up",
+    "label": "Push-up",
+    "confidence": 0.78,
+    "certainty": "margin-to-threshold",
+    "reason": "hands fixed below the shoulders and nothing hanging below them, so the hands are on the floor rather than on bars",
+    "runnerUp": "dip"
+  },
+  "variant": {
+    "name": "unspecified",
+    "source": "none"
+  },
+  "failures": {
+    "lockout": 3
+  },
+  "assessment": {
+    "version": 2,
+    "checks": [
+      {
+        "errorId": "push_up.short_travel",
+        "name": "poor range of motion",
+        "phase": "rep",
+        "observed": 0,
+        "notObserved": 19,
+        "unobservable": 0,
+        "reasons": {}
+      },
+      {
+        "errorId": "push_up.incomplete_lockout",
+        "name": "lockout",
+        "phase": "support",
+        "observed": 3,
+        "notObserved": 16,
+        "unobservable": 0,
+        "reasons": {}
+      },
+      {
+        "errorId": "push_up.hip_sag",
+        "name": "sagging hips",
+        "phase": "rep",
+        "observed": 0,
+        "notObserved": 0,
+        "unobservable": 19,
+        "reasons": {
+          "insufficient temporal evidence": 1,
+          "tracking loss": 18
+        }
+      },
+      {
+        "errorId": "push_up.dropped_descent",
+        "name": "control",
+        "phase": "rep",
+        "observed": 0,
+        "notObserved": 19,
+        "unobservable": 0,
+        "reasons": {}
+      },
+      {
+        "errorId": "push_up.lift_stall",
+        "name": "stall",
+        "phase": "lifting",
+        "observed": 0,
+        "notObserved": 19,
+        "unobservable": 0,
+        "reasons": {}
+      }
+    ]
+  },
+  "measurementVersion": 2,
+  "recommendation": {
+    "track": "push_up",
+    "failures": [
+      "lockout"
+    ],
+    "nextExercise": null,
+    "reason": "No progression chain for this movement yet.",
+    "chain": []
+  },
+  "n_reps": 19,
+  "n_candidates": 19,
+  "rescued": false,
+  "countedBy": null,
+  "consistency": {
+    "amplitudeCV": 0.13,
+    "tempoCV": 0.122
+  },
+  "view": {
+    "bin": "OBLIQUE",
+    "knowable": false,
+    "side": "anterior",
+    "agreement": 0.99,
+    "thetaDeg": 52.4,
+    "source": "estimated",
+    "why": "self-calibration 1.33 is outside the anatomical prior 0.65-0.95, so the azimuth is biased"
+  },
+  "fps": 24.925,
+  "duration_s": 19.94,
+  "trim": {
+    "startS": 0.84,
+    "endS": 19.94
+  },
+  "session": "1970-01-01",
+  "sessionScore": 56,
+  "sessionBand": "solid",
+  "sessions": [
+    {
+      "date": "1970-01-01",
+      "reps": 19,
+      "note": "19 segmented, 19 usable"
+    }
+  ],
+  "reps": [
+    {
+      "session": "1970-01-01",
+      "label": "r1",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r1",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            1.44,
+            2.89
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 1.0813,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r1",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            1.44,
+            1.52
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 175.0485,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r1",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            1.44,
+            2.89
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.054
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "insufficient temporal evidence",
+            "detail": "insufficient temporal evidence: 5% of the rep window was tracked, 60% needed"
+          }
+        },
+        {
+          "rep": "r1",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            1.44,
+            2.89
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.7692,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r1",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            2.37,
+            2.89
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          1.44,
+          2.89
+        ],
+        "setup": [
+          1.44,
+          1.52
+        ],
+        "lowering": [
+          1.44,
+          2.37
+        ],
+        "lifting": [
+          2.37,
+          2.89
+        ],
+        "support": [
+          1.44,
+          1.52
+        ],
+        "turnaround": [
+          2.29,
+          2.45
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "1.44",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.52 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "1.44 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.77 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.81 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.81 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.02 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.01 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.25 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 1.44,
+      "endS": 2.89,
+      "turnS": 2.37,
+      "score": 58,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.77x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.5,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 100% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.663,
+          "weight": 0.35,
+          "why": "the ascent ran at 66% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.25,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.025,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.7996,
+        -1.7966,
+        -1.7899,
+        -1.78,
+        -1.7672,
+        -1.7462,
+        -1.7227,
+        -1.6975,
+        -1.67,
+        -1.6381,
+        -1.5981,
+        -1.5573,
+        -1.5164,
+        -1.4741,
+        -1.4242,
+        -1.3735,
+        -1.3204,
+        -1.2626,
+        -1.2016,
+        -1.1374,
+        -1.0754,
+        -1.0181,
+        -0.9602,
+        -0.9048,
+        -0.8546,
+        -0.8117,
+        -0.7791,
+        -0.7518,
+        -0.7325,
+        -0.7215,
+        -0.7184,
+        -0.7277,
+        -0.7467,
+        -0.7767,
+        -0.8188,
+        -0.8691,
+        -0.9289,
+        -0.9951,
+        -1.0656,
+        -1.1393,
+        -1.2118,
+        -1.2846,
+        -1.3543,
+        -1.4111,
+        -1.456,
+        -1.4912,
+        -1.5186,
+        -1.5406
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r2",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r2",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            2.89,
+            3.89
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.8478,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r2",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            2.89,
+            2.97
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 164.8733,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r2",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            2.89,
+            3.89
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r2",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            2.89,
+            3.89
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0833,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r2",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            3.41,
+            3.89
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          2.89,
+          3.89
+        ],
+        "setup": [
+          2.89,
+          2.97
+        ],
+        "lowering": [
+          2.89,
+          3.41
+        ],
+        "lifting": [
+          3.41,
+          3.89
+        ],
+        "support": [
+          2.89,
+          2.97
+        ],
+        "turnaround": [
+          3.33,
+          3.49
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "1.00",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.52 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "1.00 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.08 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.04 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.63 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.59 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.02 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.01 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.12 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 2.89,
+      "endS": 3.89,
+      "turnS": 3.41,
+      "score": 56,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.08x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.483,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 97% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.641,
+          "weight": 0.35,
+          "why": "the ascent ran at 64% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.121,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.015,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5406,
+        -1.5401,
+        -1.5377,
+        -1.5218,
+        -1.5035,
+        -1.4776,
+        -1.4466,
+        -1.4067,
+        -1.3621,
+        -1.3124,
+        -1.2608,
+        -1.2079,
+        -1.1516,
+        -1.0938,
+        -1.0391,
+        -0.985,
+        -0.9383,
+        -0.8922,
+        -0.8499,
+        -0.8092,
+        -0.7753,
+        -0.7453,
+        -0.7238,
+        -0.7073,
+        -0.6972,
+        -0.6972,
+        -0.7051,
+        -0.7235,
+        -0.7468,
+        -0.7796,
+        -0.8148,
+        -0.8545,
+        -0.895,
+        -0.9446,
+        -0.9956,
+        -1.0544,
+        -1.1135,
+        -1.1731,
+        -1.2314,
+        -1.2875,
+        -1.3366,
+        -1.3793,
+        -1.4173,
+        -1.4526,
+        -1.4806,
+        -1.5063,
+        -1.5233,
+        -1.5391
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r3",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r3",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            3.89,
+            4.81
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7535,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r3",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            3.89,
+            3.97
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 166.4712,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r3",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            3.89,
+            4.81
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r3",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            3.89,
+            4.81
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r3",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            4.37,
+            4.81
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          3.89,
+          4.81
+        ],
+        "setup": [
+          3.89,
+          3.97
+        ],
+        "lowering": [
+          3.89,
+          4.37
+        ],
+        "lifting": [
+          4.37,
+          4.81
+        ],
+        "support": [
+          3.89,
+          3.97
+        ],
+        "turnaround": [
+          4.29,
+          4.45
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.06 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.66 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.60 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.03 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.06 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.15 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 3.89,
+      "endS": 4.81,
+      "turnS": 4.37,
+      "score": 56,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.493,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 99% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.628,
+          "weight": 0.35,
+          "why": "the ascent ran at 63% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.153,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.033,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5391,
+        -1.5389,
+        -1.5387,
+        -1.5237,
+        -1.5081,
+        -1.4803,
+        -1.4514,
+        -1.4138,
+        -1.375,
+        -1.3278,
+        -1.279,
+        -1.2305,
+        -1.1821,
+        -1.1332,
+        -1.0842,
+        -1.037,
+        -0.9905,
+        -0.9487,
+        -0.9095,
+        -0.8756,
+        -0.845,
+        -0.8211,
+        -0.8023,
+        -0.7913,
+        -0.7876,
+        -0.79,
+        -0.7992,
+        -0.8161,
+        -0.8431,
+        -0.8724,
+        -0.9056,
+        -0.9425,
+        -0.9865,
+        -1.0311,
+        -1.0771,
+        -1.1248,
+        -1.1777,
+        -1.2304,
+        -1.2823,
+        -1.3326,
+        -1.3754,
+        -1.4163,
+        -1.4452,
+        -1.4733,
+        -1.4912,
+        -1.5085,
+        -1.5136,
+        -1.5187
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r4",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r4",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            4.81,
+            5.7
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7327,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r4",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            4.81,
+            4.89
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 166.1901,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r4",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            4.81,
+            5.7
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r4",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            4.81,
+            5.7
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r4",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            5.26,
+            5.7
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          4.81,
+          5.7
+        ],
+        "setup": [
+          4.81,
+          4.89
+        ],
+        "lowering": [
+          4.81,
+          5.26
+        ],
+        "lifting": [
+          5.26,
+          5.7
+        ],
+        "support": [
+          4.81,
+          4.89
+        ],
+        "turnaround": [
+          5.18,
+          5.34
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.88",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.88 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.00 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.66 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.66 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.03 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.16 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.09 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 4.81,
+      "endS": 5.7,
+      "turnS": 5.26,
+      "score": 59,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.00x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.493,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 99% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.693,
+          "weight": 0.35,
+          "why": "the ascent ran at 69% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.086,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.035,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5187,
+        -1.5138,
+        -1.5089,
+        -1.4929,
+        -1.4751,
+        -1.447,
+        -1.4149,
+        -1.3791,
+        -1.3407,
+        -1.2985,
+        -1.2517,
+        -1.2041,
+        -1.155,
+        -1.1063,
+        -1.0588,
+        -1.0116,
+        -0.97,
+        -0.9284,
+        -0.8957,
+        -0.8639,
+        -0.8389,
+        -0.816,
+        -0.8035,
+        -0.7969,
+        -0.7957,
+        -0.7999,
+        -0.8102,
+        -0.831,
+        -0.8541,
+        -0.8848,
+        -0.9164,
+        -0.957,
+        -0.9977,
+        -1.0398,
+        -1.082,
+        -1.1265,
+        -1.1714,
+        -1.2177,
+        -1.2646,
+        -1.3101,
+        -1.3545,
+        -1.3944,
+        -1.4279,
+        -1.4583,
+        -1.4806,
+        -1.5015,
+        -1.5139,
+        -1.5262
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r5",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r5",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            5.7,
+            6.62
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7264,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r5",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            5.7,
+            5.78
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 169.085,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r5",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            5.7,
+            6.62
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r5",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            5.7,
+            6.62
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r5",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            6.18,
+            6.62
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          5.7,
+          6.62
+        ],
+        "setup": [
+          5.7,
+          5.78
+        ],
+        "lowering": [
+          5.7,
+          6.18
+        ],
+        "lifting": [
+          6.18,
+          6.62
+        ],
+        "support": [
+          5.7,
+          5.78
+        ],
+        "turnaround": [
+          6.1,
+          6.26
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.60 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.60 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.18 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.10 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 5.7,
+      "endS": 6.62,
+      "turnS": 6.18,
+      "score": 57,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.474,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 95% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.671,
+          "weight": 0.35,
+          "why": "the ascent ran at 67% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.102,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.045,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5262,
+        -1.5231,
+        -1.52,
+        -1.5102,
+        -1.5002,
+        -1.4721,
+        -1.4423,
+        -1.404,
+        -1.3644,
+        -1.3199,
+        -1.2743,
+        -1.2264,
+        -1.1779,
+        -1.1306,
+        -1.0838,
+        -1.0393,
+        -0.9957,
+        -0.9558,
+        -0.9178,
+        -0.8856,
+        -0.8571,
+        -0.8343,
+        -0.8161,
+        -0.8054,
+        -0.8018,
+        -0.8042,
+        -0.8134,
+        -0.8276,
+        -0.8485,
+        -0.8737,
+        -0.9056,
+        -0.941,
+        -0.9828,
+        -1.0264,
+        -1.0741,
+        -1.1218,
+        -1.1692,
+        -1.217,
+        -1.2656,
+        -1.3133,
+        -1.3563,
+        -1.3977,
+        -1.4289,
+        -1.4594,
+        -1.4818,
+        -1.5036,
+        -1.5116,
+        -1.5196
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r6",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r6",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            6.62,
+            7.58
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.722,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r6",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            6.62,
+            6.7
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 166.8244,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r6",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            6.62,
+            7.58
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r6",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            6.62,
+            7.58
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r6",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            7.1,
+            7.58
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          6.62,
+          7.58
+        ],
+        "setup": [
+          6.62,
+          6.7
+        ],
+        "lowering": [
+          6.62,
+          7.1
+        ],
+        "lifting": [
+          7.1,
+          7.58
+        ],
+        "support": [
+          6.62,
+          6.7
+        ],
+        "turnaround": [
+          7.02,
+          7.18
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.96",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.96 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.00 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.02 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.62 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.60 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.02 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.18 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.12 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 6.62,
+      "endS": 7.58,
+      "turnS": 7.1,
+      "score": 57,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.00x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.48,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 96% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.665,
+          "weight": 0.35,
+          "why": "the ascent ran at 66% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.121,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.024,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5196,
+        -1.5175,
+        -1.5148,
+        -1.4998,
+        -1.4837,
+        -1.4564,
+        -1.4275,
+        -1.3885,
+        -1.348,
+        -1.3007,
+        -1.2528,
+        -1.2032,
+        -1.1538,
+        -1.1052,
+        -1.0574,
+        -1.0118,
+        -0.9684,
+        -0.9295,
+        -0.8948,
+        -0.867,
+        -0.8433,
+        -0.8251,
+        -0.8124,
+        -0.8061,
+        -0.8087,
+        -0.8203,
+        -0.8386,
+        -0.8625,
+        -0.8916,
+        -0.9242,
+        -0.9609,
+        -1.0001,
+        -1.0431,
+        -1.0879,
+        -1.1353,
+        -1.1837,
+        -1.2306,
+        -1.277,
+        -1.3212,
+        -1.3648,
+        -1.4037,
+        -1.4417,
+        -1.4692,
+        -1.4952,
+        -1.5085,
+        -1.5206,
+        -1.523,
+        -1.525
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r7",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r7",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            7.58,
+            8.51
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6629,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r7",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            7.58,
+            7.66
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 164.7168,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r7",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            7.58,
+            8.51
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r7",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            7.58,
+            8.51
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 0.9167,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r7",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            8.02,
+            8.51
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          7.58,
+          8.51
+        ],
+        "setup": [
+          7.58,
+          7.66
+        ],
+        "lowering": [
+          7.58,
+          8.02
+        ],
+        "lifting": [
+          8.02,
+          8.51
+        ],
+        "support": [
+          7.58,
+          7.66
+        ],
+        "turnaround": [
+          7.94,
+          8.1
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "0.92 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.56 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.56 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.15 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.10 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 7.58,
+      "endS": 8.51,
+      "turnS": 8.02,
+      "score": 55,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 0.92x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.465,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 93% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.64,
+          "weight": 0.35,
+          "why": "the ascent ran at 64% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.101,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.035,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.525,
+        -1.515,
+        -1.5051,
+        -1.4818,
+        -1.4579,
+        -1.4248,
+        -1.3909,
+        -1.35,
+        -1.3081,
+        -1.2635,
+        -1.2183,
+        -1.1758,
+        -1.1341,
+        -1.0917,
+        -1.0491,
+        -1.012,
+        -0.9773,
+        -0.9487,
+        -0.9234,
+        -0.903,
+        -0.8857,
+        -0.8738,
+        -0.8659,
+        -0.8648,
+        -0.8698,
+        -0.8809,
+        -0.8985,
+        -0.9201,
+        -0.947,
+        -0.9764,
+        -1.0099,
+        -1.0462,
+        -1.0878,
+        -1.1302,
+        -1.1742,
+        -1.2175,
+        -1.2587,
+        -1.2991,
+        -1.3372,
+        -1.3744,
+        -1.4075,
+        -1.4392,
+        -1.4612,
+        -1.4823,
+        -1.494,
+        -1.5054,
+        -1.5095,
+        -1.5137
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r8",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r8",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            8.51,
+            9.47
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6768,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r8",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            8.51,
+            8.59
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 161.4309,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r8",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            8.51,
+            9.47
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r8",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            8.51,
+            9.47
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r8",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            8.99,
+            9.47
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          8.51,
+          9.47
+        ],
+        "setup": [
+          8.51,
+          8.59
+        ],
+        "lowering": [
+          8.51,
+          8.99
+        ],
+        "lifting": [
+          8.99,
+          9.47
+        ],
+        "support": [
+          8.51,
+          8.59
+        ],
+        "turnaround": [
+          8.91,
+          9.07
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.96",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.96 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.00 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.02 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.55 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.53 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.03 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.19 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.18 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 8.51,
+      "endS": 9.47,
+      "turnS": 8.99,
+      "score": 54,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.00x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.459,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 92% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.637,
+          "weight": 0.35,
+          "why": "the ascent ran at 64% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.183,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.025,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5137,
+        -1.5081,
+        -1.5021,
+        -1.4875,
+        -1.4718,
+        -1.4438,
+        -1.4144,
+        -1.3739,
+        -1.3329,
+        -1.2888,
+        -1.244,
+        -1.197,
+        -1.1502,
+        -1.1043,
+        -1.0602,
+        -1.0204,
+        -0.983,
+        -0.9504,
+        -0.9204,
+        -0.8945,
+        -0.8727,
+        -0.8568,
+        -0.8455,
+        -0.8398,
+        -0.8417,
+        -0.8513,
+        -0.8661,
+        -0.8851,
+        -0.9095,
+        -0.9377,
+        -0.97,
+        -1.0047,
+        -1.0427,
+        -1.0824,
+        -1.1252,
+        -1.1694,
+        -1.2152,
+        -1.2616,
+        -1.3046,
+        -1.3469,
+        -1.384,
+        -1.4201,
+        -1.4468,
+        -1.4722,
+        -1.4833,
+        -1.493,
+        -1.4941,
+        -1.4949
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r9",
+      "rescued": false,
+      "failures": [
+        "lockout"
+      ],
+      "faults": [
+        {
+          "name": "lockout",
+          "primitive": "start_elbow_deg",
+          "value": 158.3783,
+          "threshold": 160.0,
+          "comparison": "<",
+          "unit": "deg",
+          "class": "SCALED",
+          "errorId": "push_up.incomplete_lockout",
+          "phase": "support",
+          "intervalS": [
+            9.47,
+            9.55
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "rep": "r9",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            9.47,
+            10.39
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.705,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r9",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "observed",
+          "intervalS": [
+            9.47,
+            9.55
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 158.3783,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r9",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            9.47,
+            10.39
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r9",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            9.47,
+            10.39
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r9",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            9.95,
+            10.39
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          9.47,
+          10.39
+        ],
+        "setup": [
+          9.47,
+          9.55
+        ],
+        "lowering": [
+          9.47,
+          9.95
+        ],
+        "lifting": [
+          9.95,
+          10.39
+        ],
+        "support": [
+          9.47,
+          9.55
+        ],
+        "turnaround": [
+          9.87,
+          10.03
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.01 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.51 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.50 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.14 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.20 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 9.47,
+      "endS": 10.39,
+      "turnS": 9.95,
+      "score": 56,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.448,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 90% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.679,
+          "weight": 0.35,
+          "why": "the ascent ran at 68% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.202,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.04,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4949,
+        -1.4888,
+        -1.4828,
+        -1.4652,
+        -1.447,
+        -1.4171,
+        -1.3861,
+        -1.3483,
+        -1.3094,
+        -1.2654,
+        -1.2203,
+        -1.1754,
+        -1.1306,
+        -1.0868,
+        -1.0433,
+        -1.0023,
+        -0.9623,
+        -0.9271,
+        -0.8945,
+        -0.8661,
+        -0.8403,
+        -0.8208,
+        -0.8061,
+        -0.7968,
+        -0.7922,
+        -0.7945,
+        -0.8043,
+        -0.8193,
+        -0.8412,
+        -0.8664,
+        -0.8965,
+        -0.9292,
+        -0.9666,
+        -1.0058,
+        -1.0492,
+        -1.0933,
+        -1.1394,
+        -1.1852,
+        -1.2297,
+        -1.2736,
+        -1.3146,
+        -1.3546,
+        -1.3878,
+        -1.4197,
+        -1.4376,
+        -1.4551,
+        -1.4622,
+        -1.4694
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r10",
+      "rescued": false,
+      "failures": [
+        "lockout"
+      ],
+      "faults": [
+        {
+          "name": "lockout",
+          "primitive": "start_elbow_deg",
+          "value": 158.6516,
+          "threshold": 160.0,
+          "comparison": "<",
+          "unit": "deg",
+          "class": "SCALED",
+          "errorId": "push_up.incomplete_lockout",
+          "phase": "support",
+          "intervalS": [
+            10.39,
+            10.47
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "rep": "r10",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            10.39,
+            11.31
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6361,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r10",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "observed",
+          "intervalS": [
+            10.39,
+            10.47
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 158.6516,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r10",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            10.39,
+            11.31
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r10",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            10.39,
+            11.31
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r10",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            10.87,
+            11.31
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          10.39,
+          11.31
+        ],
+        "setup": [
+          10.39,
+          10.47
+        ],
+        "lowering": [
+          10.39,
+          10.87
+        ],
+        "lifting": [
+          10.87,
+          11.31
+        ],
+        "support": [
+          10.39,
+          10.47
+        ],
+        "turnaround": [
+          10.79,
+          10.95
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.08 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.57 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.49 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.02 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.13 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.13 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 10.39,
+      "endS": 11.31,
+      "turnS": 10.87,
+      "score": 56,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.465,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 93% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.674,
+          "weight": 0.35,
+          "why": "the ascent ran at 67% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.126,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.024,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4694,
+        -1.4674,
+        -1.4654,
+        -1.456,
+        -1.4462,
+        -1.426,
+        -1.4047,
+        -1.3747,
+        -1.3433,
+        -1.3069,
+        -1.2695,
+        -1.2296,
+        -1.189,
+        -1.1477,
+        -1.1061,
+        -1.0672,
+        -1.0295,
+        -0.9931,
+        -0.9573,
+        -0.9281,
+        -0.903,
+        -0.8826,
+        -0.8657,
+        -0.8559,
+        -0.8526,
+        -0.8558,
+        -0.8663,
+        -0.8812,
+        -0.9021,
+        -0.9271,
+        -0.9585,
+        -0.9921,
+        -1.03,
+        -1.0692,
+        -1.1112,
+        -1.1532,
+        -1.1957,
+        -1.2377,
+        -1.2781,
+        -1.3181,
+        -1.3565,
+        -1.3934,
+        -1.4201,
+        -1.446,
+        -1.4637,
+        -1.4807,
+        -1.4838,
+        -1.4869
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r11",
+      "rescued": false,
+      "failures": [
+        "lockout"
+      ],
+      "faults": [
+        {
+          "name": "lockout",
+          "primitive": "start_elbow_deg",
+          "value": 159.7655,
+          "threshold": 160.0,
+          "comparison": "<",
+          "unit": "deg",
+          "class": "SCALED",
+          "errorId": "push_up.incomplete_lockout",
+          "phase": "support",
+          "intervalS": [
+            11.31,
+            11.39
+          ]
+        }
+      ],
+      "assessments": [
+        {
+          "rep": "r11",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            11.31,
+            12.24
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6671,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r11",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "observed",
+          "intervalS": [
+            11.31,
+            11.39
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 159.7655,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r11",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            11.31,
+            12.24
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r11",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            11.31,
+            12.24
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 0.9167,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r11",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            11.76,
+            12.24
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          11.31,
+          12.24
+        ],
+        "setup": [
+          11.31,
+          11.39
+        ],
+        "lowering": [
+          11.31,
+          11.76
+        ],
+        "lifting": [
+          11.76,
+          12.24
+        ],
+        "support": [
+          11.31,
+          11.39
+        ],
+        "turnaround": [
+          11.67,
+          11.84
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "0.92 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.05 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.58 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.53 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.12 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.16 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 11.31,
+      "endS": 12.24,
+      "turnS": 11.76,
+      "score": 55,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 0.92x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.47,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 94% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.636,
+          "weight": 0.35,
+          "why": "the ascent ran at 64% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.159,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.043,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4869,
+        -1.4807,
+        -1.4744,
+        -1.455,
+        -1.435,
+        -1.4047,
+        -1.3735,
+        -1.3332,
+        -1.2915,
+        -1.2489,
+        -1.2061,
+        -1.1621,
+        -1.1179,
+        -1.077,
+        -1.0372,
+        -1.0008,
+        -0.9658,
+        -0.9372,
+        -0.912,
+        -0.8906,
+        -0.8717,
+        -0.8586,
+        -0.85,
+        -0.8483,
+        -0.8528,
+        -0.8628,
+        -0.8787,
+        -0.8992,
+        -0.9257,
+        -0.9548,
+        -0.9878,
+        -1.024,
+        -1.0664,
+        -1.1097,
+        -1.1551,
+        -1.1997,
+        -1.2425,
+        -1.285,
+        -1.3261,
+        -1.3663,
+        -1.4021,
+        -1.4366,
+        -1.4619,
+        -1.4859,
+        -1.4975,
+        -1.5086,
+        -1.5109,
+        -1.5131
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r12",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r12",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            12.24,
+            13.16
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7074,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r12",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            12.24,
+            12.32
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 161.3078,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r12",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            12.24,
+            13.16
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r12",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            12.24,
+            13.16
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r12",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            12.72,
+            13.16
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          12.24,
+          13.16
+        ],
+        "setup": [
+          12.24,
+          12.32
+        ],
+        "lowering": [
+          12.24,
+          12.72
+        ],
+        "lifting": [
+          12.72,
+          13.16
+        ],
+        "support": [
+          12.24,
+          12.32
+        ],
+        "turnaround": [
+          12.64,
+          12.8
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.08 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.09 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.65 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.56 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.13 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.14 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 12.24,
+      "endS": 13.16,
+      "turnS": 12.72,
+      "score": 58,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.489,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 98% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.682,
+          "weight": 0.35,
+          "why": "the ascent ran at 68% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.139,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.035,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5131,
+        -1.505,
+        -1.4969,
+        -1.4789,
+        -1.4606,
+        -1.4309,
+        -1.4003,
+        -1.3613,
+        -1.321,
+        -1.2769,
+        -1.2321,
+        -1.1881,
+        -1.1444,
+        -1.0996,
+        -1.0545,
+        -1.0132,
+        -0.9738,
+        -0.9405,
+        -0.9105,
+        -0.8861,
+        -0.8652,
+        -0.8493,
+        -0.8372,
+        -0.8305,
+        -0.8286,
+        -0.8344,
+        -0.8484,
+        -0.8671,
+        -0.8918,
+        -0.9206,
+        -0.956,
+        -0.9942,
+        -1.0378,
+        -1.0827,
+        -1.1307,
+        -1.1782,
+        -1.2244,
+        -1.2702,
+        -1.3148,
+        -1.3589,
+        -1.4001,
+        -1.4397,
+        -1.4686,
+        -1.4963,
+        -1.5117,
+        -1.5266,
+        -1.5308,
+        -1.5351
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r13",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r13",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            13.16,
+            14.08
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7506,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r13",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            13.16,
+            13.24
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 166.6649,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r13",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            13.16,
+            14.08
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r13",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            13.16,
+            14.08
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r13",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            13.64,
+            14.08
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          13.16,
+          14.08
+        ],
+        "setup": [
+          13.16,
+          13.24
+        ],
+        "lowering": [
+          13.16,
+          13.64
+        ],
+        "lifting": [
+          13.64,
+          14.08
+        ],
+        "support": [
+          13.16,
+          13.24
+        ],
+        "turnaround": [
+          13.56,
+          13.72
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.65 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.65 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.15 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.19 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 13.16,
+      "endS": 14.08,
+      "turnS": 13.64,
+      "score": 58,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.489,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 98% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.676,
+          "weight": 0.35,
+          "why": "the ascent ran at 68% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.194,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.04,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5351,
+        -1.5295,
+        -1.5239,
+        -1.5076,
+        -1.4908,
+        -1.4636,
+        -1.4354,
+        -1.3982,
+        -1.3597,
+        -1.314,
+        -1.2667,
+        -1.2189,
+        -1.171,
+        -1.1223,
+        -1.0732,
+        -1.0265,
+        -0.9809,
+        -0.9389,
+        -0.8987,
+        -0.8646,
+        -0.8344,
+        -0.8117,
+        -0.7947,
+        -0.786,
+        -0.785,
+        -0.789,
+        -0.7984,
+        -0.8132,
+        -0.8349,
+        -0.861,
+        -0.8941,
+        -0.9304,
+        -0.9727,
+        -1.017,
+        -1.066,
+        -1.1148,
+        -1.1628,
+        -1.2107,
+        -1.2579,
+        -1.3044,
+        -1.3481,
+        -1.3906,
+        -1.4246,
+        -1.4573,
+        -1.4766,
+        -1.4955,
+        -1.5054,
+        -1.5152
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r14",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r14",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            14.08,
+            15.0
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6871,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r14",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            14.08,
+            14.16
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 164.2297,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r14",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            14.08,
+            15.0
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r14",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            14.08,
+            15.0
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 0.9167,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r14",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            14.52,
+            15.0
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          14.08,
+          15.0
+        ],
+        "setup": [
+          14.08,
+          14.16
+        ],
+        "lowering": [
+          14.08,
+          14.52
+        ],
+        "lifting": [
+          14.52,
+          15.0
+        ],
+        "support": [
+          14.08,
+          14.16
+        ],
+        "turnaround": [
+          14.44,
+          14.6
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "0.92 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.62 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.62 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.04 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.14 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.11 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 14.08,
+      "endS": 15.0,
+      "turnS": 14.52,
+      "score": 55,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 0.92x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.482,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 96% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.629,
+          "weight": 0.35,
+          "why": "the ascent ran at 63% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.11,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.035,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.5152,
+        -1.5117,
+        -1.5083,
+        -1.4885,
+        -1.4679,
+        -1.4391,
+        -1.4095,
+        -1.3723,
+        -1.334,
+        -1.2897,
+        -1.2443,
+        -1.197,
+        -1.1493,
+        -1.1022,
+        -1.0553,
+        -1.0141,
+        -0.9753,
+        -0.9421,
+        -0.9119,
+        -0.8855,
+        -0.8617,
+        -0.8449,
+        -0.8336,
+        -0.8288,
+        -0.8302,
+        -0.8373,
+        -0.8505,
+        -0.8694,
+        -0.8957,
+        -0.9253,
+        -0.9601,
+        -0.9967,
+        -1.0366,
+        -1.0779,
+        -1.122,
+        -1.1658,
+        -1.2089,
+        -1.2516,
+        -1.2928,
+        -1.3335,
+        -1.3719,
+        -1.4083,
+        -1.432,
+        -1.4549,
+        -1.4693,
+        -1.4832,
+        -1.4868,
+        -1.4903
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r15",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r15",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            15.0,
+            15.93
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6372,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r15",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            15.0,
+            15.09
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 162.8433,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r15",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            15.0,
+            15.93
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r15",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            15.0,
+            15.93
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r15",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            15.49,
+            15.93
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          15.0,
+          15.93
+        ],
+        "setup": [
+          15.0,
+          15.09
+        ],
+        "lowering": [
+          15.0,
+          15.49
+        ],
+        "lifting": [
+          15.49,
+          15.93
+        ],
+        "support": [
+          15.0,
+          15.09
+        ],
+        "turnaround": [
+          15.41,
+          15.57
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.59 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.59 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.03 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.12 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.13 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 15.0,
+      "endS": 15.93,
+      "turnS": 15.49,
+      "score": 56,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.472,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 94% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.666,
+          "weight": 0.35,
+          "why": "the ascent ran at 67% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.126,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.03,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4903,
+        -1.486,
+        -1.4818,
+        -1.4654,
+        -1.4483,
+        -1.4226,
+        -1.3961,
+        -1.3608,
+        -1.3243,
+        -1.2859,
+        -1.2472,
+        -1.2067,
+        -1.1656,
+        -1.1231,
+        -1.08,
+        -1.0401,
+        -1.0016,
+        -0.9675,
+        -0.9358,
+        -0.9103,
+        -0.8888,
+        -0.873,
+        -0.8615,
+        -0.8553,
+        -0.8538,
+        -0.8577,
+        -0.8674,
+        -0.8829,
+        -0.9058,
+        -0.9323,
+        -0.9643,
+        -0.9985,
+        -1.0369,
+        -1.0769,
+        -1.1205,
+        -1.1635,
+        -1.205,
+        -1.2466,
+        -1.2888,
+        -1.3298,
+        -1.3656,
+        -1.4,
+        -1.4261,
+        -1.4511,
+        -1.4648,
+        -1.478,
+        -1.4813,
+        -1.4846
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r16",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r16",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            15.93,
+            16.85
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7115,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r16",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            15.93,
+            16.01
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 164.765,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r16",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            15.93,
+            16.85
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r16",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            15.93,
+            16.85
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0909,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r16",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            16.41,
+            16.85
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          15.93,
+          16.85
+        ],
+        "setup": [
+          15.93,
+          16.01
+        ],
+        "lowering": [
+          15.93,
+          16.41
+        ],
+        "lifting": [
+          16.41,
+          16.85
+        ],
+        "support": [
+          15.93,
+          16.01
+        ],
+        "turnaround": [
+          16.33,
+          16.49
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.09 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.02 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.60 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.58 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.02 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.17 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.19 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 15.93,
+      "endS": 16.85,
+      "turnS": 16.41,
+      "score": 57,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.09x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.476,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 95% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.667,
+          "weight": 0.35,
+          "why": "the ascent ran at 67% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.192,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.015,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4846,
+        -1.4799,
+        -1.4752,
+        -1.4591,
+        -1.4426,
+        -1.4127,
+        -1.3815,
+        -1.342,
+        -1.3012,
+        -1.2565,
+        -1.211,
+        -1.1652,
+        -1.1193,
+        -1.0746,
+        -1.0303,
+        -0.9876,
+        -0.9456,
+        -0.9081,
+        -0.8732,
+        -0.8446,
+        -0.82,
+        -0.8014,
+        -0.7875,
+        -0.7788,
+        -0.775,
+        -0.7774,
+        -0.7866,
+        -0.8018,
+        -0.8248,
+        -0.8519,
+        -0.8856,
+        -0.9221,
+        -0.964,
+        -1.0071,
+        -1.0528,
+        -1.0987,
+        -1.1455,
+        -1.1922,
+        -1.2386,
+        -1.2837,
+        -1.3226,
+        -1.3606,
+        -1.3935,
+        -1.4253,
+        -1.4445,
+        -1.4631,
+        -1.4662,
+        -1.4694
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r17",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r17",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            16.85,
+            17.77
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.6948,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r17",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            16.85,
+            16.93
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 168.6541,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r17",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            16.85,
+            17.77
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r17",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            16.85,
+            17.77
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 0.9167,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r17",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            17.29,
+            17.77
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          16.85,
+          17.77
+        ],
+        "setup": [
+          16.85,
+          16.93
+        ],
+        "lowering": [
+          16.85,
+          17.29
+        ],
+        "lifting": [
+          17.29,
+          17.77
+        ],
+        "support": [
+          16.85,
+          16.93
+        ],
+        "turnaround": [
+          17.21,
+          17.37
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.92",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.44 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.92 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "0.92 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.60 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.60 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.03 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.18 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.19 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 16.85,
+      "endS": 17.77,
+      "turnS": 17.29,
+      "score": 56,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 0.92x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.476,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 95% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.649,
+          "weight": 0.35,
+          "why": "the ascent ran at 65% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.186,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.025,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4694,
+        -1.4633,
+        -1.4573,
+        -1.4406,
+        -1.4236,
+        -1.3993,
+        -1.3743,
+        -1.3395,
+        -1.3031,
+        -1.2589,
+        -1.213,
+        -1.1664,
+        -1.1196,
+        -1.0732,
+        -1.0269,
+        -0.9826,
+        -0.9391,
+        -0.8998,
+        -0.8628,
+        -0.8333,
+        -0.8087,
+        -0.7915,
+        -0.78,
+        -0.7751,
+        -0.776,
+        -0.7823,
+        -0.7944,
+        -0.8118,
+        -0.8363,
+        -0.8653,
+        -0.9014,
+        -0.9392,
+        -0.9803,
+        -1.022,
+        -1.0652,
+        -1.1094,
+        -1.1564,
+        -1.2023,
+        -1.2439,
+        -1.2844,
+        -1.3192,
+        -1.353,
+        -1.3798,
+        -1.406,
+        -1.4261,
+        -1.4456,
+        -1.4526,
+        -1.4597
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r18",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r18",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            17.77,
+            18.74
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7415,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r18",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            17.77,
+            17.85
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 165.9027,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r18",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            17.77,
+            18.74
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r18",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            17.77,
+            18.74
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 1.0,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r18",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            18.25,
+            18.74
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          17.77,
+          18.74
+        ],
+        "setup": [
+          17.77,
+          17.85
+        ],
+        "lowering": [
+          17.77,
+          18.25
+        ],
+        "lifting": [
+          18.25,
+          18.74
+        ],
+        "support": [
+          17.77,
+          17.85
+        ],
+        "turnaround": [
+          18.17,
+          18.33
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "0.96",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "0.96 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "1.00 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.10 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.65 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.55 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.02 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.16 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.21 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 17.77,
+      "endS": 18.74,
+      "turnS": 18.25,
+      "score": 57,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 1.00x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.489,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 98% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.652,
+          "weight": 0.35,
+          "why": "the ascent ran at 65% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.208,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.017,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.4597,
+        -1.4536,
+        -1.4469,
+        -1.4283,
+        -1.4087,
+        -1.3778,
+        -1.3456,
+        -1.3041,
+        -1.262,
+        -1.2171,
+        -1.172,
+        -1.1258,
+        -1.0803,
+        -1.0367,
+        -0.9938,
+        -0.9524,
+        -0.914,
+        -0.8815,
+        -0.853,
+        -0.8312,
+        -0.8129,
+        -0.7995,
+        -0.7905,
+        -0.7865,
+        -0.7874,
+        -0.7931,
+        -0.8052,
+        -0.8226,
+        -0.8471,
+        -0.8766,
+        -0.9124,
+        -0.952,
+        -0.9973,
+        -1.0453,
+        -1.0937,
+        -1.1422,
+        -1.194,
+        -1.247,
+        -1.2944,
+        -1.3404,
+        -1.3811,
+        -1.4207,
+        -1.4482,
+        -1.4739,
+        -1.4921,
+        -1.5095,
+        -1.518,
+        -1.526
+      ]
+    },
+    {
+      "session": "1970-01-01",
+      "label": "r19",
+      "rescued": false,
+      "failures": [],
+      "faults": [],
+      "assessments": [
+        {
+          "rep": "r19",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.short_travel",
+          "name": "poor range of motion",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            18.74,
+            19.74
+          ],
+          "evidence": {
+            "primitive": "travel",
+            "value": 0.7362,
+            "threshold": 0.35,
+            "comparison": "<",
+            "unit": "torso",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r19",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.incomplete_lockout",
+          "name": "lockout",
+          "phase": "support",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            18.74,
+            18.82
+          ],
+          "evidence": {
+            "primitive": "start_elbow_deg",
+            "value": 168.2205,
+            "threshold": 160.0,
+            "comparison": "<",
+            "unit": "deg",
+            "class": "SCALED",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r19",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.hip_sag",
+          "name": "sagging hips",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "unobservable",
+          "intervalS": [
+            18.74,
+            19.74
+          ],
+          "evidence": {
+            "primitive": "hip_sag",
+            "value": null,
+            "threshold": 0.12,
+            "comparison": ">",
+            "unit": "torso",
+            "class": "PLANAR",
+            "coverage": 0.0
+          },
+          "source": "geometry",
+          "version": 2,
+          "availability": {
+            "reason": "tracking loss",
+            "detail": "tracking loss"
+          }
+        },
+        {
+          "rep": "r19",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.dropped_descent",
+          "name": "control",
+          "phase": "rep",
+          "scope": "rep",
+          "status": "not_observed",
+          "intervalS": [
+            18.74,
+            19.74
+          ],
+          "evidence": {
+            "primitive": "tempo_ratio",
+            "value": 0.9231,
+            "threshold": 0.7,
+            "comparison": "<",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        },
+        {
+          "rep": "r19",
+          "exercise": "push_up",
+          "variant": "unspecified",
+          "errorId": "push_up.lift_stall",
+          "name": "stall",
+          "phase": "lifting",
+          "scope": "phase",
+          "status": "not_observed",
+          "intervalS": [
+            19.22,
+            19.74
+          ],
+          "evidence": {
+            "primitive": "stalled_frac",
+            "value": 0.0,
+            "threshold": 0.05,
+            "comparison": ">=",
+            "unit": "",
+            "class": "INVARIANT",
+            "coverage": 1.0
+          },
+          "source": "geometry",
+          "version": 2
+        }
+      ],
+      "phases": {
+        "rep": [
+          18.74,
+          19.74
+        ],
+        "setup": [
+          18.74,
+          18.82
+        ],
+        "lowering": [
+          18.74,
+          19.22
+        ],
+        "lifting": [
+          19.22,
+          19.74
+        ],
+        "support": [
+          18.74,
+          18.82
+        ],
+        "turnaround": [
+          19.14,
+          19.3
+        ]
+      },
+      "assessmentBlocked": null,
+      "unmeasured": [
+        "heel_rise",
+        "hip_sag",
+        "knee_valgus",
+        "legs_straight_frac",
+        "squat_depth",
+        "transition_s"
+      ],
+      "viewBlocked": [
+        "torso_lean"
+      ],
+      "transition_s": "",
+      "total_s": "1.00",
+      "class": "INVARIANT",
+      "metrics": [
+        {
+          "name": "Concentric duration",
+          "value": "0.52 s",
+          "class": "INVARIANT",
+          "key": "concentric_s"
+        },
+        {
+          "name": "Eccentric duration",
+          "value": "0.48 s",
+          "class": "INVARIANT",
+          "key": "eccentric_s"
+        },
+        {
+          "name": "Rep duration",
+          "value": "1.00 s",
+          "class": "INVARIANT",
+          "key": "total_s"
+        },
+        {
+          "name": "Eccentric : concentric",
+          "value": "0.92 x",
+          "class": "INVARIANT",
+          "key": "tempo_ratio"
+        },
+        {
+          "name": "Time held near lockout",
+          "value": "0.04 s",
+          "class": "INVARIANT",
+          "key": "top_hold_s"
+        },
+        {
+          "name": "Range of motion",
+          "value": "0.00 torso",
+          "class": "SCALED",
+          "key": "rom"
+        },
+        {
+          "name": "Lockout height above bar",
+          "value": "1.65 torso",
+          "class": "SCALED",
+          "key": "peak_height"
+        },
+        {
+          "name": "Start position below bar",
+          "value": "-1.65 torso",
+          "class": "SCALED",
+          "key": "start_depth"
+        },
+        {
+          "name": "Shoulder asymmetry (concentric)",
+          "value": "0.03 torso",
+          "class": "PLANAR",
+          "key": "shoulder_asymmetry"
+        },
+        {
+          "name": "Shoulder asymmetry at turnaround",
+          "value": "0.05 torso",
+          "class": "PLANAR",
+          "key": "turn_asymmetry"
+        },
+        {
+          "name": "Body swing relative to the bar",
+          "value": "0.16 torso",
+          "class": "PLANAR",
+          "key": "swing"
+        }
+      ],
+      "plausible": true,
+      "problems": [],
+      "startS": 18.74,
+      "endS": 19.74,
+      "turnS": 19.22,
+      "score": 49,
+      "band": "solid",
+      "scoreNote": "",
+      "complete": true,
+      "penalties": [
+        {
+          "name": "control",
+          "value": 0.0,
+          "why": "descent 0.92x the ascent - controlled"
+        }
+      ],
+      "components": [
+        {
+          "name": "range",
+          "value": 0.489,
+          "weight": 0.4,
+          "why": "hang 0% of full, lockout 98% of full"
+        },
+        {
+          "name": "smoothness",
+          "value": 0.501,
+          "weight": 0.35,
+          "why": "the ascent ran at 50% of its own best rate"
+        }
+      ],
+      "aside": [
+        {
+          "name": "swing",
+          "value": 0.157,
+          "why": "body travel relative to the bar - needs a consistent camera side, so it is not part of the score"
+        },
+        {
+          "name": "symmetry",
+          "value": 0.028,
+          "why": "left/right shoulder difference - needs a consistent camera side, so it is not part of the score"
+        }
+      ],
+      "trace": [
+        -1.526,
+        -1.5233,
+        -1.5187,
+        -1.5002,
+        -1.4788,
+        -1.4481,
+        -1.4127,
+        -1.3688,
+        -1.3231,
+        -1.2755,
+        -1.2268,
+        -1.1776,
+        -1.1266,
+        -1.0748,
+        -1.0262,
+        -0.9781,
+        -0.9357,
+        -0.8943,
+        -0.8621,
+        -0.8325,
+        -0.8135,
+        -0.7988,
+        -0.793,
+        -0.7941,
+        -0.8039,
+        -0.8203,
+        -0.8418,
+        -0.87,
+        -0.9015,
+        -0.9417,
+        -0.9841,
+        -1.0308,
+        -1.078,
+        -1.129,
+        -1.1804,
+        -1.2341,
+        -1.2786,
+        -1.2992,
+        -1.3184,
+        -1.3355,
+        -1.3507,
+        -1.3641,
+        -1.3753,
+        -1.3852,
+        -1.3923,
+        -1.3986,
+        -1.4018,
+        -1.4045
+      ]
+    }
+  ],
+  "blockers": [],
+  "nextSession": "Five or six reps, one set, tripod on a marked spot, same side every time, lockout in frame, trimmed to the working set.",
+  "_runtimeS": {
+    "analyze": 0.055,
+    "poseSource": "cache"
+  },
+  "traceId": "260908-201440-833be5"
+}

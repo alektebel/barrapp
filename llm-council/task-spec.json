@@ -1,0 +1,38 @@
+{
+  "task": "Improve the exercise-classification pipeline of the barrapp app (an Android + Python pose-estimation fitness analyser at /home/diego/Documents/Development/barrapp) so it correctly classifies EVERY video it is given, or honestly abstains. Currently the geometric classifier barra/classify.py confidently mislabels several real cases: squats filmed with the arms held forward are reported as 'dip' (fixed hands + articulated arms + body below the hands IS the dip signature); static planche holds are reported as 'push_up'; front-lever holds as 'muscle_up'; and exercises the pipeline does not measure at all (bench press, deadlift, handstand, machine work) are reported as a confident wrong movement (dip/muscle_up) instead of being abstained as 'unknown'. A learned classifier (barra/model.py, a numpy softmax MLP) is a weak second opinion trained on a small corpus. Produce a phased, testable implementation plan that (1) makes the geometric classifier abstain honestly instead of confidently mislabeling ambiguous or unmeasurable movements, (2) fixes the specific squat-vs-dip, planche-vs-push-up, and front-lever-vs-muscle-up confusions that are genuinely fixable, and (3) grows and retrains the learned classifier on the corpus so it separates more classes accurately - all while keeping the project's core principle: measure what you can, abstain honestly, never report a fabricated verdict.",
+  "constraints": [
+    "Constraint: no new dependencies may be added; stay within numpy, torch, ultralytics, mediapipe, opencv already installed - and keep the measurement core able to run without a cloud model (offline, no per-clip paid calls, no AWS cost).",
+    "Constraint: the geometric classifier must remain interpretable, three-valued (observed / not-observed / unobservable-with-reason) and gated on a knowable camera view for planar quantities; it must abstain (return 'unknown' with a named reason) rather than confidently mislabel when the deciding measurement is ambiguous.",
+    "Constraint: correctness is measured by matching the labels we already have - data/evaluation/sample_manifest.json 'movement' for the 8 reviewed root clips and data/calisthenics/metadata.csv 'trick' for scraped clips, alias-resolved via barra/movements.resolve. Vision-model (nan.builders) disagreement is recorded as a review signal, never as ground truth.",
+    "Constraint: the whole corpus must be covered - the 8 reviewed root clips (VID-*.mp4), data/videos/, and the scraped data/calisthenics/videos corpus (~168 clips across muscle_up, pull_up, dip, push_up, squat, pistol_squat, knee_raise, front_lever, planche, split_squat, bulgarian_split_squat, bench_press, deadlift, handstand, ...).",
+    "Constraint: performance must be verified by the existing test suite (python -m unittest / pytest) which must stay green, plus a repeatable evaluation (scripts/pipeline_eval.py) that measures true-positive classification and honest abstention on the corpus.",
+    "Constraint: do NOT modify or over-fit to the reviewed baseline or the reviewed manifest in a way that hides a regression; the evaluation must diff against a saved baseline like scripts/evaluate_technique_pipeline.py does."
+  ],
+  "repo_context": {
+    "root": "/home/diego/Documents/Development/barrapp",
+    "paths": [
+      "barra/classify.py",
+      "barra/movements.py",
+      "barra/evidence.py",
+      "barra/rules.py",
+      "barra/config.py",
+      "barra/model.py",
+      "barra/skills.py",
+      "barra/exercises.py",
+      "scripts/train_model.py",
+      "scripts/pipeline_eval.py",
+      "scripts/evaluate_technique_pipeline.py",
+      "scripts/scrape_calisthenics.py",
+      "data/evaluation/sample_manifest.json",
+      "data/calisthenics/metadata.csv",
+      "data/exercises/catalog.json",
+      "server/process.py",
+      "server/vision.py",
+      "tests/",
+      "docs/PIPELINE-EVAL.md",
+      "docs/MODEL.md",
+      "tecnicas-errores-comunes.md"
+    ],
+    "notes": "Targets: barra/classify.py (decisions + features, dip/push-up branch already has a squat-with-unseen-feet abstention guard), barra/movements.py (the 11 measured movements + aliases, plus the split_squat family), barra/evidence.py (primitives incl. split_depth, planar-gated), barra/model.py (numpy softmax MLP + load head, bare: model_classify/model_load, train_classifier/train_load), scripts/train_model.py (--no-live uses cached keypoints), scripts/pipeline_eval.py (batch runner storing per-clip intermediate state + program in DynamoDB barra-pipeline-eval, nan multimodal second opinion). Known true confusions measured on the corpus (see docs/PIPELINE-EVAL.md): squat->dip (arm-forward squats; feet partly visible so the current guard does not fire), planche->push_up, front_lever->muscle_up/unknown, and unmeasurable exercises (bench_press/split_squat, deadlift, handstand) being confidently mislabeled instead of abstained. The learned model was retrained to 7 classes (muscle_up, push_up, knee_raise, dip, squat, front_lever, planche) with 0.6 holdout accuracy on 23 clips; support per class is 1 so it is weak. Pose extraction: mediapipe is SIGKILLed on this host; BARRA_POSE_BACKEND=ultralytics is the working backend and keypoints are cached to out/keypoints/."
+  }
+}

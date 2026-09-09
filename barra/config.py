@@ -71,7 +71,31 @@ class Thresholds:
     controlled_tempo: float = 0.70  # eccentric:concentric below this is dropped
     stall_rate: float = 0.20       # ascent step below this share of mean = stalled
     stalled_frac: float = 0.05     # share of stalled frames before "stall"
+    # Exclude the outer share of the lifting DISPLACEMENT from the stall count:
+    # leaving rest and turning around both decelerate, and neither is a stall.
+    # Provenance records this convention beside the rate it modifies.
+    stall_edge_fraction: float = 0.10
     transition_s: float = 0.60     # seconds crossing the bar plane, muscle-up
+
+    # -- the bar plane -------------------------------------------------------
+    # Shoulders within this many torso-lengths of the hands are "at the bar":
+    # the muscle-up's transition is the time spent inside this band, and a rep
+    # of a hanging movement whose REST position sits further than this on the
+    # wrong side of the hands (shoulders above them, on a pull-up) did not
+    # start from a hang - it is a person standing near the rig with the
+    # wrists tracked below the shoulders. 0014's walking interval rested 0.86
+    # torso-lengths above the hands; every real hang in the sample corpus
+    # rests below them.
+    bar_plane_band: float = 0.15
+    rest_side_tolerance: float = 0.30
+
+    # -- availability --------------------------------------------------------
+    # A phase-window primitive is withheld unless at least this share of the
+    # window actually saw the joints it needs. The same 60% the segmenter
+    # demands of a rep before counting it: a number from a fragment of a phase
+    # is not a measurement of that phase.
+    min_phase_coverage: float = 0.60
+    min_phase_samples: int = 3         # and at least this many observed frames
 
     # -- straightness: 180 = fully extended ----------------------------------
     straight_arm: float = 160.0
@@ -94,6 +118,9 @@ class Thresholds:
     # -- squat (hip-origin, ankle-referenced) --------------------------------
     squat_depth: float = 0.35          # hip drop from this rep's own stand, torso
 
+    # -- split squat (front-ankle-referenced) --------------------------------
+    split_depth: float = 0.35          # hip drop from the planted front ankle, torso
+
     # -- push-up -------------------------------------------------------------
     push_up_depth: float = 0.35        # shoulder travel toward the hands, torso
     hip_sag: float = 0.12              # hip off the shoulder-ankle line, torso
@@ -108,9 +135,20 @@ class Thresholds:
                                        # own median is a rep thrown, not pulled
 
     # -- segmentation (mirrored from the literals ingest.py used inline) -----
-    peak_prominence: float = 0.35      # share of clip amplitude for a turnaround
+    peak_prominence: float = 0.35      # share of span amplitude for a turnaround
     rescue_prominence: float = 0.15
     max_half_rep_s: float = 4.0        # longest half-rep the standard pass keeps
+    # The least a span may move and still be a set, in torso-lengths.
+    #
+    # Amplitude is measured per active span, so each span sets its own
+    # prominence threshold - which is the point, and which also means a span
+    # that only contains noise would set an arbitrarily small one and count
+    # its own jitter as reps. This is the floor under that, and like every
+    # other threshold in this file it sits in a measured gap rather than being
+    # tuned: a static hang plus pose jitter spans 0.014 torso-lengths, the
+    # shallowest real set measured spans 0.39, and a full set 1.54. Ten times
+    # the noise, and a third of the quietest real movement.
+    min_span_amplitude: float = 0.15
 
 
 THRESHOLDS = Thresholds()
