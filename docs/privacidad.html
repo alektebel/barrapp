@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de Privacidad — barrapp</title>
+<meta name="description" content="Política de Privacidad de la aplicación barrapp para Android.">
+<style>
+  :root{
+    --bg:#f7f7f5; --panel:#ffffff; --fg:#191c1b; --muted:#5c6360;
+    --line:#e2e4e1; --accent:#0f6b5a; --accent-soft:#e6f1ee;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#101413; --panel:#171c1a; --fg:#e8ece9; --muted:#9aa5a0;
+      --line:#28302d; --accent:#5fd3b8; --accent-soft:#12251f;
+    }
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    padding:32px 20px 72px;
+  }
+  main{max-width:760px; margin:0 auto}
+  header{border-bottom:1px solid var(--line); padding-bottom:20px; margin-bottom:28px}
+  .brand{
+    display:inline-block; font-size:12px; font-weight:700; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--accent); background:var(--accent-soft);
+    padding:4px 10px; border-radius:999px; margin-bottom:14px;
+  }
+  h1{font-size:clamp(26px,5vw,36px); line-height:1.15; margin:0 0 10px; letter-spacing:-.02em}
+  .updated{color:var(--muted); font-size:14px; margin:0}
+  h2{font-size:19px; margin:38px 0 12px; letter-spacing:-.01em}
+  h3{font-size:16px; margin:24px 0 6px; color:var(--fg)}
+  p,li{color:var(--fg)}
+  .lead{font-size:17px; color:var(--muted)}
+  ul{padding-left:22px; margin:10px 0}
+  li{margin:6px 0}
+  strong{font-weight:650}
+  code{
+    font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    background:var(--accent-soft); color:var(--accent);
+    padding:1px 6px; border-radius:6px;
+  }
+  .note{
+    border-left:3px solid var(--accent); background:var(--panel);
+    padding:14px 16px; border-radius:0 10px 10px 0; margin:22px 0;
+    color:var(--muted); font-size:14.5px;
+  }
+  .contact{
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:14px; padding:18px 20px; margin-top:14px;
+  }
+  footer{
+    margin-top:44px; padding-top:20px; border-top:1px solid var(--line);
+    color:var(--muted); font-size:13.5px;
+  }
+  a{color:var(--accent)}
+  @media print{
+    body{background:#fff; color:#000; padding:0}
+    :root{--panel:#fff; --line:#ccc; --muted:#444; --accent:#000; --accent-soft:#fff}
+    h2{page-break-after:avoid}
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <span class="brand">barrapp</span>
+    <h1>Política de Privacidad</h1>
+    <p class="updated">Última actualización: 11 de septiembre de 2026</p>
+  </header>
+
+  <p class="lead">
+    barrapp es una herramienta de medición: cuenta tus repeticiones a partir de un
+    vídeo que grabas y te devuelve números (tiempos, rangos de movimiento, número de
+    repeticiones). No es un entrenador, no es un médico y no es una red social.
+  </p>
+  <p>
+    Esta política explica qué datos tratamos, para qué, con quién se comparten y
+    cuánto tiempo los conservamos.
+  </p>
+  <div class="note">
+    <strong>Responsable del tratamiento:</strong> barrapp (alektebel), España.<br>
+    <strong>Contacto:</strong> <a href="mailto:dratencia@gmail.com">dratencia@gmail.com</a><br>
+    <strong>Eliminar tu cuenta y tus datos:</strong>
+    <a href="eliminar-cuenta.html">cómo solicitarlo</a>.
+  </div>
+
+  <h2>1. Qué datos tratamos</h2>
+
+  <h3>El vídeo que eliges</h3>
+  <p>
+    El clip que seleccionas o grabas se sube a nuestro servidor en Amazon Web
+    Services para analizarlo. La app usa el selector y la cámara del sistema:
+    barrapp no pide permiso de cámara ni acceso a toda tu galería, solo recibe el
+    clip que tú eliges.
+  </p>
+
+  <h3>Identificador de dispositivo</h3>
+  <p>
+    En el teléfono se genera un identificador aleatorio (un UUID) que se guarda
+    solo en tu dispositivo. Sirve para asociar tu historial a este teléfono sin
+    necesidad de nombre, correo ni cuenta de Google. Puedes usar barrapp de forma
+    totalmente anónima.
+  </p>
+
+  <h3>Cuenta (opcional)</h3>
+  <p>
+    Si decides crear una cuenta, tratamos tu <strong>correo electrónico</strong> y
+    tu <strong>contraseña</strong>. La contraseña la gestiona Amazon Cognito y se
+    guarda cifrada; barrapp nunca la ve. En el teléfono solo se guardan los tokens
+    de sesión. La cuenta es lo que hace que tu historial sobreviva a un cambio de
+    teléfono.
+  </p>
+
+  <h3>Resultados de medición</h3>
+  <p>
+    Los números que produce el análisis (repeticiones, tiempos, rangos, avisos de
+    técnica) se guardan en nuestra base de datos asociados a tu identificador de
+    dispositivo o a tu cuenta, para que puedas consultar tu historial. Estos
+    resultados <strong>no incluyen el vídeo</strong>.
+  </p>
+
+  <h3>Asistente de objetivos (opcional)</h3>
+  <p>
+    Los mensajes que escribes en el chat de objetivos se envían a nuestro servidor
+    y a un proveedor externo de inteligencia artificial (nan.builders, modelo
+    <code>qwen3.8-flash</code>) para generar tu perfil. El perfil resultante
+    (nombre, edad, frecuencia de entrenamiento y objetivo) se guarda en tu
+    teléfono. Ten en cuenta que la conversación que lo genera sí sale del
+    dispositivo tal como se describe aquí, así que no escribas en ese chat datos
+    que no quieras enviar.
+  </p>
+
+  <h3>Diagnóstico</h3>
+  <p>
+    Guardamos trazas técnicas de cada análisis (identificador de la ejecución,
+    etapas, métricas) para poder detectar y corregir errores. Estas trazas no
+    contienen el vídeo.
+  </p>
+
+  <h3>Notificaciones</h3>
+  <p>
+    La app usa notificaciones locales (por ejemplo, tu revisión semanal). No tratan
+    datos personales más allá de lo necesario para mostrarlas.
+  </p>
+
+  <h2>2. Para qué usamos los datos</h2>
+  <ul>
+    <li>Medir tus repeticiones y devolverte el informe.</li>
+    <li>Mantener tu historial de entrenamiento y sincronizarlo con tu cuenta.</li>
+    <li>Gestionar tu cuenta y el correo de confirmación o recuperación.</li>
+    <li>Redactar el texto del informe y la revisión de técnica.</li>
+    <li>Responder al asistente de objetivos.</li>
+    <li>Garantizar la seguridad y depurar fallos del servicio.</li>
+  </ul>
+  <p>
+    No vendemos tus datos. No mostramos publicidad. No compartimos tu clip con
+    otros usuarios.
+  </p>
+
+  <h2>3. Con quién se comparten</h2>
+  <p>Usamos proveedores que tratan datos por cuenta nuestra:</p>
+  <ul>
+    <li>
+      <strong>Amazon Web Services (AWS)</strong> — alojamiento. Guarda el vídeo
+      (S3), los resultados (DynamoDB), las credenciales de la cuenta (Cognito) y
+      ejecuta el análisis (Lambda), en la región <code>eu-west-1</code> (Irlanda).
+    </li>
+    <li>
+      <strong>DeepSeek</strong> (<code>api.deepseek.com</code>) — recibe el
+      <strong>informe numérico</strong> (sin el vídeo) para redactar el texto del
+      informe.
+    </li>
+    <li>
+      <strong>nan.builders</strong> (<code>api.nan.builders</code>) — recibe
+      <strong>fotogramas fijos extraídos de tu clip</strong> junto con el informe
+      medido, para un análisis técnico de la técnica, y recibe la conversación del
+      asistente de objetivos.
+    </li>
+  </ul>
+  <p>
+    Estos proveedores pueden tratar datos fuera del Espacio Económico Europeo,
+    amparándose en sus propias garantías (decisiones de adecuación o cláusulas
+    contractuales tipo). No usamos tus datos para entrenar modelos.
+  </p>
+
+  <h2>4. Cuánto tiempo los conservamos</h2>
+  <ul>
+    <li>
+      <strong>Vídeo:</strong> se borra automáticamente <strong>30 días</strong>
+      después de subirlo. Puedes borrarlo antes desde la pantalla del informe de
+      la sesión.
+    </li>
+    <li>
+      <strong>Resultados y trazas:</strong> mientras mantengas tu historial. Al
+      borrar una sesión se elimina también su registro.
+    </li>
+    <li>
+      <strong>Cuenta:</strong> hasta que la elimines. Puedes solicitar el borrado
+      de tu cuenta y de los datos asociados escribiendo al correo de contacto.
+    </li>
+    <li>
+      <strong>Fotogramas enviados a los proveedores de IA:</strong> no los
+      almacenamos nosotros; se procesan solo para generar el informe.
+    </li>
+  </ul>
+
+  <h2>5. Seguridad</h2>
+  <p>
+    El vídeo viaja y se guarda cifrado (HTTPS/TLS en tránsito, AES-256 en reposo
+    en S3), el bucket es privado y no accesible públicamente, y cada dato está
+    ligado a tu identificador o tu cuenta. La app tiene desactivadas las copias de
+    seguridad automáticas de Android.
+  </p>
+
+  <h2>6. Tus derechos</h2>
+  <p>
+    Si te encuentras en el Espacio Económico Europeo, puedes ejercer tus derechos
+    de acceso, rectificación, supresión, portabilidad, limitación y oposición
+    escribiendo al correo de contacto. También puedes reclamar ante la Agencia
+    Española de Protección de Datos (<a href="https://www.aepd.es">www.aepd.es</a>).
+  </p>
+
+  <h2>7. Menores</h2>
+  <p>
+    barrapp no está dirigida a menores de 16 años y no recopilamos conscientemente
+    sus datos. Si eres madre, padre o tutor y crees que un menor nos ha enviado
+    datos, escríbenos para eliminarlos.
+  </p>
+
+  <h2>8. Lo que barrapp no es</h2>
+  <p>
+    Los números son mediciones, no un diagnóstico, un plan de entrenamiento ni una
+    afirmación de que una repetición sea "buena" o "mala". No sustituyen el
+    consejo de un profesional sanitario.
+  </p>
+
+  <h2>9. Cambios en esta política</h2>
+  <p>
+    Si cambiamos esta política, actualizaremos la fecha de arriba. Los cambios
+    importantes se anunciarán en la ficha de la app.
+  </p>
+
+  <h2>10. Contacto</h2>
+  <div class="contact">
+    Para cualquier duda sobre privacidad, usa el correo de contacto de la ficha de
+    barrapp en Google Play.
+  </div>
+
+  <footer>
+    barrapp · Política de Privacidad · 11 de septiembre de 2026
+  </footer>
+</main>
+</body>
+</html>
