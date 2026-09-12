@@ -15,7 +15,7 @@
 # server, and a wipe mints a new one, stranding every past session.
 set -uo pipefail
 
-PKG=com.alektebel.barrapp
+PKG=com.fitness.barrapp
 ACT="$PKG/com.barrapp.MainActivity"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RESET=0

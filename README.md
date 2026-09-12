@@ -2,7 +2,7 @@
 
 Phone films a set. AWS measures it. The phone shows the numbers.
 
-Package id for Play: `com.alektebel.barrapp`.
+Package id for Play: `com.fitness.barrapp`.
 
 ## Local
 

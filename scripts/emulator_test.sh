@@ -38,7 +38,7 @@ echo "booted."
 
 # 3. Install and launch.
 adb install -r "$APK"
-adb shell am start -n com.alektebel.barrapp/.MainActivity
+adb shell am start -n com.fitness.barrapp/.MainActivity
 sleep 6
 
 # 4. Screenshot each screen + dump the view hierarchy.
