@@ -41,6 +41,7 @@ Globals:
         NAN_MODEL: qwen3.8-flash
         BARRA_ROOT: /opt/barra
         TRACES_TABLE: !Ref TracesTable
+        FEEDBACK_TABLE: !Ref FeedbackTable
         USER_POOL_ID: !Ref UserPool
         USER_POOL_CLIENT_ID: !Ref UserPoolClient
 
@@ -110,6 +111,33 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  # One row per user feedback submission. No TTL on purpose: feedback stays
+  # readable until reviewed, even though its clip expires from the bucket
+  # after 30 days with everything else in it.
+  FeedbackTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+        - AttributeName: owner
+          AttributeType: S
+        - AttributeName: createdAt
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      GlobalSecondaryIndexes:
+        - IndexName: owner-index
+          KeySchema:
+            - AttributeName: owner
+              KeyType: HASH
+            - AttributeName: createdAt
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+
   Api:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -140,6 +168,8 @@ Resources:
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref FeedbackTable
         - S3CrudPolicy:
             BucketName: !Ref VideoBucket
         - Statement:

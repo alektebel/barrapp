@@ -315,6 +315,37 @@ def auth_checks(rep: Report, api: str) -> None:
               f"HTTP {status} {body}")
 
 
+def feedback_checks(rep: Report, api: str, device: str) -> None:
+    """The feedback route: text lands in the table, a clip goes to the bucket
+    through a presigned PUT - the same dance an upload speaks - and an empty
+    message is refused rather than stored."""
+    status, body, _ = request("POST", f"{api}/v1/feedback", device=device,
+                              json_body={"message": ""})
+    rep.check("an empty message is refused", status == 400,
+              f"HTTP {status} {body}")
+
+    status, body, _ = request("POST", f"{api}/v1/feedback", device=device,
+                              json_body={"message": "e2e: the score looked wrong",
+                                         "traceId": "deadbeef1234"})
+    if not rep.check("a text-only feedback is accepted", status == 201 and body.get("id"),
+                     f"HTTP {status} {body}"):
+        return
+    rep.check("text-only feedback has no upload url",
+              not body.get("uploadUrl"), str(body)[:80])
+
+    status, body, _ = request("POST", f"{api}/v1/feedback", device=device,
+                              json_body={"message": "e2e: with a clip", "video": True})
+    if not rep.check("a feedback with video is accepted", status == 201 and body.get("id"),
+                     f"HTTP {status} {body}"):
+        return
+    url = body.get("uploadUrl") or ""
+    if not rep.check("the feedback carries a presigned upload url", bool(url),
+                     json.dumps(body)[:120]):
+        return
+    code, _etag = put_part(url, b"e2e feedback clip placeholder bytes")
+    rep.check("the feedback clip is accepted by storage", code == 200, f"HTTP {code}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -324,6 +355,7 @@ def main() -> int:
     ap.add_argument("--budget", type=int, default=300, help="seconds to wait for the worker")
     ap.add_argument("--negative", action="store_true", help="also run the failure modes")
     ap.add_argument("--auth", action="store_true", help="also run the account checks")
+    ap.add_argument("--feedback", action="store_true", help="also run the feedback checks")
     ap.add_argument("--keep", action="store_true", help="do not delete the job afterwards")
     args = ap.parse_args()
 
@@ -377,6 +409,9 @@ def main() -> int:
 
     if args.auth:
         auth_checks(rep, api)
+
+    if args.feedback:
+        feedback_checks(rep, api, device)
 
     if not args.keep:
         status, _, _ = request("DELETE", f"{api}/v1/jobs/{job}", device=device)

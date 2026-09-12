@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-enum class Screen { Privacy, Onboarding, Auth, Home, Coach, Diagnostics, Objectives, Replay, Plan, WorkLog }
+enum class Screen { Privacy, Onboarding, Auth, Home, Coach, Diagnostics, Feedback, Objectives, Replay, Plan, WorkLog }
 
 /** Which pane the compact layout is showing. Wide layouts show all three. */
 enum class Pane { Calendar, Session, Progress }
@@ -68,6 +68,10 @@ data class UiState(
     val authError: String? = null,
     val authNotice: String? = null,
     val signedInAs: String = "",
+    /** The feedback screen's one-shot flow: sending, sent, or what went wrong. */
+    val feedbackBusy: Boolean = false,
+    val feedbackSent: Boolean = false,
+    val feedbackError: String? = null,
 )
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
@@ -363,6 +367,61 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
     fun openDiagnostics() = _state.update {
         it.copy(screen = Screen.Diagnostics, events = EventLog.all(getApplication()))
+    }
+
+    // ---- feedback ----------------------------------------------------------
+
+    fun openFeedback() = _state.update {
+        it.copy(screen = Screen.Feedback, feedbackBusy = false,
+            feedbackSent = false, feedbackError = null)
+    }
+
+    fun resetFeedback() = _state.update {
+        it.copy(feedbackBusy = false, feedbackSent = false, feedbackError = null)
+    }
+
+    /** Send what the user wrote, and - when they attached a clip - stream it
+     *  through the presigned PUT the server answered with. Marked in the
+     *  event log like every other network hop, so a feedback that never
+     *  arrives can still be seen trying. */
+    fun sendFeedback(message: String, video: Uri?) {
+        val app = getApplication<Application>()
+        val text = message.trim()
+        if (text.isEmpty()) {
+            _state.update { it.copy(feedbackError = "Write something first") }
+            return
+        }
+        if (_state.value.feedbackBusy) return
+        _state.update { it.copy(feedbackBusy = true, feedbackError = null) }
+        viewModelScope.launch {
+            try {
+                val latest = _state.value
+                val created = withContext(Dispatchers.IO) {
+                    api.sendFeedback(
+                        message = text,
+                        video = video != null,
+                        traceId = latest.analysis?.traceId,
+                        jobId = latest.current?.id,
+                    )
+                }
+                EventLog.info(app, "feedback accepted", created.id,
+                    traceId = latest.analysis?.traceId ?: "",
+                    jobId = latest.current?.id ?: "")
+                if (video != null) {
+                    withContext(Dispatchers.IO) {
+                        api.uploadVideo(app, created.uploadUrl, created.uploadMethod, video)
+                    }
+                    EventLog.info(app, "feedback clip uploaded", created.id)
+                }
+                _state.update { it.copy(feedbackBusy = false, feedbackSent = true) }
+            } catch (err: Exception) {
+                EventLog.error(app, "feedback failed", err.message ?: "")
+                _state.update {
+                    it.copy(feedbackBusy = false,
+                        feedbackError = err.message ?: "Could not send feedback")
+                }
+            }
+        }
     }
 
     fun clearEvents() {

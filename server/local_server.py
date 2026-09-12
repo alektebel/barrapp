@@ -26,6 +26,7 @@ from process import process_job  # noqa: E402
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 JOBS: dict[str, dict] = {}
+FEEDBACK: dict[str, dict] = {}
 LOCK = threading.Lock()
 
 
@@ -168,6 +169,33 @@ class Handler(BaseHTTPRequestHandler):
             from chat import chat
 
             return self._send(200, chat(body.get("messages") or []))
+
+        if path == "/v1/feedback":
+            message = (body.get("message") or "").strip() if isinstance(body.get("message"), str) else ""
+            if not message:
+                return self._send(400, {"error": "a message is required"})
+            if len(message) > 5000:
+                return self._send(400, {"error": "the message is too long (5000 characters max)"})
+            feedback_id = uuid.uuid4().hex[:12]
+            item = {
+                "id": feedback_id,
+                "owner": owner,
+                "message": message,
+                "status": "new",
+                "createdAt": _now(),
+            }
+            for key, limit in (("traceId", 64), ("jobId", 64), ("appVersion", 80)):
+                value = (body.get(key) or "").strip() if isinstance(body.get(key), str) else ""
+                if value and len(value) <= limit:
+                    item[key] = value
+            out = {k: v for k, v in item.items() if k != "owner"}
+            if body.get("video"):
+                item["videoKey"] = f"feedback/{owner}/{feedback_id}.mp4"
+                out["uploadUrl"] = f"/v1/feedback/{feedback_id}/video"
+                out["uploadMethod"] = "PUT"
+            with LOCK:
+                FEEDBACK[feedback_id] = item
+            return self._send(201, out)
 
         parts = [p for p in path.split("/") if p]
         if (len(parts) == 5 and parts[0] == "v1" and parts[1] == "jobs"

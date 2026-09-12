@@ -205,8 +205,7 @@ class BarraApi(context: Context) {
 
     /** Send one conversation turn of the objectives intake. `messages` is the
      *  running chat as role/content pairs, oldest first. */
-    fun chat(messages: List<Pair<String, String>>): ChatResult {
-        val arr = JSONArray()
+    fun chat(messages: List<Pair<String, String>>): ChatResult {        val arr = JSONArray()
         messages.forEach { (role, content) ->
             arr.put(JSONObject().put("role", role).put("content", content))
         }
@@ -225,6 +224,32 @@ class BarraApi(context: Context) {
                     focusExercise = g.optString("focusExercise"),
                 )
             },
+        )
+    }
+
+    /** Submit a user feedback report, with an optional clip to follow.
+     *  The server answers 201 with an id, and - when `video` is true - a
+     *  presigned PUT url the caller then streams the clip through with
+     *  [uploadVideo]. Same contract as a job upload, so no second path. */
+    fun sendFeedback(
+        message: String,
+        video: Boolean,
+        traceId: String? = null,
+        jobId: String? = null,
+    ): CreatedFeedback {
+        val payload = JSONObject()
+            .put("message", message)
+            .put("video", video)
+            .put("appVersion", BuildConfig.VERSION_NAME)
+        traceId?.takeIf { it.isNotBlank() }?.let { payload.put("traceId", it) }
+        jobId?.takeIf { it.isNotBlank() }?.let { payload.put("jobId", it) }
+        val body = payload.toString().toRequestBody(JSON)
+        val request = authed(Request.Builder().url("$baseUrl/v1/feedback").post(body)).build()
+        val json = call(request)
+        return CreatedFeedback(
+            id = json.optString("id"),
+            uploadUrl = json.optString("uploadUrl"),
+            uploadMethod = json.optString("uploadMethod", "PUT"),
         )
     }
 

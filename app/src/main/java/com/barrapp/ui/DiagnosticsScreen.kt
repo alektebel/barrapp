@@ -66,6 +66,7 @@ fun DiagnosticsScreen(
     apiBase: String,
     report: () -> String,
     onClear: () -> Unit,
+    onFeedback: () -> Unit,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -159,6 +160,24 @@ fun DiagnosticsScreen(
                     modifier = Modifier.weight(1f),
                 ) { Text("Copy report") }
                 OutlinedButton(onClick = onClear) { Text("Clear log") }
+            }
+        }
+
+        item {
+            Panel {
+                Eyebrow("Something wrong?")
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    "Send feedback with an optional clip. It lands on the server with " +
+                        "the same device id this screen shows, so it can be traced to " +
+                        "the events here.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Spacer(Modifier.height(8.dp))
+                OutlinedButton(onClick = onFeedback, modifier = Modifier.fillMaxWidth()) {
+                    Text("Send feedback")
+                }
             }
         }
 

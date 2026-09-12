@@ -93,7 +93,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
 
     androidx.activity.compose.BackHandler(
         enabled = state.screen in setOf(Screen.Replay, Screen.Plan, Screen.Coach,
-            Screen.Diagnostics, Screen.WorkLog),
+            Screen.Diagnostics, Screen.Feedback, Screen.WorkLog),
     ) { vm.openHome() }
 
     Box(
@@ -160,6 +160,16 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 apiBase = BuildConfig.API_BASE_URL,
                 report = vm::diagnosticsReport,
                 onClear = vm::clearEvents,
+                onFeedback = vm::openFeedback,
+                onBack = vm::openHome,
+            )
+
+            Screen.Feedback -> FeedbackScreen(
+                busy = state.feedbackBusy,
+                sent = state.feedbackSent,
+                error = state.feedbackError,
+                onSend = vm::sendFeedback,
+                onReset = vm::resetFeedback,
                 onBack = vm::openHome,
             )
 

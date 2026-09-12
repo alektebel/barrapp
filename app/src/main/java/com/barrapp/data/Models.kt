@@ -6,6 +6,14 @@ data class CreatedJob(
     val uploadMethod: String,
 )
 
+/** The server's answer to a feedback submission: its id, and - when a clip
+ *  was offered - the presigned PUT url to stream it through. */
+data class CreatedFeedback(
+    val id: String,
+    val uploadUrl: String,
+    val uploadMethod: String,
+)
+
 data class Job(
     val id: String,
     val status: String,

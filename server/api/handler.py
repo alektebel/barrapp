@@ -17,6 +17,7 @@ s3 = boto3.client("s3")
 ddb = boto3.resource("dynamodb")
 lam = boto3.client("lambda")
 table = ddb.Table(os.environ["JOBS_TABLE"])
+feedback_table = ddb.Table(os.environ["FEEDBACK_TABLE"])
 BUCKET = os.environ["VIDEO_BUCKET"]
 WORKER = os.environ.get("WORKER_FUNCTION", "")
 
@@ -139,6 +140,56 @@ def _reap_stale(item: dict | None) -> dict | None:
 
 def _owned(item: dict | None, owner: str) -> bool:
     return bool(item and owner and item.get("owner") == owner)
+
+
+def _feedback(owner: str, body: dict) -> tuple[int, dict]:
+    """A user's report from the field, with an optional clip.
+
+    The message is the only required field; everything else - the trace id of
+    a measurement that looked wrong, the job it belonged to, the app version -
+    arrives when the app can supply it. A clip is optional and goes to the
+    bucket under feedback/<owner>/<id>.mp4 via a presigned PUT, the same
+    contract a job upload speaks, so the client needs no second code path.
+
+    The row never expires; the clip expires with the bucket's 30-day rule.
+    Feedback read late loses its video, never its text.
+    """
+    message = (body.get("message") or "").strip() if isinstance(body.get("message"), str) else ""
+    if not message:
+        return 400, {"error": "a message is required"}
+    if len(message) > 5000:
+        return 400, {"error": "the message is too long (5000 characters max)"}
+
+    feedback_id = uuid.uuid4().hex[:12]
+    item = {
+        "id": feedback_id,
+        "owner": owner,
+        "message": message,
+        "status": "new",
+        "createdAt": _now(),
+    }
+    for key, limit in (("traceId", 64), ("jobId", 64), ("appVersion", 80)):
+        value = (body.get(key) or "").strip() if isinstance(body.get(key), str) else ""
+        if value and len(value) <= limit:
+            item[key] = value
+
+    out = dict(item)
+    if body.get("video"):
+        key = f"feedback/{owner}/{feedback_id}.mp4"
+        item["videoKey"] = key
+        # No ContentType in the signing params: a presigned PUT that signs the
+        # content type rejects every request whose header differs from it, and
+        # clients cannot agree on what a clip's mime is. Unsigned headers are
+        # free - the same reason the multipart presigns sign none.
+        out["uploadUrl"] = s3.generate_presigned_url(
+            "put_object",
+            Params={"Bucket": BUCKET, "Key": key},
+            ExpiresIn=3600,
+        )
+        out["uploadMethod"] = "PUT"
+    feedback_table.put_item(Item=_to_ddb(item))
+    out.pop("owner", None)
+    return 201, out
 
 
 def _claim(owner: str, device_id: str) -> dict:
@@ -299,6 +350,10 @@ def _route(event):
         from chat import chat
 
         return _resp(200, chat(body.get("messages") or []))
+
+    if method == "POST" and path.rstrip("/") == "/v1/feedback":
+        code, payload = _feedback(owner, body)
+        return _resp(code, payload)
 
     parts = [p for p in path.split("/") if p]
 
