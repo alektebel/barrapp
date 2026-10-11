@@ -85,6 +85,25 @@ class TechniqueArtifacts:
         }
 
 
+def _ffmpeg_bin() -> str | None:
+    """A usable ffmpeg, system first then the one imageio-ffmpeg ships.
+
+    The worker image deliberately does not install a system ffmpeg (the AL2023
+    repos are not a reliable source for it), so the bundled static binary is
+    the path that actually exists in production. Tests and laptops get
+    whichever is present.
+    """
+    found = shutil.which("ffmpeg")
+    if found:
+        return found
+    try:
+        import imageio_ffmpeg  # type: ignore
+
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:  # noqa: BLE001 - no ffmpeg is a "no artifacts" answer
+        return None
+
+
 def cut_technique(video_path: Path, start_s: float, end_s: float,
                   out_path: Path) -> Path | None:
     """The raw take trimmed to the working set, with a little air either side.
@@ -94,18 +113,50 @@ def cut_technique(video_path: Path, start_s: float, end_s: float,
     """
     if end_s <= start_s:
         return None
+    exe = _ffmpeg_bin()
+    if exe is None:
+        return None
     try:
-        if shutil.which("ffmpeg") is None:
-            return None
         out_path.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(
-            ["ffmpeg", "-loglevel", "error", "-y",
+            [exe, "-loglevel", "error", "-y",
              "-ss", f"{max(0.0, start_s):.2f}", "-i", str(video_path),
              "-t", f"{max(0.1, end_s - start_s):.2f}", "-c", "copy",
              str(out_path)],
             check=True, capture_output=True, timeout=60,
         )
     except Exception:  # noqa: BLE001 - an artifact is never worth a job
+        return None
+    return out_path if out_path.exists() and out_path.stat().st_size > 0 else None
+
+
+def trim_clip(video_path: Path, start_s: float, end_s: float,
+              out_path: Path) -> Path | None:
+    """Cut [start_s, end_s] out of the clip, re-encoded frame-accurately.
+
+    Unlike `cut_technique`, this is the clip that gets STORED as the exercise,
+    so a stream-copy cut onto a keyframe is not good enough - it would keep
+    seconds of the walk-in before the located window. Re-encoding to H.264 also
+    makes the result playable on the phone. Best-effort: None means keep the
+    original.
+    """
+    if end_s <= start_s:
+        return None
+    exe = _ffmpeg_bin()
+    if exe is None:
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            [exe, "-y", "-loglevel", "error",
+             "-ss", f"{max(0.0, start_s):.2f}", "-to", f"{max(0.1, end_s):.2f}",
+             "-i", str(video_path),
+             "-c:v", "libx264", "-preset", "fast", "-crf", "23",
+             "-c:a", "aac", "-movflags", "+faststart",
+             str(out_path)],
+            check=True, capture_output=True, timeout=300,
+        )
+    except Exception:  # noqa: BLE001 - a failed cut keeps the original
         return None
     return out_path if out_path.exists() and out_path.stat().st_size > 0 else None
 

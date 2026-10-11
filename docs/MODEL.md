@@ -4,27 +4,49 @@
 and the first thing in the project that is trained rather than derived.
 
 The geometric classifier (`barra/classify.py`) draws its boundaries by hand on
-measured geometry and is still the interpretable, verified answer. The model is
-a **second opinion**: it learns the same boundaries from labelled footage and
-extends what the rules never covered, and the server ships both so a report can
-say which produced the label and how far apart they were.
+measured geometry and remains the interpretable answer — it states the
+measurement behind every label, and fusion never erases it. It is no longer the
+*authoritative* one. Measured out of fold on the 198-clip corpus:
 
-`barra/fusion.py` now makes that second opinion useful in auto mode. It keeps
-geometry authoritative when geometry is confident, but lets a clear learned-model
-margin recover weak geometric calls. Fusion states its status
-(`geometry-strong`, `model-overrides-weak-geometry`, `majority`, `abstain`, …)
-so downstream UI/reports can show review rather than silently blending evidence.
+| detector | accuracy |
+| --- | --- |
+| vision read of the frames | 0.907 |
+| learned model | 0.576 |
+| geometric rules | 0.227 |
+| geometric rules, confidence ≥ 0.85 | 0.200 |
+
+Geometry is the weakest detector by a factor of two, and its confidence is
+*anti*-correlated with being right — so the old policy, which let geometry veto
+the others above a 0.85 confidence gate, was handing the veto to geometry's
+worst answers. Fusion scored 0.409 while its own learned input scored 0.576.
+
+`barra/fusion.py` now ranks detectors by that measurement: agreement first
+(two detectors naming the same movement ran at 0.861), then the most reliable
+detector that has an answer. Fusion states its status (`majority`,
+`geometry-model-agree`, `vision-decides`, `model-decides`, `geometry-only`,
+`abstain`) so downstream UI/reports can show the disagreement rather than
+silently blending evidence.
+
+| arrangement | before | after |
+| --- | --- | --- |
+| geometry + learned (shipped) | 0.409 | **0.571** |
+| geometry + learned + vision | 0.394 | **0.848** |
 
 ## What it is
 
-A one-hidden-layer softmax classifier (numpy-only, deterministic seed) over the
-clip-level geometric features `barra/classify.features()` already computes. It
-has no new geometry — it learns which feature values belong to which movement.
-The full vector for all movements is `barra.model.FEATURE_NAMES` (n_frames,
-shoulder-above-hands percentiles, hip travel, body line, arms/legs straight
-fractions, single-leg stance, split-stance heights, and temporal summaries such
-as `shoulder_above_hands_p90`, `shoulder_above_hands_over_bar_frac`,
-`shoulder_above_hands_std`, `hip_travel_std`).
+A one-hidden-layer softmax classifier (numpy-only, deterministic seed, Adam)
+over the clip-level features in `barra.kinematics.full_features()`. It has no
+new geometry — it learns which feature values belong to which movement.
+
+That vector is the 36 geometric names the thresholds use
+(`barra.model.FEATURE_NAMES`: n_frames, shoulder-above-hands percentiles, hip
+travel, body line, arms/legs straight fractions, single-leg stance,
+split-stance heights) plus the ~70 kinematic names `barra.kinematics` adds
+(joint-angle ranges, flexed/extended fractions, periodicity, landmark
+visibility) — 106 in all. A model carries the names it was trained on, and
+`server/process.py` computes whatever those names require, so widening the
+vector does not silently feed the model a NaN for every name the geometric
+detector never computed.
 
 Two heads:
 
@@ -55,29 +77,34 @@ labelled clips. Until then it is honest, not silent.
 ## Training
 
 ```bash
-python scripts/train_model.py                     # live pose (needs a pose backend)
-python scripts/train_model.py --no-live           # cached keypoints only (deterministic)
-python scripts/train_model.py --tricks squat,push_up --per-trick 12
+python scripts/train_model.py                     # the measured corpus
+python scripts/train_model.py --window none       # untrimmed clips, on purpose
+python scripts/train_model.py --augment 1         # one view per clip
 ```
 
-Labels come from `data/calisthenics/metadata.csv` (scraped corpus) and
-`data/evaluation/sample_manifest.json` (the eight reviewed clips, whose pose is
-already cached). Features are cached to `out/model_features/features.csv`, so a
-rerun costs nothing. The model + metrics land in
-`models/exercise_model.npz` + `model_metrics.json`.
+The corpus, the technique windows, the features and the fold discipline all
+come from `scripts/classify_eval.py`, so the shipped model is the model the
+eval measured. Clips are every video under `data/calisthenics/videos/` whose
+keypoints are cached, labelled by their directory; the vision sidecars under
+`data/calisthenics/labels/` supply the technique window each clip is trimmed
+to.
 
-`--no-live` exists because live pose extraction (mediapipe) can be killed by a
-constrained host; a clip with no cached keypoints is then skipped rather than
-polluting the corpus.
+The reported accuracy is out-of-fold, with folds assigned by clip so no
+augmented view of a test clip is ever trained on. The model that ships is then
+refit on every clip and is deliberately given no score of its own. Model +
+metrics land in `models/exercise_model.npz` + `model_metrics.json`.
+
+A clip with no cached keypoints is skipped rather than posed mid-training:
+pose is paid once, in `scripts/extract_keypoints.py`, which runs each clip in
+its own subprocess so one OOM costs that clip and not the batch.
 
 ## Reading the results
 
 `model_metrics.json` reports holdout accuracy and per-class precision/recall
 **with support**. A class with support 1 is inconclusive, not 100% — the same
-warning the technique evaluation uses. The checked-in model is trained on the
-small reviewed set and is intentionally a first model; it is a starting point,
-not a verdict. `docs/TECHNIQUE-PIPELINE-IMPLEMENTATION-PLAN.md` and
-`data/evaluation/sample_manifest.json` describe the reviewed corpus it draws on.
+warning the technique evaluation uses. `heldOut.accuracy` is the number to
+quote; `shippedFit` deliberately carries no accuracy of its own, because the
+model that ships has seen every clip.
 
 ## Honesty rules it holds
 

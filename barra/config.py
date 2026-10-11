@@ -67,10 +67,24 @@ class Thresholds:
     # -- shared bar faults ---------------------------------------------------
     swing_torso: float = 0.40      # body travel, torso-lengths, before "momentum"
     lockout_min: float = 0.85      # share of the athlete's own reach at the top
+    # Pull-up lockout is NOT the muscle-up constant. A muscle-up ends in support
+    # above the bar (shoulders ~70-100% of arm reach above the hands); a pull-up
+    # finishes near hand height, where the same primitive reads ~1. Sharing
+    # 0.85 made pull_up.incomplete_lockout fire on every clip (measured range
+    # −45..73, threshold 85). Tuned against vision fault labels on the
+    # calisthenics corpus: −27.6% catches severe short-tops without the
+    # always-fire false-alarm storm. Units: percent of arm reach, same as
+    # lockout_pct in evidence.py (not a 0-1 fraction).
+    pull_up_lockout_pct: float = -27.6
     hang_min: float = 0.75         # share of that reach at the bottom
     controlled_tempo: float = 0.70  # eccentric:concentric below this is dropped
     stall_rate: float = 0.20       # ascent step below this share of mean = stalled
     stalled_frac: float = 0.05     # share of stalled frames before "stall"
+    # Clip-level coaching cue: a fault must be observed on at least this many
+    # reps before the clip-level failures / recommendation treat it as present.
+    # One-off pose jitter on a single rep was the bulk of the false-alarm storm
+    # (precision 0.146 → ~0.18 with recall unchanged on the labelled corpus).
+    fault_min_reps: int = 2
     # Exclude the outer share of the lifting DISPLACEMENT from the stall count:
     # leaving rest and turning around both decelerate, and neither is a stall.
     # Provenance records this convention beside the rate it modifies.
@@ -101,6 +115,12 @@ class Thresholds:
     straight_arm: float = 160.0
     straight_leg: float = 160.0
     arms_straight_frac: float = 0.60   # share of the hold with straight arms
+    # Hold-specific arm bars. The shared 0.60 sits above every front_lever /
+    # planche arms_straight_frac ever measured on the corpus (max 0.53 / ~0.5),
+    # so bent_arms always fired. These sit inside the measured ranges and are
+    # the fault_eval --tune proposals that catch at least one labelled positive.
+    front_lever_arms_straight_frac: float = 0.25
+    planche_arms_straight_frac: float = 0.35
     legs_straight_frac: float = 0.60
     bent_arms_frac: float = 0.50       # the looser bar-rep version
 

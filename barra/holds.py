@@ -204,10 +204,11 @@ def hold_assessments(attempts: list[dict]) -> list[list]:
     return out
 
 
-def clip_failures(reps: list[dict]) -> dict[str, int]:
-    """How many attempts showed each failure, for the clip-level read-out."""
-    counts: dict[str, int] = {}
-    for rep in reps:
-        for f in rep.get("failures") or []:
-            counts[f] = counts.get(f, 0) + 1
-    return counts
+def clip_failures(reps: list[dict], min_count: int | None = None) -> dict[str, int]:
+    """How many attempts showed each failure, for the clip-level read-out.
+
+    Applies the consensus gate in `barra.fault_select` so a one-rep jitter
+    spike does not become the coaching cue for the whole set.
+    """
+    from .fault_select import clip_fault_counts
+    return clip_fault_counts(reps, min_count=min_count)

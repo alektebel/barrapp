@@ -178,21 +178,50 @@ class ExerciseModel:
 
 
 def _init_weights(n_in: int, n_hidden: int, n_out: int, seed: int) -> tuple:
+    """He-scaled for the ReLU layer, Xavier-scaled for the softmax layer.
+
+    The fixed 0.1 this used to draw from is far too wide for a 106-feature
+    input: the hidden pre-activations start with a standard deviation of about
+    one, half the units saturate at zero on the first pass, and the run spends
+    its early epochs undoing its own initialisation. Scaling by fan-in is the
+    difference between a model that converges in 300 epochs and one that is
+    still moving at 600.
+    """
     rng = np.random.default_rng(seed)
-    w1 = rng.normal(0.0, 0.1, (n_in, n_hidden)).astype(float)
+    w1 = rng.normal(0.0, np.sqrt(2.0 / n_in), (n_in, n_hidden)).astype(float)
     b1 = np.zeros(n_hidden)
-    w2 = rng.normal(0.0, 0.1, (n_hidden, n_out)).astype(float)
+    w2 = rng.normal(0.0, np.sqrt(1.0 / n_hidden), (n_hidden, n_out)).astype(float)
     b2 = np.zeros(n_out)
     return w1, b1, w2, b2
 
 
 def train_classifier(X: np.ndarray, y: list[str], seed: int = 0,
-                     epochs: int = 300, lr: float = 0.05) -> ExerciseModel:
+                     epochs: int = 300, lr: float = 0.05,
+                     feature_names: tuple[str, ...] | list[str] | None = None,
+                     hidden: int = _HIDDEN, l2: float = 0.0,
+                     sample_weight: np.ndarray | None = None,
+                     optimizer: str = "adam") -> ExerciseModel:
     """Train the softmax MLP. X is (n, n_features), y a list of class labels.
 
     Deterministic (fixed seed) and numpy-only. Class imbalance is handled by
     inverse-frequency weighting of the cross-entropy, so a corpus dominated by
     one movement does not make the model ignore the rest.
+
+    Three arguments exist because the corpus outgrew the first model. A wider
+    feature vector must carry its own `feature_names` - the names used to be
+    sliced off the module-level tuple, which silently mislabelled every column
+    the moment a second feature set existed. `hidden` and `l2` are the two
+    knobs that decide whether 170 clips in 17 classes are learned or memorised;
+    weight decay is applied to the weight matrices only, never the biases, so a
+    rare class can still be reached by shifting its bias.
+
+    `sample_weight` lets an augmented corpus say that eight views of one clip
+    are one clip's worth of evidence, not eight.
+
+    `optimizer` is "adam" or "sgd". Adam is the default because the step size
+    that suits the steepest direction of this feature vector leaves the rest
+    of it barely moving; "sgd" is kept so an older run can be reproduced
+    exactly, and it wants a much larger `lr` than Adam does.
     """
     X = np.asarray(X, dtype=float)
     classes = sorted(set(y))
@@ -204,7 +233,8 @@ def train_classifier(X: np.ndarray, y: list[str], seed: int = 0,
         Y[i, j] = 1.0
         counts[j] += 1.0
 
-    feat = FEATURE_NAMES[:X.shape[1]]
+    feat = tuple(feature_names) if feature_names is not None \
+        else FEATURE_NAMES[:X.shape[1]]
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", RuntimeWarning)
         finite = np.where(np.isfinite(X), X, np.nan)
@@ -218,13 +248,28 @@ def train_classifier(X: np.ndarray, y: list[str], seed: int = 0,
     Xn = (X - mean) / std
     Xn[~np.isfinite(Xn)] = _NAN
 
-    w1, b1, w2, b2 = _init_weights(X.shape[1], _HIDDEN, len(classes), seed)
+    w1, b1, w2, b2 = _init_weights(X.shape[1], hidden, len(classes), seed)
     # inverse-frequency class weights
     wgt = (len(classes) / (counts + 1e-6))
     wgt /= wgt.mean()
+    sw = (np.ones(len(y)) if sample_weight is None
+          else np.asarray(sample_weight, dtype=float))
+    sw = sw / sw.mean()
+
+    params = [w1, b1, w2, b2]
+    # Adam's moment estimates, one pair per parameter. Plain gradient descent
+    # at a fixed step has to be tuned to the steepest feature in the vector,
+    # which leaves every flatter direction crawling; on this feature set that
+    # showed up as a model still improving when the epoch budget ran out.
+    # Per-parameter step sizes fix that without touching the architecture, and
+    # the update stays deterministic, so a seed still reproduces a run exactly.
+    mom = [np.zeros_like(p) for p in params]
+    vel = [np.zeros_like(p) for p in params]
+    beta1, beta2, eps = 0.9, 0.999, 1e-8
 
     n = Xn.shape[0]
     for epoch in range(epochs):
+        w1, b1, w2, b2 = params
         # forward
         h = np.maximum(Xn @ w1 + b1, 0.0)
         logits = h @ w2 + b2
@@ -232,18 +277,31 @@ def train_classifier(X: np.ndarray, y: list[str], seed: int = 0,
         exp = np.exp(logits)
         P = exp / exp.sum(axis=1, keepdims=True)
         # weighted cross-entropy gradient (softmax + CE)
-        dlogits = (P - Y) * wgt[None, :] / n
+        dlogits = (P - Y) * wgt[None, :] * sw[:, None] / n
         dW2 = h.T @ dlogits
         db2 = dlogits.sum(axis=0)
         dH = (dlogits @ w2.T)
         dH[h <= 0] = 0.0
         dW1 = Xn.T @ dH
         db1 = dH.sum(axis=0)
-        w2 -= lr * dW2
-        b2 -= lr * db2
-        w1 -= lr * dW1
-        b1 -= lr * db1
+        # Weight decay on the matrices only, never the biases: a rare class
+        # has to stay reachable by shifting its bias.
+        grads = [dW1 + l2 * w1, db1, dW2 + l2 * w2, db2]
 
+        if optimizer == "adam":
+            t = epoch + 1
+            bc1 = 1.0 - beta1 ** t
+            bc2 = 1.0 - beta2 ** t
+            for i, g in enumerate(grads):
+                mom[i] = beta1 * mom[i] + (1.0 - beta1) * g
+                vel[i] = beta2 * vel[i] + (1.0 - beta2) * (g * g)
+                params[i] = params[i] - lr * (mom[i] / bc1) / (
+                    np.sqrt(vel[i] / bc2) + eps)
+        else:
+            for i, g in enumerate(grads):
+                params[i] = params[i] - lr * g
+
+    w1, b1, w2, b2 = params
     m = ExerciseModel(classes, feat, mean, std, _NAN, w1, b1, w2, b2)
     return m
 

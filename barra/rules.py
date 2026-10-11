@@ -119,7 +119,10 @@ def _r(movement: str, error: str, name: str, phase: str, primitive: str,
 # ---------------------------------------------------------------------------
 # Shared bar rules - wrist-origin repetition movements
 # ---------------------------------------------------------------------------
-def _bar(movement: str) -> list[Rule]:
+def _bar(movement: str, lockout_pct: float | None = None) -> list[Rule]:
+    # lockout_pct defaults to the muscle-up support bar. Pull-ups pass their
+    # own constant: the geometries are not comparable (see Thresholds).
+    lockout = (T.lockout_min * 100 if lockout_pct is None else lockout_pct)
     return [
         _r(movement, "body_swing", "momentum", "rep", "swing", ">", T.swing_torso,
            "the hips travel more than the threshold, in torso-lengths, relative "
@@ -129,7 +132,7 @@ def _bar(movement: str) -> list[Rule]:
                 "variant: a kipping rep is allowed it, a strict one is not.",
            variants=(STRICT,), variant_dependent=True),
         _r(movement, "incomplete_lockout", "lockout", "support", "lockout_pct", "<",
-           T.lockout_min * 100,
+           lockout,
            "the shoulders' height above the hands at the top, as a share of the "
            "athlete's own arm reach",
            "Lock out fully at the top of every rep"),
@@ -160,7 +163,7 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the median shoulder-hip line angle from vertical across the hold",
            "Take every rep through its full range"),
         _r("front_lever", "bent_arms", "poor scapular retraction", "hold",
-           "arms_straight_frac", "<", T.arms_straight_frac,
+           "arms_straight_frac", "<", T.front_lever_arms_straight_frac,
            "the share of the hold with the elbow angle at or above the "
            "straight-arm threshold",
            "Set the shoulders down and back first",
@@ -187,7 +190,7 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the median shoulder-hip line angle from vertical across the hold",
            "Take every rep through its full range"),
         _r("planche", "bent_arms", "poor scapular protraction", "hold",
-           "arms_straight_frac", "<", T.arms_straight_frac,
+           "arms_straight_frac", "<", T.planche_arms_straight_frac,
            "the share of the hold with the elbow angle at or above the "
            "straight-arm threshold",
            "Push the shoulders away at the top",
@@ -220,7 +223,7 @@ RULES: dict[str, tuple[Rule, ...]] = {
            note="elbows bend during the pull and transition by design; only the "
                 "support at the top is held to the straight-arm threshold."),
     ),
-    "pull_up": tuple(_bar("pull_up")) + (
+    "pull_up": tuple(_bar("pull_up", lockout_pct=T.pull_up_lockout_pct)) + (
         _r("pull_up", "no_active_hang", "no active hang", "setup", "start_elbow_deg",
            "<", T.active_hang_deg,
            "the median elbow angle in the setup window at the start of the rep",
