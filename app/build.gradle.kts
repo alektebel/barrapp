@@ -123,6 +123,7 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     // Weekly review notification. Scheduled by the system, so it survives the
     // app being killed - which is the whole point of a weekly nudge.
     implementation("androidx.work:work-runtime-ktx:2.10.0")

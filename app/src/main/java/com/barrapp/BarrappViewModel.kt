@@ -707,14 +707,16 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
         fun fail(raw: String, traceId: String = "") {
             val message = when {
-                raw.contains("resolve host", ignoreCase = true) ||
-                    raw.contains("Failed to connect", ignoreCase = true) ->
-                    "No internet connection. The clip is kept - press Retry when you are back online."
+                raw.contains("resolve host", ignoreCase = true) ->
+                    "No se encontró el servidor (falló la resolución del nombre). " +
+                        "El vídeo se guarda: pulsa Reintentar."
+                raw.contains("Failed to connect", ignoreCase = true) ->
+                    "Sin conexión a internet. El vídeo se guarda: pulsa Reintentar cuando vuelvas a tener red."
                 raw.contains("unknown job", ignoreCase = true) ->
-                    "That clip's job was lost on the server. Retry - it sends as a fresh job."
+                    "El servidor perdió este análisis. Pulsa Reintentar y se enviará de nuevo."
                 raw.contains("timed out", ignoreCase = true) ||
                     raw.contains("timeout", ignoreCase = true) ->
-                    "The server took too long to answer. Retry - the clip is kept."
+                    "El servidor tardó demasiado en responder. Pulsa Reintentar: el vídeo se guarda."
                 else -> raw
             }
             log(WorkStore.Level.ERROR, message)

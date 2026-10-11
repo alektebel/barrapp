@@ -19,6 +19,9 @@ class BarraApi(context: Context) {
     private val deviceId = DeviceId.get(context)
     private val baseUrl = BuildConfig.API_BASE_URL.trimEnd('/')
     private val client: OkHttpClient = OkHttpClient.Builder()
+        // The phone's resolver failed on the API host on 2026-10-11 while the
+        // API was up; see FallbackDns.
+        .dns(FallbackDns.standard())
         .connectTimeout(30, TimeUnit.SECONDS)
         .readTimeout(120, TimeUnit.SECONDS)
         .writeTimeout(120, TimeUnit.SECONDS)
