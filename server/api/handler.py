@@ -126,10 +126,11 @@ def _reap_stale(item: dict | None) -> dict | None:
     age_min = (datetime.now(timezone.utc) - then).total_seconds() / 60
     if age_min < STALE_AFTER_MIN:
         return item
+    # Spanish here: the API zip has no barra.i18n (see sweeper._reason).
     reason = (
-        "the clip was never finished uploading. Retry."
+        "la subida del vídeo no llegó a terminar. Vuelve a intentarlo."
         if item.get("status") == "created"
-        else "the worker never picked this up. Retry."
+        else "el análisis no llegó a empezar. Vuelve a intentarlo."
     )
     table.update_item(
         Key={"id": item["id"]},
@@ -137,7 +138,7 @@ def _reap_stale(item: dict | None) -> dict | None:
         ExpressionAttributeNames={"#s": "status", "#e": "error"},
         ExpressionAttributeValues={
             ":s": "failed",
-            ":e": "%s (stuck for %d min)" % (reason, int(age_min)),
+            ":e": "%s (atascado %d min)" % (reason, int(age_min)),
         },
     )
     uploads.record(item["id"], item.get("owner") or "", "reaped", reason,
@@ -674,6 +675,37 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
         return False
 
 
+def _set_stage(job_id: str, owner: str, name: str) -> None:
+    """Where the job is. `stage` stays the English phrase the installed app
+    matches on; `stageCode` is stable and `stageText` is what to show."""
+    code, text = _i18n_stage(name)
+    table.update_item(
+        Key={"id": job_id},
+        UpdateExpression="SET #st = :st, #sc = :sc, #sx = :sx",
+        ExpressionAttributeNames={"#st": "stage", "#sc": "stageCode", "#sx": "stageText"},
+        ExpressionAttributeValues={":st": name, ":sc": code, ":sx": text},
+    )
+    uploads.record(job_id, owner, "stage", name)
+
+
+def _i18n_stage(name: str) -> tuple[str, str]:
+    try:
+        from barra.i18n import stage
+    except ImportError:  # the API zip has no barra; only the worker sets stages
+        return "stage.other", name
+    return stage(name)
+
+
+def _spanish_error(text: str) -> str:
+    """A job's error as the phone shows it. The English original stays in
+    the trace and the upload log."""
+    try:
+        from barra.i18n import localize_text
+    except ImportError:
+        return text
+    return localize_text(text)
+
+
 def worker(event, _context):
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
@@ -688,7 +720,7 @@ def worker(event, _context):
             Key={"id": job_id},
             UpdateExpression="SET #s = :s, #e = :e",
             ExpressionAttributeNames={"#s": "status", "#e": "error"},
-            ExpressionAttributeValues={":s": "failed", ":e": str(exc)},
+            ExpressionAttributeValues={":s": "failed", ":e": _spanish_error(str(exc))},
         )
         try:
             from barra.tracestore import put_failure
@@ -703,13 +735,7 @@ def worker(event, _context):
         from process import process_job
 
         def _stage(name: str) -> None:
-            table.update_item(
-                Key={"id": job_id},
-                UpdateExpression="SET #st = :st",
-                ExpressionAttributeNames={"#st": "stage"},
-                ExpressionAttributeValues={":st": name},
-            )
-            uploads.record(job_id, owner, "stage", name)
+            _set_stage(job_id, owner, name)
 
         _stage("receiving the clip")
         s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))

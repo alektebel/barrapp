@@ -218,6 +218,9 @@ def check_payload(payload: dict, expected_version: int | None = None, **_: Any) 
     if n_reps == 0 and not (payload.get("blockers") or []):
         out.append(Violation("payload", "zero_reps_has_blocker", "nothing counted and no reason given"))
 
+    untranslated = (payload.get("i18n") or {}).get("untranslated") or []
+    if untranslated:
+        out.append(Violation("payload", "untranslated_text", "; ".join(map(str, untranslated))[:200]))
     for text in _visible_text(payload):
         if _DEVELOPER_TEXT.search(text):
             out.append(Violation("payload", "no_developer_text", text[:120]))

@@ -116,8 +116,10 @@ class FallsBack(unittest.TestCase):
             out = report.write_report(payload())
         self.assertEqual(out["proseSource"], "fallback")
         self.assertEqual(out["proseRejected"], "not_configured")
+        from barra.i18n import english_words
         for k in ("headline", "narrative", "nextSession"):
             self.assertTrue(out[k])
+            self.assertEqual(english_words(out[k]), [], out[k])
 
     def test_the_old_writer_is_gone(self):
         self.assertFalse((ROOT / "server" / "deepseek.py").exists())

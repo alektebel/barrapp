@@ -10,6 +10,7 @@ import numpy as np
 from pathlib import Path
 
 from barra import sentinel
+from barra.i18n import localize_payload
 from report import write_report
 from vision import technique_note, technique_second_opinion, count_from_clip
 
@@ -148,8 +149,12 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
     # geometric movement, the count or a score.
     note = technique_note(artifacts, report)
     if note is not None:
-        report.update(note)
-        report["proseSource"] = "vision"
+        # The report owns headline/narrative/nextSession; the vision model's
+        # own prose is kept beside it, never over it (a real job's headline
+        # became the model's paragraph about stills on 2026-10-11).
+        prose_keys = ("headline", "narrative", "nextSession")
+        report["visionNote"] = {k: note[k] for k in prose_keys if note.get(k)}
+        report.update({k: v for k, v in note.items() if k not in prose_keys})
         if trace is not None:
             trace.step("vision observations",
                        kept=len(note.get("visionObservations") or []),
@@ -164,7 +169,6 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
         second = technique_second_opinion(artifacts)
         if second is not None:
             report["visionVerdict"] = second
-            report["proseSource"] = "vision"
             if trace is not None:
                 trace.step("vision second opinion", verdict=second)
     elif trace is not None and artifacts.stills:
@@ -175,6 +179,7 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
         report["traceId"] = trace.id
         report["provenance"] = _provenance()
         trace.stage("payload")
+        report = localize_payload(report)
         sentinel.watch(trace, "payload", {"payload": report},
                        inputs={"job": job.get("id"), "requested": requested})
         if isinstance(report["provenance"], dict):
@@ -304,6 +309,14 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
             "every time, the whole body in frame."
         ),
     }
+
+
+def _unsupported(chosen: str, detected: dict | None) -> dict:
+    """A movement the classifier can name but the pipeline has no profile
+    for. The blocker is a catalog code (barra/i18n.py renders it in Spanish);
+    the raw SystemExit - a developer's list of known movements - never reaches
+    the phone."""
+    return _empty(chosen, [f"movement_unsupported:{chosen}"], detected=detected)
 
 
 def _empty(exercise: str, blockers: list[str], **extra) -> dict:
@@ -553,8 +566,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     try:
         movement = resolve(chosen)
-    except SystemExit as exc:
-        return _empty(chosen, [str(exc)], detected=detected)
+    except SystemExit:
+        return _unsupported(chosen, detected)
 
     # The declared variant, labelled as declared - or unspecified. A variant
     # the movement does not define is not accepted, so a typo cannot switch

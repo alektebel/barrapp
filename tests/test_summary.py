@@ -1,4 +1,6 @@
-"""The session description a person actually reads."""
+"""The session description a person actually reads - in Spanish, since the
+alpha is Spanish; the logic (when "verified" is earned, the three-rep floor,
+advice keyed to the first blocker) is unchanged."""
 import unittest
 
 from barra.summary import describe
@@ -27,22 +29,23 @@ def payload(**over):
 class TestSessionDescription(unittest.TestCase):
     def test_it_says_what_was_recorded(self):
         head, text = describe(payload())
-        self.assertIn("4 verified muscle-up reps", head)
-        self.assertIn("solid", head)
-        self.assertIn("74 out of 100", text)
-        self.assertIn("14-second working set", text)
-        self.assertIn("trimmed from 22 seconds", text)
+        self.assertIn("4 muscle-ups verificados", head)
+        self.assertIn("sólida", head)
+        self.assertIn("74 sobre 100", text)
+        self.assertIn("serie de trabajo de 14 segundos", text)
+        self.assertIn("recortada de 22 segundos", text)
 
     def test_it_names_the_weakest_part_with_its_evidence(self):
         """The one sentence of any report that gets acted on."""
         _, text = describe(payload())
-        self.assertIn("smoothness", text)
-        self.assertIn("62%", text)
-        self.assertIn("31% of the ascent made no progress", text)
+        self.assertIn("fluidez", text)
+        self.assertIn("62 %", text)
+        self.assertIn("el 31 % de la subida no avanzó", text)
 
     def test_it_does_not_call_a_push_up_a_pull(self):
         _, text = describe(payload(
             exercise="push_up", detected={"exercise": "push_up", "label": "Push-up"}))
+        self.assertNotIn("tirón", text.lower())
         self.assertNotIn("pull", text.lower())
 
     def test_two_reps_are_not_reported_as_a_session(self):
@@ -50,13 +53,13 @@ class TestSessionDescription(unittest.TestCase):
         to say so rather than quietly presenting a number of equal weight."""
         p = payload(n_reps=2, reps=payload()["reps"][:2])
         _, text = describe(p)
-        self.assertIn("single observation", text)
+        self.assertIn("una sola observación", text)
 
     def test_a_scored_set_does_not_hide_unscored_reps(self):
         reps = payload()["reps"]
         reps[0] = {**reps[0], "score": None, "scoreNote": "Range was not measurable"}
         _, text = describe(payload(reps=reps))
-        self.assertIn("could not be scored", text)
+        self.assertIn("no se pudo puntuar", text)
         self.assertIn("range was not measurable", text.lower())
 
     def test_no_reps_gets_a_reason_and_something_to_do(self):
@@ -64,9 +67,9 @@ class TestSessionDescription(unittest.TestCase):
             n_reps=0, n_candidates=0, reps=[], sessionScore=None,
             sessionBand="unmeasured",
             blockers=["no turnaround stood out from the noise"]))
-        self.assertIn("nothing countable", head.lower())
-        self.assertIn("no turnaround", text.lower())
-        self.assertIn("frame", text.lower())
+        self.assertIn("nada que contar", head.lower())
+        self.assertIn("ningún cambio de dirección", text.lower())
+        self.assertIn("encuadre", text.lower())
 
     def test_unrecognised_clip_is_told_how_to_film_it(self):
         head, text = describe(payload(
@@ -74,8 +77,8 @@ class TestSessionDescription(unittest.TestCase):
             sessionBand="unmeasured", detected={"exercise": "unknown"},
             blockers=["the hands were only tracked in 31% of the clip - "
                       "they are out of frame for most of it"]))
-        self.assertIn("could not tell", text.lower())
-        self.assertIn("stay in shot", text.lower())
+        self.assertIn("no pudo saber", text.lower())
+        self.assertIn("dentro del plano", text.lower())
 
     def test_it_never_claims_progress_from_one_clip(self):
         """One clip cannot support a comparison. Note the phrases checked are
@@ -83,14 +86,14 @@ class TestSessionDescription(unittest.TestCase):
         single rep and is a measurement, not a claim about the athlete."""
         for p in (payload(), payload(n_reps=0, reps=[], sessionScore=None)):
             _, text = describe(p)
-            for phrase in ("improv", "better than", "worse than", "personal best",
-                           "last session", "since last", "you are getting"):
+            for phrase in ("mejora", "mejor que", "peor que", "récord",
+                           "última sesión", "desde la", "estás progresando"):
                 self.assertNotIn(phrase, text.lower(), text)
 
     def test_a_steady_set_is_described_as_steady(self):
         reps = [{**r, "total_s": "4.0"} for r in payload()["reps"]]
         _, text = describe(payload(reps=reps))
-        self.assertIn("held steady", text)
+        self.assertIn("se mantuvieron estables", text)
 
 
 class TestFilmingAdvice(unittest.TestCase):
@@ -107,8 +110,8 @@ class TestFilmingAdvice(unittest.TestCase):
                 "they were not on a fixed bar - this is movement around the rig",
                 "turnaround at 32.8s was never actually tracked",
             ]))
-        self.assertIn("already on the bar", text)
-        self.assertNotIn("top to bottom", text)
+        self.assertIn("ya estés en la barra", text)
+        self.assertNotIn("de arriba abajo", text)
 
     def test_a_hold_is_told_to_film_reps(self):
         _, text = describe(payload(
@@ -116,7 +119,7 @@ class TestFilmingAdvice(unittest.TestCase):
             sessionBand="unmeasured", detected={"exercise": "unknown"},
             blockers=["78% of the clip is spent within a fifth of a torso-length "
                       "of one position - a hold, or resting between attempts"]))
-        self.assertIn("counts repetitions", text)
+        self.assertIn("cuenta repeticiones", text)
 
 
 class TestVerifiedIsEarned(unittest.TestCase):
@@ -129,18 +132,30 @@ class TestVerifiedIsEarned(unittest.TestCase):
         head, text = describe(payload(
             n_reps=19, reps=reps, sessionScore=None, sessionBand="unmeasured",
             exercise="push_up", detected={"exercise": "push_up", "label": "Push-up"}))
-        self.assertIn("none verified", head)
-        self.assertNotIn("verified", text.split(".")[0])
-        self.assertIn("19 push-up reps found", text)
+        self.assertIn("ninguna verificada", head)
+        self.assertNotIn("verificad", text.split(".")[0])
+        self.assertIn("19 flexiones encontradas", text)
 
     def test_it_says_the_reps_do_not_count_towards_a_progression(self):
         reps = [{"score": None, "total_s": "1.0", "components": []}] * 5
         _, text = describe(payload(n_reps=5, reps=reps, sessionScore=None,
                                    sessionBand="unmeasured"))
-        self.assertIn("count towards a progression", text)
+        self.assertIn("cuenta para una progresión", text)
 
     def test_it_does_not_point_at_a_number_that_does_not_exist(self):
         reps = [{"score": None, "total_s": "1.0", "components": []}] * 5
         _, text = describe(payload(n_reps=5, reps=reps, sessionScore=None,
                                    sessionBand="unmeasured"))
-        self.assertNotIn("left out of the number above", text)
+        self.assertNotIn("fuera de la cifra de arriba", text)
+
+
+class TestSpanish(unittest.TestCase):
+    def test_no_english_reaches_the_text(self):
+        from barra.i18n import english_words
+        cases = [payload(), payload(n_reps=2, reps=payload()["reps"][:2]),
+                 payload(n_reps=0, n_candidates=0, reps=[], sessionScore=None,
+                         sessionBand="unmeasured",
+                         blockers=["no turnaround stood out from the noise"])]
+        for p in cases:
+            head, text = describe(p)
+            self.assertEqual(english_words(head + " " + text), [], head + " | " + text)

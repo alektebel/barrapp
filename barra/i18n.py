@@ -66,6 +66,12 @@ METRICS = {
     "Body swing relative to the bar": "Balanceo respecto a la barra",
 }
 
+# Movement keys (pull_up) -> the English label MOVEMENTS is keyed on.
+HUMAN_KEYS = {"muscle_up": "Muscle-up", "pull_up": "Pull-up", "dip": "Dip", "push_up": "Push-up",
+              "squat": "Squat", "knee_raise": "Hanging knee raise", "front_lever": "Front lever",
+              "planche": "Planche", "pistol_squat": "Pistol squat", "split_squat": "Split squat",
+              "bulgarian_split_squat": "Bulgarian split squat"}
+
 COMPONENTS = {"range": "recorrido", "control": "control", "smoothness": "fluidez",
               "swing": "balanceo", "symmetry": "simetría"}
 
@@ -125,6 +131,11 @@ CATALOG: list[Msg] = [
         "ni siquiera la pasada flexible encontró una repetición"),
     Msg("segment.standard_then", "the standard pass found nothing ({why*}) — {then*}",
         "la pasada normal no encontró nada ({why*}); {then*}"),
+    # the session row's note (server/process.py)
+    Msg("session.need_three", "{found} segmented, {usable} usable — need {min} for a session median",
+        "{found} detectadas, {usable} útiles: hacen falta {min} para la mediana de una sesión"),
+    Msg("session.counts", "{found} segmented, {usable} usable", "{found} detectadas, {usable} útiles"),
+    Msg("session.hold", "hold", "mantenimiento"),
     # pose / probe (server/process.py)
     Msg("probe.no_video", "No video arrived at the server.", "El vídeo no llegó al servidor."),
     Msg("probe.cannot_open", "Could not open the clip: {why*}", "No se pudo abrir el vídeo: {why*}"),
@@ -344,6 +355,11 @@ def _fragment(text: str, missing: list[str]) -> str:
     stripped = text.strip()
     if stripped in BODY:
         return BODY[stripped]
+    if stripped in MOVEMENTS:
+        name = MOVEMENTS[stripped]
+        return name if name[:1].isupper() and name.split()[0] in ("Muscle-up", "Front", "Back") else name.lower()
+    if stripped in HUMAN_KEYS:
+        return _fragment(HUMAN_KEYS[stripped], missing)
     t = translate(stripped, missing)
     if t is None:
         missing.append(stripped)

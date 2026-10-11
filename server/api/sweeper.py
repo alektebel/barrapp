@@ -61,12 +61,14 @@ def _age_min(stamp: str) -> float | None:
 
 
 def _reason(status: str, age_min: float) -> str:
+    # Spanish here, not through barra.i18n: this runs from the API zip, which
+    # carries no barra. The catalog holds the same sentences (job.*).
     base = {
-        "created": "the clip was never finished uploading",
-        "queued": "the worker never picked this up",
-        "processing": "the worker died while measuring this",
-    }.get(status, "this job never reached a terminal state")
-    return f"{base} (stuck for {int(age_min)} min). Retry."
+        "created": "la subida del vídeo no llegó a terminar",
+        "queued": "el análisis no llegó a empezar",
+        "processing": "el análisis se interrumpió mientras medía",
+    }.get(status, "este análisis nunca terminó")
+    return f"{base} (atascado {int(age_min)} min). Vuelve a intentarlo."
 
 
 def reap_jobs() -> list[dict]:

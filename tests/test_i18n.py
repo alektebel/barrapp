@@ -59,6 +59,11 @@ class Translate(unittest.TestCase):
     def test_a_trailing_full_stop_is_kept(self):
         self.assertTrue(i18n.translate("no turnaround stood out from the noise.").text.endswith("."))
 
+    def test_the_session_note(self):
+        self.assertEqual(i18n.translate("4 segmented, 2 usable — need 3 for a session median").text,
+                         "4 detectadas, 2 útiles: hacen falta 3 para la mediana de una sesión")
+        self.assertEqual(i18n.translate("5 segmented, 5 usable").text, "5 detectadas, 5 útiles")
+
     def test_unknown_text_is_not_guessed(self):
         self.assertIsNone(i18n.translate("something nobody wrote a template for"))
 

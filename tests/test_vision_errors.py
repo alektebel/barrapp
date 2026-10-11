@@ -93,6 +93,12 @@ class SkipReason(unittest.TestCase):
             self.assertEqual(vision.skip_reason(), "no_usable_reply")
 
 
+class Spanish(unittest.TestCase):
+    def test_the_technique_prompt_asks_for_spanish_prose_and_keeps_codes(self):
+        self.assertIn("in Spanish from Spain", vision.SYSTEM)
+        self.assertIn("they are codes, not prose", vision.SYSTEM)
+
+
 class OneDefault(unittest.TestCase):
     def test_the_default_model_is_one_nan_still_serves(self):
         self.assertEqual(vision.VISION_MODEL_DEFAULT, "mimo-v2.6-flash")

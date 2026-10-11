@@ -69,6 +69,11 @@ SYSTEM = """You are barrapp's technique analyst. You look at stills that walk \
 through the phases of a few representative repetitions (or holds) of one \
 calisthenics set, alongside what a pose-estimation pipeline measured.
 
+LANGUAGE: write every free-text value (headline, narrative, nextSession and \
+each observation's description) in Spanish from Spain, second person. Keep \
+JSON keys, rule ids, rep labels, frame names and status values exactly as \
+specified - they are codes, not prose.
+
 What you are given:
 - The movement the geometry recognised, the technique variant if one was \
 declared, each sampled rep's time boundaries and phases, the checks the \

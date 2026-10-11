@@ -136,7 +136,7 @@ class TestSweeper(unittest.TestCase):
             reaped = sweeper.reap_jobs()
         self.assertEqual([r["id"] for r in reaped], ["old"])
         self.assertEqual(table.items["old"]["status"], "failed")
-        self.assertIn("never finished uploading", table.items["old"]["error"])
+        self.assertIn("la subida del vídeo no llegó a terminar", table.items["old"]["error"])
         rec.assert_called_once()
         self.assertEqual(rec.call_args[0][2], "reaped")
 
@@ -165,9 +165,12 @@ class TestSweeper(unittest.TestCase):
         """"never picked up" and "died while measuring" are different
         problems, and a user reading the message should be able to tell."""
         import sweeper
-        self.assertIn("never finished uploading", sweeper._reason("created", 60))
-        self.assertIn("never picked this up", sweeper._reason("queued", 60))
-        self.assertIn("died while measuring", sweeper._reason("processing", 60))
+        # Spanish: the phone shows these as they are (the API zip has no
+        # barra, so no catalog to translate them on the way out).
+        self.assertIn("la subida del vídeo no llegó a terminar", sweeper._reason("created", 60))
+        self.assertIn("el análisis no llegó a empezar", sweeper._reason("queued", 60))
+        self.assertIn("el análisis se interrumpió mientras medía", sweeper._reason("processing", 60))
+        self.assertIn("(atascado 60 min)", sweeper._reason("queued", 60))
 
     def test_an_abandoned_multipart_upload_is_aborted(self):
         s3 = mock.Mock()

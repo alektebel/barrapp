@@ -19,46 +19,66 @@ under are the ones the rest of the project works under:
 """
 from __future__ import annotations
 
+from . import i18n
+
+# The alpha is Spanish (2026-10-11). This text is the fallback when no model
+# writes the report, so it is the one the phone shows on a bad day.
 BAND_WORD = {
-    "strong": "strong",
-    "solid": "solid",
-    "shaky": "shaky",
-    "broken down": "breaking down",
-    "unmeasured": "unmeasured",
+    "strong": "fuerte",
+    "solid": "sólida",
+    "shaky": "irregular",
+    "broken down": "desmoronándose",
+    "unmeasured": "sin medir",
 }
 
 # Plain names for the score's parts. The component keys are internal; these are
-# what the sentence says.
+# what the sentence says. Not "fluidez del tirón": the same component scores a
+# push-up, and a push-up has no pull.
 PART = {
-    "range": "range of motion",
-    "control": "control of the descent",
-    # Not "smoothness of the pull": the same component scores a push-up, and a
-    # push-up has no pull.
-    "smoothness": "smoothness through the rep",
+    "range": "el recorrido",
+    "control": "el control de la bajada",
+    "smoothness": "la fluidez durante la repetición",
 }
 
+# (singular, plural, feminine) per movement key, for agreement in Spanish.
+NOUN = {
+    "muscle_up": ("muscle-up", "muscle-ups", False),
+    "pull_up": ("dominada", "dominadas", True),
+    "dip": ("fondo", "fondos", False),
+    "push_up": ("flexión", "flexiones", True),
+    "squat": ("sentadilla", "sentadillas", True),
+    "knee_raise": ("elevación de rodillas", "elevaciones de rodillas", True),
+    "front_lever": ("front lever", "front levers", False),
+    "planche": ("plancha", "planchas", True),
+    "pistol_squat": ("sentadilla pistol", "sentadillas pistol", True),
+    "split_squat": ("sentadilla split", "sentadillas split", True),
+    "bulgarian_split_squat": ("sentadilla búlgara", "sentadillas búlgaras", True),
+}
+_REP = ("repetición", "repeticiones", True)
+
 # What to film differently, per reason the clip failed. Keyed by a distinctive
-# fragment of the blocker text rather than an error code, because the blockers
-# are written for humans first and are the same strings shown in the trace.
+# fragment of the ENGLISH blocker - the text barra wrote and the trace keeps -
+# so the match does not depend on the translation.
 FILMING_ADVICE = [
-    ("out of frame", "Tilt the camera up or step back so your hands stay in shot "
-                     "for the whole set - they are the reference everything else "
-                     "is measured against."),
-    ("fixed bar", "Start filming once you are already on the bar, and stop "
-                  "before you walk off. Moving around the rig is measured as "
-                  "part of the movement."),
-    ("around the rig", "Start filming once you are already on the bar, and stop "
-                       "before you walk off. Moving around the rig is measured "
-                       "as part of the movement."),
-    ("not on anything fixed", "Start filming once you are already on the bar. "
-                              "Walking to and from the rig is measured as part "
-                              "of the movement."),
-    ("hold", "Barra counts repetitions, so a hold has nothing to count. Film a "
-             "set of reps instead."),
-    ("turnaround", "Get the whole rep in frame, top to bottom. A turnaround that "
-                   "leaves the shot cannot be timed."),
-    ("interpolated", "More light, or a slower phone. Too many frames were "
-                     "guessed rather than seen."),
+    ("out of frame", "Inclina la cámara hacia arriba o aléjate para que las manos "
+                     "queden dentro del plano toda la serie: son la referencia con "
+                     "la que se mide todo lo demás."),
+    ("fixed bar", "Empieza a grabar cuando ya estés en la barra y para antes de "
+                  "bajarte. Moverse por la estructura se mide como parte del "
+                  "movimiento."),
+    ("around the rig", "Empieza a grabar cuando ya estés en la barra y para antes "
+                       "de bajarte. Moverse por la estructura se mide como parte "
+                       "del movimiento."),
+    ("not on anything fixed", "Empieza a grabar cuando ya estés en la barra. Ir y "
+                              "volver de la estructura se mide como parte del "
+                              "movimiento."),
+    ("hold", "Barra cuenta repeticiones, así que un mantenimiento no tiene nada que "
+             "contar. Graba una serie de repeticiones."),
+    ("turnaround", "Que se vea la repetición entera en el encuadre, de arriba "
+                   "abajo. Un cambio de dirección que se sale del encuadre no se "
+                   "puede cronometrar."),
+    ("interpolated", "Más luz, o un móvil más estable. Demasiados fotogramas se "
+                     "adivinaron en vez de verse."),
 ]
 
 
@@ -72,14 +92,33 @@ def _sentence(text: str) -> str:
     return text if text[-1] in ".!?" else text + "."
 
 
-def _plural(n: int, word: str) -> str:
-    return f"{n} {word}" if n == 1 else f"{n} {word}s"
+def _es(text: str) -> str:
+    return i18n.localize_text(text) if isinstance(text, str) else text
 
 
-def _movement(payload: dict) -> str:
-    detected = payload.get("detected") or {}
-    label = detected.get("label") or (payload.get("exercise") or "").replace("_", " ")
-    return (label or "movement").lower()
+def _pct(x: float) -> str:
+    return f"{x:.0%}".replace("%", " %")
+
+
+def _num(x: float, fmt: str = ".1f") -> str:
+    return format(x, fmt).replace(".", ",")
+
+
+def _noun(payload: dict) -> tuple[str, str, bool]:
+    key = (payload.get("detected") or {}).get("exercise") or payload.get("exercise") or ""
+    if key in NOUN:
+        return NOUN[key]
+    label = _es((payload.get("detected") or {}).get("label") or key.replace("_", " "))
+    return ((label or "movimiento").lower(),) * 2 + (False,)
+
+
+def _count(n: int, noun: tuple[str, str, bool], adjective: str = "") -> str:
+    """"4 muscle-ups verificados", "1 dominada verificada"."""
+    word = noun[0] if n == 1 else noun[1]
+    if not adjective:
+        return f"{n} {word}"
+    ending = ("a" if noun[2] else "o") + ("" if n == 1 else "s")
+    return f"{n} {word} {adjective}{ending}"
 
 
 def _advice(blockers: list[str]) -> str:
@@ -96,8 +135,8 @@ def _advice(blockers: list[str]) -> str:
         for needle, text in FILMING_ADVICE:
             if needle in haystack:
                 return text
-    return ("Film one set from a fixed spot, with the whole movement in frame "
-            "from start to finish.")
+    return ("Graba una serie desde un punto fijo, con todo el movimiento dentro "
+            "del plano de principio a fin.")
 
 
 def _spread(reps: list[dict]) -> str:
@@ -106,23 +145,22 @@ def _spread(reps: list[dict]) -> str:
     times = []
     for r in reps:
         try:
-            times.append(float(r.get("total_s")))
-        except (TypeError, ValueError):
+            times.append(float(str(r.get("total_s")).replace(",", ".").split()[0]))
+        except (TypeError, ValueError, IndexError):
             continue
     if len(times) < 3:
         return ""
     first, last = times[0], times[-1]
-    slowest = max(times)
-    if slowest <= 0:
+    if max(times) <= 0:
         return ""
     drift = (last - first) / first if first > 0 else 0.0
     if abs(drift) < 0.15:
-        return (f"Rep times held steady across the set "
-                f"({min(times):.1f}-{max(times):.1f} s).")
+        return (f"Los tiempos por repetición se mantuvieron estables "
+                f"({_num(min(times))}-{_num(max(times))} s).")
     if drift > 0:
-        return (f"Reps slowed through the set, {first:.1f} s at the start to "
-                f"{last:.1f} s at the end - {drift:.0%} longer.")
-    return (f"Reps sped up through the set, {first:.1f} s to {last:.1f} s.")
+        return (f"Las repeticiones se fueron ralentizando: de {_num(first)} s al "
+                f"principio a {_num(last)} s al final, un {_pct(drift)} más.")
+    return f"Las repeticiones se aceleraron a lo largo de la serie: de {_num(first)} s a {_num(last)} s."
 
 
 def _weakest(reps: list[dict]) -> str:
@@ -145,13 +183,12 @@ def _weakest(reps: list[dict]) -> str:
     worst = min(means, key=means.get)
     best = max(means, key=means.get)
     if means[worst] >= 0.95:
-        return "Every part of the movement scored near full."
-    line = (f"The weakest part was {PART.get(worst, worst)} at "
-            f"{means[worst]:.0%}")
+        return "Todas las partes del movimiento puntuaron cerca del máximo."
+    line = f"Lo más flojo fue {PART.get(worst, worst)}, al {_pct(means[worst])}"
     if why.get(worst):
-        line += f" ({why[worst]})"
+        line += f" ({_es(why[worst])})"
     if best != worst:
-        line += f"; {PART.get(best, best)} was the strongest at {means[best]:.0%}"
+        line += f"; lo mejor, {PART.get(best, best)}, al {_pct(means[best])}"
     return line + "."
 
 
@@ -161,41 +198,41 @@ def _unmeasured(reps: list[dict]) -> str:
     missing = [r for r in reps if r.get("score") is None]
     if not missing:
         return ""
-    notes = [r.get("scoreNote") for r in missing if r.get("scoreNote")]
-    line = (f"{_plural(len(missing), 'rep')} could not be scored and "
-            f"{'is' if len(missing) == 1 else 'are'} left out of the number above")
-    return line + (f": {notes[0].lower()}." if notes else ".")
+    notes = [_es(r.get("scoreNote")) for r in missing if r.get("scoreNote")]
+    n = len(missing)
+    line = (f"{_count(n, _REP)} no se pudo puntuar y queda fuera de la cifra de arriba"
+            if n == 1 else
+            f"{_count(n, _REP)} no se pudieron puntuar y quedan fuera de la cifra de arriba")
+    return line + (f": {notes[0][:1].lower() + notes[0][1:]}" if notes else "") + "."
 
 
 def describe(payload: dict) -> tuple[str, str]:
     """(headline, narrative) for one analysed clip."""
     reps = payload.get("reps") or []
     n = int(payload.get("n_reps") or 0)
-    move = _movement(payload)
+    noun = _noun(payload)
     blockers = [str(b) for b in (payload.get("blockers") or [])]
+    first = _sentence(_es(blockers[0])) if blockers else ""
     score = payload.get("sessionScore")
     band = str(payload.get("sessionBand") or "unmeasured")
+    band_word = BAND_WORD.get(band, band)
 
     # ---- nothing countable -------------------------------------------------
     if n == 0:
         detected = payload.get("detected") or {}
         if not detected.get("exercise") or detected.get("exercise") == "unknown":
-            headline = "No movement barra can measure"
-            opening = (f"Barra could not tell what this clip shows. "
-                       f"{blockers[0][0].upper() + blockers[0][1:]}."
-                       if blockers else
-                       "Barra could not tell what this clip shows.")
+            headline = "Ningún ejercicio que barra pueda medir"
+            opening = "Barra no pudo saber qué se ve en este vídeo." + (f" {first}" if first else "")
         else:
-            headline = f"{move.capitalize()} - nothing countable"
+            headline = f"{noun[0].capitalize()}: nada que contar"
             candidates = int(payload.get("n_candidates") or 0)
             opening = (
-                f"Recognised as a {move}"
-                + (f" and {_plural(candidates, 'possible rep')} found, "
-                   "but none survived checking. " if candidates else ", but no rep "
-                   "could be picked out of it. ")
-                + (blockers[0][0].upper() + blockers[0][1:] + "."
-                   if blockers else "")
-            )
+                f"Reconocido como {noun[0]}"
+                + (f" y con {_count(candidates, ('posible repetición', 'posibles repeticiones', True))}, "
+                   "pero ninguna pasó las comprobaciones. " if candidates else
+                   ", pero no se pudo separar ninguna repetición. ")
+                + first
+            ).strip()
         return headline, " ".join(x for x in [opening, _advice(blockers)] if x)
 
     # ---- a measured set ----------------------------------------------------
@@ -206,41 +243,35 @@ def describe(payload: dict) -> tuple[str, str]:
     if trim.get("startS") is not None and trim.get("endS") is not None:
         working = float(trim["endS"]) - float(trim["startS"])
 
-    # "verified", not just "reps": the count is what barra measured, and the
-    # distinction is the product. See docs/MARKET.md - a system that never
-    # refuses cannot certify anything, so the word has to be earned and used.
-    # "verified" is earned, not decorative: it means barra measured the rep.
+    # "verificadas" is earned, not decorative: it means barra measured the rep.
     # A set where nothing could be scored is a set of found reps, not verified
-    # ones - "19 verified push-up reps" above "none of them could be scored"
-    # was a contradiction inside one paragraph.
+    # ones - "19 flexiones verificadas" above "ninguna se pudo puntuar" was a
+    # contradiction inside one paragraph. See docs/MARKET.md.
     verified = sum(1 for r in reps if r.get("score") is not None)
-    opening = (f"{_plural(n, f'verified {move} rep')}" if verified
-               else f"{_plural(n, f'{move} rep')} found")
+    opening = _count(n, noun, "verificad" if verified else "encontrad")
     if working:
-        opening += f" across a {working:.0f}-second working set"
+        opening += f" en una serie de trabajo de {working:.0f} segundos"
         if duration and float(duration) - working > 2.0:
-            opening += f", trimmed from {float(duration):.0f} seconds of footage"
+            opening += f", recortada de {float(duration):.0f} segundos de vídeo"
     parts.append(opening + ".")
 
     if score is None:
-        headline = f"{_plural(n, f'{move} rep')} - none verified"
-        note = next((r.get("scoreNote") for r in reps if r.get("scoreNote")), "")
-        parts.append("None of them could be scored, so this session has no "
-                     "number and none of these reps count towards a progression."
+        headline = f"{_count(n, noun)}: ninguna verificada"
+        note = next((_es(r.get("scoreNote")) for r in reps if r.get("scoreNote")), "")
+        parts.append("No se pudo puntuar ninguna, así que esta sesión no tiene cifra "
+                     "y ninguna de estas repeticiones cuenta para una progresión."
                      + (f" {_sentence(note)}" if note else ""))
     elif n < 3:
-        headline = f"{_plural(n, f'verified {move} rep')}, {BAND_WORD.get(band, band)}"
-        parts.append(f"Scored {int(score)} out of 100 - {BAND_WORD.get(band, band)}. "
-                     "Three reps is the floor before a session median means "
-                     "anything, so treat this as a single observation rather "
-                     "than a session.")
+        headline = f"{_count(n, noun, 'verificad')}, {band_word}"
+        parts.append(f"Puntuación: {int(score)} sobre 100 ({band_word}). Hacen falta "
+                     "tres repeticiones para que la mediana de una sesión signifique "
+                     "algo, así que tómalo como una sola observación y no como una sesión.")
     else:
-        headline = f"{_plural(n, f'verified {move} rep')}, {BAND_WORD.get(band, band)}"
-        parts.append(f"Scored {int(score)} out of 100 - {BAND_WORD.get(band, band)}.")
+        headline = f"{_count(n, noun, 'verificad')}, {band_word}"
+        parts.append(f"Puntuación: {int(score)} sobre 100 ({band_word}).")
 
     # _unmeasured is suppressed when nothing scored at all: the line above has
-    # already said so, and repeating it as "19 reps could not be scored and are
-    # left out of the number above" points at a number that does not exist.
+    # already said so, and repeating it points at a number that does not exist.
     extras = [_weakest(reps), _spread(reps)]
     if verified:
         extras.append(_unmeasured(reps))
@@ -249,6 +280,6 @@ def describe(payload: dict) -> tuple[str, str]:
             parts.append(extra)
 
     if blockers:
-        parts.append("Also noted: " + blockers[0] + ".")
+        parts.append("También: " + first)
 
     return headline, " ".join(parts)

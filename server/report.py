@@ -25,6 +25,7 @@ import math
 import os
 import re
 
+from barra import i18n
 from barra.summary import describe
 
 try:
@@ -61,21 +62,23 @@ def digest(payload: dict) -> dict:
     reps = []
     for r in payload.get("reps") or []:
         reps.append({
-            "label": r.get("label"), "score": r.get("score"), "band": r.get("band"),
+            "label": r.get("label"), "score": r.get("score"), "band": i18n.band(r.get("band")),
             "plausible": r.get("plausible"),
-            "metrics": {m.get("name"): m.get("value") for m in r.get("metrics") or []
-                        if m.get("name")},
+            "metrics": {i18n.localize_text(m.get("name")): i18n.localize_value(m.get("value"))
+                        for m in r.get("metrics") or [] if m.get("name")},
             "faults": [f.get("name") for f in r.get("faults") or [] if f.get("name")],
-            "problems": list(r.get("problems") or [])[:3],
+            "problems": [i18n.localize_text(x) for x in (r.get("problems") or [])[:3]],
         })
+    # Spanish going in, so the model has no English word to echo ("solid").
     return {
         "exercise": payload.get("exercise"),
-        "movement": detected.get("label") or payload.get("exercise"),
+        "movement": i18n.localize_text(detected.get("label") or payload.get("exercise")),
         "variant": (payload.get("variant") or {}).get("name"),
         "n_reps": payload.get("n_reps"), "n_candidates": payload.get("n_candidates"),
-        "sessionScore": payload.get("sessionScore"), "sessionBand": payload.get("sessionBand"),
+        "sessionScore": payload.get("sessionScore"),
+        "sessionBand": i18n.band(payload.get("sessionBand")),
         "duration_s": payload.get("duration_s"),
-        "blockers": list(payload.get("blockers") or [])[:5],
+        "blockers": [i18n.localize_text(b) for b in (payload.get("blockers") or [])[:5]],
         "reps": reps[:30],
     }
 
@@ -157,7 +160,8 @@ def _fallback(payload: dict) -> dict:
         "headline": headline,
         "narrative": narrative,
         "nextSession": payload.get("nextSession")
-        or "Five or six reps, one set, tripod on a marked spot, same side, lockout in frame, trimmed to the working set.",
+        or "Cinco o seis repeticiones, una serie, el móvil fijo en un punto marcado, "
+           "siempre desde el mismo lado y con la parte de arriba dentro del encuadre.",
     }
 
 
