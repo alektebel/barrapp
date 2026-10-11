@@ -352,7 +352,9 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
     from barra.holds import hold_assessments
     from barra.fault_select import primary_from_assessments
     hold_rows = hold_assessments(reps)
-    primary = primary_from_assessments(hold_rows)
+    primary = primary_from_assessments(hold_rows, movement=movement.name)
+    from barra.fault_select import top_fixes
+    fixes = top_fixes(hold_rows, movement.name)
     rec = recommend_for_payload({"track": movement.name, "failures": failures})
     if primary and primary.get("name"):
         rec = recommend_for_payload({
@@ -369,6 +371,8 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
         "variant": variant,
         "failures": failures,
         "primaryFault": primary,
+        # The three things to improve, most important first (docs/UX-PLAN.md).
+        "topFixes": fixes,
         "recommendation": rec,
         "n_reps": len(reps),
         "n_candidates": len(reps),
@@ -425,6 +429,7 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
         # No rep, so no check was made. An empty list under `checks` is the
         # statement that nothing was assessed, not that everything passed.
         "assessment": {"version": ASSESSMENT_VERSION, "checks": []},
+        "topFixes": [],
         "sessions": [],
         "reps": [],
         "blockers": blockers,
@@ -941,7 +946,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     clip_faults = clip_failures(reps)
     from barra.fault_select import primary_from_assessments
-    primary = primary_from_assessments(per_rep_assessments)
+    primary = primary_from_assessments(per_rep_assessments, movement=movement.name)
+    from barra.fault_select import top_fixes
+    fixes = top_fixes(per_rep_assessments, movement.name)
     rec = recommend_for_payload({"track": movement.name, "failures": clip_faults})
     if primary and primary.get("name"):
         # Prefer the measured primary cue over the static PRIORITY table when
@@ -964,6 +971,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "variant": variant_info,
         "failures": clip_faults,
         "primaryFault": primary,
+        # The three things to improve, most important first (docs/UX-PLAN.md).
+        "topFixes": fixes,
         # Per errorId: reps observed / checked clean / could not be checked.
         # The clip-level counterpart of reps[].assessments; `failures` above
         # is its observed column only.

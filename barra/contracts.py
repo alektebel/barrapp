@@ -27,6 +27,7 @@ REQUIRED = [
     "sessionScore", "sessionBand",
     "n_reps", "n_candidates", "fps", "duration_s",
     "reps", "sessions", "blockers",
+    "topFixes",
 ]
 
 REP_REQUIRED = [

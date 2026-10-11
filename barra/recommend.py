@@ -96,6 +96,13 @@ FAILURE_FIX: dict[str, tuple[str, str]] = {
 
 # The failure that should lead the recommendation, by track - the one the
 # athlete most needs to hear first.
+#
+# Also the importance order of the "three things to improve"
+# (fault_select.top_fixes). A coaching convention, not a measurement, written
+# here so it can be argued with: what the rest depends on comes first - a set
+# carried by momentum, a joint pushed past a safe range, a range not completed -
+# then control, then tempo. Every movement with rules is covered
+# (tests/test_top_fixes.py).
 PRIORITY: dict[str, tuple[str, ...]] = {
     "front_lever": ("poor scapular retraction", "piked hips", "bent knees",
                     "poor range of motion", "momentum"),
@@ -103,8 +110,19 @@ PRIORITY: dict[str, tuple[str, ...]] = {
                 "poor range of motion", "momentum"),
     "muscle_up": ("momentum", "stall", "poor transition", "lockout",
                   "dead hang", "control", "bent arms"),
+    "pull_up": ("momentum", "lockout", "dead hang", "control", "stall",
+                "no active hang", "too fast"),
+    "dip": ("too deep", "lockout", "bounce at bottom", "control", "stall"),
+    "push_up": ("sagging hips", "poor range of motion", "lockout", "control",
+                "stall"),
+    "squat": ("knee valgus", "poor range of motion", "heel raise",
+              "uncontrolled descent", "stall"),
     "pistol_squat": ("knee valgus", "poor range of motion", "leaning back",
                      "heel raise", "uncontrolled descent", "arm swing"),
+    "split_squat": ("knee valgus", "poor range of motion", "leaning back",
+                    "heel raise", "uncontrolled descent"),
+    "bulgarian_split_squat": ("knee valgus", "poor range of motion", "leaning back",
+                              "heel raise", "uncontrolled descent"),
 }
 
 
