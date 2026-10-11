@@ -543,6 +543,9 @@ object LogicTest {
     }
 
     fun runAll(): Int {
+        // The expected strings use '.' decimals; the app formats in the
+        // phone's locale, so pin one or a Spanish JVM reads "5,8" and fails.
+        java.util.Locale.setDefault(java.util.Locale.US)
         failures = 0
         checks = 0
         profileRules()

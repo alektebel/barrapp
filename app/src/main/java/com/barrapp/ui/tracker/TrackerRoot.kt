@@ -121,7 +121,8 @@ fun TrackerRoot(
     }
 
     if (sheet != Sheet.NONE) {
-        SheetHost(vm, state, sheet, repsOpen, { repsOpen = !repsOpen }) { sheet = Sheet.NONE }
+        SheetHost(vm, state, sheet, repsOpen, { repsOpen = !repsOpen },
+            onOpenSession = { sheet = Sheet.SESSION }) { sheet = Sheet.NONE }
         return
     }
 
@@ -205,6 +206,7 @@ private fun SheetHost(
     sheet: Sheet,
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
+    onOpenSession: () -> Unit,
     onClose: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().background(Tk.bg)) {
@@ -227,7 +229,7 @@ private fun SheetHost(
             ) {
                 when (sheet) {
                     Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onClose)
-                    Sheet.CALENDAR -> CalendarSheet(vm, state, onClose)
+                    Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenSession)
                     Sheet.LADDER -> LadderSheet(state, onClose)
                     else -> Unit
                 }
@@ -316,13 +318,18 @@ private fun SessionSheet(
 }
 
 @Composable
-private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onClose: () -> Unit) {
+private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: () -> Unit) {
     var offset by remember { mutableStateOf(0) }
     val cal = Calendar.getInstance().apply { add(Calendar.MONTH, offset) }
     val month = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.forLanguageTag("es")) ?: ""
     val byDate = state.days.associateBy { it.date }
     val daysInMonth = cal.getActualMaximum(Calendar.DAY_OF_MONTH)
     val today = if (offset == 0) cal.get(Calendar.DAY_OF_MONTH) else -1
+    // Rows and totals belong to the month on screen: a row's day number is
+    // resolved against this month, so a row from another month would open
+    // the wrong day.
+    val prefix = "%04d-%02d-".format(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+    val inMonth = state.days.filter { it.date.startsWith(prefix) }
     val firstDow = ((cal.clone() as Calendar)
         .apply { set(Calendar.DAY_OF_MONTH, 1) }
         .get(Calendar.DAY_OF_WEEK) + 5) % 7
@@ -342,9 +349,9 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onClose: () -> U
         month = month.replaceFirstChar { it.uppercase() },
         year = "${cal.get(Calendar.YEAR)}",
         days = cells,
-        summaryMeasured = "${state.days.count { it.reps > 0 }} días medidos",
-        summaryReps = "${state.days.sumOf { it.reps }} reps en total",
-        rows = state.days.sortedByDescending { it.date }.take(3).map { day ->
+        summaryMeasured = "${inMonth.count { it.reps > 0 }} días medidos",
+        summaryReps = "${inMonth.sumOf { it.reps }} reps en $month",
+        rows = inMonth.sortedByDescending { it.date }.take(3).map { day ->
             CalRow(
                 title = movementEs(day.exercise, day.exerciseLabel),
                 subtitle = "${day.reps} reps · ${shortDate(day.date)}",
@@ -360,7 +367,7 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onClose: () -> U
         onOpenDay = { n ->
             val key = "%04d-%02d-%02d".format(
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, n)
-            byDate[key]?.let { vm.selectDate(it.date); onClose() }
+            byDate[key]?.takeIf { it.reps > 0 }?.let { vm.selectDate(it.date); onOpenSession() }
         },
     )
 }

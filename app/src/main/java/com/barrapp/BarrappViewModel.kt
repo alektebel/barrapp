@@ -454,10 +454,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             _state.update { it.copy(analysis = known.result, current = known) }
             return
         }
+        // Clear first: until the fetch lands (or if it fails) the sheet must not
+        // present the previously opened session under this day's heading.
+        _state.update { it.copy(analysis = null, current = null) }
         viewModelScope.launch {
             runCatching { withContext(Dispatchers.IO) { api.getJob(jobId) } }
                 .onSuccess { job ->
-                    _state.update { it.copy(current = job, analysis = job.result) }
+                    // A slower fetch for an earlier tap must not overwrite this one.
+                    _state.update {
+                        if (it.selectedDate != date) it
+                        else it.copy(current = job, analysis = job.result)
+                    }
                 }
         }
     }
