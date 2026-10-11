@@ -24,6 +24,11 @@ from . import __version__
 
 @lru_cache(maxsize=1)
 def git_commit() -> str:
+    # The image is stamped at build time (deploy.sh -> Dockerfile ARG) and has
+    # no .git; the stamp also wins over a checkout, since it names what ran.
+    stamped = os.environ.get("BARRA_COMMIT", "").strip()
+    if stamped and stamped != "unknown":
+        return stamped
     root = Path(__file__).resolve().parent.parent
     try:
         out = subprocess.run(["git", "-C", str(root), "rev-parse", "--short", "HEAD"],

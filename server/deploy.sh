@@ -18,6 +18,15 @@ REPO="${WORKER_REPO:-257394490122.dkr.ecr.eu-west-1.amazonaws.com/samapp7427b055
 REGION="${AWS_REGION:-eu-west-1}"
 TAG="worker-$(date +%Y%m%d-%H%M%S)"
 
+# Production was built from an uncommitted tree on 2026-09-13, so what ran
+# could not be reproduced from the repository. Refuse that, and stamp the
+# image with the commit so every trace names it.
+if [ -n "$(git status --porcelain)" ] && [ "${ALLOW_DIRTY:-}" != "1" ]; then
+  echo "the working tree has uncommitted changes; commit them (or ALLOW_DIRTY=1)" >&2
+  exit 1
+fi
+COMMIT="$(git rev-parse --short HEAD)$( [ -n "$(git status --porcelain)" ] && echo +dirty )"
+
 bash vendor_barra.sh
 
 aws ecr get-login-password --region "$REGION" \
@@ -26,6 +35,7 @@ aws ecr get-login-password --region "$REGION" \
 docker buildx build \
   --provenance=false --sbom=false \
   --output type=docker,oci-mediatypes=false \
+  --build-arg BARRA_COMMIT="$COMMIT" \
   -t "$REPO:$TAG" .
 docker push "$REPO:$TAG"
 

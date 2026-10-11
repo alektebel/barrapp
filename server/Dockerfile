@@ -33,7 +33,15 @@ COPY vendor/barra /opt/barra
 # import time with `No module named '<x>'` - which is exactly how the
 # deploy of 2026-09-12 sent every clip to the dead-letter queue while
 # reporting success. deploy.sh now smoke-invokes the image for this.
-COPY api/handler.py api/auth.py api/chat.py api/nan_secret.py api/uploads.py \
-     process.py deepseek.py vision.py ${LAMBDA_TASK_ROOT}/
+#
+# The whole api/ folder rather than a list: the list is what went stale twice
+# (auth on 09-12, referral on 10-11). tests/test_deploy_contract.py checks the
+# worker's import closure against this file.
+COPY api/*.py process.py deepseek.py vision.py ${LAMBDA_TASK_ROOT}/
+
+# Last, so a new commit does not invalidate the pip layer. Read by
+# barra.provenance: every trace names the commit that produced it.
+ARG BARRA_COMMIT=unknown
+ENV BARRA_COMMIT=${BARRA_COMMIT}
 
 CMD ["handler.worker"]
