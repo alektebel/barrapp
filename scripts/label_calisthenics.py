@@ -3,7 +3,7 @@
 
 For every clip in data/calisthenics/metadata.csv:
   1. Sample timestamped frames with ffmpeg.
-  2. Ask mimo-v2.5 (vision) to verify the trick, write a one-line description,
+  2. Ask mimo-v2.6-flash (vision) to verify the trick, write a one-line description,
      and report the time window where the person is actually performing the
      technique (intros, talking heads, and title cards excluded).
   3. Trim the clip in place to that window (re-encode, same 720p recipe as the
@@ -36,7 +36,7 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 API_URL = "https://api.nan.builders/v1/chat/completions"
-MODEL = "mimo-v2.5"
+MODEL = "mimo-v2.6-flash"
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36"
 TRICKS = [
     "muscle_up", "pull_up", "dip", "push_up", "squat", "knee_raise",

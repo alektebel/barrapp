@@ -32,7 +32,7 @@ primitive behind it and the measurement can be attached as evidence.
 
 Usage:
   python scripts/rank_faults.py --limit 20
-  python scripts/rank_faults.py --models mimo-v2.5,glm5.3-flash,qwen3.8-flash
+  python scripts/rank_faults.py --models mimo-v2.6-flash,glm5.3-flash,qwen3.8-flash
 """
 from __future__ import annotations
 
@@ -61,7 +61,7 @@ API_URL = os.environ.get("NAN_BASE_URL", "https://api.nan.builders") + \
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/128.0 Safari/537.36")
 DATASET = ROOT / "data" / "calisthenics"
-DEFAULT_MODELS = ("mimo-v2.5", "glm5.3-flash", "qwen3.8-flash")
+DEFAULT_MODELS = ("mimo-v2.6-flash", "glm5.3-flash", "qwen3.8-flash")
 TOP_N = 3
 
 _lock = threading.Lock()

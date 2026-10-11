@@ -42,7 +42,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from barra.rules import RULES  # noqa: E402
 
 API_URL = "https://api.nan.builders/v1/chat/completions"
-MODEL = "mimo-v2.5"
+MODEL = "mimo-v2.6-flash"
 UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) "
       "Chrome/128.0 Safari/537.36")
 

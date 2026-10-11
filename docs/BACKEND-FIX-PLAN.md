@@ -146,6 +146,13 @@ antes de cada deploy.
 0. ✅ 2026‑10‑11: el secreto `barrapp/nan-api-key` se actualizó con la clave
    de `~/.bashrc` (era otra). Con la clave nueva, `mimo-v2.5` **sigue** dando
    401 y no aparece en `/v1/models`, así que el cambio de modelo hace falta igual.
+✅ **Hecho en código (2026‑10‑11, sin desplegar):** `ChatResult` con la causa;
+los 4xx no se reintentan; comprobación de `/v1/models`; `skip_reason()` en la
+traza; log `[barra] vision call failed …`; `mimo-v2.6-flash` en `vision.py`,
+`template.yaml` y los scripts de etiquetado (21 tests). Probado con NaN real
+sobre `VID-20260827-WA0010`: localización OK, 14 observaciones válidas, segunda
+opinión OK, y con el voto de visión la fusión acierta (`muscle_up`).
+
 1. *Tests rojos:* un `_chat` que recibe 401 lanza `VisionUnavailable("401 …")`,
    no `""`; la traza distingue `not_configured` de `call_failed:<código>`.
 2. Modelo configurable en un solo sitio: `BARRA_VISION_MODEL=mimo-v2.6-flash`

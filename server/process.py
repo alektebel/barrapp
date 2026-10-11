@@ -168,7 +168,8 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
             if trace is not None:
                 trace.step("vision second opinion", verdict=second)
     elif trace is not None and artifacts.stills:
-        trace.step("vision pass skipped", reason="no vision endpoint configured")
+        from vision import skip_reason
+        trace.step("vision pass skipped", reason=skip_reason())
 
     if trace is not None:
         report["traceId"] = trace.id

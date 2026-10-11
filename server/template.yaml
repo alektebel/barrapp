@@ -289,9 +289,9 @@ Resources:
           # MiMo does both passes in the worker: localizing the exercise in
           # the raw clip, and the rubric error read over the stills + the
           # geometry's measurements.
-          BARRA_VISION_MODEL: mimo-v2.5
+          BARRA_VISION_MODEL: mimo-v2.6-flash
           BARRA_LOCALIZE: "1"
-          BARRA_LOCALIZE_MODEL: mimo-v2.5
+          BARRA_LOCALIZE_MODEL: mimo-v2.6-flash
           # /opt/barra is read-only; artifacts and trace JSON go to /tmp.
           BARRA_TRACE_DIR: /tmp/traces
       Policies:
