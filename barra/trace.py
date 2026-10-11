@@ -65,7 +65,7 @@ def _plain(v: Any) -> Any:
 @dataclass
 class Entry:
     stage: str
-    kind: str                    # step | decision | reject | note | error
+    kind: str                    # step | decision | reject | note | error | sentinel
     at_ms: int
     message: str = ""
     data: dict = field(default_factory=dict)
@@ -121,6 +121,12 @@ class Trace:
     def error(self, message: str, **data: Any) -> None:
         self._add("error", message, data)
 
+    def sentinel(self, stage: str, *, ok: bool, **data: Any) -> None:
+        """A stage's contract verdict, with what went in and came out
+        (barra/sentinel.py writes these)."""
+        self._add("sentinel", f"{stage}: {'ok' if ok else 'VIOLATED'}",
+                  {"stage": stage, "ok": ok, **data})
+
     # -- reading -----------------------------------------------------------
     @property
     def rejections(self) -> list[Entry]:
@@ -142,7 +148,7 @@ class Trace:
             "durationMs": self.entries[-1].at_ms if self.entries else 0,
             "counts": {
                 k: sum(1 for e in self.entries if e.kind == k)
-                for k in ("step", "decision", "reject", "note", "error")
+                for k in ("step", "decision", "reject", "note", "error", "sentinel")
             },
             "entries": [e.as_dict() for e in self.entries],
         }

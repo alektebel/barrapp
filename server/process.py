@@ -9,6 +9,7 @@ from datetime import date
 import numpy as np
 from pathlib import Path
 
+from barra import sentinel
 from deepseek import write_report
 from vision import technique_note, technique_second_opinion, count_from_clip
 
@@ -172,6 +173,9 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
     if trace is not None:
         report["traceId"] = trace.id
         report["provenance"] = _provenance()
+        trace.stage("payload")
+        sentinel.watch(trace, "payload", {"payload": report},
+                       inputs={"job": job.get("id"), "requested": requested})
         if isinstance(report["provenance"], dict):
             report["provenance"]["poseBackendUsed"] = report.get("poseBackend")
         _write_trace(trace, str(job.get("id") or ""))
@@ -417,6 +421,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     _stage("estimating the pose")
     info = probe_video(video_path)
     tr.step("container", **{k: v for k, v in info.items() if k != "ok"})
+    sentinel.watch(tr, "probe", {"info": info},
+                   inputs={"clip": video_path.name, "bytes": video_path.stat().st_size})
     if not info.get("ok"):
         tr.error("could not open the clip", reason=info.get("reason"))
         return _empty(exercise,
@@ -463,6 +469,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     # look fine and mean nothing.
     tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps),
             backend=pose_backend)
+    sentinel.watch(tr, "pose", {"keypoints": pose.keypoints},
+                   inputs={"backend": pose_backend, "fps": float(fps)}, fps=fps)
     _stage("recognising the movement")
     detection = classify(pose.keypoints, tr, fps=fps)
     detected = {
@@ -477,6 +485,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "reason": detection.reason,
         "runnerUp": detection.runner_up,
     }
+    sentinel.watch(tr, "detection", {"detected": detected},
+                   inputs={"frames": int(len(pose.keypoints))})
     # The first learned model runs alongside the geometric classifier. It is a
     # second opinion, never a replacement: `detected` stays the interpretable,
     # verified answer, and `model` says what the model thinks and - with the
@@ -521,6 +531,10 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                 nan_label=vision_label,
             )
             tr.step("fusion", **fusion)
+            sentinel.watch(tr, "fusion", {"fusion": fusion},
+                           inputs={"geometry": detected.get("exercise"),
+                                   "model": ((model_out or {}).get("classification") or {}).get("exercise"),
+                                   "vision": vision_label})
         except Exception as exc:  # noqa: BLE001 - fusion is an improvement, not a requirement
             tr.error("could not fuse detector votes", reason=str(exc)[:200])
         detected["fusion"] = fusion
@@ -556,6 +570,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     _stage("finding the reps")
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
+    sentinel.watch(tr, "segments", {"found": found, "blockers": reasons},
+                   subject=found, n_frames=int(len(pose.keypoints)),
+                   inputs={"movement": movement.name, "fps": float(fps)})
     rescued = False
     if not found:
         from barra.ingest import rescue_reps

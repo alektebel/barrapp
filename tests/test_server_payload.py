@@ -15,21 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "server"))
 
-# Keys the Kotlin client reads. Kept in one list so adding a field to the app
-# without adding it to the server fails here rather than at a user's phone.
-REQUIRED = [
-    "headline", "narrative", "nextSession",
-    "exercise", "detected", "trim", "session",
-    "sessionScore", "sessionBand",
-    "n_reps", "n_candidates", "fps", "duration_s",
-    "reps", "sessions", "blockers",
-]
-
-REP_REQUIRED = [
-    "session", "label", "transition_s", "total_s", "class", "metrics",
-    "plausible", "problems", "startS", "endS", "turnS",
-    "score", "band", "scoreNote", "components", "aside", "trace",
-]
+# Keys the Kotlin client reads - defined once, in barra/contracts.py, where
+# the production sentinel reads them too.
+from barra.contracts import REP_REQUIRED, REQUIRED  # noqa: E402,F401
 
 
 class TestPayloadShape(unittest.TestCase):

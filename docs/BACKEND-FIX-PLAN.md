@@ -40,17 +40,101 @@
 
 ---
 
+## 1b. Contratos de entrada/salida y centinelas (aplica a TODAS las fases)
+
+Objetivo: saber **en todo momento** qué entra y qué sale de cada proceso, y
+que una comprobación automática (un *centinela*) diga si es correcto.
+
+### Etapas y su contrato
+
+Cada etapa del pipeline declara qué recibe, qué devuelve y qué invariantes
+debe cumplir. Viven en `barra/contracts.py`:
+
+| Etapa | Entrada → Salida | Invariantes del centinela (ejemplos) |
+|---|---|---|
+| `ingest` | ruta del vídeo → `{fps, frames, duración, w×h}` | fps > 0; duración = frames/fps ± 1 frame; vídeo legible |
+| `pose` | frames → keypoints `(T, K, 3)` | forma correcta; fracción de NaN ≤ umbral o *blocker* explícito; coordenadas normalizadas en [0, 1] |
+| `localize` (visión) | vídeo → `{startS, endS, exercise, usable}` | 0 ≤ start < end ≤ duración; modelo registrado; error con causa si falla |
+| `classify` / `fusion` | señales → `{movement, votos, confianza}` | movimiento medible o `movement_unsupported`; nunca un `SystemExit` |
+| `segment` | señal → reps `[{start, turn, end}]` | ordenadas, sin solaparse, start < turn < end, dentro del clip |
+| `faults` / `checks` | reps → `assessment.checks` | cada id de regla existe en la taxonomía; una medida ausente nunca cuenta como "sano" (C2) |
+| `score` | checks → `sessionScore` | ∈ [0, 100] o `None` con motivo; `n_reps == len(reps)` |
+| `vision_note` | stills + payload → observaciones | cada observación cita una regla, rep, frame y fase válidos |
+| `report` (LLM) | payload → `{headline, narrative, nextSession}` | JSON válido; **todos los números citados existen en el payload**; español |
+| `payload` final | → móvil | `measurementVersion == 2`; todas las claves que lee Kotlin; texto visible sin inglés; `provenance.commit` real |
+
+### Tres capas de comprobación
+
+1. **Tests unitarios por transformación** (TDD): cada función que cambia datos
+   tiene tests de su entrada → salida, de los bordes (clip vacío, 0 reps, NaN,
+   fps raro) y de los errores. Cada bug de producción → un test de regresión.
+2. **Centinela en ejecución** (`barra/sentinel.py`): tras cada etapa,
+   `sentinel.check(etapa, entrada, salida)` evalúa su contrato y lo apunta en la
+   traza (`kind: "sentinel"`, `ok`, `violations`, resumen de entrada/salida).
+   - En **tests y en el corpus**: una violación **falla**.
+   - En **producción**: se registra y se emite la métrica `SentinelViolation{stage}`,
+     pero el job sigue, salvo los invariantes marcados *fatales* (por ejemplo, un
+     payload sin claves obligatorias), que fallan el job con causa.
+   - `barra explain --replay <trace>` enseña la entrada/salida y el veredicto
+     de cada etapa.
+3. **Clips centinela (canario)**: 5–10 clips con resultado conocido (reps,
+   movimiento, que sea abstención) que se ejecutan **tras cada deploy** (amplía
+   el *smoke* de `deploy.sh`) y a diario. Si cambia un resultado esperado →
+   alarma y *rollback*.
+
+### Datos: los ~400 vídeos de `data/calisthenics/videos/`
+
+412 vídeos (12 GB, 20 clases, de YouTube o Wikimedia, más 8 propios en `own/`),
+con `metadata.csv` y etiquetas en `labels*.csv` / `labels/`.
+**Ojo:** las etiquetas existentes (`reps_estimate`, `detected_trick`, ventana
+de técnica) las generó un **modelo de visión**, así que son *plata*, no verdad.
+
+| Nivel | Qué | Uso |
+|---|---|---|
+| **Oro** | ~40–60 clips con reps y movimiento revisados por una persona (`scripts/label_reps.py`), repartidos por clase, más los clips propios y los de producción | puertas de promoción y clips centinela |
+| **Plata** | ~200 clips con etiqueta del modelo de visión (las que ya existen) | detectar regresiones grandes y desacuerdos que revisar |
+| **Sin etiquetar** | el resto | pruebas de robustez (que nada reviente, que se cumplan los contratos) |
+
+- **Partición fija** `dev` / `test` por clip (hash del contenido, ya está en
+  `metadata.csv`): los umbrales se ajustan en `dev` y `test` solo se mira
+  para aprobar. Nunca se ajusta sobre `test`.
+- Clases que no medimos (deadlift, bench_press, barbell_squat, handstand,
+  human_flag, back_lever, ~80 clips): **casos negativos**. El resultado correcto es
+  `movement_unsupported`, nunca reps inventadas.
+- Licencia: los vídeos de YouTube son solo para evaluación interna. Siguen
+  fuera de git y no se redistribuyen.
+
+### NaN
+
+Todas las llamadas usan la clave de `~/.bashrc` (`NAN_API_KEY`) en local y el
+secreto `barrapp/nan-api-key` en producción (actualizado el 2026‑10‑11 con esa
+misma clave). Los tests unitarios **nunca** llaman a NaN: usan un falso. Hay
+un test de integración aparte (`-m nan`) que sí la llama y se ejecuta a mano y
+antes de cada deploy.
+
+---
+
 ## 2. Fases (en orden)
 
 ### Fase 0 — Línea base (sin cambiar comportamiento)
-1. **Commitear el trabajo pendiente** en commits lógicos (algoritmo, scripts
-   de etiquetado, server, tests). Suite verde (hoy 285 OK).
+1. ✅ **Commitear el trabajo pendiente** en commits lógicos (`6f2c74f`…`4b7b063`).
+   Suite verde (285 OK).
 2. **Sello de build (D7)**: `deploy.sh` pasa `--build-arg BARRA_COMMIT=$(git rev-parse HEAD)`;
    `provenance.git_commit()` usa `BARRA_COMMIT` si no hay `.git`; `deploy.sh`
    se niega a desplegar con el árbol sucio (o lo sella con `+dirty`).
    *Test:* `git_commit()` devuelve la env var cuando no hay repo.
-3. **Corpus dorado** (`scripts/replay_corpus.py`): bajar los 20 clips de S3 +
-   los `VID-*.mp4` locales + `data/calisthenics` etiquetados; ejecutar
+3. ✅ **Contratos y centinela** (§1b): `barra/contracts.py` + `barra/sentinel.py`
+   (41 tests), conectados a probe → pose → detection → fusion → segments →
+   payload. En modo `record` no cambian el resultado. Probado en `strict` con
+   un clip real: 6/6 etapas OK.
+   - ✅ Además: `tests/test_deploy_contract.py` detectó que el `Dockerfile` no
+     copiaba `referral.py` (el próximo deploy habría roto todos los clips), y el
+     sello de commit (`BARRA_COMMIT`) arregla D7.
+   - 🔎 Primer hallazgo de la traza: `VID-20260827-WA0010` (muscle‑up declarado):
+     geometría `muscle_up` 0,98, modelo `pull_up`, y la fusión
+     (`model-decides`) eligió `pull_up` con 0,35 → caso para la Fase 5.
+4. **Corpus dorado** (`scripts/replay_corpus.py`): bajar los 20 clips de S3 +
+   los `VID-*.mp4` locales + `data/calisthenics` (partición dev/test); ejecutar
    `process_job` offline (sin LLM) y guardar por clip `exercise, n_reps,
    blockers, sessionScore` en `data/golden/baseline.json`. Este es el
    *baseline* contra el que se mide todo lo demás.
