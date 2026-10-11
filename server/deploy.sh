@@ -69,6 +69,11 @@ overrides=(
 if [ -n "${NAN_BASE_URL:-}" ]; then
   overrides+=("NanBaseUrl=$NAN_BASE_URL")
 fi
+# Where the dead-letter and error alarms go. Blank on the stack until
+# 2026-10-11, so they fired at nobody. Passed once; later deploys keep it.
+if [ -n "${ALARM_EMAIL:-}" ]; then
+  overrides+=("AlarmEmail=$ALARM_EMAIL")
+fi
 
 sam deploy \
   --no-confirm-changeset \
