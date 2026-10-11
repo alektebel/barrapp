@@ -1,0 +1,68 @@
+{
+ "detected.label": [
+  "Hanging knee raise",
+  "Muscle-up",
+  "Not recognised",
+  "Pull-up",
+  "Push-up",
+  "deadlift",
+  "monkey_bar_traversal",
+  "monkey_bar_traverse"
+ ],
+ "detected.reason": [
+  "hands fixed below the shoulders and nothing hanging below them, so the hands are on the floor rather than on bars",
+  "hanging from a fixed bar with the knees carried 0.54 torso-lengths above the hips and travelling further than the shoulders - the legs are doing the work",
+  "hanging from a fixed bar, and the shoulders finish 0.85 torso-lengths above the hands",
+  "hanging from a fixed bar, and the shoulders never rise above the hands (peak -0.03 torso-lengths)",
+  "hanging from something fixed, but 65% of the clip is spent within a fifth of a torso-length of one position - a hold, or resting between attempts, rather than a set of repetitions",
+  "no 3-second stretch of this clip shows hands on something fixed or feet planted (the hands were only tracked in 27% of the clip - they are out of frame for most of it, and the feet moved 1.62 torso-lengths, past 0.8), so it does not show a movement barra can measure",
+  "the learned classifier decided; it is measured well above the geometric detector on this corpus",
+  "the vision read of the frames is the most reliable single detector and the others did not agree"
+ ],
+ "component.why": [
+  "9% of the ascent made no progress",
+  "body travel relative to the bar - needs a consistent camera side, so it is not part of the score",
+  "descent 0.69x the ascent, under the 0.70x that counts as controlled",
+  "descent 0.97x the ascent - controlled",
+  "hang 60% of full, lockout 0% of full",
+  "left/right shoulder difference - needs a consistent camera side, so it is not part of the score",
+  "the ascent ran at 65% of its own best rate",
+  "the torso-length ruler is not usable on this clip (arm reads 2.75 torso), so range cannot be scored"
+ ],
+ "metric.name": [
+  "Body swing relative to the bar",
+  "Concentric duration",
+  "Eccentric : concentric",
+  "Eccentric duration",
+  "Lockout height above bar",
+  "Range of motion",
+  "Rep duration",
+  "Shoulder asymmetry (concentric)",
+  "Shoulder asymmetry at turnaround",
+  "Start position below bar",
+  "Time held near lockout",
+  "Transition through the bar"
+ ],
+ "metric.value": [
+  "0.27 s",
+  "0.71 torso",
+  "0.97 x"
+ ],
+ "blockers": [
+  "Could not open the clip: cannot open",
+  "candidate at 1.5s rests with the shoulders 0.64 torso-lengths above the hands, so it did not start from a hang - not a rep of a hanging movement",
+  "candidate at 22.9s: the hands travelled 1.2 torso-lengths, so they were not on a fixed bar - this is movement around the rig, not a rep",
+  "hanging from something fixed, but 65% of the clip is spent within a fifth of a torso-length of one position - a hold, or resting between attempts, rather than a set of repetitions",
+  "no stretch of this clip shows the athlete on the apparatus - the hands were never still on anything fixed",
+  "no turnaround stood out from the noise",
+  "rep starts 1.08 torso ABOVE the bar, so the detected start is not a hang",
+  "turnaround at 32.8s was never actually tracked - the subject left frame or the pose was lost at the top"
+ ],
+ "rep.problems": [
+  "rep starts 1.08 torso ABOVE the bar, so the detected start is not a hang"
+ ],
+ "rep.scoreNote": [
+  "Range of motion could not be measured on this clip, and a quality score without it would say nothing about how much of the movement happened. Film from the side so the torso is not foreshortened.",
+  "This rep could not be measured - the pose estimate is not physically possible."
+ ]
+}
