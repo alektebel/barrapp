@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": false,
+ "description": "In a gym with weightlifting equipment, two men are present, and one performs pistol squats while the other observes.",
+ "technique_start": 57.0,
+ "technique_end": 148.1,
+ "reps_estimate": 3,
+ "file": "videos/squat/youtube_CdjFLWq-yFk.mp4",
+ "claimed_trick": "squat"
+}

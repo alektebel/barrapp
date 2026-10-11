@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A woman in a living room performs deadlifts using a large water jug as a weight, hinging at the hips to lower the object and standing back up.",
+ "technique_start": 1.3,
+ "technique_end": 14.2,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/youtube_VDG3ka4lPp8.mp4",
+ "claimed_trick": "deadlift"
+}

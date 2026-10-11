@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": true,
+ "description": "A person wearing a yellow shirt and backpack performs a static hold at the top of a pull-up on an outdoor bar before landing on the ground.",
+ "technique_start": 1.0,
+ "technique_end": 8.6,
+ "reps_estimate": 1,
+ "file": "videos/pull_up/youtube_fBi8KyT_kWo.mp4",
+ "claimed_trick": "pull_up"
+}

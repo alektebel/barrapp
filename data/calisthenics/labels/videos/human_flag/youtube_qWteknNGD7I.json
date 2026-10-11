@@ -1,0 +1,12 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "In a gym with red walls, a man performs a human flag regression by holding a vertical pole while lying on a white bench, as an instructor observes and explains.",
+ "technique_start": 71.2,
+ "technique_end": 213.4,
+ "reps_estimate": 1,
+ "original_duration": 284.6,
+ "duration_after_cut": 144.2,
+ "file": "videos/human_flag/youtube_qWteknNGD7I.mp4",
+ "claimed_trick": "human_flag"
+}

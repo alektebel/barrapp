@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": true,
+ "description": "A man performs weighted pull-ups in a gym, wearing a dipping belt with a weight plate attached.",
+ "technique_start": 5.2,
+ "technique_end": 99.0,
+ "reps_estimate": 5,
+ "file": "videos/pull_up/youtube_WyD2g3rANu8.mp4",
+ "claimed_trick": "pull_up"
+}

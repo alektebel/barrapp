@@ -1,0 +1,12 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "In an outdoor park setting, a man performs a human flag on a vertical bar, holding his body horizontally sideways parallel to the ground.",
+ "technique_start": 14.9,
+ "technique_end": 44.6,
+ "reps_estimate": 1,
+ "original_duration": 297.3,
+ "duration_after_cut": 31.76,
+ "file": "videos/human_flag/youtube_Mw03szzpbEg.mp4",
+ "claimed_trick": "human_flag"
+}

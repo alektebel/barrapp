@@ -1,0 +1,10 @@
+{
+ "detected_trick": "push_up",
+ "agrees": true,
+ "description": "A man performs push-ups on a mat in a gym while a trainer kneels beside him observing.",
+ "technique_start": 15.0,
+ "technique_end": 40.7,
+ "reps_estimate": 2,
+ "file": "videos/push_up/youtube_Cb4avXaM6kM.mp4",
+ "claimed_trick": "push_up"
+}

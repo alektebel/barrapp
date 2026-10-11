@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "Side view of a person in a squat rack performing barbell back squats, with green checkmarks indicating correct form on frames 3-6.",
+ "technique_start": 15.7,
+ "technique_end": 34.5,
+ "reps_estimate": 1,
+ "file": "videos/barbell_squat/youtube_jHnQZ80Dhfg.mp4",
+ "claimed_trick": "barbell_squat"
+}

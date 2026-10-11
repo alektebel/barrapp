@@ -1,0 +1,12 @@
+{
+ "detected_trick": "muscle_up",
+ "agrees": true,
+ "description": "A shirtless man wearing sunglasses performs muscle-ups on gymnastic rings in an outdoor courtyard.",
+ "technique_start": 2.3,
+ "technique_end": 29.9,
+ "reps_estimate": 2,
+ "original_duration": 46.0,
+ "duration_after_cut": 29.64,
+ "file": "videos/muscle_up/youtube_fsL30RRJ9ds.mp4",
+ "claimed_trick": "muscle_up"
+}

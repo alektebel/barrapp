@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A powerlifting coach in a gym demonstrates a conventional deadlift with a barbell, showing the setup and lifting phase from front and side angles.",
+ "technique_start": 2.5,
+ "technique_end": 48.1,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/youtube_N6zs7QLh5RA.mp4",
+ "claimed_trick": "deadlift"
+}

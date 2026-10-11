@@ -1,0 +1,10 @@
+{
+ "detected_trick": "squat",
+ "agrees": false,
+ "description": "A man in black athletic wear demonstrates bodyweight squats (and block-assisted squats) in a bright room with white shelving, explaining squat mechanics.",
+ "technique_start": 19.2,
+ "technique_end": 65.4,
+ "reps_estimate": 3,
+ "file": "videos/barbell_squat/youtube_SvdRQrWoJhs.mp4",
+ "claimed_trick": "barbell_squat"
+}

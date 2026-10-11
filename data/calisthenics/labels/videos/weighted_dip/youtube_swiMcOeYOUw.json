@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A man in a blue tank top performs a one-arm weighted dip variation on a machine while wearing a weight belt, observed by a spotter.",
+ "technique_start": 8.4,
+ "technique_end": 58.9,
+ "reps_estimate": 1,
+ "original_duration": 168.3,
+ "duration_after_cut": 52.5525,
+ "file": "videos/weighted_dip/youtube_swiMcOeYOUw.mp4",
+ "claimed_trick": "weighted_dip"
+}

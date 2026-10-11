@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A woman performs pistol squats on her left leg in a gym, squatting down while extending her right leg forward for balance.",
+ "technique_start": 1.3,
+ "technique_end": 14.7,
+ "reps_estimate": 2,
+ "file": "videos/pistol_squat/youtube_twHMDK-q3go.mp4",
+ "claimed_trick": "pistol_squat"
+}

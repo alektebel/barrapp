@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": true,
+ "description": "A man in a grey shirt talks to the camera explaining the exercise, followed by clips of a shirtless man performing Bulgarian split squats with dumbbells in outdoor and gym settings.",
+ "technique_start": 138.6,
+ "technique_end": 163.8,
+ "reps_estimate": 1,
+ "original_duration": 252.0,
+ "duration_after_cut": 27.2,
+ "file": "videos/bulgarian_split_squat/youtube_O0JjK5zmkus.mp4",
+ "claimed_trick": "bulgarian_split_squat"
+}

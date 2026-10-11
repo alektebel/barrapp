@@ -1,0 +1,12 @@
+{
+ "detected_trick": "muscle_up",
+ "agrees": true,
+ "description": "In a gym, a man performs a muscle-up on rings with a static front-view camera, while another man stands nearby.",
+ "technique_start": 102.3,
+ "technique_end": 120.9,
+ "reps_estimate": 1,
+ "original_duration": 186.0,
+ "duration_after_cut": 20.64,
+ "file": "videos/muscle_up/youtube_4hjF99ed5Pc.mp4",
+ "claimed_trick": "muscle_up"
+}

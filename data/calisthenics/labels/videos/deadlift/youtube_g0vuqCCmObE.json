@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "In a gym, multiple individuals perform barbell deadlifts, lifting from the ground to a standing position from various angles.",
+ "technique_start": 2.7,
+ "technique_end": 52.1,
+ "reps_estimate": 4,
+ "file": "videos/deadlift/youtube_g0vuqCCmObE.mp4",
+ "claimed_trick": "deadlift"
+}

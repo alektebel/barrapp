@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A person performs a kettlebell deadlift with a side-to-side view on a cliff edge, lifting the weight from the ground to a standing position.",
+ "technique_start": 2.2,
+ "technique_end": 11.2,
+ "reps_estimate": 1,
+ "file": "videos/deadlift/commons_Kettlebell_Triceps_Push-up_Deadlift_Kettlebell_Combo.mp4",
+ "claimed_trick": "deadlift"
+}

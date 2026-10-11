@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": false,
+ "description": "A person in an outdoor park performs a pistol squat, balancing on one leg with the other extended forward while lowering their hips.",
+ "technique_start": 103.4,
+ "technique_end": 117.2,
+ "reps_estimate": 1,
+ "file": "videos/squat/youtube_NYSuE84oNMo.mp4",
+ "claimed_trick": "squat"
+}

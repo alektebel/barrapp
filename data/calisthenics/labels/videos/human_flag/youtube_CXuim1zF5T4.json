@@ -1,0 +1,12 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "A man performs a human flag on a vertical pole in an outdoor setting.",
+ "technique_start": 82.2,
+ "technique_end": 173.5,
+ "reps_estimate": 2,
+ "original_duration": 182.6,
+ "duration_after_cut": 93.3,
+ "file": "videos/human_flag/youtube_CXuim1zF5T4.mp4",
+ "claimed_trick": "human_flag"
+}

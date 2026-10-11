@@ -1,0 +1,10 @@
+{
+ "detected_trick": "none",
+ "agrees": false,
+ "description": "A man in a black t-shirt stands and talks in a gym environment near various weightlifting machines, but does not perform any exercise.",
+ "technique_start": 0,
+ "technique_end": 0,
+ "reps_estimate": 0,
+ "file": "videos/dip/youtube_k_hb58B5jWk.mp4",
+ "claimed_trick": "dip"
+}

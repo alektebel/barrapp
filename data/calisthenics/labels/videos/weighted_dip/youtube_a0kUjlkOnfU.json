@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A man in a neon yellow shirt performs weighted dips on parallel bars in a gym, lowering his body and pushing back up.",
+ "technique_start": 1.6,
+ "technique_end": 17.6,
+ "reps_estimate": 1,
+ "original_duration": 19.2,
+ "duration_after_cut": 18.018,
+ "file": "videos/weighted_dip/youtube_a0kUjlkOnfU.mp4",
+ "claimed_trick": "weighted_dip"
+}

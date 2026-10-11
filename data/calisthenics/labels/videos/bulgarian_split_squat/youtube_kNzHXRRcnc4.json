@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": true,
+ "description": "A man in a gym demonstrates a bulgarian split squat with his rear foot elevated on a bench while holding dumbbells.",
+ "technique_start": 57.5,
+ "technique_end": 218.4,
+ "reps_estimate": 8,
+ "original_duration": 229.9,
+ "duration_after_cut": 162.9628,
+ "file": "videos/bulgarian_split_squat/youtube_kNzHXRRcnc4.mp4",
+ "claimed_trick": "bulgarian_split_squat"
+}

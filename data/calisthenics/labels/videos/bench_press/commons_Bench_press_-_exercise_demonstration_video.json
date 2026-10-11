@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A woman wearing a teal top and blue leggings performs a barbell bench press on a flat weight bench.",
+ "technique_start": 0.6,
+ "technique_end": 6.5,
+ "reps_estimate": 1,
+ "file": "videos/bench_press/commons_Bench_press_-_exercise_demonstration_video.mp4",
+ "claimed_trick": "bench_press"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "push_up",
+ "agrees": true,
+ "description": "A person in a black outfit demonstrates a standard push-up by lowering their body to the floor and pushing back up on a white surface.",
+ "technique_start": 10.9,
+ "technique_end": 47.3,
+ "reps_estimate": 1,
+ "file": "videos/push_up/commons_Conditioning_Drill-_Eight_Count_T_Push-Up.mp4",
+ "claimed_trick": "push_up"
+}

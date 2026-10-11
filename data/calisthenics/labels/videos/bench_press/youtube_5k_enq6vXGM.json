@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A man is performing an incline barbell bench press with a spotter present in a home gym setting.",
+ "technique_start": 11.6,
+ "technique_end": 44.1,
+ "reps_estimate": 3,
+ "file": "videos/bench_press/youtube_5k_enq6vXGM.mp4",
+ "claimed_trick": "bench_press"
+}

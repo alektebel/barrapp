@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "From a side-view in a gym with barbell racks, a woman and a man alternately perform deadlifts with a barbell while a coach observes.",
+ "technique_start": 33.5,
+ "technique_end": 100.6,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/youtube_USpmiOk61Ek.mp4",
+ "claimed_trick": "deadlift"
+}

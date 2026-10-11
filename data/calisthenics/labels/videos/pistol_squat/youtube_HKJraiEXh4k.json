@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A woman in a gym performs pistol squats, shown from a side view, squatting on one leg with the other extended.",
+ "technique_start": 22.4,
+ "technique_end": 30.5,
+ "reps_estimate": 2,
+ "file": "videos/pistol_squat/youtube_HKJraiEXh4k.mp4",
+ "claimed_trick": "pistol_squat"
+}

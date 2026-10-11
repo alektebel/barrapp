@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A man performs deadlifts on a Smith machine, bending at the hips and knees to lower the bar and then standing back up.",
+ "technique_start": 13.8,
+ "technique_end": 46.9,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/youtube_NBR6tozmx2I.mp4",
+ "claimed_trick": "deadlift"
+}

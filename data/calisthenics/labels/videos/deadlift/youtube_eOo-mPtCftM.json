@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A man in a gym, viewed from the front, uses a barbell to perform a sumo deadlift, lifting it from the floor to a standing position.",
+ "technique_start": 51.5,
+ "technique_end": 67.3,
+ "reps_estimate": 1,
+ "file": "videos/deadlift/youtube_eOo-mPtCftM.mp4",
+ "claimed_trick": "deadlift"
+}

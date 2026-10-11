@@ -85,8 +85,8 @@ and the model's load estimate says "baseline" when it has no labelled data
 (barra cannot see weight in a 2D pose; the athlete captures it).
 
 ```bash
-python scripts/train_model.py --no-live           # retrain on cached keypoints
-python scripts/train_model.py                     # retrain, posing new clips
+python scripts/extract_keypoints.py               # pose the corpus (cached, resumable)
+python scripts/train_model.py                     # retrain on the measured corpus
 ```
 
 ## Does it recognise the right movement?

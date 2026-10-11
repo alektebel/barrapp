@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": false,
+ "description": "A person performs a Bulgarian split squat by elevating their rear foot on a bench and squatting with the front leg.",
+ "technique_start": 12.6,
+ "technique_end": 42.9,
+ "reps_estimate": 2,
+ "file": "videos/split_squat/youtube_onUcwAbmZF8.mp4",
+ "claimed_trick": "split_squat"
+}

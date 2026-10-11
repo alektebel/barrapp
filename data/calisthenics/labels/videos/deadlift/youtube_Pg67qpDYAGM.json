@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A person in a gym performs a barbell deadlift, lifting the weight from the floor to a standing position, captured from front and side angles.",
+ "technique_start": 8.6,
+ "technique_end": 54.1,
+ "reps_estimate": 3,
+ "file": "videos/deadlift/youtube_Pg67qpDYAGM.mp4",
+ "claimed_trick": "deadlift"
+}

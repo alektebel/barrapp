@@ -1,0 +1,10 @@
+{
+ "detected_trick": "squat",
+ "agrees": true,
+ "description": "A man holds a weight and performs levitation squats, lowering his body on one leg with the other leg bent behind him without touching the floor.",
+ "technique_start": 2.9,
+ "technique_end": 54.7,
+ "reps_estimate": 2,
+ "file": "videos/squat/youtube_EHocz1P-0iQ.mp4",
+ "claimed_trick": "squat"
+}

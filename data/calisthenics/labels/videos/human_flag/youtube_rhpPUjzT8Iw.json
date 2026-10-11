@@ -1,0 +1,10 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "A man in a yellow shirt performs a human flag by holding his body horizontally sideways from a vertical pole while a woman watches in the background.",
+ "technique_start": 0.8,
+ "technique_end": 9.2,
+ "reps_estimate": 1,
+ "file": "videos/human_flag/youtube_rhpPUjzT8Iw.mp4",
+ "claimed_trick": "human_flag"
+}

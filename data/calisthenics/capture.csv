@@ -1,0 +1,9 @@
+file,movement,intended_fault,severity,subject,angle,note
+videos/own/VID-20260827-WA0010.mp4,muscle_up,,,diego,frontal-posterior,"declared in data/videos/sessions.csv (2026-08-14, set 1)"
+videos/own/VID-20260827-WA0012.mp4,muscle_up,,,diego,frontal-anterior,"declared in data/videos/sessions.csv (2026-08-10, set 1)"
+videos/own/VID-20260827-WA0014.mp4,muscle_up,,,diego,frontal-anterior,"declared in data/videos/sessions.csv (2026-08-19, set 2)"
+videos/own/VID-20260827-WA0020.mp4,dip,,,diego,,"movement detected, not declared - confirm the movement as well as the faults"
+videos/own/VID-20260827-WA0018.mp4,muscle_up,,,diego,,"detected muscle_up at 0.0 confidence and the segmenter finds no reps"
+videos/own/VID-20260827-WA0011.mp4,knee_raise,,,diego,frontal-anterior,"declared knee_raise - no fault rules exist for it"
+videos/own/VID-20260827-WA0017.mp4,back_lever,,,diego,,"detected back_lever - no fault rules exist for it"
+videos/own/VID-20260827-WA0019.mp4,freestanding_handstand,,,diego,,"old classifier said handstand, which is not a skill id - confirm which handstand"

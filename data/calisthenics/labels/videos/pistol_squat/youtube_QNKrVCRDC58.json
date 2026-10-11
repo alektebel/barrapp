@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A man in an orange shirt performs a pistol squat on a blue bench while holding a red resistance band for balance.",
+ "technique_start": 68.5,
+ "technique_end": 129.5,
+ "reps_estimate": 3,
+ "file": "videos/pistol_squat/youtube_QNKrVCRDC58.mp4",
+ "claimed_trick": "pistol_squat"
+}

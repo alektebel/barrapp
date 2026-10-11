@@ -1,0 +1,12 @@
+{
+ "detected_trick": "dip",
+ "agrees": true,
+ "description": "A woman performs dips on green parallel bars while a man instructs her in a gym.",
+ "technique_start": 160.1,
+ "technique_end": 184.7,
+ "reps_estimate": 1,
+ "original_duration": 246.3,
+ "duration_after_cut": 26.64,
+ "file": "videos/dip/youtube_uBgrmiPo6tE.mp4",
+ "claimed_trick": "dip"
+}

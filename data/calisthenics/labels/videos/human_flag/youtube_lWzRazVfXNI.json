@@ -1,0 +1,10 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "A man in a studio performs a human flag on a vertical pole.",
+ "technique_start": 17.1,
+ "technique_end": 58.2,
+ "reps_estimate": 3,
+ "file": "videos/human_flag/youtube_lWzRazVfXNI.mp4",
+ "claimed_trick": "human_flag"
+}

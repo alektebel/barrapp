@@ -1,0 +1,10 @@
+{
+ "detected_trick": "push_up",
+ "agrees": true,
+ "description": "An animated male figure demonstrates push-ups from multiple camera angles, including top-down, front, and side views, with hands on the ground or rings.",
+ "technique_start": 1.8,
+ "technique_end": 19.6,
+ "reps_estimate": 1,
+ "file": "videos/push_up/youtube_Ogc30Y2jeh4.mp4",
+ "claimed_trick": "push_up"
+}

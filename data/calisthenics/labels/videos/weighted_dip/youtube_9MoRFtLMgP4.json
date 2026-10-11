@@ -1,0 +1,10 @@
+{
+ "detected_trick": "dip",
+ "agrees": false,
+ "description": "A person performs bodyweight bench dips with their hands on a bench and feet on a step.",
+ "technique_start": 1.6,
+ "technique_end": 11.5,
+ "reps_estimate": 3,
+ "file": "videos/weighted_dip/youtube_9MoRFtLMgP4.mp4",
+ "claimed_trick": "weighted_dip"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "split_squat",
+ "agrees": true,
+ "description": "A person in a split stance holding a kettlebell in one hand performs a split squat.",
+ "technique_start": 0.8,
+ "technique_end": 8.8,
+ "reps_estimate": 1,
+ "file": "videos/split_squat/youtube_uBW00CL0qPc.mp4",
+ "claimed_trick": "split_squat"
+}

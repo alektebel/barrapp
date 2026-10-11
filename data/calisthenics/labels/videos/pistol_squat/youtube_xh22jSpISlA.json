@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A woman performs single-leg box squats, lowering herself to a bench and standing back up with one leg extended.",
+ "technique_start": 1.8,
+ "technique_end": 19.2,
+ "reps_estimate": 2,
+ "file": "videos/pistol_squat/youtube_xh22jSpISlA.mp4",
+ "claimed_trick": "pistol_squat"
+}

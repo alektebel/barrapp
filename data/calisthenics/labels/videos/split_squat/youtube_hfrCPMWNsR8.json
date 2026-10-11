@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": false,
+ "description": "A man in a gym setting performs Bulgarian split squats with his rear foot elevated on a box, demonstrating the movement first with bodyweight and then holding dumbbells.",
+ "technique_start": 73.9,
+ "technique_end": 280.9,
+ "reps_estimate": 5,
+ "file": "videos/split_squat/youtube_hfrCPMWNsR8.mp4",
+ "claimed_trick": "split_squat"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A female athlete performs barbell back squats in a rack while a male coach observes.",
+ "technique_start": 34.5,
+ "technique_end": 83.7,
+ "reps_estimate": 2,
+ "file": "videos/barbell_squat/youtube_qm3W6f129lw.mp4",
+ "claimed_trick": "barbell_squat"
+}

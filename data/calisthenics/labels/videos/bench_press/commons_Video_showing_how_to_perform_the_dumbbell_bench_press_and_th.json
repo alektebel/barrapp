@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "From a side viewpoint, a woman in a pink shirt performs a dumbbell bench press on a weight bench in a gym setting.",
+ "technique_start": 42.2,
+ "technique_end": 61.0,
+ "reps_estimate": 5,
+ "file": "videos/bench_press/commons_Video_showing_how_to_perform_the_dumbbell_bench_press_and_th.mp4",
+ "claimed_trick": "bench_press"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A woman in a camouflage shirt performs a bench press with a barbell on a weight bench while a male instructor in a grey hoodie stands nearby to supervise and instruct.",
+ "technique_start": 89.3,
+ "technique_end": 101.2,
+ "reps_estimate": 2,
+ "file": "videos/bench_press/youtube__y0ScewgSCM.mp4",
+ "claimed_trick": "bench_press"
+}

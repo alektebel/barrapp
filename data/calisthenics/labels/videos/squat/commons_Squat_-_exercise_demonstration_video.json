@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A person viewed from behind performs two repetitions of a barbell back squat in a gym.",
+ "technique_start": 0.6,
+ "technique_end": 6.5,
+ "reps_estimate": 2,
+ "file": "videos/squat/commons_Squat_-_exercise_demonstration_video.mp4",
+ "claimed_trick": "squat"
+}

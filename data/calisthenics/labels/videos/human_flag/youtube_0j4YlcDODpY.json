@@ -1,0 +1,10 @@
+{
+ "detected_trick": "none",
+ "agrees": false,
+ "description": "A person in a gym performs a candle (shoulder stand) on a mat, holding their body vertically while balancing on their shoulders.",
+ "technique_start": 8.3,
+ "technique_end": 15.0,
+ "reps_estimate": 1,
+ "file": "videos/human_flag/youtube_0j4YlcDODpY.mp4",
+ "claimed_trick": "human_flag"
+}

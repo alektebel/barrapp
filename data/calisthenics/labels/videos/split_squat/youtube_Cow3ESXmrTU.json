@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": false,
+ "description": "A man in a gym holds dumbbells while performing a Bulgarian split squat, with his rear foot resting on a weight bench as he lowers his body and rises back up through the squat motion.",
+ "technique_start": 8.8,
+ "technique_end": 13.8,
+ "reps_estimate": 1,
+ "file": "videos/split_squat/youtube_Cow3ESXmrTU.mp4",
+ "claimed_trick": "split_squat"
+}

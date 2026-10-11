@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": false,
+ "description": "A shirtless man performs wide-grip pull-ups on a power tower, viewed from the back.",
+ "technique_start": 1.4,
+ "technique_end": 15.2,
+ "reps_estimate": 3,
+ "file": "videos/weighted_pull_up/youtube_1cZ2I-8DR-Q.mp4",
+ "claimed_trick": "weighted_pull_up"
+}

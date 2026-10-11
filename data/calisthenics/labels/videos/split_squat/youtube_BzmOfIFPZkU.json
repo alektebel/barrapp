@@ -1,0 +1,10 @@
+{
+ "detected_trick": "split_squat",
+ "agrees": true,
+ "description": "A woman in a pink top performs split squats on a blue yoga mat in a living room while holding a dumbbell.",
+ "technique_start": 57.1,
+ "technique_end": 120.6,
+ "reps_estimate": 3,
+ "file": "videos/split_squat/youtube_BzmOfIFPZkU.mp4",
+ "claimed_trick": "split_squat"
+}

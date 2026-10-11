@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": true,
+ "description": "In a gym, trainer John Le performs Bulgarian split squats with dumbbells and kettlebells, shown from front and side views.",
+ "technique_start": 43.1,
+ "technique_end": 48.9,
+ "reps_estimate": 1,
+ "file": "videos/bulgarian_split_squat/youtube_8J2KFvaXTko.mp4",
+ "claimed_trick": "bulgarian_split_squat"
+}

@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": true,
+ "description": "A woman in a gym demonstrates Bulgarian split squats with her back leg elevated on a bench while text overlays highlight key points of the exercise.",
+ "technique_start": 11.3,
+ "technique_end": 33.9,
+ "reps_estimate": 3,
+ "original_duration": 45.2,
+ "duration_after_cut": 24.607917,
+ "file": "videos/bulgarian_split_squat/youtube_xlRVueVndh4.mp4",
+ "claimed_trick": "bulgarian_split_squat"
+}

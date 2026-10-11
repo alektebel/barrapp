@@ -1,0 +1,10 @@
+{
+ "detected_trick": "front_lever",
+ "agrees": true,
+ "description": "A person in a home gym is holding a front lever on a bar, keeping their body horizontal and parallel to the floor.",
+ "technique_start": 1.6,
+ "technique_end": 17.8,
+ "reps_estimate": 1,
+ "file": "videos/front_lever/youtube_W9QCwWuJFKw.mp4",
+ "claimed_trick": "front_lever"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": true,
+ "description": "A man in a white t - shirt and cap performs pull - ups on a bar in a home gym (with a digital clock visible), starting at 15.3s and ending at 39.7s, completing approximately 2 reps.",
+ "technique_start": 15.3,
+ "technique_end": 39.7,
+ "reps_estimate": 2,
+ "file": "videos/pull_up/youtube_VWxuKP6jdx0.mp4",
+ "claimed_trick": "pull_up"
+}

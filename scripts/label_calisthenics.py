@@ -42,6 +42,8 @@ TRICKS = [
     "muscle_up", "pull_up", "dip", "push_up", "squat", "knee_raise",
     "pistol_squat", "handstand", "front_lever", "planche", "back_lever",
     "human_flag", "bench_press", "deadlift", "barbell_squat",
+    "split_squat", "bulgarian_split_squat",
+    "weighted_pull_up", "weighted_dip", "weighted_squat",
 ]
 
 PROMPT = """You are labeling a calisthenics/weightlifting training dataset.
@@ -108,16 +110,35 @@ def call_mimo(frames: list[tuple[float, str]], claimed: str, duration: float,
                                  headers={"Authorization": f"Bearer {api_key}",
                                           "Content-Type": "application/json",
                                           "User-Agent": UA})
+    # The endpoint rate-limits, and a 429 that gives up after four quick tries
+    # is a clip silently missing from the corpus. Back off geometrically with
+    # jitter and keep going: the batch is long anyway, and a label that arrives
+    # a minute late is worth far more than one that never arrives.
     body = None
-    for attempt in range(4):
+    attempts = int(os.environ.get("NAN_MAX_ATTEMPTS", "8") or 8)
+    for attempt in range(attempts):
         try:
             with urllib.request.urlopen(req, timeout=180) as r:
                 body = json.load(r)
             break
-        except urllib.error.HTTPError as e:
-            if e.code in (429, 500, 502, 503) and attempt < 3:
+        except (urllib.error.HTTPError, urllib.error.URLError, TimeoutError) as e:
+            code = getattr(e, "code", 0)
+            # Retry anything that is not a clear, permanent refusal. The
+            # enumerated-codes version of this kept losing clips to statuses
+            # nobody had thought to list: 524 (Cloudflare timed out waiting on
+            # the model) and even 400, whose clips were re-sent unchanged
+            # minutes later and labelled fine. Both are transient here, and a
+            # status left off the list silently drops a clip from the corpus
+            # forever - the one failure mode this batch cannot afford. So the
+            # default is retry, and only 401/403/404 - credentials and routing,
+            # which no amount of waiting fixes - are allowed to be fatal.
+            retryable = (code not in (401, 403, 404)) or not isinstance(
+                e, urllib.error.HTTPError)
+            if retryable and attempt < attempts - 1:
+                import random
                 import time
-                time.sleep(5 * (attempt + 1))
+                time.sleep(min(90.0, 4.0 * (2 ** attempt))
+                           * (0.7 + 0.6 * random.random()))
                 continue
             raise
     text = body["choices"][0]["message"]["content"]
@@ -136,7 +157,10 @@ def trim(path: Path, start: float, end: float, duration: float) -> bool:
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-ss", str(start),
              "-to", str(end), "-i", str(path),
-             "-vf", "scale=-2:min(ih,720)", "-c:v", "libx264",
+             # The inner quotes are load-bearing: ffmpeg's filtergraph parser
+             # splits on commas, so an unquoted min(ih,720) is read as a second
+             # filter named "720)" and the whole call fails.
+             "-vf", "scale=-2:'min(ih,720)'", "-c:v", "libx264",
              "-preset", "fast", "-crf", "23", "-c:a", "aac",
              "-movflags", "+faststart", str(tmp)],
             capture_output=True, timeout=900, check=True)
@@ -163,8 +187,25 @@ def main() -> int:
         return 1
 
     root = Path(a.dataset)
-    with open(root / "metadata.csv") as f:
-        rows = [r for r in csv.DictReader(f) if (root / r["file"]).exists()]
+    # The corpus is the videos on disk, not the ledger. metadata.csv only ever
+    # holds rows a scrape wrote, and the directory has since grown past it - 26
+    # clips had no row, so they could never be labelled, and two whole
+    # rule-covered movements (split_squat, bulgarian_split_squat) sat at zero
+    # labels because of it. The ledger is now consulted for what it does know
+    # (duration, fps) and never for what exists.
+    meta: dict[str, dict] = {}
+    meta_path = root / "metadata.csv"
+    if meta_path.exists():
+        with open(meta_path) as f:
+            for r in csv.DictReader(f):
+                meta[r["file"]] = r
+    rows = []
+    for video in sorted((root / "videos").rglob("*.mp4")):
+        rel = str(video.relative_to(root))
+        row = dict(meta.get(rel, {}))
+        row["file"] = rel
+        row["trick"] = video.parent.name
+        rows.append(row)
     label_dir = root / "labels"
     label_dir.mkdir(exist_ok=True)
 
@@ -217,8 +258,6 @@ def main() -> int:
         with open(out) as f:
             for r in csv.DictReader(f):
                 existing[r["file"]] = r
-    for r in [x for x in results if x] + [existing.get(v["file"], {}) for v in []]:
-        pass
     # merge: any clip with a sidecar (including ones skipped this run)
     merged: dict[str, dict] = {}
     for j in sorted(label_dir.rglob("*.json")):

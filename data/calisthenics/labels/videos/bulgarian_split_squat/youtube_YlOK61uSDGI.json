@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": true,
+ "description": "A woman performs a bulgarian split squat with her rear foot elevated on a bench, holding a weight at her chest in a gym setting.",
+ "technique_start": 1.2,
+ "technique_end": 11.2,
+ "reps_estimate": 1,
+ "original_duration": 15.0,
+ "duration_after_cut": 12.0,
+ "file": "videos/bulgarian_split_squat/youtube_YlOK61uSDGI.mp4",
+ "claimed_trick": "bulgarian_split_squat"
+}

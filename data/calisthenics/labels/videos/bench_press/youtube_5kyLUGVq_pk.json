@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A man in a black shirt lies on an incline bench and performs a bench press repetition with a barbell.",
+ "technique_start": 75.4,
+ "technique_end": 102.8,
+ "reps_estimate": 1,
+ "file": "videos/bench_press/youtube_5kyLUGVq_pk.mp4",
+ "claimed_trick": "bench_press"
+}

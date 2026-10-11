@@ -1,0 +1,12 @@
+{
+ "detected_trick": "handstand",
+ "agrees": true,
+ "description": "A person in a park performs a freestanding handstand and demonstrates progression steps like crow pose and alignment.",
+ "technique_start": 9.1,
+ "technique_end": 118.2,
+ "reps_estimate": 1,
+ "original_duration": 181.8,
+ "duration_after_cut": 111.1,
+ "file": "videos/handstand/youtube_8WJPWOOLyZM.mp4",
+ "claimed_trick": "handstand"
+}

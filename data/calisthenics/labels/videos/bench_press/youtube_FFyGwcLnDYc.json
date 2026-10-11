@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A man in a black tank top and elbow sleeves is seen performing a repetition on a decline bench press with a barbell, accompanied by a picture-in-picture overlay of him speaking.",
+ "technique_start": 44.0,
+ "technique_end": 44.0,
+ "reps_estimate": 1,
+ "file": "videos/bench_press/youtube_FFyGwcLnDYc.mp4",
+ "claimed_trick": "bench_press"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "Filmed from multiple angles in a gym, a man hangs from a power rack pull-up bar and performs hanging knee raises by lifting his knees toward his chest.",
+ "technique_start": 1.2,
+ "technique_end": 13.1,
+ "reps_estimate": 4,
+ "file": "videos/knee_raise/youtube_ULINjQ5TBZI.mp4",
+ "claimed_trick": "knee_raise"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "A woman hangs from a pull-up bar in a gym and performs a knee raise by lifting her knees towards her chest.",
+ "technique_start": 3.7,
+ "technique_end": 13.7,
+ "reps_estimate": 1,
+ "file": "videos/knee_raise/youtube_fOlBO3CG4cI.mp4",
+ "claimed_trick": "knee_raise"
+}

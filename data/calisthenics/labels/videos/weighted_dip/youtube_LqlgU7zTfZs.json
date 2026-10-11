@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A man in a blue shirt performs weighted dips on parallel bars, lowering and raising his body while a weight plate hangs from a belt around his waist.",
+ "technique_start": 7.6,
+ "technique_end": 13.6,
+ "reps_estimate": 2,
+ "original_duration": 18.2,
+ "duration_after_cut": 8.008,
+ "file": "videos/weighted_dip/youtube_LqlgU7zTfZs.mp4",
+ "claimed_trick": "weighted_dip"
+}

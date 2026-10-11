@@ -1,0 +1,12 @@
+{
+ "detected_trick": "muscle_up",
+ "agrees": true,
+ "description": "A person performs a muscle-up on an outdoor high bar, transitioning from a hanging position to a support position above the bar.",
+ "technique_start": 189.9,
+ "technique_end": 219.2,
+ "reps_estimate": 1,
+ "original_duration": 292.2,
+ "duration_after_cut": 31.3,
+ "file": "videos/muscle_up/youtube_AL0S4sCryFY.mp4",
+ "claimed_trick": "muscle_up"
+}

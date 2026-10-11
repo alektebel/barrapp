@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A woman lies on a flat bench in a gym and performs a dumbbell bench press.",
+ "technique_start": 18.8,
+ "technique_end": 56.2,
+ "reps_estimate": 3,
+ "original_duration": 75.0,
+ "duration_after_cut": 39.4,
+ "file": "videos/bench_press/youtube_4PyIQNJfAH8.mp4",
+ "claimed_trick": "bench_press"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A man in a blue sleeveless shirt and grey shorts performs a barbell deadlift in a garage gym.",
+ "technique_start": 0.6,
+ "technique_end": 6.8,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/commons_Deadlift_-_exercise_demonstration_video.mp4",
+ "claimed_trick": "deadlift"
+}

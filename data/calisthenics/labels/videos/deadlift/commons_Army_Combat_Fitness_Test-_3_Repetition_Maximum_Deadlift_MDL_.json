@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A group of soldiers performs trap bar deadlifts on a grassy field under the supervision of an instructor.",
+ "technique_start": 19.0,
+ "technique_end": 64.5,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/commons_Army_Combat_Fitness_Test-_3_Repetition_Maximum_Deadlift_MDL_.mp4",
+ "claimed_trick": "deadlift"
+}

@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A man sits on a seated dip machine in a gym and demonstrates the exercise by pushing the handles downward.",
+ "technique_start": 42.6,
+ "technique_end": 110.8,
+ "reps_estimate": 2,
+ "original_duration": 170.5,
+ "duration_after_cut": 70.25,
+ "file": "videos/weighted_dip/youtube_EBnq0A5L_wo.mp4",
+ "claimed_trick": "weighted_dip"
+}

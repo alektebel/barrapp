@@ -1,0 +1,10 @@
+{
+ "detected_trick": "push_up",
+ "agrees": true,
+ "description": "A man in a black shirt performs a push-up on a blue mat in a gym, followed by a man in a white tank top performing an incline push-up outdoors, with anatomical diagrams illustrating the exercise shown in between.",
+ "technique_start": 6.5,
+ "technique_end": 32.7,
+ "reps_estimate": 2,
+ "file": "videos/push_up/youtube_ASYC3fAOOJw.mp4",
+ "claimed_trick": "push_up"
+}

@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A man lies on a mat in a gym and performs a dumbbell floor press.",
+ "technique_start": 27.5,
+ "technique_end": 71.6,
+ "reps_estimate": 1,
+ "original_duration": 110.1,
+ "duration_after_cut": 46.125,
+ "file": "videos/bench_press/youtube_Bx4QPVH-J1g.mp4",
+ "claimed_trick": "bench_press"
+}

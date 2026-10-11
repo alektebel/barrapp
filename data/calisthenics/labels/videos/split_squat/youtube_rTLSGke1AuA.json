@@ -1,0 +1,10 @@
+{
+ "detected_trick": "split_squat",
+ "agrees": true,
+ "description": "A man viewed from the side performs split squats with a kettlebell, lowering and raising his body in a split stance.",
+ "technique_start": 0.8,
+ "technique_end": 9.3,
+ "reps_estimate": 2,
+ "file": "videos/split_squat/youtube_rTLSGke1AuA.mp4",
+ "claimed_trick": "split_squat"
+}

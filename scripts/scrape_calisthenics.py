@@ -8,7 +8,10 @@ Sources (no API keys needed):
 
 Output:
   data/calisthenics/videos/<trick>/<id>.mp4
-  data/calisthenics/metadata.csv  (one row per clip, with attribution)
+  data/calisthenics/metadata.csv  (one row per clip, with attribution + content_hash)
+
+Dedup: source_url first, then sha256 content hash (16-hex) so the same bytes
+cannot enter twice under different URLs. Duplicate downloads are deleted.
 
 Usage:
   python scripts/scrape_calisthenics.py [--tricks muscle_up,pull_up] [--per-trick N]
@@ -21,6 +24,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import hashlib
 import json
 import re
 import shutil
@@ -38,94 +42,115 @@ COMMONS_API = "https://commons.wikimedia.org/w/api.php"
 TRICKS: dict[str, dict] = {
     "muscle_up": {
         "yt": ["bar muscle up calisthenics", "ring muscle up calisthenics",
-               "muscle up tutorial"],
+               "muscle up tutorial", "muscle up common mistakes",
+               "muscle up form errors", "bad muscle up technique"],
         "commons": ["Category:Muscle-ups", "muscle-up exercise filetype:video"],
     },
     "pull_up": {
         "yt": ["pull up calisthenics form", "weighted pull up calisthenics",
-               "pull up exercise"],
+               "pull up exercise", "pull up common mistakes",
+               "pull up form errors", "kipping pull up mistakes"],
         "commons": ["Category:Pull-ups",
                     'incategory:Pull-ups filetype:video',
                     "pull-up exercise filetype:video"],
     },
     "dip": {
-        "yt": ["bar dip calisthenics", "parallel bar dip form"],
+        "yt": ["bar dip calisthenics", "parallel bar dip form",
+               "dip common mistakes", "dip form errors", "shoulder dip mistakes"],
         "commons": ["Category:Dips",
                     "dip exercise calisthenics filetype:video",
                     "parallel bars dip filetype:video"],
     },
     "push_up": {
         "yt": ["push up calisthenics form", "pseudo planche push up",
-               "push up exercise"],
+               "push up exercise", "push up common mistakes",
+               "push up form errors", "push up technique errors"],
         "commons": ["Category:Push-ups",
                     "incategory:Push-ups filetype:video",
                     "push-up exercise filetype:video"],
     },
     "squat": {
-        "yt": ["pistol squat calisthenics", "bodyweight squat form"],
+        "yt": ["pistol squat calisthenics", "bodyweight squat form",
+               "bodyweight squat common mistakes", "squat form errors"],
         "commons": ["Category:Squats",
                     "bodyweight squat filetype:video",
                     "pistol squat filetype:video"],
     },
     "knee_raise": {
-        "yt": ["hanging knee raise", "knee raise calisthenics"],
+        "yt": ["hanging knee raise", "knee raise calisthenics",
+               "hanging leg raise mistakes", "knee raise form errors"],
         "commons": ["hanging knee raise filetype:video",
                     "knee raise calisthenics filetype:video"],
     },
     "pistol_squat": {
-        "yt": ["pistol squat", "pistol squat tutorial"],
+        "yt": ["pistol squat", "pistol squat tutorial",
+               "pistol squat common mistakes", "pistol squat form errors"],
         "commons": ["pistol squat filetype:video"],
     },
     "handstand": {
         "yt": ["handstand hold calisthenics", "handstand push up calisthenics",
-               "handstand hold"],
+               "handstand hold", "handstand common mistakes",
+               "handstand form errors", "banana handstand mistakes"],
         "commons": ["Category:Handstands",
                     "handstand filetype:video",
                     "handstand push-up filetype:video"],
     },
     "front_lever": {
-        "yt": ["front lever calisthenics", "front lever tutorial"],
+        "yt": ["front lever calisthenics", "front lever tutorial",
+               "front lever common mistakes", "front lever form errors"],
         "commons": ["front lever calisthenics filetype:video"],
     },
     "planche": {
-        "yt": ["planche calisthenics", "tuck planche", "planche exercise"],
+        "yt": ["planche calisthenics", "tuck planche", "planche exercise",
+               "planche common mistakes", "planche form errors"],
         "commons": ["planche calisthenics filetype:video"],
     },
     "back_lever": {
-        "yt": ["back lever calisthenics", "back lever tutorial progression"],
+        "yt": ["back lever calisthenics", "back lever tutorial progression",
+               "back lever common mistakes", "back lever form errors"],
         "commons": ["back lever calisthenics filetype:video"],
     },
     "human_flag": {
-        "yt": ["human flag calisthenics", "human flag pole"],
+        "yt": ["human flag calisthenics", "human flag pole",
+               "human flag common mistakes", "human flag form errors"],
         "commons": ["human flag calisthenics filetype:video"],
     },
     "bench_press": {
-        "yt": ["bench press form", "bench press exercise"],
+        "yt": ["bench press form", "bench press exercise",
+               "bench press common mistakes", "bench press form errors",
+               "bench press elbow flare mistakes"],
         "commons": ["Category:Bench press", "bench press filetype:video"],
     },
     "deadlift": {
-        "yt": ["deadlift exercise", "deadlift form", "deadlift form powerlifting"],
+        "yt": ["deadlift exercise", "deadlift form", "deadlift form powerlifting",
+               "deadlift common mistakes", "deadlift form errors",
+               "rounded back deadlift mistakes"],
         "commons": ["Category:Deadlift", "deadlift filetype:video"],
     },
     "barbell_squat": {
-        "yt": ["barbell back squat", "barbell squat form"],
+        "yt": ["barbell back squat", "barbell squat form",
+               "barbell squat common mistakes", "squat form errors knee cave",
+               "butt wink squat mistakes"],
         "commons": ["barbell squat filetype:video"],
     },
     "split_squat": {
-        "yt": ["split squat form", "static lunge split squat"],
+        "yt": ["split squat form", "static lunge split squat",
+               "split squat common mistakes", "split squat form errors"],
         "commons": ["split squat exercise filetype:video", "lunges filetype:video"],
     },
     "bulgarian_split_squat": {
-        "yt": ["bulgarian split squat", "bulgarian split squat form"],
+        "yt": ["bulgarian split squat", "bulgarian split squat form",
+               "bulgarian split squat mistakes", "bulgarian split squat form errors"],
         "commons": ["bulgarian split squat filetype:video",
                     "rear foot elevated split squat filetype:video"],
     },
     "weighted_pull_up": {
-        "yt": ["weighted pull up form", "weighted pull up"],
+        "yt": ["weighted pull up form", "weighted pull up",
+               "weighted pull up mistakes"],
         "commons": ["weighted pull up filetype:video", "weighted pull-up filetype:video"],
     },
     "weighted_dip": {
-        "yt": ["weighted dip form", "weighted dips"],
+        "yt": ["weighted dip form", "weighted dips", "weighted dip mistakes"],
         "commons": ["weighted dip filetype:video"],
     },
     "weighted_squat": {
@@ -372,6 +397,14 @@ def is_cc_license(info: dict) -> bool:
     return "creative commons" in lic or "cc by" in lic or lic.startswith("cc")
 
 
+def license_label(info: dict, cc: bool) -> str:
+    """Human-readable license for the ledger. yt-dlp leaves Standard YT empty."""
+    lic = (info.get("license") or "").strip()
+    if lic:
+        return lic
+    return "Creative Commons Attribution" if cc else "Standard YouTube License"
+
+
 def normalize_video(path: Path) -> None:
     """Transcode to 720p H.264 mp4 so the dataset is uniform and small.
     No-op if already <=720p avc mp4."""
@@ -388,7 +421,10 @@ def normalize_video(path: Path) -> None:
         tmp = path.with_suffix(".norm.mp4")
         subprocess.run(
             ["ffmpeg", "-y", "-loglevel", "error", "-i", str(path),
-             "-vf", "scale=-2:min(ih,720)", "-c:v", "libx264",
+             # The inner quotes are load-bearing: ffmpeg's filtergraph parser
+             # splits on commas, so an unquoted min(ih,720) is read as a second
+             # filter named "720)" and the whole call fails.
+             "-vf", "scale=-2:'min(ih,720)'", "-c:v", "libx264",
              "-preset", "fast", "-crf", "23", "-c:a", "aac", "-movflags",
              "+faststart", str(tmp)],
             capture_output=True, timeout=900, check=True)
@@ -478,6 +514,20 @@ def slug(s: str) -> str:
     return re.sub(r"[^a-zA-Z0-9_-]+", "_", s).strip("_")[:60]
 
 
+def content_hash(path: Path, chunk: int = 1 << 20) -> str:
+    """sha256 of the whole file (16-hex prefix), same recipe as barra.memory."""
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        while block := f.read(chunk):
+            h.update(block)
+    return h.hexdigest()[:16]
+
+
+META_FIELDS = ["file", "trick", "source", "source_url", "page_url", "license",
+               "author", "width", "height", "duration", "fps", "title",
+               "content_hash"]
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--tricks", default=",".join(TRICKS),
@@ -503,20 +553,69 @@ def main() -> int:
     out = Path(a.out)
     vdir = out / "videos"
     meta_path = out / "metadata.csv"
-    existing: set[str] = set()
+    existing_urls: set[str] = set()
+    existing_hashes: set[str] = set()
     rows: list[dict] = []
     if meta_path.exists():
         with open(meta_path) as f:
             for r in csv.DictReader(f):
-                existing.add(r.get("source_url", ""))
-                rows.append(r)
+                existing_urls.add(r.get("source_url", ""))
+                ch = (r.get("content_hash") or "").strip()
+                if ch:
+                    existing_hashes.add(ch)
+                rows.append({k: r.get(k, "") for k in META_FIELDS})
+
+    # Backfill hashes for on-disk clips that predate the content_hash column,
+    # so a re-scrape cannot re-add the same bytes under a new URL.
+    print("== hashing existing clips ==")
+    hashed = 0
+    for row in rows:
+        path = out / row["file"]
+        if not path.exists():
+            continue
+        if not row.get("content_hash"):
+            row["content_hash"] = content_hash(path)
+            hashed += 1
+        existing_hashes.add(row["content_hash"])
+    # Also catch orphan files not yet in metadata.
+    if vdir.exists():
+        known_files = {r["file"] for r in rows}
+        for path in vdir.rglob("*.mp4"):
+            rel = str(path.relative_to(out))
+            if rel in known_files:
+                continue
+            h = content_hash(path)
+            existing_hashes.add(h)
+            hashed += 1
+    print(f"  {len(existing_hashes)} unique content hashes "
+          f"({hashed} newly computed)")
+
+    def claim_download(dest: Path, source_url: str) -> str | None:
+        """Hash dest; return hash if unique, else delete dest and return None."""
+        if source_url in existing_urls:
+            print(f"  skip (url already have): {source_url[:80]}")
+            dest.unlink(missing_ok=True)
+            return None
+        h = content_hash(dest)
+        if h in existing_hashes:
+            print(f"  skip (content hash {h} duplicate): {dest.name}")
+            dest.unlink(missing_ok=True)
+            return None
+        return h
 
     def add_row(row: dict) -> bool:
-        if row["source_url"] in existing:
+        if row["source_url"] in existing_urls:
             print(f"  skip (already have): {row['source_url'][:80]}")
             return False
-        existing.add(row["source_url"])
-        rows.append(row)
+        h = row.get("content_hash", "")
+        if h and h in existing_hashes:
+            print(f"  skip (hash already have): {h}")
+            return False
+        existing_urls.add(row["source_url"])
+        if h:
+            existing_hashes.add(h)
+        # Normalise to the full column set.
+        rows.append({k: row.get(k, "") for k in META_FIELDS})
         return True
 
     # One walk of the channel, then every trick draws from the same pool.
@@ -558,32 +657,63 @@ def main() -> int:
                 fid = slug(info["title"].removeprefix("File:").rsplit(".", 1)[0])
                 dest = vdir / trick / f"commons_{fid}.mp4"
                 if dest.exists():
-                    got += 1
+                    # Ensure an existing file is ledgered (and hashed).
+                    if info["url"] not in existing_urls:
+                        h = content_hash(dest)
+                        if h not in existing_hashes:
+                            pr = probe(dest)
+                            if add_row({"file": str(dest.relative_to(out)), "trick": trick,
+                                     "source": "wikimedia_commons", "source_url": info["url"],
+                                     "page_url": info["page"], "license": info["license"],
+                                     "author": info["user"] or info["artist"],
+                                     **{k: pr.get(k, "") for k in ("width", "height", "duration", "fps")},
+                                     "title": info["title"], "content_hash": h}):
+                                got += 1
+                        else:
+                            got += 1
+                    else:
+                        got += 1
                     continue
                 print(f"  [commons] dl {info['title'][:70]}")
                 time.sleep(1.5)  # rate-limit courtesy
                 if download_direct(info["url"], dest):
                     normalize_video(dest)
+                    h = claim_download(dest, info["url"])
+                    if not h:
+                        continue
                     pr = probe(dest)
                     if add_row({"file": str(dest.relative_to(out)), "trick": trick,
                              "source": "wikimedia_commons", "source_url": info["url"],
                              "page_url": info["page"], "license": info["license"],
                              "author": info["user"] or info["artist"],
                              **{k: pr.get(k, "") for k in ("width", "height", "duration", "fps")},
-                             "title": info["title"]}):
+                             "title": info["title"], "content_hash": h}):
                         got += 1
 
         # --- YouTube: the channel pool first, then CC search ---
         if a.youtube and got < a.per_trick:
             pool = channel_pool.get(trick, [])
             candidates: list[str] = [vid for vid, _ in pool[: a.per_trick * 4]]
-            if not pool:
+            # Channel mode is a creator brief: never fall back to open YT search
+            # (that flooded the set with unrelated CC hits when a channel walk
+            # returned 0 uploads). Search is only for non-channel runs.
+            if not pool and not a.channel:
                 for q in cfg["yt"]:
-                    if len(candidates) >= a.per_trick:
+                    if len(candidates) >= a.per_trick * 3:
                         break
-                    candidates.extend(yt_search_ids(q, a.per_trick - len(candidates) + 2))
-                    print(f"  [yt] {q!r}: searching")
+                    found = yt_search_ids(q, a.per_trick - len(candidates) + 4)
+                    candidates.extend(found)
+                    print(f"  [yt] {q!r}: {len(found)} ids")
+            elif not pool and a.channel:
+                print(f"  [yt] no channel titles matched {trick}, skip")
+            # De-dupe candidate ids while preserving order.
+            seen_ids: set[str] = set()
+            unique_cands: list[str] = []
             for vid in candidates:
+                if vid not in seen_ids:
+                    seen_ids.add(vid)
+                    unique_cands.append(vid)
+            for vid in unique_cands:
                 if got >= a.per_trick:
                     break
                 info = yt_info(vid)
@@ -600,34 +730,55 @@ def main() -> int:
                     print(f"  [yt] skip long ({info.get('duration')}s): {vid}")
                     continue
                 page = info.get("webpage_url") or f"https://www.youtube.com/watch?v={vid}"
-                if page in existing:
-                    print(f"  [yt] skip duplicate: {vid}")
+                if page in existing_urls:
+                    print(f"  [yt] skip duplicate url: {vid}")
                     continue
                 dest = vdir / trick / f"youtube_{vid}.mp4"
                 if dest.exists():
-                    got += 1
+                    if page not in existing_urls:
+                        h = content_hash(dest)
+                        if h not in existing_hashes:
+                            pr = probe(dest)
+                            if add_row({"file": str(dest.relative_to(out)), "trick": trick,
+                                     "source": "youtube_cc" if cc else "youtube_channel",
+                                     "source_url": page, "page_url": page,
+                                     "license": license_label(info, cc),
+                                     "author": info.get("uploader", "") or info.get("channel", ""),
+                                     **{k: pr.get(k) if pr.get(k, '') != '' else info.get(
+                                         {'width': 'width', 'height': 'height',
+                                          'duration': 'duration', 'fps': 'fps'}[k], '')
+                                         for k in ("width", "height", "duration", "fps")},
+                                     "title": info.get("title", ""),
+                                     "content_hash": h}):
+                                got += 1
+                        else:
+                            got += 1
+                    else:
+                        got += 1
                     continue
                 print(f"  [yt] dl {vid} {(info.get('title') or '')[:60]}")
                 if download(page, dest, a.max_duration):
+                    h = claim_download(dest, page)
+                    if not h:
+                        continue
                     pr = probe(dest)
                     if add_row({"file": str(dest.relative_to(out)), "trick": trick,
                              "source": "youtube_cc" if cc else "youtube_channel",
                              "source_url": page,
                              "page_url": page,
-                             "license": info.get("license", ""),
+                             "license": license_label(info, cc),
                              "author": info.get("uploader", "") or info.get("channel", ""),
                              **{k: pr.get(k) if pr.get(k, '') != '' else info.get(
                                  {'width': 'width', 'height': 'height',
                                   'duration': 'duration', 'fps': 'fps'}[k], '')
                                  for k in ("width", "height", "duration", "fps")},
-                             "title": info.get("title", "")}):
+                             "title": info.get("title", ""),
+                             "content_hash": h}):
                         got += 1
         print(f"  -> {trick}: {got} clips total")
 
     with open(meta_path, "w", newline="") as f:
-        w = csv.DictWriter(f, fieldnames=["file", "trick", "source", "source_url",
-                                          "page_url", "license", "author",
-                                          "width", "height", "duration", "fps", "title"])
+        w = csv.DictWriter(f, fieldnames=META_FIELDS)
         w.writeheader()
         w.writerows(rows)
     print(f"\nDone: {len(rows)} clips, {len([r for r in rows if (out / r['file']).exists()])} files on disk -> {meta_path}")

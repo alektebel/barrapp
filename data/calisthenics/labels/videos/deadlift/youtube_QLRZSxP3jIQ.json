@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A woman wearing purple exercise clothes stands on a yoga mat in a living room and performs a dumbbell deadlift by hinging at the hips to lower the weights towards the floor and then returning to a standing position.",
+ "technique_start": 18.1,
+ "technique_end": 39.9,
+ "reps_estimate": 1,
+ "file": "videos/deadlift/youtube_QLRZSxP3jIQ.mp4",
+ "claimed_trick": "deadlift"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A man in a gym performs cable deadlifts by hinging at the hips while holding a straight bar attached to a low pulley, lowering it towards the ground and standing back up.",
+ "technique_start": 18.4,
+ "technique_end": 50.0,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/youtube__4U_5JO3oiE.mp4",
+ "claimed_trick": "deadlift"
+}

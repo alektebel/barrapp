@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "From a low-angle perspective, a person with a tattooed left arm hangs from a pull-up bar and performs knee raises, lifting their knees toward their chest and then lowering their legs.",
+ "technique_start": 0.5,
+ "technique_end": 5.7,
+ "reps_estimate": 2,
+ "file": "videos/knee_raise/youtube_NqEBxvCkrgo.mp4",
+ "claimed_trick": "knee_raise"
+}

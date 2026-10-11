@@ -1,0 +1,10 @@
+{
+ "detected_trick": "push_up",
+ "agrees": true,
+ "description": "A man performs push-ups with one hand on a dumbbell on a wooden deck by the sea.",
+ "technique_start": 2.6,
+ "technique_end": 48.9,
+ "reps_estimate": 3,
+ "file": "videos/push_up/commons_Interval_Push-ups.mp4",
+ "claimed_trick": "push_up"
+}

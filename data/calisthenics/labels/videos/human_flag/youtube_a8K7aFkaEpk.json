@@ -1,0 +1,10 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "A man in a home gym performs a human flag hold by gripping the vertical support of an elliptical machine and extending his body horizontally.",
+ "technique_start": 20.3,
+ "technique_end": 33.8,
+ "reps_estimate": 1,
+ "file": "videos/human_flag/youtube_a8K7aFkaEpk.mp4",
+ "claimed_trick": "human_flag"
+}

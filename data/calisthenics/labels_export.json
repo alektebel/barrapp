@@ -1,0 +1,1112 @@
+[
+ {
+  "detected_trick": "back_lever",
+  "agrees": true,
+  "description": "A shirtless man performs the back lever on parallettes, first demonstrating an incorrect form marked with a red cross, then kneeling to rest, and finally executing the correct form marked with a green check.",
+  "technique_start": 0.9,
+  "technique_end": 10.3,
+  "reps_estimate": 2,
+  "file": "videos/back_lever/youtube_1XeItecO3ZM.mp4",
+  "claimed_trick": "back_lever"
+ },
+ {
+  "detected_trick": "back_lever",
+  "agrees": true,
+  "description": "A shirtless man performs repetitions of the back lever on gymnastic rings in a gym with blue stall bars.",
+  "technique_start": 2.7,
+  "technique_end": 52.1,
+  "reps_estimate": 4,
+  "file": "videos/back_lever/youtube_3Kl1atdIQJw.mp4",
+  "claimed_trick": "back_lever"
+ },
+ {
+  "detected_trick": "back_lever",
+  "agrees": true,
+  "description": "A person performs a back lever on parallettes, holding their body horizontal and face down while engaging the posterior chain.",
+  "technique_start": 110.5,
+  "technique_end": 110.5,
+  "reps_estimate": 1,
+  "file": "videos/back_lever/youtube_EZQ3vhF8LM8.mp4",
+  "claimed_trick": "back_lever"
+ },
+ {
+  "detected_trick": "back_lever",
+  "agrees": true,
+  "description": "A man with dreadlocks performs back lever progressions and a full static hold on a metal bar in a park.",
+  "technique_start": 66.9,
+  "technique_end": 173.9,
+  "reps_estimate": 1,
+  "file": "videos/back_lever/youtube_Fg--0yrcdes.mp4",
+  "claimed_trick": "back_lever"
+ },
+ {
+  "detected_trick": "back_lever",
+  "agrees": true,
+  "description": "A man in a black shirt performs a back lever on a red high bar in an outdoor park.",
+  "technique_start": 35.8,
+  "technique_end": 61.8,
+  "reps_estimate": 2,
+  "file": "videos/back_lever/youtube_pbNWv4Qxkxs.mp4",
+  "claimed_trick": "back_lever"
+ },
+ {
+  "detected_trick": "back_lever",
+  "agrees": true,
+  "description": "A shirtless man performs a static back lever on an outdoor horizontal bar with a tennis court in the background.",
+  "technique_start": 6.2,
+  "technique_end": 8.7,
+  "reps_estimate": 1,
+  "file": "videos/back_lever/youtube_raAQB7ad24s.mp4",
+  "claimed_trick": "back_lever"
+ },
+ {
+  "detected_trick": "none",
+  "agrees": false,
+  "description": "Several men are sitting in leather chairs in a recording studio, speaking into microphones during a podcast or interview session.",
+  "technique_start": 0,
+  "technique_end": 0,
+  "reps_estimate": 0,
+  "file": "videos/barbell_squat/youtube_0df2my-cswQ.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "squat",
+  "agrees": false,
+  "description": "A man in black athletic wear demonstrates bodyweight squats (and block-assisted squats) in a bright room with white shelving, explaining squat mechanics.",
+  "technique_start": 19.2,
+  "technique_end": 65.4,
+  "reps_estimate": 3,
+  "file": "videos/barbell_squat/youtube_SvdRQrWoJhs.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "barbell_squat",
+  "agrees": true,
+  "description": "Side view of a person in a squat rack performing barbell back squats, with green checkmarks indicating correct form on frames 3-6.",
+  "technique_start": 15.7,
+  "technique_end": 34.5,
+  "reps_estimate": 1,
+  "file": "videos/barbell_squat/youtube_jHnQZ80Dhfg.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "barbell_squat",
+  "agrees": true,
+  "description": "A man in a gym performs barbell back squats, viewed from the side, lowering his hips to knee level and standing back up with the weight.",
+  "technique_start": 2.2,
+  "technique_end": 24.6,
+  "reps_estimate": 2,
+  "file": "videos/barbell_squat/youtube_kwGOKBIMpX4.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "barbell_squat",
+  "agrees": true,
+  "description": "A man in a grey tank top performs a heavy barbell back squat inside a rack, flanked by spotters, descending to a full squat position and standing back up.",
+  "technique_start": 6.5,
+  "technique_end": 19.4,
+  "reps_estimate": 1,
+  "file": "videos/barbell_squat/youtube_mWMf8DS_efA.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "barbell_squat",
+  "agrees": true,
+  "description": "A female athlete performs barbell back squats in a rack while a male coach observes.",
+  "technique_start": 34.5,
+  "technique_end": 83.7,
+  "reps_estimate": 2,
+  "file": "videos/barbell_squat/youtube_qm3W6f129lw.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "barbell_squat",
+  "agrees": true,
+  "description": "A man in a gym performs a barbell back squat with blue plates.",
+  "technique_start": 6.9,
+  "technique_end": 20.8,
+  "reps_estimate": 1,
+  "file": "videos/barbell_squat/youtube_w15R1ULoN7o.mp4",
+  "claimed_trick": "barbell_squat"
+ },
+ {
+  "detected_trick": "bench_press",
+  "agrees": true,
+  "description": "A man in a black shirt lies on an incline bench and performs a bench press repetition with a barbell.",
+  "technique_start": 75.4,
+  "technique_end": 102.8,
+  "reps_estimate": 1,
+  "file": "videos/bench_press/youtube_5kyLUGVq_pk.mp4",
+  "claimed_trick": "bench_press"
+ },
+ {
+  "detected_trick": "bench_press",
+  "agrees": true,
+  "description": "A woman in a camouflage shirt performs a bench press with a barbell on a weight bench while a male instructor in a grey hoodie stands nearby to supervise and instruct.",
+  "technique_start": 89.3,
+  "technique_end": 101.2,
+  "reps_estimate": 2,
+  "file": "videos/bench_press/youtube__y0ScewgSCM.mp4",
+  "claimed_trick": "bench_press"
+ },
+ {
+  "detected_trick": "bench_press",
+  "agrees": true,
+  "description": "A man performs the bench press exercise on a weight bench with a barbell in an outdoor gym.",
+  "technique_start": 59.5,
+  "technique_end": 99.1,
+  "reps_estimate": 1,
+  "file": "videos/bench_press/youtube_mxptMnF6siM.mp4",
+  "claimed_trick": "bench_press"
+ },
+ {
+  "detected_trick": "bench_press",
+  "agrees": true,
+  "description": "A man in a gym demonstrates the bench press exercise on a chest press machine, pushing the handles forward and explaining proper elbow technique.",
+  "technique_start": 51.5,
+  "technique_end": 66.2,
+  "reps_estimate": 1,
+  "file": "videos/bench_press/youtube_zgP-UCKGe24.mp4",
+  "claimed_trick": "bench_press"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "A powerlifting coach in a gym demonstrates a conventional deadlift with a barbell, showing the setup and lifting phase from front and side angles.",
+  "technique_start": 2.5,
+  "technique_end": 48.1,
+  "reps_estimate": 2,
+  "file": "videos/deadlift/youtube_N6zs7QLh5RA.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "A person in a gym performs a barbell deadlift, lifting the weight from the floor to a standing position, captured from front and side angles.",
+  "technique_start": 8.6,
+  "technique_end": 54.1,
+  "reps_estimate": 3,
+  "file": "videos/deadlift/youtube_Pg67qpDYAGM.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "A woman wearing purple exercise clothes stands on a yoga mat in a living room and performs a dumbbell deadlift by hinging at the hips to lower the weights towards the floor and then returning to a standing position.",
+  "technique_start": 18.1,
+  "technique_end": 39.9,
+  "reps_estimate": 1,
+  "file": "videos/deadlift/youtube_QLRZSxP3jIQ.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "From a side-view in a gym with barbell racks, a woman and a man alternately perform deadlifts with a barbell while a coach observes.",
+  "technique_start": 33.5,
+  "technique_end": 100.6,
+  "reps_estimate": 2,
+  "file": "videos/deadlift/youtube_USpmiOk61Ek.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "A woman in a living room performs deadlifts using a large water jug as a weight, hinging at the hips to lower the object and standing back up.",
+  "technique_start": 1.3,
+  "technique_end": 14.2,
+  "reps_estimate": 2,
+  "file": "videos/deadlift/youtube_VDG3ka4lPp8.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "A man in a gym performs cable deadlifts by hinging at the hips while holding a straight bar attached to a low pulley, lowering it towards the ground and standing back up.",
+  "technique_start": 18.4,
+  "technique_end": 50.0,
+  "reps_estimate": 2,
+  "file": "videos/deadlift/youtube__4U_5JO3oiE.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "A man in a gym, viewed from the front, uses a barbell to perform a sumo deadlift, lifting it from the floor to a standing position.",
+  "technique_start": 51.5,
+  "technique_end": 67.3,
+  "reps_estimate": 1,
+  "file": "videos/deadlift/youtube_eOo-mPtCftM.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "In a gym, multiple individuals perform barbell deadlifts, lifting from the ground to a standing position from various angles.",
+  "technique_start": 2.7,
+  "technique_end": 52.1,
+  "reps_estimate": 4,
+  "file": "videos/deadlift/youtube_g0vuqCCmObE.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "deadlift",
+  "agrees": true,
+  "description": "From a side view, a woman in athletic wear performs bodyweight single-leg deadlifts by hinging at the hips with one leg lifted behind and arms reaching forward.",
+  "technique_start": 3.2,
+  "technique_end": 9.5,
+  "reps_estimate": 2,
+  "file": "videos/deadlift/youtube_yC9QdRA3Z2U.mp4",
+  "claimed_trick": "deadlift"
+ },
+ {
+  "detected_trick": "dip",
+  "agrees": true,
+  "description": "A shirtless man demonstrates regular dips on parallel bars in a gym setting, displayed in a split-screen view with instructional text overlays.",
+  "technique_start": 16.7,
+  "technique_end": 35.9,
+  "reps_estimate": 1,
+  "file": "videos/dip/youtube_Hrt3McyGjpQ.mp4",
+  "claimed_trick": "dip"
+ },
+ {
+  "detected_trick": "dip",
+  "agrees": true,
+  "description": "A shirtless man performs dips on parallel bars in a gym, demonstrating variations for the triceps and chest.",
+  "technique_start": 94.8,
+  "technique_end": 138.5,
+  "reps_estimate": 2,
+  "file": "videos/dip/youtube_MDDqsoXzAR8.mp4",
+  "claimed_trick": "dip"
+ },
+ {
+  "detected_trick": "dip",
+  "agrees": true,
+  "description": "From a side angle, a man in a gym performs dips on a dipping station, lowering his body by bending his elbows and pushing back up to a straight-arm position.",
+  "technique_start": 1.6,
+  "technique_end": 17.2,
+  "reps_estimate": 2,
+  "file": "videos/dip/youtube_UQEVOSyEogE.mp4",
+  "claimed_trick": "dip"
+ },
+ {
+  "detected_trick": "none",
+  "agrees": false,
+  "description": "A man in a gym setting performs a cable triceps pushdown using a rope attachment, which is not a dip.",
+  "technique_start": 0,
+  "technique_end": 0,
+  "reps_estimate": 0,
+  "file": "videos/dip/youtube_Z-wvp8ZjvHY.mp4",
+  "claimed_trick": "dip"
+ },
+ {
+  "detected_trick": "dip",
+  "agrees": true,
+  "description": "A woman in a yellow tank top performs dips on parallel bars in a gym, viewed from behind.",
+  "technique_start": 1.7,
+  "technique_end": 11.7,
+  "reps_estimate": 1,
+  "file": "videos/dip/youtube_ZWMNnuFhX6k.mp4",
+  "claimed_trick": "dip"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "A compilation showing various athletes performing static front lever holds on bars in different indoor and outdoor settings.",
+  "technique_start": 6.9,
+  "technique_end": 117.0,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube_1UXt2HNtWdY.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "A shirtless man performs a front lever on rings, holding his body horizontally, followed by pull-ups on a rig.",
+  "technique_start": 2.9,
+  "technique_end": 8.7,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube_HkdFu1fZ8tY.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "A person wearing a white tank top and black pants hangs from a horizontal bar in a gym, holding their body parallel to the floor in a static front lever position.",
+  "technique_start": 35.3,
+  "technique_end": 35.3,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube_RTg8r4EV0Pc.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "A side-view shot in an outdoor park showing a man performing a front lever hold on a pull-up bar.",
+  "technique_start": 8.7,
+  "technique_end": 12.1,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube_UJpP-PPsPRw.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "back_lever",
+  "agrees": false,
+  "description": "A person performs a back lever on a curved outdoor ladder.",
+  "technique_start": 23.2,
+  "technique_end": 23.2,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube__uJMBS3i6kg.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "In a gym setting, a shirtless man performs front lever progressions on a pull-up bar, maintaining a horizontal body position while another man observes and instructs.",
+  "technique_start": 40.4,
+  "technique_end": 147.9,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube_aTAfTF5gTOQ.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "A compilation of various athletes performing the front lever hold on horizontal bars in different outdoor and indoor settings.",
+  "technique_start": 6.8,
+  "technique_end": 114.8,
+  "reps_estimate": 9,
+  "file": "videos/front_lever/youtube_pokSDgHiLng.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "front_lever",
+  "agrees": true,
+  "description": "A montage of various athletes performing a static front lever hold on bars, maintaining a horizontal body position facing upwards in different environments.",
+  "technique_start": 8.3,
+  "technique_end": 156.8,
+  "reps_estimate": 1,
+  "file": "videos/front_lever/youtube_zwXABzdQaLM.mp4",
+  "claimed_trick": "front_lever"
+ },
+ {
+  "detected_trick": "handstand",
+  "agrees": true,
+  "description": "In a white room, a man in a black tank top performs tuck handstands against a wall while a coach observes and instructs.",
+  "technique_start": 67.2,
+  "technique_end": 144.0,
+  "reps_estimate": 2,
+  "file": "videos/handstand/youtube_0qjYd6GCB2k.mp4",
+  "claimed_trick": "handstand"
+ },
+ {
+  "detected_trick": "handstand",
+  "agrees": true,
+  "description": "A man performs a handstand using a resistance band for foot support while another man kneels and observes.",
+  "technique_start": 46.9,
+  "technique_end": 72.5,
+  "reps_estimate": 1,
+  "file": "videos/handstand/youtube_Fi9ykunof3k.mp4",
+  "claimed_trick": "handstand"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": false,
+  "description": "A man in a red shirt and khaki pants performs a pistol squat in a gym.",
+  "technique_start": 47.2,
+  "technique_end": 68.2,
+  "reps_estimate": 1,
+  "file": "videos/handstand/youtube__d7rjA0r7TM.mp4",
+  "claimed_trick": "handstand"
+ },
+ {
+  "detected_trick": "none",
+  "agrees": false,
+  "description": "A man in a living room performs a pike stretch with hands and feet on the floor, but never lifts his legs into a handstand.",
+  "technique_start": 0,
+  "technique_end": 0,
+  "reps_estimate": 0,
+  "file": "videos/handstand/youtube_exlk6d6BhKc.mp4",
+  "claimed_trick": "handstand"
+ },
+ {
+  "detected_trick": "handstand",
+  "agrees": true,
+  "description": "A shirtless man wearing a cap performs a static handstand hold on a rocky surface near a river with a city skyline in the background.",
+  "technique_start": 54.5,
+  "technique_end": 85.6,
+  "reps_estimate": 1,
+  "file": "videos/handstand/youtube_jx5AnxI3xDY.mp4",
+  "claimed_trick": "handstand"
+ },
+ {
+  "detected_trick": "handstand",
+  "agrees": true,
+  "description": "A person in a gym setting places their hands on the mat and lifts their legs into a vertical handstand position, maintaining the hold.",
+  "technique_start": 16.5,
+  "technique_end": 36.4,
+  "reps_estimate": 1,
+  "file": "videos/handstand/youtube_sm30TW8r1Yc.mp4",
+  "claimed_trick": "handstand"
+ },
+ {
+  "detected_trick": "human_flag",
+  "agrees": true,
+  "description": "A shirtless man grips a vertical yellow ladder, lifts his legs to extend his body horizontally sideways in a human flag hold, and returns to the ground.",
+  "technique_start": 5.6,
+  "technique_end": 10.1,
+  "reps_estimate": 1,
+  "file": "videos/human_flag/youtube_PN8yJTq5y1o.mp4",
+  "claimed_trick": "human_flag"
+ },
+ {
+  "detected_trick": "human_flag",
+  "agrees": true,
+  "description": "A man is performing a human flag on a vertical pole in a gym setting with a spotter behind him.",
+  "technique_start": 15.1,
+  "technique_end": 15.1,
+  "reps_estimate": 1,
+  "file": "videos/human_flag/youtube_S62I0HUOb68.mp4",
+  "claimed_trick": "human_flag"
+ },
+ {
+  "detected_trick": "human_flag",
+  "agrees": true,
+  "description": "A man in a blue shirt performs a static human flag on a railroad crossing signpost in a park.",
+  "technique_start": 11.7,
+  "technique_end": 18.3,
+  "reps_estimate": 1,
+  "file": "videos/human_flag/youtube_VsEp6Ef9sBY.mp4",
+  "claimed_trick": "human_flag"
+ },
+ {
+  "detected_trick": "human_flag",
+  "agrees": true,
+  "description": "A man performs the human flag exercise by holding his body horizontally on a vertical pole, with scenes of instruction and assisted variations using bands.",
+  "technique_start": 19.6,
+  "technique_end": 372.7,
+  "reps_estimate": 3,
+  "file": "videos/human_flag/youtube__jgdKns5E-s.mp4",
+  "claimed_trick": "human_flag"
+ },
+ {
+  "detected_trick": "human_flag",
+  "agrees": true,
+  "description": "A shirtless man in blue shorts maintains a static human flag hold on a blue vertical ladder in a forest setting.",
+  "technique_start": 7.5,
+  "technique_end": 37.3,
+  "reps_estimate": 1,
+  "file": "videos/human_flag/youtube_gBxuld1R4jI.mp4",
+  "claimed_trick": "human_flag"
+ },
+ {
+  "detected_trick": "human_flag",
+  "agrees": true,
+  "description": "A man in a studio performs a human flag on a vertical pole.",
+  "technique_start": 17.1,
+  "technique_end": 58.2,
+  "reps_estimate": 3,
+  "file": "videos/human_flag/youtube_lWzRazVfXNI.mp4",
+  "claimed_trick": "human_flag"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A shirtless man hangs from a pull-up bar and performs hanging oblique knee raises by lifting his knees toward his side.",
+  "technique_start": 17.3,
+  "technique_end": 37.1,
+  "reps_estimate": 2,
+  "file": "videos/knee_raise/youtube_2bsS-LzNJyQ.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A muscular man in red shorts performs knee raises on a dip station in a frontal view, lifting his knees towards his chest.",
+  "technique_start": 7.5,
+  "technique_end": 22.4,
+  "reps_estimate": 2,
+  "file": "videos/knee_raise/youtube_3gigiE2iuiA.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A man in a pink shirt and grey shorts hangs from a pull-up bar on a Life Fitness machine and holds his knees raised at a 90-degree angle.",
+  "technique_start": 6.3,
+  "technique_end": 18.8,
+  "reps_estimate": 1,
+  "file": "videos/knee_raise/youtube_5KD7E0JPczo.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A shirtless man demonstrates hanging knee raises on a pull-up bar in a gym, shown from front and side angles with instructional text overlays.",
+  "technique_start": 18.8,
+  "technique_end": 40.4,
+  "reps_estimate": 2,
+  "file": "videos/knee_raise/youtube_C0RXOvy609I.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "none",
+  "agrees": false,
+  "description": "A man in a grey t-shirt hangs from a yellow pull-up bar with straight arms in a static position.",
+  "technique_start": 0,
+  "technique_end": 0,
+  "reps_estimate": 0,
+  "file": "videos/knee_raise/youtube_GSOfcbwbd-g.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A man in a green shirt hangs from a pull-up bar and demonstrates the hanging knee raise exercise from a front-view perspective.",
+  "technique_start": 7.8,
+  "technique_end": 23.5,
+  "reps_estimate": 1,
+  "file": "videos/knee_raise/youtube_K15s39PRFqg.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A woman in a gym, seen from a front-side angle, hangs from a pull-up bar and performs hanging knee raises, lifting her knees toward her torso.",
+  "technique_start": 1.9,
+  "technique_end": 13.6,
+  "reps_estimate": 2,
+  "file": "videos/knee_raise/youtube_KqUMAIQn0K8.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "From a low-angle perspective, a person with a tattooed left arm hangs from a pull-up bar and performs knee raises, lifting their knees toward their chest and then lowering their legs.",
+  "technique_start": 0.5,
+  "technique_end": 5.7,
+  "reps_estimate": 2,
+  "file": "videos/knee_raise/youtube_NqEBxvCkrgo.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A shirtless man in blue shorts performs seated knee raises on a Roman chair bench, lifting his knees toward his chest and then extending his legs.",
+  "technique_start": 2.5,
+  "technique_end": 27.3,
+  "reps_estimate": 2,
+  "file": "videos/knee_raise/youtube_fMaUOQpniLE.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A woman hangs from a pull-up bar in a gym and performs a knee raise by lifting her knees towards her chest.",
+  "technique_start": 3.7,
+  "technique_end": 13.7,
+  "reps_estimate": 1,
+  "file": "videos/knee_raise/youtube_fOlBO3CG4cI.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A woman performs a hanging knee raise on a pull-up bar in a room, viewed from the front.",
+  "technique_start": 61.6,
+  "technique_end": 61.6,
+  "reps_estimate": 1,
+  "file": "videos/knee_raise/youtube_mSWOjuFH9kU.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "knee_raise",
+  "agrees": true,
+  "description": "A front-view shot of a shirtless man in red shorts performing alternating hanging knee raises on a vertical knee raise station.",
+  "technique_start": 2.4,
+  "technique_end": 26.0,
+  "reps_estimate": 1,
+  "file": "videos/knee_raise/youtube_w8a_QnNjU14.mp4",
+  "claimed_trick": "knee_raise"
+ },
+ {
+  "detected_trick": "muscle_up",
+  "agrees": true,
+  "description": "A person in a blue shirt performs a muscle-up on a straight bar in a gym with graffiti walls.",
+  "technique_start": 2.9,
+  "technique_end": 6.8,
+  "reps_estimate": 1,
+  "file": "videos/muscle_up/youtube_BHXSLUkIQkQ.mp4",
+  "claimed_trick": "muscle_up"
+ },
+ {
+  "detected_trick": "muscle_up",
+  "agrees": true,
+  "description": "The video depicts a progression of athletes performing muscle-ups on a straight bar using varying levels of resistance band assistance, concluding with a woman successfully completing an unassisted muscle-up.",
+  "technique_start": 2.4,
+  "technique_end": 41.4,
+  "reps_estimate": 4,
+  "file": "videos/muscle_up/youtube_GZpSonEJH-4.mp4",
+  "claimed_trick": "muscle_up"
+ },
+ {
+  "detected_trick": "muscle_up",
+  "agrees": true,
+  "description": "A woman in a blue shirt and grey sweatpants performs muscle-ups on a high bar in a gym with a colorful jungle-themed mural, moving from a dead hang to a straight-arm support position.",
+  "technique_start": 5.3,
+  "technique_end": 68.9,
+  "reps_estimate": 2,
+  "file": "videos/muscle_up/youtube_IvJtx3NaKew.mp4",
+  "claimed_trick": "muscle_up"
+ },
+ {
+  "detected_trick": "muscle_up",
+  "agrees": true,
+  "description": "An older man performs muscle-ups on gymnastic rings in a backyard.",
+  "technique_start": 16.2,
+  "technique_end": 55.0,
+  "reps_estimate": 2,
+  "file": "videos/muscle_up/youtube_MsmvBlyxlO4.mp4",
+  "claimed_trick": "muscle_up"
+ },
+ {
+  "detected_trick": "muscle_up",
+  "agrees": true,
+  "description": "A person in a gym performs a muscle-up on wall-mounted stall bars, climbing up and down vertically from a side viewpoint.",
+  "technique_start": 0.7,
+  "technique_end": 7.8,
+  "reps_estimate": 1,
+  "file": "videos/muscle_up/youtube_OS5XVjmSOfE.mp4",
+  "claimed_trick": "muscle_up"
+ },
+ {
+  "detected_trick": "muscle_up",
+  "agrees": true,
+  "description": "A shirtless man performs a handstand, then after a text card, demonstrates a muscle_up on outdoor bars in a park.",
+  "technique_start": 43.0,
+  "technique_end": 111.9,
+  "reps_estimate": 1,
+  "file": "videos/muscle_up/youtube_UDzoojVcbvY.mp4",
+  "claimed_trick": "muscle_up"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "In an indoor gym with a purple floor and 'NYU' wall graphic, a person in a gray shirt and patterned leggings performs pistol squats, balancing on one leg with the other extended forward, arms held out for stability.",
+  "technique_start": 1.3,
+  "technique_end": 14.6,
+  "reps_estimate": 2,
+  "file": "videos/pistol_squat/youtube_BrZQ1HqpJGQ.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A woman in a gym performs pistol squats, shown from a side view, squatting on one leg with the other extended.",
+  "technique_start": 22.4,
+  "technique_end": 30.5,
+  "reps_estimate": 2,
+  "file": "videos/pistol_squat/youtube_HKJraiEXh4k.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A man in a gym performs assisted pistol squats using TRX straps and a resistance band.",
+  "technique_start": 39.4,
+  "technique_end": 51.5,
+  "reps_estimate": 1,
+  "file": "videos/pistol_squat/youtube_LPSoVmJJl5E.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A man in an orange shirt performs a pistol squat on a blue bench while holding a red resistance band for balance.",
+  "technique_start": 68.5,
+  "technique_end": 129.5,
+  "reps_estimate": 3,
+  "file": "videos/pistol_squat/youtube_QNKrVCRDC58.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A shirtless man wearing grey pants performs multiple repetitions of single-leg pistol squats while balancing on a raised wooden beam.",
+  "technique_start": 2.1,
+  "technique_end": 40.0,
+  "reps_estimate": 3,
+  "file": "videos/pistol_squat/youtube_Xkha2COy00o.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A man in a gym holds onto gymnastic rings for balance and performs a single-leg pistol squat, lowering himself down on his right leg and then standing back up.",
+  "technique_start": 18.4,
+  "technique_end": 34.2,
+  "reps_estimate": 1,
+  "file": "videos/pistol_squat/youtube_YSqFCuLQrg8.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A woman performs pistol squats on her left leg in a gym, squatting down while extending her right leg forward for balance.",
+  "technique_start": 1.3,
+  "technique_end": 14.7,
+  "reps_estimate": 2,
+  "file": "videos/pistol_squat/youtube_twHMDK-q3go.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": true,
+  "description": "A man performs a box pistol squat while holding a kettlebell.",
+  "technique_start": 74.8,
+  "technique_end": 86.2,
+  "reps_estimate": 1,
+  "file": "videos/pistol_squat/youtube_wPBlwF93qI4.mp4",
+  "claimed_trick": "pistol_squat"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "Side view of men performing planche variations on parallel bars and ground across multiple locations.",
+  "technique_start": 6.9,
+  "technique_end": 103.2,
+  "reps_estimate": 1,
+  "file": "videos/planche/youtube_0IG-FXZ4jQw.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A shirtless man demonstrates the planche exercise on parallettes placed on a yoga mat in a living room.",
+  "technique_start": 3.6,
+  "technique_end": 67.7,
+  "reps_estimate": 3,
+  "file": "videos/planche/youtube_D_9F7-jk1yc.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A compilation video demonstrating planche training progressions including planche leans, tuck planches, and one-leg planches on the floor and parallettes.",
+  "technique_start": 11.8,
+  "technique_end": 176.8,
+  "reps_estimate": 6,
+  "file": "videos/planche/youtube_Gfmuh_P4l80.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A man in a living room performs planche holds and handstand presses using wooden parallettes.",
+  "technique_start": 3.2,
+  "technique_end": 48.5,
+  "reps_estimate": 3,
+  "file": "videos/planche/youtube_I9wbS757cvM.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A shirtless man performs a planche on wooden parallettes in a room, holding his body straight and horizontal parallel to the floor.",
+  "technique_start": 3.8,
+  "technique_end": 71.9,
+  "reps_estimate": 1,
+  "file": "videos/planche/youtube_JsA4f4M0WSI.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A shirtless man performs various planche progressions, including straddle, tuck, and half-lay, on wooden parallettes in a park.",
+  "technique_start": 5.9,
+  "technique_end": 111.9,
+  "reps_estimate": 1,
+  "file": "videos/planche/youtube__-xYflyYgqw.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A side-view of a person in a t-shirt and shorts performing a full planche hold on wooden parallettes in a park setting.",
+  "technique_start": 3.2,
+  "technique_end": 16.2,
+  "reps_estimate": 1,
+  "file": "videos/planche/youtube_bx4HWhIIgd4.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A person performs planche holds on wooden parallettes across indoor and outdoor spaces, with a performance graph overlay tracking 12 days of training progress.",
+  "technique_start": 4.6,
+  "technique_end": 78.5,
+  "reps_estimate": 8,
+  "file": "videos/planche/youtube_q5Y60s3Ak8A.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "A person performs a planche on parallettes, holding a static position with their body suspended and leaning forward.",
+  "technique_start": 7.1,
+  "technique_end": 135.1,
+  "reps_estimate": 1,
+  "file": "videos/planche/youtube_tKFpAMYvDyE.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "planche",
+  "agrees": true,
+  "description": "Various athletes demonstrate the planche by holding their bodies horizontal to the ground supported only by their hands on parallel bars or parallettes.",
+  "technique_start": 6.8,
+  "technique_end": 114.8,
+  "reps_estimate": 1,
+  "file": "videos/planche/youtube_zl9oQyG6oHg.mp4",
+  "claimed_trick": "planche"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A man in military fatigue pants performs a pull-up on an outdoor bar, gripping the bar, hanging, pulling his chin over the bar, and lowering back down.",
+  "technique_start": 21.0,
+  "technique_end": 45.0,
+  "reps_estimate": 1,
+  "file": "videos/pull_up/commons_Get_Fit-_Proper_Pull-Up_Technique_Marine_Corps_Air_Station_I.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A man in a navy t-shirt and shorts performs pull-ups on an outdoor metal bar.",
+  "technique_start": 53.3,
+  "technique_end": 82.4,
+  "reps_estimate": 3,
+  "file": "videos/pull_up/commons_Navy-seal-buds-training-pull-ups.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A man in a white tank top demonstrates pull-up variations, performing a standard pull-up, a band-assisted pull-up, and a machine pull-up in a gym.",
+  "technique_start": 50.1,
+  "technique_end": 170.3,
+  "reps_estimate": 3,
+  "file": "videos/pull_up/youtube_-O0AH_ohf-U.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "Viewed from behind, a shirtless man performs strict pull-ups on a black gym rig, demonstrating the movement with a shoulder-width grip.",
+  "technique_start": 2.6,
+  "technique_end": 29.0,
+  "reps_estimate": 2,
+  "file": "videos/pull_up/youtube_3_I57g2kn3g.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A shirtless man performs pull-ups on a home gym tower and a doorway pull-up bar.",
+  "technique_start": 27.2,
+  "technique_end": 92.6,
+  "reps_estimate": 3,
+  "file": "videos/pull_up/youtube_8NgfUwPT16o.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "none",
+  "agrees": false,
+  "description": "A man in a gym demonstrates an inverted row (bodyweight row) using a barbell, showing both correct form and mistakes.",
+  "technique_start": 24.8,
+  "technique_end": 140.7,
+  "reps_estimate": 4,
+  "file": "videos/pull_up/youtube_GdyhjXlxE-U.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "none",
+  "agrees": false,
+  "description": "The video starts with an introductory text overlay, followed by a sequence showing a man hanging motionless from a pull-up bar with fully extended arms without performing any pull-up repetitions.",
+  "technique_start": 0,
+  "technique_end": 0,
+  "reps_estimate": 0,
+  "file": "videos/pull_up/youtube_PKsKcvDfLCQ.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A man in a black shirt performs pull-ups on an outdoor bar.",
+  "technique_start": 53.4,
+  "technique_end": 82.5,
+  "reps_estimate": 1,
+  "file": "videos/pull_up/youtube_ScAYp-Gik_E.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A shirtless man performs repetitions of pull-ups and hanging knee raises on an outdoor horizontal bar.",
+  "technique_start": 25.4,
+  "technique_end": 96.3,
+  "reps_estimate": 4,
+  "file": "videos/pull_up/youtube_VXYkxmjqnpM.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "pull_up",
+  "agrees": true,
+  "description": "A shirtless man performs an 'In & Out' pull-up variation on a rig in a gym, pulling explosively and releasing his hands at the top.",
+  "technique_start": 16.1,
+  "technique_end": 34.4,
+  "reps_estimate": 2,
+  "file": "videos/pull_up/youtube_yR0N5blGZng.mp4",
+  "claimed_trick": "pull_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A man demonstrates the proper form for a push-up in a gym setting, shown from front and side angles with instructional text overlays.",
+  "technique_start": 8.8,
+  "technique_end": 26.3,
+  "reps_estimate": 1,
+  "file": "videos/push_up/youtube_3nnzOvAAbP8.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A man in a black shirt and grey shorts performs push-ups on a red mat from a side profile view, extending his arms to the sides at the bottom of each repetition.",
+  "technique_start": 1.8,
+  "technique_end": 15.9,
+  "reps_estimate": 2,
+  "file": "videos/push_up/youtube_62x-4qKAq5o.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "An animated man demonstrates the push-up, transitioning between plank and lowered positions while anatomical overlays highlight muscle engagement.",
+  "technique_start": 2.4,
+  "technique_end": 45.1,
+  "reps_estimate": 2,
+  "file": "videos/push_up/youtube_BbDcMfu-i4w.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A man performs push-ups on a mat in a gym while a trainer kneels beside him observing.",
+  "technique_start": 15.0,
+  "technique_end": 40.7,
+  "reps_estimate": 2,
+  "file": "videos/push_up/youtube_Cb4avXaM6kM.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A man in a navy blue shirt performs push-ups on a raised concrete platform outdoors.",
+  "technique_start": 38.6,
+  "technique_end": 82.7,
+  "reps_estimate": 1,
+  "file": "videos/push_up/youtube_GmH2UfFBrN8.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A shirtless man performs push-ups on a blue mat in a park, captured from side, front, and rear angles.",
+  "technique_start": 2.1,
+  "technique_end": 19.2,
+  "reps_estimate": 1,
+  "file": "videos/push_up/youtube_iHX1EjfAJGE.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A man in a gym setting demonstrates push-up technique on a yoga mat, emphasizing elbow position and showing variations while kneeling between sets.",
+  "technique_start": 21.3,
+  "technique_end": 106.7,
+  "reps_estimate": 1,
+  "file": "videos/push_up/youtube_l02EZAm-qn0.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "push_up",
+  "agrees": true,
+  "description": "A man in a gym setting demonstrates push-up variations using a box, a stepper, and the floor.",
+  "technique_start": 10.4,
+  "technique_end": 197.7,
+  "reps_estimate": 12,
+  "file": "videos/push_up/youtube_zfEqoLnoTCc.mp4",
+  "claimed_trick": "push_up"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": false,
+  "description": "In a gym with weightlifting equipment, two men are present, and one performs pistol squats while the other observes.",
+  "technique_start": 57.0,
+  "technique_end": 148.1,
+  "reps_estimate": 3,
+  "file": "videos/squat/youtube_CdjFLWq-yFk.mp4",
+  "claimed_trick": "squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": false,
+  "description": "A woman in a gym setting, viewed from the side, performs pistol squats on a mat with a power rack and weights in the background.",
+  "technique_start": 2.3,
+  "technique_end": 24.9,
+  "reps_estimate": 3,
+  "file": "videos/squat/youtube_DHpYd8cvc3M.mp4",
+  "claimed_trick": "squat"
+ },
+ {
+  "detected_trick": "squat",
+  "agrees": true,
+  "description": "A shirtless man performs a deep assisted squat holding onto a railing in a home gym.",
+  "technique_start": 34.8,
+  "technique_end": 34.8,
+  "reps_estimate": 1,
+  "file": "videos/squat/youtube_Wl1lSJ7fCdU.mp4",
+  "claimed_trick": "squat"
+ },
+ {
+  "detected_trick": "pistol_squat",
+  "agrees": false,
+  "description": "A man in a living room performs assisted pistol squats using a small black bench, sitting down and standing up on one leg.",
+  "technique_start": 8.0,
+  "technique_end": 50.8,
+  "reps_estimate": 2,
+  "file": "videos/squat/youtube_ZSp8x-twJAs.mp4",
+  "claimed_trick": "squat"
+ },
+ {
+  "detected_trick": "squat",
+  "agrees": true,
+  "description": "A blonde woman wearing a blue sports bra and grey leggings performs a slow bodyweight squat on a yoga mat on an outdoor patio.",
+  "technique_start": 2.4,
+  "technique_end": 26.1,
+  "reps_estimate": 1,
+  "file": "videos/squat/youtube_u_7BwqHmv-g.mp4",
+  "claimed_trick": "squat"
+ },
+ {
+  "detected_trick": "squat",
+  "agrees": true,
+  "description": "A shirtless man in blue shorts performs bodyweight squats, clasping his hands in front of his chest against a white background.",
+  "technique_start": 2.7,
+  "technique_end": 29.2,
+  "reps_estimate": 2,
+  "file": "videos/squat/youtube_zawXRtyOTuA.mp4",
+  "claimed_trick": "squat"
+ }
+]

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "front_lever",
+ "agrees": false,
+ "description": "A compilation video showing a person performing various exercises including a handstand and a front lever, but no back lever is performed.",
+ "technique_start": 94.1,
+ "technique_end": 115.0,
+ "reps_estimate": 1,
+ "file": "videos/back_lever/youtube_S9UxPtTmr50.mp4",
+ "claimed_trick": "back_lever"
+}

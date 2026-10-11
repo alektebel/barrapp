@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": false,
+ "description": "A split-screen video showing a woman performing Bulgarian split squats at home with a dumbbell and rear foot on a chair, and in a gym with a barbell and rear foot on a box.",
+ "technique_start": 0.9,
+ "technique_end": 9.4,
+ "reps_estimate": 2,
+ "file": "videos/split_squat/youtube_X_9Euh-PZKU.mp4",
+ "claimed_trick": "split_squat"
+}

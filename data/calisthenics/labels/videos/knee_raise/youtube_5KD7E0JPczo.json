@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "A man in a pink shirt and grey shorts hangs from a pull-up bar on a Life Fitness machine and holds his knees raised at a 90-degree angle.",
+ "technique_start": 6.3,
+ "technique_end": 18.8,
+ "reps_estimate": 1,
+ "file": "videos/knee_raise/youtube_5KD7E0JPczo.mp4",
+ "claimed_trick": "knee_raise"
+}

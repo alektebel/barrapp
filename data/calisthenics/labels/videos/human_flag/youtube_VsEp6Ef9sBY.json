@@ -1,0 +1,10 @@
+{
+ "detected_trick": "human_flag",
+ "agrees": true,
+ "description": "A man in a blue shirt performs a static human flag on a railroad crossing signpost in a park.",
+ "technique_start": 11.7,
+ "technique_end": 18.3,
+ "reps_estimate": 1,
+ "file": "videos/human_flag/youtube_VsEp6Ef9sBY.mp4",
+ "claimed_trick": "human_flag"
+}

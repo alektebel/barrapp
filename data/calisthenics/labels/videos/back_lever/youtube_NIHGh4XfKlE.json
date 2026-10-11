@@ -1,0 +1,12 @@
+{
+ "detected_trick": "back_lever",
+ "agrees": true,
+ "description": "From a side view, a person in athletic wear performs a back lever on a horizontal bar in an indoor setting, holding their body parallel to the ground.",
+ "technique_start": 202.9,
+ "technique_end": 226.8,
+ "reps_estimate": 1,
+ "original_duration": 238.7,
+ "duration_after_cut": 25.9,
+ "file": "videos/back_lever/youtube_NIHGh4XfKlE.mp4",
+ "claimed_trick": "back_lever"
+}

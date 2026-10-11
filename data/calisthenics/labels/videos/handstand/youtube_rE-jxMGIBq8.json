@@ -1,0 +1,12 @@
+{
+ "detected_trick": "handstand",
+ "agrees": true,
+ "description": "A man in a black shirt and green cap performs a handstand against a pillar and later freestanding on a grass lawn.",
+ "technique_start": 103.7,
+ "technique_end": 251.8,
+ "reps_estimate": 1,
+ "original_duration": 296.2,
+ "duration_after_cut": 150.116633,
+ "file": "videos/handstand/youtube_rE-jxMGIBq8.mp4",
+ "claimed_trick": "handstand"
+}

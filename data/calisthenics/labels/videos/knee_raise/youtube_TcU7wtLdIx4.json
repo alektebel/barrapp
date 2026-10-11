@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "A shirtless man hangs from a power tower and performs knee raises, lifting his knees towards his chest.",
+ "technique_start": 1.8,
+ "technique_end": 19.9,
+ "reps_estimate": 2,
+ "file": "videos/knee_raise/youtube_TcU7wtLdIx4.mp4",
+ "claimed_trick": "knee_raise"
+}

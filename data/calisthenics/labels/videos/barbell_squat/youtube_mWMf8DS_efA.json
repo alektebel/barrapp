@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A man in a grey tank top performs a heavy barbell back squat inside a rack, flanked by spotters, descending to a full squat position and standing back up.",
+ "technique_start": 6.5,
+ "technique_end": 19.4,
+ "reps_estimate": 1,
+ "file": "videos/barbell_squat/youtube_mWMf8DS_efA.mp4",
+ "claimed_trick": "barbell_squat"
+}

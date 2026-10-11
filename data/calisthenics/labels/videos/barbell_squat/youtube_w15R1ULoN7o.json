@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A man in a gym performs a barbell back squat with blue plates.",
+ "technique_start": 6.9,
+ "technique_end": 20.8,
+ "reps_estimate": 1,
+ "file": "videos/barbell_squat/youtube_w15R1ULoN7o.mp4",
+ "claimed_trick": "barbell_squat"
+}

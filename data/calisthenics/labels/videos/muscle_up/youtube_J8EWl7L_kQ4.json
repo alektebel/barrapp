@@ -1,0 +1,12 @@
+{
+ "detected_trick": "muscle_up",
+ "agrees": true,
+ "description": "A man in a black jacket and blue sweatpants performs a muscle-up on a high bar in a backyard setting.",
+ "technique_start": 11.6,
+ "technique_end": 220.6,
+ "reps_estimate": 1,
+ "original_duration": 232.2,
+ "duration_after_cut": 211.0,
+ "file": "videos/muscle_up/youtube_J8EWl7L_kQ4.mp4",
+ "claimed_trick": "muscle_up"
+}

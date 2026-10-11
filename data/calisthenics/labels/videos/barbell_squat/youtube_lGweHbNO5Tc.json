@@ -1,0 +1,12 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A woman wearing pink clothing performs barbell back squats in a gym, viewed from the side.",
+ "technique_start": 1.0,
+ "technique_end": 10.5,
+ "reps_estimate": 3,
+ "original_duration": 11.5,
+ "duration_after_cut": 11.470658,
+ "file": "videos/barbell_squat/youtube_lGweHbNO5Tc.mp4",
+ "claimed_trick": "barbell_squat"
+}

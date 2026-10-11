@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "A shirtless man hangs from a pull-up bar in a gym, performing hanging hip raises with legs raised to horizontal and inverted positions.",
+ "technique_start": 14.6,
+ "technique_end": 49.7,
+ "reps_estimate": 5,
+ "file": "videos/knee_raise/youtube_iywNfxVHev8.mp4",
+ "claimed_trick": "knee_raise"
+}

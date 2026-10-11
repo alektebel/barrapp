@@ -1,0 +1,12 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "In a gym setting, a blonde woman wearing a pink tank top and black shorts performs a barbell back squat, lowering her body into a deep squat position and standing back up.",
+ "technique_start": 1.7,
+ "technique_end": 18.7,
+ "reps_estimate": 1,
+ "original_duration": 20.4,
+ "duration_after_cut": 19.0,
+ "file": "videos/barbell_squat/youtube_PANgGQ6iCoU.mp4",
+ "claimed_trick": "barbell_squat"
+}

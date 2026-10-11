@@ -1,0 +1,10 @@
+{
+ "detected_trick": "front_lever",
+ "agrees": true,
+ "description": "A side-view of a person hanging from a pull-up bar, maintaining a static front lever hold with their body horizontal and parallel to the floor.",
+ "technique_start": 0.5,
+ "technique_end": 5.6,
+ "reps_estimate": 1,
+ "file": "videos/front_lever/youtube_kepkpZlfBxQ.mp4",
+ "claimed_trick": "front_lever"
+}

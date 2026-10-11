@@ -1,0 +1,10 @@
+{
+ "detected_trick": "split_squat",
+ "agrees": true,
+ "description": "A man in a gym demonstrates the split squat, alternating legs and pausing between sets to explain the technique.",
+ "technique_start": 25.1,
+ "technique_end": 159.1,
+ "reps_estimate": 5,
+ "file": "videos/split_squat/youtube_pzvpmVBvhNA.mp4",
+ "claimed_trick": "split_squat"
+}

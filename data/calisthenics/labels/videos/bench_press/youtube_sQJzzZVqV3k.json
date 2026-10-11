@@ -1,0 +1,12 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A person lies on a flat bench press station and performs a repetition with a barbell.",
+ "technique_start": 2.4,
+ "technique_end": 26.7,
+ "reps_estimate": 1,
+ "original_duration": 29.1,
+ "duration_after_cut": 26.3263,
+ "file": "videos/bench_press/youtube_sQJzzZVqV3k.mp4",
+ "claimed_trick": "bench_press"
+}

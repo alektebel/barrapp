@@ -1,0 +1,12 @@
+{
+ "detected_trick": "split_squat",
+ "agrees": true,
+ "description": "A woman in a gym demonstrates a split squat with one foot elevated on a step box.",
+ "technique_start": 100.8,
+ "technique_end": 187.2,
+ "reps_estimate": 2,
+ "original_duration": 288.0,
+ "duration_after_cut": 88.455034,
+ "file": "videos/split_squat/youtube_m54_KMCc3ks.mp4",
+ "claimed_trick": "split_squat"
+}

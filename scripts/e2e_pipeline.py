@@ -10,6 +10,8 @@ in the seams between the phone, API Gateway, S3 and the worker.
   scripts/e2e_pipeline.py                      # happy path + contract checks
   scripts/e2e_pipeline.py --negative           # also the failure modes
   scripts/e2e_pipeline.py --clip path/to.mp4   # a clip of your choosing
+  scripts/e2e_pipeline.py --uploadlog          # also the upload log and the
+                                               # floor under a truncated clip
   scripts/e2e_pipeline.py --keep               # do not delete the job after
 
 Exit code is 0 only when every check passed.
@@ -315,6 +317,68 @@ def auth_checks(rep: Report, api: str) -> None:
               f"HTTP {status} {body}")
 
 
+def upload_log_checks(rep: Report, api: str, device: str) -> None:
+    """The upload log, and the floor under a truncated clip.
+
+    Both exist because of things found in the live table: nine dead uploads
+    with no record of what the phone saw, and a 17-byte .mp4 that a
+    "successful" upload produced.
+    """
+    status, created, _ = request("POST", f"{api}/v1/jobs", device=device,
+                                 json_body={"exercise": "auto"})
+    if not rep.check("a job is created for the upload-log checks",
+                     status == 201 and created.get("id"), f"HTTP {status} {created}"):
+        return
+    job = created["id"]
+
+    status, body, _ = request("POST", f"{api}/v1/jobs/{job}/upload/event",
+                              device=device,
+                              json_body={"event": "paused", "level": "warn",
+                                         "detail": "e2e: pretending the train "
+                                                   "went into a tunnel",
+                                         "partNumber": 2, "attempt": 1})
+    rep.check("the phone can ship an upload event", status == 202,
+              f"HTTP {status} {body}")
+    rep.check("the event was actually stored, not just accepted",
+              bool(body.get("stored")),
+              "the API answered 202 but wrote nothing - UPLOADS_TABLE unset?")
+
+    status, body, _ = request("POST", f"{api}/v1/jobs/{job}/upload/event",
+                              device=f"someone-else-{uuid.uuid4().hex[:8]}",
+                              json_body={"event": "paused"})
+    rep.check("another device cannot write to this job's upload log",
+              status == 404, f"HTTP {status} {body}")
+
+    # A truncated clip has to be refused at the upload seam. Before the floor
+    # it was accepted here and failed much later, inside the worker, as a clip
+    # OpenCV could not open.
+    status, start, _ = request("POST", f"{api}/v1/jobs/{job}/upload/start",
+                               device=device, json_body={})
+    if not rep.check("upload/start for the truncated-clip check", status == 201,
+                     f"HTTP {status} {start}"):
+        return
+    status, presigned, _ = request("POST", f"{api}/v1/jobs/{job}/upload/part",
+                                   device=device, json_body={"partNumber": 1})
+    if not rep.check("part 1 presigned for the truncated-clip check", status == 200,
+                     f"HTTP {status} {presigned}"):
+        return
+    code, etag = put_part(presigned["url"], b"not a video")
+    if not rep.check("S3 accepts the truncated part", code == 200, f"HTTP {code}"):
+        return
+    status, body, _ = request("POST", f"{api}/v1/jobs/{job}/upload/complete",
+                              device=device,
+                              json_body={"parts": [{"partNumber": 1, "etag": etag}]})
+    rep.check("an 11-byte clip is refused at upload, not at the worker",
+              status == 400, f"HTTP {status} {body}")
+
+    status, item, _ = request("GET", f"{api}/v1/jobs/{job}", device=device)
+    rep.check("the truncated upload leaves the job failed with a reason",
+              item.get("status") == "failed" and bool(item.get("error")),
+              f"status={item.get('status')} error={item.get('error')}")
+
+    request("DELETE", f"{api}/v1/jobs/{job}", device=device)
+
+
 def feedback_checks(rep: Report, api: str, device: str) -> None:
     """The feedback route: text lands in the table, a clip goes to the bucket
     through a presigned PUT - the same dance an upload speaks - and an empty
@@ -356,6 +420,8 @@ def main() -> int:
     ap.add_argument("--negative", action="store_true", help="also run the failure modes")
     ap.add_argument("--auth", action="store_true", help="also run the account checks")
     ap.add_argument("--feedback", action="store_true", help="also run the feedback checks")
+    ap.add_argument("--uploadlog", action="store_true",
+                    help="also run the upload-log and truncated-clip checks")
     ap.add_argument("--keep", action="store_true", help="do not delete the job afterwards")
     args = ap.parse_args()
 
@@ -412,6 +478,9 @@ def main() -> int:
 
     if args.feedback:
         feedback_checks(rep, api, device)
+
+    if args.uploadlog:
+        upload_log_checks(rep, api, device)
 
     if not args.keep:
         status, _, _ = request("DELETE", f"{api}/v1/jobs/{job}", device=device)

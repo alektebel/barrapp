@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": true,
+ "description": "A man in a blue tank top performs pull-ups on a bar, viewed from the back.",
+ "technique_start": 0.5,
+ "technique_end": 5.5,
+ "reps_estimate": 2,
+ "file": "videos/pull_up/commons_Pull-ups_-_exercise_demonstration_video.mp4",
+ "claimed_trick": "pull_up"
+}

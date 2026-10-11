@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A man in a red shirt performs barbell back squats under the supervision of a trainer in a gym.",
+ "technique_start": 3.3,
+ "technique_end": 16.4,
+ "reps_estimate": 2,
+ "file": "videos/barbell_squat/youtube_xRCEegfvlH4.mp4",
+ "claimed_trick": "barbell_squat"
+}

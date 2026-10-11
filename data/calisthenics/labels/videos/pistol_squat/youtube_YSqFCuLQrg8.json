@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A man in a gym holds onto gymnastic rings for balance and performs a single-leg pistol squat, lowering himself down on his right leg and then standing back up.",
+ "technique_start": 18.4,
+ "technique_end": 34.2,
+ "reps_estimate": 1,
+ "file": "videos/pistol_squat/youtube_YSqFCuLQrg8.mp4",
+ "claimed_trick": "pistol_squat"
+}

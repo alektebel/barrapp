@@ -1,0 +1,12 @@
+{
+ "detected_trick": "dip",
+ "agrees": true,
+ "description": "From a side angle in a CrossFit gym, a man in black athletic wear performs dips on gymnastic rings while a coach in a red shirt observes, gestures, and provides verbal cues.",
+ "technique_start": 39.8,
+ "technique_end": 225.5,
+ "reps_estimate": 3,
+ "original_duration": 265.3,
+ "duration_after_cut": 187.72,
+ "file": "videos/dip/youtube_ZHvuqzdaZUQ.mp4",
+ "claimed_trick": "dip"
+}

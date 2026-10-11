@@ -1,0 +1,10 @@
+{
+ "detected_trick": "muscle_up",
+ "agrees": true,
+ "description": "A person in a gym performs a muscle-up on wall-mounted stall bars, climbing up and down vertically from a side viewpoint.",
+ "technique_start": 0.7,
+ "technique_end": 7.8,
+ "reps_estimate": 1,
+ "file": "videos/muscle_up/youtube_OS5XVjmSOfE.mp4",
+ "claimed_trick": "muscle_up"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": true,
+ "description": "A man in military fatigue pants performs a pull-up on an outdoor bar, gripping the bar, hanging, pulling his chin over the bar, and lowering back down.",
+ "technique_start": 21.0,
+ "technique_end": 45.0,
+ "reps_estimate": 1,
+ "file": "videos/pull_up/commons_Get_Fit-_Proper_Pull-Up_Technique_Marine_Corps_Air_Station_I.mp4",
+ "claimed_trick": "pull_up"
+}

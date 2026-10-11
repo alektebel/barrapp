@@ -1,0 +1,12 @@
+{
+ "detected_trick": "dip",
+ "agrees": true,
+ "description": "A man in a blue tank top performs dips on a parallel bar station in a home gym.",
+ "technique_start": 127.2,
+ "technique_end": 240.3,
+ "reps_estimate": 1,
+ "original_duration": 282.7,
+ "duration_after_cut": 115.1,
+ "file": "videos/dip/youtube_0mTEfVEISWg.mp4",
+ "claimed_trick": "dip"
+}

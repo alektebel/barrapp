@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A side view of a man performing weighted dips on a dip station with a weight plate attached to a dip belt.",
+ "technique_start": 12.1,
+ "technique_end": 60.3,
+ "reps_estimate": 4,
+ "original_duration": 80.4,
+ "duration_after_cut": 50.2,
+ "file": "videos/weighted_dip/youtube_8fzG4byd5jo.mp4",
+ "claimed_trick": "weighted_dip"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "In an indoor gym setting, a man in a white shirt performs multiple slow repetitions of a single-leg pistol squat while holding an archery bow.",
+ "technique_start": 5.5,
+ "technique_end": 105.3,
+ "reps_estimate": 4,
+ "file": "videos/pistol_squat/youtube_MVcIa4wUl9E.mp4",
+ "claimed_trick": "pistol_squat"
+}

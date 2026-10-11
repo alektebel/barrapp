@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": false,
+ "description": "A woman in a gym setting, viewed from the side, performs pistol squats on a mat with a power rack and weights in the background.",
+ "technique_start": 2.3,
+ "technique_end": 24.9,
+ "reps_estimate": 3,
+ "file": "videos/squat/youtube_DHpYd8cvc3M.mp4",
+ "claimed_trick": "squat"
+}

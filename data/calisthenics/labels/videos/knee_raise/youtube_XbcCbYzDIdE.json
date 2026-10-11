@@ -1,0 +1,10 @@
+{
+ "detected_trick": "knee_raise",
+ "agrees": true,
+ "description": "A man in a blue shirt hangs from a bar in a gym and performs a hanging knee raise by lifting his knees towards his chest and lowering them.",
+ "technique_start": 2.8,
+ "technique_end": 6.5,
+ "reps_estimate": 1,
+ "file": "videos/knee_raise/youtube_XbcCbYzDIdE.mp4",
+ "claimed_trick": "knee_raise"
+}

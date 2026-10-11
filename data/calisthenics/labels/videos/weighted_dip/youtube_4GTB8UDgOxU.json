@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A man in a black shirt and white shorts performs weighted dips on a dip station with a spotter standing to his left.",
+ "technique_start": 2.8,
+ "technique_end": 30.5,
+ "reps_estimate": 3,
+ "original_duration": 33.3,
+ "duration_after_cut": 29.77975,
+ "file": "videos/weighted_dip/youtube_4GTB8UDgOxU.mp4",
+ "claimed_trick": "weighted_dip"
+}

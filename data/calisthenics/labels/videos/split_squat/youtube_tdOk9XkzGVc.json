@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": false,
+ "description": "A man performs Bulgarian split squats with his rear foot elevated on a bench behind him.",
+ "technique_start": 0.7,
+ "technique_end": 7.5,
+ "reps_estimate": 2,
+ "file": "videos/split_squat/youtube_tdOk9XkzGVc.mp4",
+ "claimed_trick": "split_squat"
+}

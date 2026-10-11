@@ -1,0 +1,12 @@
+{
+ "detected_trick": "weighted_dip",
+ "agrees": true,
+ "description": "A shirtless man performs weighted dips on parallel bars in a gym, using a dipping belt with a weight plate, while instructional text overlays highlight technique cues.",
+ "technique_start": 16.5,
+ "technique_end": 71.5,
+ "reps_estimate": 10,
+ "original_duration": 110.0,
+ "duration_after_cut": 57.023633,
+ "file": "videos/weighted_dip/youtube_ihowMUeIMtQ.mp4",
+ "claimed_trick": "weighted_dip"
+}

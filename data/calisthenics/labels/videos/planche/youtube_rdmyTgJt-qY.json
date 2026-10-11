@@ -1,0 +1,12 @@
+{
+ "detected_trick": "planche",
+ "agrees": true,
+ "description": "A person in a black hoodie performs a tuck planche progression on the floor inside a room.",
+ "technique_start": 8.6,
+ "technique_end": 25.7,
+ "reps_estimate": 1,
+ "original_duration": 34.2,
+ "duration_after_cut": 19.1,
+ "file": "videos/planche/youtube_rdmyTgJt-qY.mp4",
+ "claimed_trick": "planche"
+}

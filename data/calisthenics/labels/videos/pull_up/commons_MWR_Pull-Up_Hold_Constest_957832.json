@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pull_up",
+ "agrees": true,
+ "description": "A low-angle sequence showing different individuals performing pull-ups on an outdoor metal bar structure.",
+ "technique_start": 17.5,
+ "technique_end": 22.5,
+ "reps_estimate": 2,
+ "file": "videos/pull_up/commons_MWR_Pull-Up_Hold_Constest_957832.mp4",
+ "claimed_trick": "pull_up"
+}

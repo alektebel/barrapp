@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A man in a gym performs assisted pistol squats using TRX straps and a resistance band.",
+ "technique_start": 39.4,
+ "technique_end": 51.5,
+ "reps_estimate": 1,
+ "file": "videos/pistol_squat/youtube_LPSoVmJJl5E.mp4",
+ "claimed_trick": "pistol_squat"
+}

@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A man performs the bench press exercise on a weight bench with a barbell in an outdoor gym.",
+ "technique_start": 59.5,
+ "technique_end": 99.1,
+ "reps_estimate": 1,
+ "file": "videos/bench_press/youtube_mxptMnF6siM.mp4",
+ "claimed_trick": "bench_press"
+}

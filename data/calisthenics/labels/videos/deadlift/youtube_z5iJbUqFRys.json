@@ -1,0 +1,10 @@
+{
+ "detected_trick": "deadlift",
+ "agrees": true,
+ "description": "A woman in a gym performs kettlebell deadlifts using a sumo stance, lifting the weight to a standing position and lowering it back down.",
+ "technique_start": 1.9,
+ "technique_end": 13.6,
+ "reps_estimate": 2,
+ "file": "videos/deadlift/youtube_z5iJbUqFRys.mp4",
+ "claimed_trick": "deadlift"
+}

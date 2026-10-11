@@ -1,0 +1,10 @@
+{
+ "detected_trick": "pistol_squat",
+ "agrees": true,
+ "description": "A side-view of a woman in a gym performing an assisted pistol squat by standing up from a bench with one leg extended and then sitting back down.",
+ "technique_start": 1.3,
+ "technique_end": 11.8,
+ "reps_estimate": 2,
+ "file": "videos/pistol_squat/youtube_vG0gybD89Pw.mp4",
+ "claimed_trick": "pistol_squat"
+}

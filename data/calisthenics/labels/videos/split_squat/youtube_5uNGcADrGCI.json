@@ -1,0 +1,10 @@
+{
+ "detected_trick": "split_squat",
+ "agrees": true,
+ "description": "Side view of a person performing a static split squat in a gym, holding a low lunge position with one knee on the ground and the other foot flat.",
+ "technique_start": 1.5,
+ "technique_end": 16.9,
+ "reps_estimate": 1,
+ "file": "videos/split_squat/youtube_5uNGcADrGCI.mp4",
+ "claimed_trick": "split_squat"
+}

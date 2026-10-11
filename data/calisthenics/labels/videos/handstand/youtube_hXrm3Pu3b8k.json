@@ -1,0 +1,12 @@
+{
+ "detected_trick": "handstand",
+ "agrees": true,
+ "description": "The video shows a progression of a person performing handstands, starting with wall-assisted holds and advancing to freestanding holds in a gym setting.",
+ "technique_start": 14.8,
+ "technique_end": 222.8,
+ "reps_estimate": 1,
+ "original_duration": 297.0,
+ "duration_after_cut": 210.0,
+ "file": "videos/handstand/youtube_hXrm3Pu3b8k.mp4",
+ "claimed_trick": "handstand"
+}

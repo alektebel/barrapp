@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bulgarian_split_squat",
+ "agrees": false,
+ "description": "A woman in gym wear performs a dumbbell Bulgarian split squat with her rear foot elevated on a bench.",
+ "technique_start": 1.9,
+ "technique_end": 13.1,
+ "reps_estimate": 1,
+ "file": "videos/split_squat/youtube_QiQ2e3nNyGo.mp4",
+ "claimed_trick": "split_squat"
+}

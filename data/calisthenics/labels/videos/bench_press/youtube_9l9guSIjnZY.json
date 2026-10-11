@@ -1,0 +1,10 @@
+{
+ "detected_trick": "bench_press",
+ "agrees": true,
+ "description": "A 3D animated man lies on a flat bench and performs a barbell bench press, demonstrating the movement, muscle engagement, and variations.",
+ "technique_start": 3.0,
+ "technique_end": 57.6,
+ "reps_estimate": 2,
+ "file": "videos/bench_press/youtube_9l9guSIjnZY.mp4",
+ "claimed_trick": "bench_press"
+}

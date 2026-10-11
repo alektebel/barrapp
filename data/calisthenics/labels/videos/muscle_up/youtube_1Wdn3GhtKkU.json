@@ -1,0 +1,12 @@
+{
+ "detected_trick": "muscle_up",
+ "agrees": true,
+ "description": "A male athlete in a black tank top performs a muscle up on gymnastic rings, transitioning from a hang to a support position.",
+ "technique_start": 67.8,
+ "technique_end": 106.5,
+ "reps_estimate": 1,
+ "original_duration": 193.6,
+ "duration_after_cut": 40.72,
+ "file": "videos/muscle_up/youtube_1Wdn3GhtKkU.mp4",
+ "claimed_trick": "muscle_up"
+}

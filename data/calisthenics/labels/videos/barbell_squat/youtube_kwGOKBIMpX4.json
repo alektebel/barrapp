@@ -1,0 +1,10 @@
+{
+ "detected_trick": "barbell_squat",
+ "agrees": true,
+ "description": "A man in a gym performs barbell back squats, viewed from the side, lowering his hips to knee level and standing back up with the weight.",
+ "technique_start": 2.2,
+ "technique_end": 24.6,
+ "reps_estimate": 2,
+ "file": "videos/barbell_squat/youtube_kwGOKBIMpX4.mp4",
+ "claimed_trick": "barbell_squat"
+}
