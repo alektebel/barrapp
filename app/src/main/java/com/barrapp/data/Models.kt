@@ -40,6 +40,10 @@ data class Analysis(
     /** The server measures first and adds the advisory vision note after
      *  (visionStatus "pending"); a session opened in between is re-fetched. */
     val visionPending: Boolean = false,
+    /** The three things to improve, most important first, as the server
+     *  ranked them (barra/fault_select.top_fixes). Empty = nothing to fix,
+     *  or an older server (see ui/tracker fixItems for the fallback). */
+    val topFixes: List<TopFix> = emptyList(),
     val exercise: String = "",
     val detected: Detected? = null,
     /** The first learned model's verdict and load estimate, shipped beside the
@@ -75,6 +79,14 @@ data class Analysis(
     /** True when the vision model saw a different movement than the
      *  geometry labelled - flagged for review, never applied. */
     val visionDisagreesOnMovement: Boolean = false,
+)
+
+data class TopFix(
+    val rank: Int,
+    val errorId: String,
+    val name: String,       // a fault key: faultEs / cueEs render it
+    val observedReps: Int,
+    val judgedReps: Int,
 )
 
 data class Provenance(

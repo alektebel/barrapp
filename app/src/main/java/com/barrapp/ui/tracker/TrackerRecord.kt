@@ -22,6 +22,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +60,8 @@ data class ResultsData(
     val narrative: String = "",
     val blockers: List<String> = emptyList(),
     val nextSession: String = "",
+    /** The three things to improve, most important first (Fixes.kt). */
+    val fixes: List<FixItem> = emptyList(),
     val movement: String,
     val setsLabel: String,
     val reps: Int,
@@ -380,12 +384,26 @@ private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
             }
         }
 
-        if (results.headline.isNotBlank() || results.narrative.isNotBlank() ||
-            results.blockers.isNotEmpty()) {
+        // Short by default (docs/UX-PLAN.md): what to fix, in order. A set
+        // with nothing counted says why instead. Everything else is one tap away.
+        if (results.reps > 0) {
+            SlideUp(delayMillis = 60) { FixesCard(results.fixes) }
+        } else if (results.headline.isNotBlank() || results.blockers.isNotEmpty()) {
             SlideUp(delayMillis = 60) { WhatHappened(results) }
         }
 
-        if (results.faults.isNotEmpty()) {
+        var detail by androidx.compose.runtime.saveable.rememberSaveable {
+            androidx.compose.runtime.mutableStateOf(false)
+        }
+        if (results.reps > 0) {
+            TkSecondaryButton(if (detail) "Ocultar detalle" else "Ver detalle", { detail = !detail })
+        }
+        if (detail && results.reps > 0 &&
+            (results.headline.isNotBlank() || results.narrative.isNotBlank())) {
+            WhatHappened(results)
+        }
+
+        if (detail && results.faults.isNotEmpty()) {
             SlideUp(delayMillis = 100) {
                 TkCard {
                     Eyebrow("Errores detectados")
@@ -405,8 +423,10 @@ private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
             }
         }
 
-        results.repCards.forEachIndexed { i, rep ->
-            SlideUp(delayMillis = 200 + i * 60) { RepCard(rep) }
+        if (detail) {
+            results.repCards.forEachIndexed { i, rep ->
+                SlideUp(delayMillis = 200 + i * 60) { RepCard(rep) }
+            }
         }
 
         TkPrimaryButton(

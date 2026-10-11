@@ -159,6 +159,12 @@ class TrackerScreenshotTest {
                         phase = RecordPhase.RESULTS,
                         stages = emptyList(), activeStage = 0,
                         results = ResultsData(
+                            headline = "6 dominadas verificadas, sólida",
+                            fixes = listOf(
+                                com.barrapp.ui.tracker.FixItem("Balanceo", "Cuerpo quieto: sin impulso.", "en 4 de 6 repeticiones"),
+                                com.barrapp.ui.tracker.FixItem("Sin bloqueo arriba", "Termina con la barbilla por encima de la barra.", "en 2 de 6 repeticiones"),
+                                com.barrapp.ui.tracker.FixItem("Bajada sin control", "Baja en dos segundos.", "en 2 de 6 repeticiones"),
+                            ),
                             movement = "Dominada", setsLabel = "1 serie", reps = 6, score = 71,
                             faults = listOf("Balanceo" to 4, "Sin bloqueo arriba" to 2),
                             repCards = listOf(

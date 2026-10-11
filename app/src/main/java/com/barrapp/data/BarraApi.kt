@@ -388,6 +388,15 @@ class BarraApi(context: Context) {
             val blockers = json.optJSONArray("blockers") ?: JSONArray()
             return Analysis(
                 visionPending = json.optString("visionStatus") == "pending",
+                topFixes = json.optJSONArray("topFixes").mapObjects { f ->
+                    TopFix(
+                        rank = f.optInt("rank"),
+                        errorId = f.optString("errorId"),
+                        name = f.optString("name"),
+                        observedReps = f.optInt("observedReps"),
+                        judgedReps = f.optInt("judgedReps"),
+                    )
+                }.sortedBy { it.rank },
                 headline = json.optString("headline"),
                 narrative = json.optString("narrative"),
                 sessions = (0 until sessions.length()).map {

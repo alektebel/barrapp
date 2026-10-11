@@ -315,11 +315,16 @@ private fun SessionSheet(
         },
         visionDisagrees = a.visionDisagreesOnMovement,
     )
-    // The server's own account of the session - and, on a clip with nothing
-    // counted, the only place the athlete learns why.
+    // What to fix first, then the server's own account - which, on a clip
+    // with nothing counted, is the only place the athlete learns why.
+    val summary = resultsData(a, state.days)
+    androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 16.dp))
+    if (a.repCount > 0) {
+        com.barrapp.ui.tracker.FixesCard(summary.fixes)
+        androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 12.dp))
+    }
     if (a.headline.isNotBlank() || a.narrative.isNotBlank() || a.blockers.isNotEmpty()) {
-        androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 16.dp))
-        com.barrapp.ui.tracker.WhatHappened(resultsData(a, state.days))
+        com.barrapp.ui.tracker.WhatHappened(summary)
     }
 }
 
@@ -472,6 +477,7 @@ private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
         narrative = a.narrative,
         blockers = a.blockers,
         nextSession = a.nextSession,
+        fixes = fixItems(a),
         movement = movementEs(a.exercise, a.detected?.label.orEmpty()),
         setsLabel = "1 serie",
         reps = a.repCount,
