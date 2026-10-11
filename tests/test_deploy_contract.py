@@ -108,6 +108,29 @@ class StackDefinesWhatTheCodeRequires(unittest.TestCase):
         self.assertEqual(missing, [])
 
 
+class ApiHasAStableName(unittest.TestCase):
+    """The app talks to api.barrapp.fit, not to the API Gateway id: a phone
+    could not resolve *.execute-api.amazonaws.com on 2026-10-11, and the id
+    changes whenever the API is recreated."""
+
+    def setUp(self):
+        self.t = (SERVER / "template.yaml").read_text()
+
+    def test_the_custom_domain_is_part_of_the_stack(self):
+        for needle in ("Type: AWS::ApiGatewayV2::DomainName",
+                       "Type: AWS::ApiGatewayV2::ApiMapping",
+                       "EndpointType: REGIONAL", "Default: api.barrapp.fit"):
+            self.assertIn(needle, self.t)
+
+    def test_it_is_only_created_with_a_certificate(self):
+        self.assertIn("HasApiDomain:", self.t)
+        self.assertEqual(self.t.count("Condition: HasApiDomain"), 3)  # domain, mapping, output
+
+    def test_the_dns_target_is_an_output(self):
+        self.assertIn("ApiDomainTarget:", self.t)
+        self.assertIn("RegionalDomainName", self.t)
+
+
 class BuildIsStamped(unittest.TestCase):
     def setUp(self):
         from barra import provenance

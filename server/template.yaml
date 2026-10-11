@@ -11,6 +11,18 @@ Parameters:
       exists and still fires - it just has nowhere to go, which is how the
       "No module named 'auth'" deploy managed to fail every clip for a day
       with the evidence sitting unread in the queue.
+  ApiDomainName:
+    Type: String
+    Default: api.barrapp.fit
+    Description: >-
+      The name the app calls. A CNAME at the registrar (Porkbun) points it at
+      the ApiDomainTarget output.
+  ApiCertificateArn:
+    Type: String
+    Default: arn:aws:acm:eu-west-1:257394490122:certificate/73af029a-af15-46f2-8f74-38fba02b28bb
+    Description: >-
+      ACM certificate for *.barrapp.fit in this region, validated by DNS.
+      Blank leaves the custom domain out of the stack.
   NanBaseUrl:
     Type: String
     Default: ""
@@ -54,6 +66,7 @@ Globals:
 
 Conditions:
   HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, ""]]
+  HasApiDomain: !Not [!Equals [!Ref ApiCertificateArn, ""]]
 
 Resources:
   VideoBucket:
@@ -209,6 +222,27 @@ Resources:
           - PUT
           - DELETE
           - OPTIONS
+
+  # A stable name for the API (2026-10-11): a phone could not resolve the
+  # execute-api host, and that host changes whenever the API is recreated.
+  ApiDomain:
+    Type: AWS::ApiGatewayV2::DomainName
+    Condition: HasApiDomain
+    Properties:
+      DomainName: !Ref ApiDomainName
+      DomainNameConfigurations:
+        - CertificateArn: !Ref ApiCertificateArn
+          EndpointType: REGIONAL
+          SecurityPolicy: TLS_1_2
+
+  ApiDomainMapping:
+    Type: AWS::ApiGatewayV2::ApiMapping
+    Condition: HasApiDomain
+    DependsOn: ApiApiGatewayDefaultStage
+    Properties:
+      DomainName: !Ref ApiDomain
+      ApiId: !Ref Api
+      Stage: $default
 
   ApiFunction:
     Type: AWS::Serverless::Function
@@ -472,6 +506,10 @@ Resources:
           Destination: !GetAtt WorkerDLQ.Arn
 
 Outputs:
+  ApiDomainTarget:
+    Condition: HasApiDomain
+    Description: CNAME target for ApiDomainName at the registrar.
+    Value: !GetAtt ApiDomain.RegionalDomainName
   UserPoolId:
     Description: Cognito user pool holding the accounts.
     Value: !Ref UserPool
