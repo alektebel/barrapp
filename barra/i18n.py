@@ -53,6 +53,15 @@ MOVEMENTS = {
     "deadlift": "Peso muerto", "bench_press": "Press de banca", "barbell_squat": "Sentadilla con barra",
     "handstand": "Pino", "human_flag": "Bandera humana", "back_lever": "Back lever",
     "monkey_bar_traversal": "Pasamanos", "monkey_bar_traverse": "Pasamanos",
+    # Skill-catalog names the pipeline cannot measure yet (barra/skills.py):
+    # the vision localizer still reports them, and the name reaches the phone.
+    "leg_raise": "Elevación de piernas colgado", "toes_to_bar": "Puntas a la barra",
+    "dragon_flag": "Dragon flag", "dragonflag": "Dragon flag", "dragon flag": "Dragon flag",
+    "plank": "Plancha frontal", "hollow_hold": "Hollow hold",
+    "l_sit": "L-sit", "v_sit": "V-sit", "manna": "Manna", "ab_wheel": "Rueda abdominal",
+    "dead_hang": "Dead hang", "australian_row": "Remo australiano",
+    "nordic_curl": "Curl nórdico", "sissy_squat": "Sentadilla sissy",
+    "skin_the_cat": "Skin the cat", "hefesto": "Hefesto",
 }
 
 METRICS = {
@@ -406,6 +415,9 @@ def localize_text(text, missing: list[str] | None = None):
     missing = [] if missing is None else missing
     if text in MOVEMENTS:
         return MOVEMENTS[text]
+    normalized = MOVEMENTS.get(_normalize_label(text))
+    if normalized is not None:
+        return normalized
     if text in METRICS:
         return METRICS[text]
     sub: list[str] = []
@@ -417,6 +429,15 @@ def localize_text(text, missing: list[str] | None = None):
     missing.extend(sub)
     return t.text
 
+
+
+_LABEL_NONWORD = re.compile(r"[\s_-]+")
+
+
+def _normalize_label(text: str) -> str:
+    """An exercise label in the catalog's exact casing: "dragon-flag" and
+    "DRAGON FLAG" find "Dragon flag"; unknown text comes back as it came."""
+    return _LABEL_NONWORD.sub(" ", text.strip().strip(".")).lower()
 
 _VALUE = re.compile(r"^(-?\d+(?:\.\d+)?)\s*(s|x|torso|deg|%)?$")
 _UNITS = {"torso": "torsos", "s": "s", "x": "x", "deg": "°", "%": "%"}

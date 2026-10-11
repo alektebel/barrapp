@@ -162,6 +162,29 @@ class Payload(unittest.TestCase):
         once = i18n.localize_payload(self.payload())
         self.assertEqual(i18n.localize_payload(once), once)
 
+    def test_an_unmeasured_exercise_label_is_spanish(self):
+        """"Dragon flag" (2026-10-11, 16:32): the vision localizer names a
+        movement the pipeline does not measure, and the name reached the
+        phone in English. Every skill the catalog knows - measured or not -
+        comes out Spanish, in any casing or spacing the model writes."""
+        for label in ("dragon flag", "Dragon Flag", "dragonflag", "dragon-flag",
+                      "Dragon flag"):
+            p = {"headline": "1 dragon flag", "detected": {"label": label}}
+            out = i18n.localize_payload(p)
+            self.assertEqual(out["detected"]["label"], "Dragon flag", label)
+            self.assertEqual(out["i18n"]["untranslated"], [], label)
+
+    def test_known_exercise_labels_translate_exactly_as_before(self):
+        for label, es in (("Muscle-up", "Muscle-up"), ("Pull-up", "Dominada"),
+                          ("Dip", "Fondo"), ("Push-up", "Flexión")):
+            out = i18n.localize_payload({"detected": {"label": label}})
+            self.assertEqual(out["detected"]["label"], es)
+            self.assertEqual(out["i18n"]["untranslated"], [])
+
+    def test_genuinely_unknown_text_is_still_listed(self):
+        out = i18n.localize_payload({"detected": {"label": "a frobnicate maximal movement"}})
+        self.assertEqual(out["i18n"]["untranslated"], ["a frobnicate maximal movement"])
+
 
 class StagesAndErrors(unittest.TestCase):
     def test_every_worker_stage_has_a_code_and_spanish_text(self):
