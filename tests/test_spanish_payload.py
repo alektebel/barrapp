@@ -70,6 +70,25 @@ class ProcessJob(unittest.TestCase):
         self.assertEqual(out["visionObservations"], [{"rep": "r1"}])
 
 
+class Defaults(unittest.TestCase):
+    def test_every_literal_next_session_in_process_is_spanish(self):
+        """Caught by the strict sentinel on a real clip (2026-10-11): the
+        default nextSession was English, and reached the phone whenever the
+        report model did not answer."""
+        import ast
+        tree = ast.parse((ROOT / "server" / "process.py").read_text())
+        found = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Dict):
+                for k, v in zip(node.keys, node.values):
+                    if isinstance(k, ast.Constant) and k.value == "nextSession" \
+                            and isinstance(v, ast.Constant) and isinstance(v.value, str):
+                        found.append(v.value)
+        self.assertGreaterEqual(len(found), 2)
+        for text in found:
+            self.assertEqual(i18n.english_words(text), [], text)
+
+
 class Unsupported(unittest.TestCase):
     def test_an_unmeasurable_movement_is_a_spanish_sentence(self):
         out = process._unsupported("deadlift", {"exercise": "deadlift", "label": "deadlift"})

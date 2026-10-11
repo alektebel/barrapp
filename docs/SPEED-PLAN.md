@@ -31,6 +31,25 @@ What remains on the critical path: **pose (~128 s)**, the report + artifacts
 
 ## Steps
 
+## Results so far (2026-10-11)
+
+| Step | Status | Finding |
+|---|---|---|
+| 0 Timing tool | ✅ `scripts/job_timing.py` | Named a hidden stage: **~44 s** cutting and re-uploading the stored clip *before* `done` was written |
+| 1 Vision calls overlap + result before the clip cut | ✅ exact (no number changes) | ~44 s off the critical path; note arrives ~20 s sooner |
+| 2 Pose in parallel chunks | ⚠️ built, **off by default** | ~1.6–1.8× faster with 4 workers, but **not identical**: sequential MediaPipe is bit-for-bit deterministic, yet a chunk started cold never converges to it (VIDEO mode carries tracking/smoothing state through the whole clip; 1–10 px for the chunk's full length, any warm-up). On two real clips: score 55 → 56, a distance 1.2 → 1.1 torso. `scripts/pose_parallel_check.py` reproduces it. |
+| 3 More vCPU | ❌ no effect | The model uses one core: 58.6 s on 1 core, 61.6 s on 2, 59.7 s on 6, identical output. Decoding is negligible (0.5 s of 1,206 frames). |
+| 4 Phone compression | ⚠️ changes numbers too | Re-encoding changes the pixels the model sees, so keypoints move like in step 2. |
+
+**Conclusion:** with steps 0–1 the exact speed-ups are exhausted. ~100% of the
+remaining critical path is MediaPipe inference, one frame at a time. Every
+further gain (chunks, fewer frames, a lighter model, compression, pose on the
+phone) changes the keypoints by a few pixels. That is a measurement decision:
+it must be taken on the reference clip set, comparing each option's error
+against the labels - not against today's sequential output, which is itself
+only one of the many answers a tracker gives depending on where the clip
+starts (a cold start anywhere in a clip moves it by the same 1–10 px).
+
 ### Step 0 — A timing tool
 `scripts/job_timing.py <job_id>`: reads the job's upload log and trace from
 production and prints each stage's duration (upload, locate, pose, measure,

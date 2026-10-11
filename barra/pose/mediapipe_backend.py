@@ -64,58 +64,90 @@ class MediapipeBackend:
         return find_spec("mediapipe") is not None
 
     def estimate(self, video: Path) -> PoseResult:
-        import mediapipe as mp
-        from mediapipe.tasks import python as mp_python
-        from mediapipe.tasks.python import vision
-
-        model = ensure_model(self.model_path)
         cap = cv2.VideoCapture(str(video))
         if not cap.isOpened():
             raise RuntimeError(f"cannot open video: {video}")
         fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
         w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-
-        options = vision.PoseLandmarkerOptions(
-            base_options=mp_python.BaseOptions(model_asset_path=str(model)),
-            running_mode=vision.RunningMode.VIDEO,
-            num_poses=1,
-            min_pose_detection_confidence=0.5,
-            min_pose_presence_confidence=0.5,
-            min_tracking_confidence=0.5,
-            output_segmentation_masks=False,
-        )
-
-        frames: list[np.ndarray] = []
-        with vision.PoseLandmarker.create_from_options(options) as landmarker:
-            idx = 0
-            while True:
-                ok, frame = cap.read()
-                if not ok:
-                    break
-                if w > PROCESS_WIDTH:
-                    scale = PROCESS_WIDTH / w
-                    frame = cv2.resize(frame, (PROCESS_WIDTH, max(1, int(h * scale))),
-                                       interpolation=cv2.INTER_AREA)
-                image = mp.Image(
-                    image_format=mp.ImageFormat.SRGB,
-                    data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
-                )
-                ts = int(idx * 1000.0 / max(fps, 1.0))
-                res = landmarker.detect_for_video(image, ts)
-                row = np.zeros((33, 3), dtype=np.float32)
-                if res.pose_landmarks:
-                    for i, lm in enumerate(res.pose_landmarks[0]):
-                        # visibility x presence: a landmark the model placed but
-                        # believes is out of frame is not a usable observation.
-                        # lm.x/lm.y are normalised to the processed image, so
-                        # scaling back by the ORIGINAL dimensions keeps the
-                        # pixel coordinates downstream has always expected.
-                        row[i] = (lm.x * w, lm.y * h,
-                                  float(lm.visibility) * float(lm.presence))
-                frames.append(row)
-                idx += 1
+        n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         cap.release()
-        if not frames:
+
+        model = ensure_model(self.model_path)
+        from .parallel import pose_frames
+        # In parallel chunks when the clip is long enough and there are CPUs
+        # for it (barra/pose/parallel.py); the same pose_range either way.
+        blaze = pose_frames(
+            Path(video), n_frames, fps,
+            sequential=lambda: pose_range(model, Path(video), 0, 0, -1, fps))
+        if not len(blaze):
             raise RuntimeError(f"no frames decoded from {video}")
-        return PoseResult(remap(np.stack(frames), COCO_FROM_BLAZE), fps, w, h)
+        return PoseResult(remap(blaze, COCO_FROM_BLAZE), fps, w, h)
+
+
+def pose_range(model: Path, video: Path, warm: int, start: int, end: int,
+               fps: float) -> np.ndarray:
+    """BlazePose landmarks (frames, 33, 3) for frames [start, end) of the clip
+    (end = -1: to the end of the file), with tracking warmed up from frame
+    `warm`. Frames are reached by decoding from the start, never by seeking:
+    OpenCV seeks in H.264 are not frame-accurate. The sequential path is
+    pose_range(model, video, 0, 0, -1, fps); a parallel chunk is a slice of it.
+    """
+    import mediapipe as mp
+    from mediapipe.tasks import python as mp_python
+    from mediapipe.tasks.python import vision
+
+    cap = cv2.VideoCapture(str(video))
+    if not cap.isOpened():
+        raise RuntimeError(f"cannot open video: {video}")
+    w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    options = vision.PoseLandmarkerOptions(
+        base_options=mp_python.BaseOptions(model_asset_path=str(model)),
+        running_mode=vision.RunningMode.VIDEO,
+        num_poses=1,
+        min_pose_detection_confidence=0.5,
+        min_pose_presence_confidence=0.5,
+        min_tracking_confidence=0.5,
+        output_segmentation_masks=False,
+    )
+    frames: list[np.ndarray] = []
+    with vision.PoseLandmarker.create_from_options(options) as landmarker:
+        idx = 0
+        while end < 0 or idx < end:
+            if idx < warm:
+                # Decode but do not pose: grab() advances without converting.
+                if not cap.grab():
+                    break
+                idx += 1
+                continue
+            ok, frame = cap.read()
+            if not ok:
+                break
+            if w > PROCESS_WIDTH:
+                scale = PROCESS_WIDTH / w
+                frame = cv2.resize(frame, (PROCESS_WIDTH, max(1, int(h * scale))),
+                                   interpolation=cv2.INTER_AREA)
+            image = mp.Image(
+                image_format=mp.ImageFormat.SRGB,
+                data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
+            )
+            ts = int(idx * 1000.0 / max(fps, 1.0))
+            res = landmarker.detect_for_video(image, ts)
+            row = np.zeros((33, 3), dtype=np.float32)
+            if res.pose_landmarks:
+                for i, lm in enumerate(res.pose_landmarks[0]):
+                    # visibility x presence: a landmark the model placed but
+                    # believes is out of frame is not a usable observation.
+                    # lm.x/lm.y are normalised to the processed image, so
+                    # scaling back by the ORIGINAL dimensions keeps the
+                    # pixel coordinates downstream has always expected.
+                    row[i] = (lm.x * w, lm.y * h,
+                              float(lm.visibility) * float(lm.presence))
+            if idx >= start:
+                frames.append(row)
+            idx += 1
+    cap.release()
+    if not frames:
+        return np.zeros((0, 33, 3), dtype=np.float32)
+    return np.stack(frames)

@@ -388,8 +388,8 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
         "sessions": [{"date": session or date.today().isoformat(),
                       "reps": len(reps), "note": "hold"}],
         "nextSession": (
-            "Three or four holds, one set, tripod on a marked spot, same side "
-            "every time, the whole body in frame."
+            "Tres o cuatro mantenimientos, una serie, el móvil fijo en un punto "
+            "marcado, siempre desde el mismo lado y con todo el cuerpo en el encuadre."
         ),
     }
 
@@ -994,7 +994,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # every clip that needed it.
         "blockers": blockers_out,
         "nextSession": (
-            "Five or six reps, one set, tripod on a marked spot, same side every time, "
-            "lockout in frame, trimmed to the working set."
+            "Cinco o seis repeticiones, una serie, el móvil fijo en un punto marcado, "
+            "siempre desde el mismo lado y con la parte de arriba dentro del encuadre."
         ),
     }
