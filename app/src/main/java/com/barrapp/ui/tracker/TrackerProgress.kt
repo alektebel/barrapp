@@ -88,6 +88,7 @@ fun TrackerProgress(
     onOpenLadder: () -> Unit,
     onRecord: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenSkills: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -100,6 +101,23 @@ fun TrackerProgress(
         Column {
             Text("BarrApp", style = T.eyebrowWide)
             Text("PROGRESO", style = T.pageTitle)
+        }
+
+        // The path to the goal skill - shown even before any measured set,
+        // because it is what the first sets are for.
+        TkCard(accent = true, modifier = Modifier.noRipple(onOpenSkills)) {
+            Row(
+                Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Eyebrow("Tu camino")
+                    Text("Qué habilidades llevan a la que quieres, y cuál toca ahora",
+                        style = T.bodyS, modifier = Modifier.padding(top = 4.dp))
+                }
+                Text("VER", style = mono(9, 0.05f, Tk.primary))
+            }
         }
 
         if (data.history.isEmpty()) {

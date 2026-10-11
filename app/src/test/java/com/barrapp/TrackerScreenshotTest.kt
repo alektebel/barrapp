@@ -32,6 +32,10 @@ import com.barrapp.ui.tracker.TrackerOnboarding
 import com.barrapp.ui.tracker.TrackerShell
 import com.barrapp.ui.tracker.TrackerTab
 import org.junit.Rule
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.unit.dp
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -184,6 +188,26 @@ class TrackerScreenshotTest {
             }
         }
         snap("tracker-record-results")
+    }
+
+    /** The path to the goal skill (docs/UX-PLAN.md B3). */
+    @Test
+    fun skillPath() {
+        val graph = com.barrapp.data.SkillGraph.load(
+            androidx.test.core.app.ApplicationProvider.getApplicationContext())
+        val data = com.barrapp.ui.tracker.skillPathData(graph, "muscle_up", setOf("pull_up"), "muscle_up")!!
+        rule.setContent {
+            BarrappTheme {
+                androidx.compose.foundation.layout.Box(
+                    Modifier.fillMaxSize().background(com.barrapp.ui.theme.Tk.bg)
+                        .verticalScroll(androidx.compose.foundation.rememberScrollState())
+                        .padding(16.dp),
+                ) {
+                    com.barrapp.ui.tracker.SkillPathScreen(data, onTarget = {}, onClose = {})
+                }
+            }
+        }
+        snap("tracker-skill-path")
     }
 
     /** A clip with nothing counted must say why (before: "0 reps" and silence). */

@@ -60,7 +60,7 @@ import java.util.Calendar
 import java.util.Locale
 
 /** A page opened on top of a tab, not one of the four tabs itself. */
-private enum class Sheet { NONE, SESSION, CALENDAR, LADDER, CHAT }
+private enum class Sheet { NONE, SESSION, CALENDAR, LADDER, CHAT, SKILLS }
 
 /**
  * The redesigned app, wired to the real view model.
@@ -183,6 +183,7 @@ fun TrackerRoot(
                         data = progressData(state),
                         onOpenDay = { date -> vm.selectDate(date); sheet = Sheet.SESSION },
                         onOpenLadder = { sheet = Sheet.LADDER },
+                        onOpenSkills = { sheet = Sheet.SKILLS },
                         onRecord = { tab = TrackerTab.RECORD },
                     )
 
@@ -231,6 +232,7 @@ private fun SheetHost(
                     Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onClose)
                     Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenSession)
                     Sheet.LADDER -> LadderSheet(state, onClose)
+                    Sheet.SKILLS -> SkillsSheet(state, onClose)
                     else -> Unit
                 }
             }
@@ -381,6 +383,18 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: (
             byDate[key]?.takeIf { it.reps > 0 }?.let { vm.selectDate(it.date); onOpenSession() }
         },
     )
+}
+
+/** The path to the athlete's goal skill (docs/UX-PLAN.md B3). */
+@Composable
+private fun SkillsSheet(state: UiState, onClose: () -> Unit) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val graph = remember { com.barrapp.data.SkillGraph.load(context) }
+    val goal = state.goals?.focusExercise?.takeIf { graph[it] != null }
+    var target by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(goal ?: "muscle_up") }
+    val verified = remember(state.days) { graph.verifiedFrom(state.days) }
+    val data = remember(target, verified) { skillPathData(graph, target, verified, goal) }
+    if (data != null) SkillPathScreen(data, onTarget = { target = it }, onClose = onClose)
 }
 
 @Composable
