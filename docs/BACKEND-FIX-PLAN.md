@@ -303,10 +303,14 @@ y sin `DEEPSEEK_*`. Suscripción de alarmas a dratencia@gmail.com creada
   mientras la API respondía bien: fallo del DNS del móvil, no del backend.
 - ✅ App: `FallbackDns` (DNS del sistema → DNS‑over‑HTTPS de Cloudflare y de
   Google por IP fija → última IP buena), con 6 tests. Mensajes en español.
-- Pendiente: **dominio propio para la API** (`api.<dominio>` con dominio
-  personalizado de API Gateway + certificado ACM, en `template.yaml`), para que
-  la app no dependa nunca del ID de API Gateway. Después, un
-  `config.json` en ese dominio para versión mínima y avisos.
+- ✅ **`api.barrapp.fit`** (dominio en Porkbun): certificado ACM comodín
+  `*.barrapp.fit` (validado por CNAME en Porkbun; no borrar esa fila, renueva el
+  certificado), dominio personalizado regional de API Gateway en `template.yaml`
+  (`ApiDomain`, `ApiDomainMapping`, salida `ApiDomainTarget`) y CNAME
+  `api` → `d-4ro9x7ezbk.execute-api.eu-west-1.amazonaws.com`. La app usa
+  `https://api.barrapp.fit` (`gradle.properties`). Verificado: DNS público y
+  `/health` + `/v1/jobs` con 200.
+- Siguiente: un `config.json` en el dominio para versión mínima y avisos.
 
 ## 3. Decisiones que necesito
 
