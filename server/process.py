@@ -10,7 +10,7 @@ import numpy as np
 from pathlib import Path
 
 from barra import sentinel
-from deepseek import write_report
+from report import write_report
 from vision import technique_note, technique_second_opinion, count_from_clip
 
 from barra.evidence import declared_view, estimate_view, rep_evidence

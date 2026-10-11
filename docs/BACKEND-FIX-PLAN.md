@@ -169,6 +169,14 @@ opinión OK, y con el voto de visión la fusión acierta (`muscle_up`).
 funcionan en ≥ 90 % de los clips con atleta visible; cero 401.
 
 ### Fase 2 — Un cliente LLM único + informe con LLM (D2)
+✅ **Hecho en código (2026‑10‑11, sin desplegar):** `server/api/llm.py` (cliente
+único, 13 tests); `vision.py` y `chat.py` delegan en él (chat en español, con
+tests nuevos); `server/report.py` sustituye a `deepseek.py`: `deepseek-v4-flash` →
+`qwen3.8-flash`, prompt en español, resumen compacto y **centinela de números**
+(una cifra que no está en la medida invalida la respuesta). Probado con NaN
+real: informe en español fiel a los números. Pendiente de la Fase 3: se cuelan
+"solid" y "pull-up" desde los datos (bandas y nombres sin traducir).
+
 1. `server/llm.py` (o `api/nan_client.py`): `chat(model, messages, *, json=True,
    timeout, attempts)`. Usa la clave de `nan_secret`, el UA de navegador y
    reintentos ante respuesta vacía, y devuelve también el modelo y la latencia.
@@ -246,6 +254,13 @@ técnicos (`code`) no cambian.
 3. *Test:* el `sweeper` ya cubre el cierre; se añade el caso detectado.
 
 **Puerta:** causa documentada y caso cubierto por un test.
+
+### ✅ Deploy 1 (Fase 1) — 2026‑10‑11
+Imagen `worker-20261011-133823` (commit `fe10cad`), *smoke* OK, `/health` 200,
+`ReferralsTable` creada. Imagen anterior para *rollback*: `worker-20260913-191014`.
+Hallazgos durante el deploy: `deploy.sh` moría en silencio con el árbol limpio
+(`set -e` + `$( [ … ] && … )`), arreglado y con test; `AlarmEmail` vacío → las
+alarmas no avisan a nadie (decisión pendiente).
 
 ### Fase 7 — Despliegue y verificación
 1. Árbol limpio y suite completa (Python + `testDebugUnitTest`).

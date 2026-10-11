@@ -66,9 +66,6 @@ sam build --use-container ApiFunction
 overrides=(
   "WorkerImageUri=$REPO:$TAG"
 )
-if [ -n "${DEEPSEEK_API_KEY:-}" ]; then
-  overrides+=("DeepSeekApiKey=$DEEPSEEK_API_KEY")
-fi
 if [ -n "${NAN_BASE_URL:-}" ]; then
   overrides+=("NanBaseUrl=$NAN_BASE_URL")
 fi

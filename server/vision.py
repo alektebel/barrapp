@@ -27,7 +27,6 @@ Optional by design. Without a key the pipeline behaves exactly as before.
 from __future__ import annotations
 
 import base64
-from dataclasses import dataclass
 import json
 import os
 import re
@@ -40,6 +39,11 @@ try:  # worker/task root
     from nan_secret import get_nan_key
 except ImportError:  # tests / local dev with `server/` on the path
     from api.nan_secret import get_nan_key
+
+try:
+    import llm
+except ImportError:
+    from api import llm
 
 REQUEST_TIMEOUT = 60
 SOURCE_VISION = "vision-advisory"
@@ -122,32 +126,11 @@ USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 CHAT_ATTEMPTS = 3
 
 
-@dataclass(frozen=True)
-class ChatResult:
-    """One call's outcome. `error` is None on success, else the cause in a few
-    words ("401 This API key does not have access…", "empty reply",
-    "model_missing: mimo-v2.5", "timeout")."""
-    model: str
-    text: str | None = None
-    error: str | None = None
-    status: int | None = None
-
-
-# Per container (a Lambda instance handles one job at a time): the most recent
-# failure, so the trace can say why a pass produced nothing, and the provider's
-# model list, fetched once.
-_last_error: str | None = None
-_listed: set[str] | None = None
-
-
-def reset_state() -> None:
-    """Forget the remembered failure and model list. Tests only."""
-    global _last_error, _listed
-    _last_error, _listed = None, None
-
-
-def last_error() -> str | None:
-    return _last_error
+# Every call goes through the one client (api/llm.py): the cause of a failure,
+# the retry policy, the /models guard and the metric line all live there.
+ChatResult = llm.ChatResult
+last_error = llm.last_error
+reset_state = llm.reset_state
 
 
 def skip_reason() -> str:
@@ -155,102 +138,20 @@ def skip_reason() -> str:
     that failed (with its cause), or a reply that did not parse."""
     if _config() is None:
         return "not_configured"
-    if _last_error:
-        return f"call_failed: {_last_error}"
+    if llm.last_error():
+        return f"call_failed: {llm.last_error()}"
     return "no_usable_reply"
-
-
-def _model_listed(base: str, key: str, model: str) -> bool:
-    """Is `model` in the provider's /models? Fetched once per container. A
-    guard, not a gate: when the listing itself cannot be read, the call is
-    attempted anyway and its own error says what went wrong."""
-    global _listed
-    if _listed is None:
-        req = urllib.request.Request(f"{base}/models", headers={
-            "Authorization": f"Bearer {key}", "User-Agent": USER_AGENT})
-        try:
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = json.loads(resp.read().decode())
-            _listed = {str(m.get("id")) for m in data.get("data", []) if isinstance(m, dict)}
-        except Exception:  # noqa: BLE001 - see docstring
-            return True
-    return model in _listed
-
-
-def _http_cause(exc: urllib.error.HTTPError) -> str:
-    try:
-        body = json.loads(exc.read().decode() or "{}")
-        message = (body.get("error") or {}).get("message") or ""
-    except Exception:  # noqa: BLE001
-        message = ""
-    return f"{exc.code} {message or exc.reason}".strip()[:200]
-
-
-def _fail(model: str, error: str, status: int | None = None) -> ChatResult:
-    global _last_error
-    _last_error = error
-    # One parseable line per failure: the VisionCallFailed metric filter.
-    print(f"[barra] vision call failed model={model} status={status or '-'} "
-          f"error={error}", flush=True)
-    return ChatResult(model=model, error=error, status=status)
 
 
 def _chat_result(base: str, key: str, model: str, system: str, content: list[dict],
                  timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS) -> ChatResult:
-    """One OpenAI-compatible call. Never raises; the cause of a failure is kept.
-
-    Retries transport failures, 5xx/429 and empty replies. A 4xx is the
-    provider saying no - a retired model, a bad key - and asking again only
-    delays the same answer. A malformed reply is returned for the caller to
-    parse; only a missing one is retried.
-    """
-    global _last_error
-    if not _model_listed(base, key, model):
-        return _fail(model, f"model_missing: {model}")
-    body = json.dumps({
-        "model": model,
-        "messages": [{"role": "system", "content": system},
-                     {"role": "user", "content": content}],
-        "temperature": 0.3,
-    }).encode()
-    req = urllib.request.Request(
-        f"{base}/chat/completions", data=body,
-        headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
-                 "User-Agent": USER_AGENT},
-        method="POST",
-    )
-    error, status = "no attempt made", None
-    for attempt in range(max(1, attempts)):
-        if attempt:
-            time.sleep(0.8 * attempt)
-        try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
-                data = json.loads(resp.read().decode())
-            text = data["choices"][0]["message"]["content"]
-        except urllib.error.HTTPError as exc:
-            error, status = _http_cause(exc), exc.code
-            if 400 <= exc.code < 500 and exc.code != 429:
-                break
-            continue
-        except (TimeoutError, OSError) as exc:  # URLError is an OSError
-            reason = getattr(exc, "reason", exc)
-            error, status = (f"timeout: {reason}" if "timed out" in str(reason).lower()
-                             or isinstance(exc, TimeoutError) else f"transport: {reason}"), None
-            continue
-        except (KeyError, IndexError, TypeError, json.JSONDecodeError) as exc:
-            error, status = f"malformed response: {type(exc).__name__}", None
-            continue
-        if isinstance(text, str) and text.strip():
-            _last_error = None
-            return ChatResult(model=model, text=text)
-        error, status = "empty reply", None
-    return _fail(model, error, status)
+    return llm.complete(model, [{"role": "user", "content": content}], system=system,
+                        base=base, key=key, timeout=timeout, attempts=attempts)
 
 
 def _chat(base: str, key: str, model: str, system: str, content: list[dict],
           timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS) -> str | None:
-    """The reply text, or None. Callers that need the cause read last_error()
-    or call _chat_result directly."""
+    """The reply text, or None; the cause of a None is in last_error()."""
     return _chat_result(base, key, model, system, content, timeout, attempts).text
 
 

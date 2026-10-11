@@ -120,7 +120,7 @@ Nothing in `server/` reaches AWS until you re-build. Two deployables:
 
 - **API** — a zip of `server/api/` (`handler.py`).
 - **Worker** — a Docker image built from `server/Dockerfile`, which copies
-  `api/handler.py process.py deepseek.py` plus `vendor/barra` (barra source).
+  `api/*.py process.py report.py vision.py` plus `vendor/barra` (barra source).
 
 ```bash
 cd server
@@ -129,12 +129,12 @@ sam build
 sam deploy            # samconfig.toml already holds stack/region/ECR
 ```
 
-- `process.py` / `deepseek.py` / barra changed → the worker image re-builds and
+- `process.py` / `report.py` / `vision.py` / barra changed → the worker image re-builds and
   re-uploads (the big, slow one).
 - `api/handler.py` changed → that alone is in the API zip, but `sam build`
   rebuilds both; `sam deploy` uploads whatever changed.
-- DeepSeek key changed → pass it as a parameter. `server/deploy.sh` already does
-  this: `sam deploy --parameter-overrides "DeepSeekApiKey=${DEEPSEEK_API_KEY:-}"`.
+- nan.builders key changed → update the secret `barrapp/nan-api-key`
+  (`{"NAN_API_KEY": "..."}`); every model call reads it through `api/llm.py`.
   Or edit it in the Lambda console (Environment variables) and redeploy.
 
 ## 6.1 Two worker-image blockers (fixed and deployed)

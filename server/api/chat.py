@@ -1,43 +1,42 @@
-"""nan.builder chat for the objectives intake.
+"""nan.builders chat for the objectives intake.
 
-OpenAI-compatible: the phone sends the conversation, this module calls
-`{NAN_BASE_URL}/chat/completions` with model `qwen3.8-flash`, and parses a
-trailing JSON block out of the reply so the app can update the profile and the
-goals. The key is server-side only; it never ships in the app.
+The phone sends the conversation; this module asks `qwen3.8-flash` through the
+one model client (llm.py) and parses a trailing JSON block out of the reply so
+the app can update the profile and the goals. The key is server-side only; it
+never ships in the app.
 """
 from __future__ import annotations
 
 import json
 import os
-import urllib.error
-import urllib.request
 
-try:  # worker/task root and the API package both put this module beside chat
-    from nan_secret import get_nan_key
+try:  # worker/task root and the API package both put llm beside chat
+    import llm
 except ImportError:  # local dev imports `api.chat` with server/ on the path
-    from api.nan_secret import get_nan_key
+    from api import llm
 
-NAN_BASE_URL = os.environ.get("NAN_BASE_URL", "").rstrip("/")
 NAN_MODEL = os.environ.get("NAN_MODEL", "qwen3.8-flash")
 
 # The Lambda that runs this has a 60s budget; the model usually answers in a
 # few seconds, so leave headroom for the response to travel back.
 REQUEST_TIMEOUT = 45
 
-SYSTEM = """You are barrapp's onboarding assistant. Talk with the user to learn their
-training objectives so the app can set up their profile.
+SYSTEM = """Eres el asistente de bienvenida de barrapp. Habla con la persona para
+conocer sus objetivos de entrenamiento y así configurar su perfil. Responde
+siempre en español de España.
 
-Rules:
-- Ask ONE question at a time. Warm, short, concrete.
-- Cover, in order: their name, their age, how often they train, and what they
-  most want to achieve (a strength goal, a skill, a target rep count).
-- Do not invent anything. If they have not said it, ask again.
-- When you have everything, end your reply with ONE JSON object on its own
-  line, plain JSON, no markdown fences, exactly these keys:
+Reglas:
+- Haz UNA pregunta cada vez. Cercano, breve, concreto.
+- Cubre, en este orden: su nombre, su edad, cada cuánto entrena y qué quiere
+  conseguir sobre todo (un objetivo de fuerza, una habilidad, un número de reps).
+- No inventes nada. Si no lo ha dicho, vuelve a preguntar.
+- Cuando lo tengas todo, termina tu respuesta con UN objeto JSON en su propia
+  línea, JSON plano, sin bloques de código, exactamente con estas claves:
   {"name": "...", "age": 0, "activity": "new|occasional|regular|daily",
    "goal": "...", "focusExercise": "pull_up|push_up|squat|dip|muscle_up|handstand|planche|front_lever|back_lever|human_flag|unknown"}
-- Only output that JSON block once, at the very end, when you have all of it.
-  Do not output it before then, and do not output anything after it.
+- Escribe ese JSON una sola vez, al final, cuando lo tengas todo. Ni antes,
+  ni nada después. Los valores de "activity" y "focusExercise" van tal cual
+  (en inglés): son códigos que lee la app.
 """
 
 # Keys the app actually reads out of the trailing JSON block.
@@ -46,36 +45,15 @@ GOAL_KEYS = ("name", "age", "activity", "goal", "focusExercise")
 
 def chat(messages: list[dict]) -> dict:
     """Return {'reply': str, 'goals': dict | None} for one conversation turn."""
-    nan_api_key = get_nan_key()
-    if not nan_api_key or not NAN_BASE_URL:
+    if llm.config() is None:
         return {"reply": _offline_first_question(), "goals": None}
 
-    body = json.dumps(
-        {
-            "model": NAN_MODEL,
-            "messages": [{"role": "system", "content": SYSTEM}, *messages],
-            "temperature": 0.4,
-        }
-    ).encode()
-    req = urllib.request.Request(
-        f"{NAN_BASE_URL}/chat/completions",
-        data=body,
-        headers={
-            "Authorization": f"Bearer {nan_api_key}",
-            "Content-Type": "application/json",
-            # The provider's edge blocks requests whose client looks like a
-            # script; without this the model call comes back HTTP 403.
-            "User-Agent": "barrapp-objectives/1.0",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode())
-        content = data["choices"][0]["message"]["content"]
-    except (urllib.error.URLError, KeyError, json.JSONDecodeError, TimeoutError) as exc:
-        return {"reply": f"I could not reach the objectives service right now. ({exc})",
-                "goals": None}
+    result = llm.complete(NAN_MODEL, messages, system=SYSTEM, temperature=0.4,
+                          timeout=REQUEST_TIMEOUT)
+    if not result.ok:
+        return {"reply": "Ahora mismo no puedo conectar con el asistente. "
+                         "Inténtalo de nuevo en un momento.", "goals": None}
+    content = result.text
 
     goals, reply = _extract_goals(content)
     return {"reply": reply, "goals": goals}
@@ -108,7 +86,7 @@ def _offline_first_question() -> str:
     """Used when the key/base URL are not configured, so the screen still works
     in local development and the empty state is not a dead end."""
     return (
-        "Hi, I'm barrapp. Tell me what you'd like to get out of training and I'll "
-        "set up your profile — a goal to aim for, and how often you train. "
-        "What's your name?"
+        "Hola, soy barrapp. Cuéntame qué quieres conseguir entrenando y "
+        "preparo tu perfil: un objetivo al que apuntar y cada cuánto entrenas. "
+        "¿Cómo te llamas?"
     )

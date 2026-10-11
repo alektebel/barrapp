@@ -37,7 +37,7 @@ COPY vendor/barra /opt/barra
 # The whole api/ folder rather than a list: the list is what went stale twice
 # (auth on 09-12, referral on 10-11). tests/test_deploy_contract.py checks the
 # worker's import closure against this file.
-COPY api/*.py process.py deepseek.py vision.py ${LAMBDA_TASK_ROOT}/
+COPY api/*.py process.py report.py vision.py ${LAMBDA_TASK_ROOT}/
 
 # Last, so a new commit does not invalidate the pip layer. Read by
 # barra.provenance: every trace names the commit that produced it.
