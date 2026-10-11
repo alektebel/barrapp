@@ -77,21 +77,43 @@ def _num(value) -> str:
 
 
 def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
-    """Measure one clip and return the payload the phone renders.
+    """Measure one clip, then add the vision pass: the payload the phone renders.
 
-    `on_stage`, when given, receives a short human phrase at each step that
-    can take time, for the phone's work list. `pose`, when given, is supplied to
-    `analyze_clip` unchanged; the debugging tool uses it to reuse the keypoint
-    cache while still running the production post-analysis path.
-
-    `exercise` may be omitted or "auto": the clip is then classified from its
-    own geometry rather than from what the athlete remembered to tap.
-
-    Every job carries a trace id. It goes into the payload, so the phone can
-    show it; into a JSON trace on disk, so the decision chain can be replayed
-    with `barra explain --replay <id>`; and into the log line, so a user report
-    maps to a specific run of a specific build.
+    The two halves are `measure_job` and `add_vision`; the worker calls them
+    separately so the measurement reaches the phone without waiting for the
+    vision models (see tests/test_fast_result.py). Local tools call this.
     """
+    report = measure_job(job, video_path, on_stage=on_stage, pose=pose,
+                         vision_label=job.get("visionLabel"))
+    return add_vision(job, video_path, report)
+
+
+# The trace of a measured job, kept until its vision pass appends to it. Per
+# container: a worker instance runs one job at a time.
+_TRACES: dict[str, object] = {}
+
+
+def _resolve_vote(vote):
+    """The vision vote for fusion: a label, or a callable that produces one
+    (the worker's localization, running alongside pose). A vote that fails is
+    no vote - localization never fails a job."""
+    if not callable(vote):
+        return vote
+    try:
+        return vote()
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _vision_configured() -> bool:
+    try:
+        from vision import _config
+        return _config() is not None
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _stager(on_stage):
     def _stage(name: str) -> None:
         """A named heartbeat for the phone: the work list shows where the clip
         actually is, instead of a single undifferentiated 'processing'."""
@@ -101,7 +123,46 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
             on_stage(name)
         except Exception:  # noqa: BLE001 - a heartbeat never fails a job
             pass
+    return _stage
 
+
+def _finish(trace, report: dict, job: dict, requested: str) -> dict:
+    """Spanish, sentinel-checked, traced: what is written for the phone."""
+    if trace is None:
+        return localize_payload(report)
+    report["traceId"] = trace.id
+    report["provenance"] = _provenance()
+    trace.stage("payload")
+    report = localize_payload(report)
+    sentinel.watch(trace, "payload", {"payload": report},
+                   inputs={"job": job.get("id"), "requested": requested})
+    if isinstance(report["provenance"], dict):
+        report["provenance"]["poseBackendUsed"] = report.get("poseBackend")
+    _write_trace(trace, str(job.get("id") or ""))
+    return report
+
+
+def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
+                vision_label=None) -> dict:
+    """The measurement and its report - everything the phone needs except the
+    advisory vision note, which `add_vision` adds afterwards.
+
+    `on_stage`, when given, receives a short human phrase at each step that
+    can take time, for the phone's work list. `pose`, when given, is supplied to
+    `analyze_clip` unchanged; the debugging tool uses it to reuse the keypoint
+    cache while still running the production post-analysis path.
+    `vision_label` is the vision model's name for the movement, or a callable
+    that returns it when fusion asks (the worker locates in parallel).
+
+    `exercise` may be omitted or "auto": the clip is then classified from its
+    own geometry rather than from what the athlete remembered to tap.
+
+    Every job carries a trace id. It goes into the payload, so the phone can
+    show it; into a JSON trace, so the decision chain can be replayed with
+    `barra explain --replay <id>`; and into the log line, so a user report
+    maps to a specific run of a specific build.
+    """
+    _stage = _stager(on_stage)
     _stage("opening the clip")
     requested = (job.get("exercise") or "auto").strip() or "auto"
     trace = _new_trace(job, video_path, requested)
@@ -116,7 +177,7 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
                            declared_bin=job.get("view"),
                            variant=job.get("variant"),
                            pose=pose,
-                           vision_label=job.get("visionLabel"))
+                           vision_label=vision_label)
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -129,68 +190,80 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
     for key, value in metrics.items():
         if key not in prose:
             report[key] = value
+    report["visionStatus"] = "pending" if _vision_configured() else "skipped"
 
-    # The raw take is not the technique. Cut the working set out of the clip
-    # and still every rep's turning point, then let a vision model - when one
-    # is configured - study those artifacts and say what the geometry missed.
-    # Both steps are best-effort; without a vision key nothing changes.
-    artifacts_root = Path(os.environ.get(
-        "BARRA_TRACE_DIR", str(BARRA_ROOT / "out" / "traces")))
-    artifacts = technique_artifacts(video_path, report, artifacts_root,
-                                    str(report.get("traceId") or job.get("id") or "job"))
-    if trace is not None and (artifacts.clip or artifacts.stills):
-        # The selected timestamps, reps and phases, so the request the model
-        # saw can be rebuilt from the trace.
-        trace.step("technique artifacts", **artifacts.as_trace_data())
-    # The vision model is handed the measured report - movement, variant,
-    # boundaries, per-rep checks and what could not be checked - not just the
-    # pictures. Its observations come back validated against that report and
-    # are kept as advisory, separately sourced rows: they never overwrite the
-    # geometric movement, the count or a score.
-    note = technique_note(artifacts, report)
-    if note is not None:
-        # The report owns headline/narrative/nextSession; the vision model's
-        # own prose is kept beside it, never over it (a real job's headline
-        # became the model's paragraph about stills on 2026-10-11).
-        prose_keys = ("headline", "narrative", "nextSession")
-        report["visionNote"] = {k: note[k] for k in prose_keys if note.get(k)}
-        report.update({k: v for k, v in note.items() if k not in prose_keys})
-        if trace is not None:
-            trace.step("vision observations",
-                       kept=len(note.get("visionObservations") or []),
-                       validation=note.get("visionValidation"),
-                       movement=note.get("visionMovement"))
-            if (note.get("visionMovement") or {}).get("review"):
-                trace.note("vision disagrees with the geometric movement label",
-                           geometry=report.get("exercise"),
-                           vision=note["visionMovement"].get("label"))
-        # Key moment 2, second opinion: the same stills, a different model,
-        # one word. A disagreement is worth more than either agreement.
-        second = technique_second_opinion(artifacts)
-        if second is not None:
-            report["visionVerdict"] = second
-            if trace is not None:
-                trace.step("vision second opinion", verdict=second)
-    elif trace is not None and artifacts.stills:
-        from vision import skip_reason
-        trace.step("vision pass skipped", reason=skip_reason())
-
+    report = _finish(trace, report, job, requested)
     if trace is not None:
-        report["traceId"] = trace.id
-        report["provenance"] = _provenance()
-        trace.stage("payload")
-        report = localize_payload(report)
-        sentinel.watch(trace, "payload", {"payload": report},
-                       inputs={"job": job.get("id"), "requested": requested})
-        if isinstance(report["provenance"], dict):
-            report["provenance"]["poseBackendUsed"] = report.get("poseBackend")
-        _write_trace(trace, str(job.get("id") or ""))
+        _TRACES[trace.id] = (trace, requested)
         print(f"[barra] job={job.get('id')} trace={trace.id} "
               f"exercise={report.get('exercise')} reps={report.get('n_reps')} "
               f"score={report.get('sessionScore')} "
               f"rejections={len(trace.rejections)} errors={len(trace.errors)}",
               flush=True)
     return report
+
+
+def add_vision(job: dict, video_path: Path, report: dict) -> dict:
+    """The advisory vision pass on a measured payload: technique note and
+    second opinion. Never changes the movement, the count or a score, and
+    never leaves `visionStatus` pending: done, skipped or failed."""
+    report = dict(report)
+    trace, requested = _TRACES.pop(str(report.get("traceId") or ""), (None, "auto"))
+    if report.get("visionStatus") == "skipped":
+        return report
+    try:
+        # The raw take is not the technique. Cut the working set out of the clip
+        # and still every rep's turning point, then let a vision model study
+        # those artifacts and say what the geometry missed.
+        artifacts_root = Path(os.environ.get(
+            "BARRA_TRACE_DIR", str(BARRA_ROOT / "out" / "traces")))
+        artifacts = technique_artifacts(video_path, report, artifacts_root,
+                                        str(report.get("traceId") or job.get("id") or "job"))
+        if trace is not None:
+            trace.stage("vision")
+            if artifacts.clip or artifacts.stills:
+                # The selected timestamps, reps and phases, so the request the
+                # model saw can be rebuilt from the trace.
+                trace.step("technique artifacts", **artifacts.as_trace_data())
+        # The vision model is handed the measured report - movement, variant,
+        # boundaries, per-rep checks and what could not be checked - not just
+        # the pictures. Its observations come back validated against that
+        # report and are kept as advisory, separately sourced rows.
+        note = technique_note(artifacts, report)
+        if note is not None:
+            # The report owns headline/narrative/nextSession; the vision
+            # model's own prose is kept beside it, never over it (a real job's
+            # headline became the model's paragraph about stills on 2026-10-11).
+            prose_keys = ("headline", "narrative", "nextSession")
+            report["visionNote"] = {k: note[k] for k in prose_keys if note.get(k)}
+            report.update({k: v for k, v in note.items() if k not in prose_keys})
+            if trace is not None:
+                trace.step("vision observations",
+                           kept=len(note.get("visionObservations") or []),
+                           validation=note.get("visionValidation"),
+                           movement=note.get("visionMovement"))
+                if (note.get("visionMovement") or {}).get("review"):
+                    trace.note("vision disagrees with the geometric movement label",
+                               geometry=report.get("exercise"),
+                               vision=note["visionMovement"].get("label"))
+            # Key moment 2, second opinion: the same stills, a different
+            # model, one word. A disagreement is worth more than either.
+            second = technique_second_opinion(artifacts)
+            if second is not None:
+                report["visionVerdict"] = second
+                if trace is not None:
+                    trace.step("vision second opinion", verdict=second)
+            report["visionStatus"] = "done"
+        else:
+            if trace is not None and artifacts.stills:
+                from vision import skip_reason
+                trace.step("vision pass skipped", reason=skip_reason())
+            report["visionStatus"] = "skipped"
+    except Exception as exc:  # noqa: BLE001 - advisory: the measurement stands
+        report["visionStatus"] = "failed"
+        if trace is not None:
+            trace.error("vision pass failed", reason=str(exc)[:200])
+    return _finish(trace, report, job, requested)
 
 
 def _new_trace(job: dict, video_path: Path, requested: str):
@@ -539,6 +612,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             # locate_exercise already paid for a multimodal read of the clip;
             # reuse that name as the vision vote rather than making geometry
             # and the tiny pose model decide alone (0.556 → 0.817 measured).
+            # A callable vote is the worker's localization, started alongside
+            # pose; it is waited for here, where it is needed.
+            vision_label = _resolve_vote(vision_label)
             fusion = fuse_detection(
                 detected,
                 (model_out or {}).get("classification"),

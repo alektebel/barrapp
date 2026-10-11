@@ -706,6 +706,15 @@ def _spanish_error(text: str) -> str:
     return localize_text(text)
 
 
+def _write_result(job_id: str, result: dict) -> None:
+    table.update_item(
+        Key={"id": job_id},
+        UpdateExpression="SET #s = :s, #r = :r",
+        ExpressionAttributeNames={"#s": "status", "#r": "result"},
+        ExpressionAttributeValues={":s": "done", ":r": _to_ddb(result)},
+    )
+
+
 def worker(event, _context):
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
@@ -732,7 +741,7 @@ def worker(event, _context):
     try:
         # Inside the try on purpose: a broken image (missing module, bad
         # dependency) must fail the job, not crash before the first update.
-        from process import process_job
+        import process  # noqa: F401
 
         def _stage(name: str) -> None:
             _set_stage(job_id, owner, name)
@@ -749,29 +758,44 @@ def worker(event, _context):
             ExpressionAttributeValues={":s": "processing"},
         )
 
-        # Locate the exercise before anything is measured, the way the offline
-        # labeller does it, and store only that window. The measurement itself
-        # still runs on the FULL clip: every reported timestamp is in the
-        # source video's time, and the phone seeks its own local copy with
-        # them, so shortening the video the geometry sees would shift every
-        # offset on the client. Localization decides what is kept, not what is
-        # measured.
-        localization = None
-        vision_label = None
-        _stage("locating the exercise")
-        try:
-            from vision import locate_exercise
+        # Locate the exercise ALONGSIDE the pose, not before it: the vision call
+        # took 57 s of a 375 s job on 2026-10-11, and pose (128 s) does not need
+        # it. Fusion asks for the vote when it gets there, by which time the
+        # call has long finished. The measurement still runs on the FULL clip:
+        # every reported timestamp is in the source video's time, and the
+        # phone seeks its own local copy with them. Localization decides what
+        # is kept, not what is measured.
+        from concurrent.futures import ThreadPoolExecutor
+        from process import add_vision, measure_job
 
-            located = locate_exercise(dest, Path("/tmp") / f"{job_id}-locate",
-                                      item.get("exercise"))
-        except Exception:  # noqa: BLE001 - localization never fails a job
+        _stage("locating the exercise")
+        pool = ThreadPoolExecutor(max_workers=1)
+
+        def _locate():
+            try:
+                from vision import locate_exercise
+                return locate_exercise(dest, Path("/tmp") / f"{job_id}-locate",
+                                       item.get("exercise"))
+            except Exception:  # noqa: BLE001 - localization never fails a job
+                return None
+
+        located_future = pool.submit(_locate)
+
+        def _vision_vote():
+            located = located_future.result(timeout=300)
+            label = (located or {}).get("exercise") or None
+            if label and str(label).lower() in ("none", "unknown", ""):
+                return None
+            return label
+
+        result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote)
+        try:
+            located = located_future.result(timeout=300)
+        except Exception:  # noqa: BLE001
             located = None
-        if located:
-            # Keep the name even when the window is not usable for trimming —
-            # fusion still wants the vision vote on auto-detect.
-            vision_label = located.get("exercise") or None
-            if vision_label and str(vision_label).lower() in ("none", "unknown", ""):
-                vision_label = None
+        pool.shutdown(wait=False)
+
+        localization = None
         if located and located.get("usable"):
             loc = dict(located)
             loc["source"] = "vision"
@@ -779,13 +803,6 @@ def worker(event, _context):
                 dest, owner, job_id, located["startS"], located["endS"],
                 located.get("durationS"))
             localization = loc
-
-        if vision_label:
-            item = dict(item)
-            item["visionLabel"] = vision_label
-
-        result = process_job(item, dest, on_stage=_stage)
-
         # Vision unavailable or it found no window: fall back to the geometric
         # working set the measurement already computed.
         if localization is None:
@@ -805,14 +822,19 @@ def worker(event, _context):
         else:
             print("[barra] localization skipped; storing the raw clip", flush=True)
 
-        table.update_item(
-            Key={"id": job_id},
-            UpdateExpression="SET #s = :s, #r = :r",
-            ExpressionAttributeNames={"#s": "status", "#r": "result"},
-            ExpressionAttributeValues={":s": "done", ":r": _to_ddb(result)},
-        )
+        # The measurement reaches the phone now; the advisory vision note
+        # follows (visionStatus pending -> done/skipped/failed).
+        _write_result(job_id, result)
         uploads.record(job_id, owner, "done",
                        f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
+        if result.get("visionStatus") == "pending":
+            try:
+                result = add_vision(item, dest, result)
+            except Exception as exc:  # noqa: BLE001 - the measurement stands
+                result = {**result, "visionStatus": "failed"}
+                print(f"[barra] vision pass failed: {exc}", flush=True)
+            _write_result(job_id, result)
+            uploads.record(job_id, owner, "vision", result.get("visionStatus", ""))
         uploads.trim(job_id)
     except Exception as exc:  # noqa: BLE001
         _fail(exc)
