@@ -229,7 +229,18 @@ def add_vision(job: dict, video_path: Path, report: dict) -> dict:
         # boundaries, per-rep checks and what could not be checked - not just
         # the pictures. Its observations come back validated against that
         # report and are kept as advisory, separately sourced rows.
-        note = technique_note(artifacts, report)
+        # The note and the second opinion are independent calls (124 s and
+        # 21 s measured on 2026-10-11): run them at the same time. A second
+        # opinion is only kept beside a note, as before.
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            note_f = pool.submit(technique_note, artifacts, report)
+            second_f = pool.submit(technique_second_opinion, artifacts)
+            note = note_f.result()
+            try:
+                second = second_f.result()
+            except Exception:  # noqa: BLE001 - a second opinion never sinks the note
+                second = None
         if note is not None:
             # The report owns headline/narrative/nextSession; the vision
             # model's own prose is kept beside it, never over it (a real job's
@@ -248,7 +259,6 @@ def add_vision(job: dict, video_path: Path, report: dict) -> dict:
                                vision=note["visionMovement"].get("label"))
             # Key moment 2, second opinion: the same stills, a different
             # model, one word. A disagreement is worth more than either.
-            second = technique_second_opinion(artifacts)
             if second is not None:
                 report["visionVerdict"] = second
                 if trace is not None:

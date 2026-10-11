@@ -113,6 +113,37 @@ class Split(unittest.TestCase):
         self.assertEqual(out["visionStatus"], "done")
 
 
+class VisionInParallel(Split):
+    def test_note_and_second_opinion_overlap(self):
+        """Independent calls (124 s + 21 s measured): neither waits for the other."""
+        both = threading.Barrier(2, timeout=2)
+
+        def note(*a, **k):
+            both.wait()  # deadlocks (BrokenBarrierError) if run one after the other
+            return {"visionObservations": []}
+
+        def second(*a, **k):
+            both.wait()
+            return "clean"
+
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            with mock.patch.object(process, "technique_note", side_effect=note), \
+                    mock.patch.object(process, "technique_second_opinion", side_effect=second):
+                return process.add_vision({"id": "j"}, Path("/tmp/x.mp4"), out)
+        out = self.run_with(go)
+        self.assertEqual(out["visionStatus"], "done")
+        self.assertEqual(out["visionVerdict"], "clean")
+
+    def test_a_second_opinion_without_a_note_is_not_kept(self):
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            return process.add_vision({"id": "j"}, Path("/tmp/x.mp4"), out)
+        out = self.run_with(go, note=None)
+        self.assertNotIn("visionVerdict", out)
+        self.assertEqual(out["visionStatus"], "skipped")
+
+
 class LazyVisionVote(unittest.TestCase):
     def test_a_callable_vote_is_resolved_only_when_asked(self):
         calls = []
@@ -168,6 +199,26 @@ class Worker(unittest.TestCase):
         # When the vision pass started, the phone could already read "done".
         self.assertEqual(order[1], ("vision", ("done", "pending")))
         self.assertEqual(self.statuses()[-1], ("done", "done"))
+
+    def test_the_result_is_written_before_the_clip_is_cut(self):
+        """Cutting and re-uploading the stored clip took ~44 s on job
+        31103ccedfc3, all of it before the phone could read the result."""
+        order = []
+        payload = {**measured(), "visionStatus": "skipped", "traceId": "t",
+                   "trim": {"startS": 1.0, "endS": 8.0}}
+        self.table.update_item.side_effect = lambda **kw: order.append(
+            ("write", kw.get("ExpressionAttributeValues", {}).get(":s")))
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=dict(payload)), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r), \
+                mock.patch.object(self.h, "_store_trimmed_clip",
+                                  side_effect=lambda *a, **k: order.append(("cut",)) or True):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        first_done = order.index(("write", "done"))
+        self.assertLess(first_done, order.index(("cut",)))
+        # ...and the localization it produced is written too.
+        final = self.table.update_item.call_args.kwargs["ExpressionAttributeValues"][":r"]
+        self.assertEqual(final["localization"]["source"], "geometry")
 
     def test_localization_runs_while_the_pose_runs(self):
         started = threading.Event()

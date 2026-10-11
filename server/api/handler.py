@@ -789,12 +789,19 @@ def worker(event, _context):
             return label
 
         result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote)
+
+        # The measurement reaches the phone now. Cutting and re-uploading the
+        # stored clip (~44 s on 2026-10-11) and the advisory vision note come
+        # after it (visionStatus pending -> done/skipped/failed).
+        _write_result(job_id, result)
+        uploads.record(job_id, owner, "done",
+                       f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
+
         try:
             located = located_future.result(timeout=300)
         except Exception:  # noqa: BLE001
             located = None
         pool.shutdown(wait=False)
-
         localization = None
         if located and located.get("usable"):
             loc = dict(located)
@@ -822,19 +829,14 @@ def worker(event, _context):
         else:
             print("[barra] localization skipped; storing the raw clip", flush=True)
 
-        # The measurement reaches the phone now; the advisory vision note
-        # follows (visionStatus pending -> done/skipped/failed).
-        _write_result(job_id, result)
-        uploads.record(job_id, owner, "done",
-                       f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
         if result.get("visionStatus") == "pending":
             try:
                 result = add_vision(item, dest, result)
             except Exception as exc:  # noqa: BLE001 - the measurement stands
                 result = {**result, "visionStatus": "failed"}
                 print(f"[barra] vision pass failed: {exc}", flush=True)
-            _write_result(job_id, result)
             uploads.record(job_id, owner, "vision", result.get("visionStatus", ""))
+        _write_result(job_id, result)
         uploads.trim(job_id)
     except Exception as exc:  # noqa: BLE001
         _fail(exc)
