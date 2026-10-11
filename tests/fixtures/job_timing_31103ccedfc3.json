@@ -1,0 +1,1828 @@
+{
+ "jobId": "31103ccedfc3",
+ "uploads": [
+  {
+   "at": "2026-10-11T16:16:06Z",
+   "event": "job-created",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:06Z",
+   "event": "upload-started",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:06Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:13Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:19Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:26Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:32Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:38Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:44Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:50Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:16:55Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:17:00Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:17:05Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:17:12Z",
+   "event": "part-presigned",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:17:15Z",
+   "event": "upload-complete",
+   "detail": ""
+  },
+  {
+   "at": "2026-10-11T16:17:15Z",
+   "event": "submitted",
+   "detail": "handed to the worker"
+  },
+  {
+   "at": "2026-10-11T16:17:17Z",
+   "event": "stage",
+   "detail": "receiving the clip"
+  },
+  {
+   "at": "2026-10-11T16:17:17Z",
+   "event": "stage",
+   "detail": "locating the exercise"
+  },
+  {
+   "at": "2026-10-11T16:17:17Z",
+   "event": "stage",
+   "detail": "opening the clip"
+  },
+  {
+   "at": "2026-10-11T16:17:20Z",
+   "event": "stage",
+   "detail": "estimating the pose"
+  },
+  {
+   "at": "2026-10-11T16:19:32Z",
+   "event": "stage",
+   "detail": "recognising the movement"
+  },
+  {
+   "at": "2026-10-11T16:19:33Z",
+   "event": "stage",
+   "detail": "finding the reps"
+  },
+  {
+   "at": "2026-10-11T16:19:33Z",
+   "event": "stage",
+   "detail": "scoring the reps"
+  },
+  {
+   "at": "2026-10-11T16:20:37Z",
+   "event": "done",
+   "detail": "push_up, 27 rep(s)"
+  },
+  {
+   "at": "2026-10-11T16:21:45Z",
+   "event": "vision",
+   "detail": "done"
+  }
+ ],
+ "trace": {
+  "traceId": "261011-161717-155e17",
+  "durationMs": 267442,
+  "entries": [
+   {
+    "stage": "job",
+    "kind": "step",
+    "atMs": 0,
+    "message": "entered job"
+   },
+   {
+    "stage": "job",
+    "kind": "step",
+    "atMs": 1122,
+    "message": "provenance"
+   },
+   {
+    "stage": "probe",
+    "kind": "step",
+    "atMs": 1122,
+    "message": "entered probe"
+   },
+   {
+    "stage": "probe",
+    "kind": "step",
+    "atMs": 3119,
+    "message": "container"
+   },
+   {
+    "stage": "probe",
+    "kind": "sentinel",
+    "atMs": 3119,
+    "message": "probe: ok"
+   },
+   {
+    "stage": "probe",
+    "kind": "step",
+    "atMs": 134939,
+    "message": "pose backend"
+   },
+   {
+    "stage": "probe",
+    "kind": "step",
+    "atMs": 134939,
+    "message": "keypoints"
+   },
+   {
+    "stage": "probe",
+    "kind": "sentinel",
+    "atMs": 134940,
+    "message": "pose: ok"
+   },
+   {
+    "stage": "classify",
+    "kind": "step",
+    "atMs": 135011,
+    "message": "entered classify"
+   },
+   {
+    "stage": "classify",
+    "kind": "step",
+    "atMs": 135129,
+    "message": "geometry measured"
+   },
+   {
+    "stage": "classify",
+    "kind": "step",
+    "atMs": 135129,
+    "message": "gates"
+   },
+   {
+    "stage": "classify",
+    "kind": "decision",
+    "atMs": 135129,
+    "message": "nothing hangs below the hands, so they are on the floor"
+   },
+   {
+    "stage": "classify",
+    "kind": "sentinel",
+    "atMs": 135129,
+    "message": "detection: ok"
+   },
+   {
+    "stage": "model",
+    "kind": "step",
+    "atMs": 135129,
+    "message": "entered model"
+   },
+   {
+    "stage": "fusion",
+    "kind": "step",
+    "atMs": 135283,
+    "message": "entered fusion"
+   },
+   {
+    "stage": "fusion",
+    "kind": "step",
+    "atMs": 135284,
+    "message": "fusion"
+   },
+   {
+    "stage": "fusion",
+    "kind": "sentinel",
+    "atMs": 135284,
+    "message": "fusion: ok"
+   },
+   {
+    "stage": "fusion",
+    "kind": "step",
+    "atMs": 135284,
+    "message": "variant"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135296,
+    "message": "entered segment"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135348,
+    "message": "signal built"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135377,
+    "message": "trimmed to the active spans"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135377,
+    "message": "amplitude"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135378,
+    "message": "candidate turnarounds"
+   },
+   {
+    "stage": "segment",
+    "kind": "reject",
+    "atMs": 135378,
+    "message": "mostly interpolated frames"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135379,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135380,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135381,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135382,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135383,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135384,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135385,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135386,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135387,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135388,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135389,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135390,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135391,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135392,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135393,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135394,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135396,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135396,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135397,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135398,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135399,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135400,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135401,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135402,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135403,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135404,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "decision",
+    "atMs": 135405,
+    "message": "accepted"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135405,
+    "message": "segmentation complete"
+   },
+   {
+    "stage": "segment",
+    "kind": "sentinel",
+    "atMs": 135405,
+    "message": "segments: ok"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135409,
+    "message": "keypoint timesteps"
+   },
+   {
+    "stage": "segment",
+    "kind": "step",
+    "atMs": 135413,
+    "message": "viewpoint"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135429,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135429,
+    "message": "measured r1"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135429,
+    "message": "pose quality r1"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135429,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135430,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135430,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135430,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135435,
+    "message": "failure classification r1"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135438,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135438,
+    "message": "measured r2"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135438,
+    "message": "pose quality r2"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135438,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135438,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135438,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135439,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135442,
+    "message": "failure classification r2"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135445,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135445,
+    "message": "measured r3"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135445,
+    "message": "pose quality r3"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135445,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135445,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135445,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135445,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135450,
+    "message": "failure classification r3"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135452,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135452,
+    "message": "measured r4"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135452,
+    "message": "pose quality r4"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135452,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135453,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135453,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135453,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135457,
+    "message": "failure classification r4"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135460,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135460,
+    "message": "measured r5"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135460,
+    "message": "pose quality r5"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135460,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135460,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135460,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135460,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135464,
+    "message": "failure classification r5"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135466,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135466,
+    "message": "measured r6"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135467,
+    "message": "pose quality r6"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135467,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135467,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135467,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135467,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135471,
+    "message": "failure classification r6"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135474,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135474,
+    "message": "measured r7"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135474,
+    "message": "pose quality r7"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135474,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135475,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135475,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135475,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135479,
+    "message": "failure classification r7"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135482,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135482,
+    "message": "measured r8"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135482,
+    "message": "pose quality r8"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135482,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135482,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135483,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135483,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135487,
+    "message": "failure classification r8"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135489,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135489,
+    "message": "measured r9"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135489,
+    "message": "pose quality r9"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135489,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135490,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135490,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135490,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135493,
+    "message": "failure classification r9"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135496,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135496,
+    "message": "measured r10"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135496,
+    "message": "pose quality r10"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135496,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135497,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135497,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135497,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135501,
+    "message": "failure classification r10"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135503,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135503,
+    "message": "measured r11"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135503,
+    "message": "pose quality r11"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135503,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135503,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135504,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135504,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135507,
+    "message": "failure classification r11"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135510,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135510,
+    "message": "measured r12"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135510,
+    "message": "pose quality r12"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135510,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135511,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135511,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135511,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135514,
+    "message": "failure classification r12"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135517,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135517,
+    "message": "measured r13"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135517,
+    "message": "pose quality r13"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135517,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135518,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135518,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135518,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135522,
+    "message": "failure classification r13"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135525,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135525,
+    "message": "measured r14"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135525,
+    "message": "pose quality r14"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135525,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135525,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135525,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135525,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135529,
+    "message": "failure classification r14"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135532,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135532,
+    "message": "measured r15"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135532,
+    "message": "pose quality r15"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135532,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135532,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135532,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135532,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135536,
+    "message": "failure classification r15"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135539,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135539,
+    "message": "measured r16"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135539,
+    "message": "pose quality r16"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135539,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135539,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135539,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135539,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135543,
+    "message": "failure classification r16"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135545,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135545,
+    "message": "measured r17"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135546,
+    "message": "pose quality r17"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135546,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135546,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135546,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135546,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135550,
+    "message": "failure classification r17"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135552,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135552,
+    "message": "measured r18"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135552,
+    "message": "pose quality r18"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135552,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135553,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135553,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135553,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135557,
+    "message": "failure classification r18"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135560,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135560,
+    "message": "measured r19"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135560,
+    "message": "pose quality r19"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135560,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135560,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135560,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135560,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135564,
+    "message": "failure classification r19"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135567,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135567,
+    "message": "measured r20"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135567,
+    "message": "pose quality r20"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135567,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135567,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135567,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135567,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135571,
+    "message": "failure classification r20"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135574,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135574,
+    "message": "measured r21"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135574,
+    "message": "pose quality r21"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135574,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135574,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135574,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135574,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135578,
+    "message": "failure classification r21"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135581,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135581,
+    "message": "measured r22"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135581,
+    "message": "pose quality r22"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135581,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135581,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135581,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135581,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135585,
+    "message": "failure classification r22"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135587,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135587,
+    "message": "measured r23"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135587,
+    "message": "pose quality r23"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135588,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135588,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135588,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135588,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135592,
+    "message": "failure classification r23"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135595,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135595,
+    "message": "measured r24"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135595,
+    "message": "pose quality r24"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135595,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135595,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135595,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135595,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135599,
+    "message": "failure classification r24"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135602,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135602,
+    "message": "measured r25"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135602,
+    "message": "pose quality r25"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135602,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135602,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135602,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135602,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135606,
+    "message": "failure classification r25"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135609,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135609,
+    "message": "measured r26"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135609,
+    "message": "pose quality r26"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135609,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135609,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135609,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135609,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135613,
+    "message": "failure classification r26"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135616,
+    "message": "entered metrics"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135616,
+    "message": "measured r27"
+   },
+   {
+    "stage": "metrics",
+    "kind": "step",
+    "atMs": 135616,
+    "message": "pose quality r27"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135616,
+    "message": "entered quality"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135616,
+    "message": "component range"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135616,
+    "message": "component smoothness"
+   },
+   {
+    "stage": "quality",
+    "kind": "decision",
+    "atMs": 135616,
+    "message": "weighted mean of the measured components, less any fault penalty"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135620,
+    "message": "failure classification r27"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135620,
+    "message": "set consistency"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135624,
+    "message": "assessment summary"
+   },
+   {
+    "stage": "quality",
+    "kind": "step",
+    "atMs": 135624,
+    "message": "primary fault"
+   },
+   {
+    "stage": "payload",
+    "kind": "step",
+    "atMs": 155931,
+    "message": "entered payload"
+   },
+   {
+    "stage": "payload",
+    "kind": "sentinel",
+    "atMs": 155941,
+    "message": "payload: VIOLATED"
+   },
+   {
+    "stage": "vision",
+    "kind": "step",
+    "atMs": 204450,
+    "message": "entered vision"
+   },
+   {
+    "stage": "vision",
+    "kind": "step",
+    "atMs": 204450,
+    "message": "technique artifacts"
+   },
+   {
+    "stage": "vision",
+    "kind": "step",
+    "atMs": 266418,
+    "message": "vision observations"
+   },
+   {
+    "stage": "vision",
+    "kind": "step",
+    "atMs": 267418,
+    "message": "vision second opinion"
+   },
+   {
+    "stage": "payload",
+    "kind": "step",
+    "atMs": 267419,
+    "message": "entered payload"
+   },
+   {
+    "stage": "payload",
+    "kind": "sentinel",
+    "atMs": 267442,
+    "message": "payload: VIOLATED"
+   }
+  ]
+ }
+}
