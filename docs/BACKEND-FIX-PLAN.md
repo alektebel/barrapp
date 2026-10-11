@@ -194,6 +194,19 @@ el corpus el informe sale del LLM en ≥ 95 % de los casos y nunca cita un
 número ausente del payload.
 
 ### Fase 3 — Todo en español (D3)
+✅ **Hecho (2026‑10‑11):** catálogo `barra/i18n.py` (plantillas inglés → español
+con `code`, números con coma, fragmentos anidados), aplicado al final de
+`process_job`. El centinela del payload marca `untranslated_text`. Los 58
+resultados reales de producción se traducen sin dejar nada sin traducir (sin
+contar la prosa antigua). La nota de visión ya no pisa el titular
+(`visionNote`) y la visión escribe en español. Movimiento no medible →
+`movement_unsupported`. Etapas con `stageCode` + `stageText`; errores de job en
+español (sweeper/reaper directamente, porque el zip de la API no lleva `barra`).
+`summary.describe` en español, con concordancia. App: tarjeta «Qué ha pasado»
+(titular, texto, motivos, «Para la próxima») en resultados y en la ficha de
+sesión; progreso por `stageCode`; etapas, notificaciones y errores del cliente
+en español; captura de pantalla del caso 0 reps revisada.
+
 1. Catálogo `barra/i18n.py`: `MESSAGES = {code: "plantilla en español {param}"}`
    y `t(code, **params)`. Locale por defecto `es`; la estructura permite
    añadir `en` más adelante sin tocar el código.
@@ -262,6 +275,12 @@ Hallazgos durante el deploy: `deploy.sh` moría en silencio con el árbol limpio
 (`set -e` + `$( [ … ] && … )`), arreglado y con test; `AlarmEmail` vacío → las
 alarmas no avisan a nadie (decisión pendiente).
 
+### ✅ Deploy 2 (Fases 2 y 3) — 2026‑10‑11
+Imagen `worker-20261011-141218` (commit `2a5db80`): *smoke* OK, `/health` 200,
+`/v1/chat` responde en español a través de `llm.py`, `BARRA_REPORT_MODEL=deepseek-v4-flash`
+y sin `DEEPSEEK_*`. Suscripción de alarmas a dratencia@gmail.com creada
+(pendiente de confirmar por email). Imagen para *rollback*: `worker-20261011-133823`.
+
 ### Fase 7 — Despliegue y verificación
 1. Árbol limpio y suite completa (Python + `testDebugUnitTest`).
 2. Anotar el digest de la imagen actual (para el *rollback*).
@@ -277,6 +296,17 @@ alarmas no avisan a nadie (decisión pendiente).
 - Un `scripts/prod_report.py` que saque esta misma tabla del §0 a demanda.
 
 ---
+
+## 2b. Conectividad de la app con la API (2026‑10‑11)
+
+- Un móvil no pudo resolver el nombre `*.execute-api.eu-west-1.amazonaws.com`
+  mientras la API respondía bien: fallo del DNS del móvil, no del backend.
+- ✅ App: `FallbackDns` (DNS del sistema → DNS‑over‑HTTPS de Cloudflare y de
+  Google por IP fija → última IP buena), con 6 tests. Mensajes en español.
+- Pendiente: **dominio propio para la API** (`api.<dominio>` con dominio
+  personalizado de API Gateway + certificado ACM, en `template.yaml`), para que
+  la app no dependa nunca del ID de API Gateway. Después, un
+  `config.json` en ese dominio para versión mínima y avisos.
 
 ## 3. Decisiones que necesito
 
