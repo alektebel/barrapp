@@ -292,10 +292,10 @@ private fun SessionSheet(
                 trace = rep.trace,
                 traceColor = bandColor(rep.band),
                 components = rep.components.map {
-                    RepComponent(it.name, (it.weight * 100).toInt(), it.value?.toInt() ?: 0)
+                    RepComponent(it.label.ifBlank { it.name }, (it.weight * 100).toInt(), it.value?.toInt() ?: 0)
                 },
                 asides = rep.asides.map {
-                    it.name.replaceFirstChar { c -> c.uppercase() } to "%.2f torso".format(it.value)
+                    it.label.ifBlank { it.name }.replaceFirstChar { c -> c.uppercase() } to "%.2f torsos".format(it.value)
                 },
                 note = rep.scoreNote,
                 checks = repChecks(rep),
@@ -315,6 +315,12 @@ private fun SessionSheet(
         },
         visionDisagrees = a.visionDisagreesOnMovement,
     )
+    // The server's own account of the session - and, on a clip with nothing
+    // counted, the only place the athlete learns why.
+    if (a.headline.isNotBlank() || a.narrative.isNotBlank() || a.blockers.isNotEmpty()) {
+        androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 16.dp))
+        com.barrapp.ui.tracker.WhatHappened(resultsData(a, state.days))
+    }
 }
 
 @Composable
@@ -450,13 +456,8 @@ private fun stagesFor(state: UiState): Pair<List<String>, Int> {
     val idx = when (active?.status) {
         WorkStore.STATUS_SENDING, WorkStore.STATUS_CONNECTING -> 0
         WorkStore.STATUS_QUEUED -> 1
-        WorkStore.STATUS_MEASURING -> when {
-            active.stage.contains("recognising", true) -> 1
-            active.stage.contains("pose", true) -> 1
-            active.stage.contains("finding", true) ||
-                active.stage.contains("scoring", true) -> 3
-            else -> 2
-        }
+        WorkStore.STATUS_MEASURING ->
+            com.barrapp.data.Stage.progressIndex(active.stageCode, active.stage)
         else -> 2
     }
     return stages to idx
@@ -467,6 +468,10 @@ private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
     val priorMean = priorScores.takeIf { it.isNotEmpty() }?.average()
     val verifiedXp = a.reps.count { it.score != null && it.complete }
     return ResultsData(
+        headline = a.headline,
+        narrative = a.narrative,
+        blockers = a.blockers,
+        nextSession = a.nextSession,
         movement = movementEs(a.exercise, a.detected?.label.orEmpty()),
         setsLabel = "1 serie",
         reps = a.repCount,

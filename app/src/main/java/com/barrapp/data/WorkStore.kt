@@ -26,7 +26,8 @@ data class Work(
     val createdAt: Long,
     val status: String,
     val jobId: String = "",     // the server's name for it, once known
-    val stage: String = "",     // where the work is, in words
+    val stage: String = "",     // where the work is, in words (Spanish)
+    val stageCode: String = "", // the same, as a stable code (data/Stage.kt)
     val exercise: String = "",  // what it turned out to be, when done
     val error: String? = null,
     val traceId: String = "",
@@ -53,7 +54,7 @@ data class Work(
         get() = when {
             status == WorkStore.STATUS_FAILED && !error.isNullOrBlank() -> error.orEmpty()
             status == WorkStore.STATUS_CONNECTING ->
-                stage.ifBlank { "waiting for a connection - the upload will resume" }
+                stage.ifBlank { Stage.CONNECTING.text }
             stage.isNotBlank() -> stage
             else -> status
         }
@@ -97,6 +98,7 @@ object WorkStore {
                 status = o.optString("status", STATUS_FAILED),
                 jobId = o.optString("jobId"),
                 stage = o.optString("stage"),
+                stageCode = o.optString("stageCode"),
                 exercise = o.optString("exercise"),
                 error = o.optString("error").ifBlank { null },
                 traceId = o.optString("traceId"),
@@ -140,7 +142,8 @@ object WorkStore {
             }
             arr.put(JSONObject()
                 .put("id", w.id).put("createdAt", w.createdAt).put("status", w.status)
-                .put("jobId", w.jobId).put("stage", w.stage).put("exercise", w.exercise)
+                .put("jobId", w.jobId).put("stage", w.stage).put("stageCode", w.stageCode)
+                .put("exercise", w.exercise)
                 .put("error", w.error.orEmpty()).put("traceId", w.traceId)
                 .put("clipPath", w.clipPath)
                 .put("uploadId", w.uploadId).put("partSize", w.partSize)

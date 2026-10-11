@@ -51,6 +51,13 @@ data class RepCardItem(
 )
 
 data class ResultsData(
+    /** What happened, in the server's (Spanish) words: the report's headline
+     *  and narrative, why nothing was counted, and what to film next. Before
+     *  these were shown, a clip with 0 reps said "0 reps" and nothing else. */
+    val headline: String = "",
+    val narrative: String = "",
+    val blockers: List<String> = emptyList(),
+    val nextSession: String = "",
     val movement: String,
     val setsLabel: String,
     val reps: Int,
@@ -308,6 +315,36 @@ private fun AnalyzingPhase(stages: List<String>, activeStage: Int) {
 }
 
 @Composable
+internal fun WhatHappened(results: ResultsData) {
+    TkCard {
+        Eyebrow("Qué ha pasado")
+        if (results.headline.isNotBlank()) {
+            Text(results.headline, style = T.cardHeadline, modifier = Modifier.padding(top = 8.dp))
+        }
+        if (results.narrative.isNotBlank()) {
+            Text(results.narrative, style = T.bodyS, modifier = Modifier.padding(top = 6.dp))
+        }
+        if (results.blockers.isNotEmpty()) {
+            Text(
+                if (results.reps == 0) "Por qué no se contó nada" else "Notas",
+                style = mono(10, 0.05f, Tk.amber),
+                modifier = Modifier.padding(top = 12.dp),
+            )
+            results.blockers.forEach { b ->
+                Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(Modifier.padding(top = 7.dp).size(5.dp).clip(CircleShape).background(Tk.amber))
+                    Text(b, style = T.bodyInk)
+                }
+            }
+        }
+        if (results.nextSession.isNotBlank()) {
+            Text("Para la próxima", style = mono(10, 0.05f, Tk.primary), modifier = Modifier.padding(top = 12.dp))
+            Text(results.nextSession, style = T.bodyS, modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+}
+
+@Composable
 private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
     Column(
         Modifier
@@ -341,6 +378,11 @@ private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
                     }
                 }
             }
+        }
+
+        if (results.headline.isNotBlank() || results.narrative.isNotBlank() ||
+            results.blockers.isNotEmpty()) {
+            SlideUp(delayMillis = 60) { WhatHappened(results) }
         }
 
         if (results.faults.isNotEmpty()) {

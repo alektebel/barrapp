@@ -21,8 +21,12 @@ data class Job(
     val createdAt: String,
     val result: Analysis? = null,
     val error: String? = null,
-    /** Where the server's worker is, in words. Absent when idle or done. */
+    /** Where the server's worker is, in English words (older apps match on
+     *  them). Absent when idle or done. */
     val stage: String = "",
+    /** Stable code for [stage] (barra/i18n.py STAGES) and its Spanish text. */
+    val stageCode: String = "",
+    val stageText: String = "",
 )
 
 /** What the server made of one clip. */
@@ -154,17 +158,19 @@ data class MetricLine(
 
 /** One component of the quality proxy, shown so the total can be taken apart. */
 data class ScorePart(
-    val name: String,
+    val name: String,       // a key: Cues.kt matches on "control"
     val value: Double?,
     val weight: Double,
     val why: String,
+    val label: String = "", // what to show; blank on older servers
 )
 
 /** Measured, reported beside the score, deliberately not folded into it. */
 data class Aside(
-    val name: String,
+    val name: String,       // a key: Cues.kt matches on "swing"
     val value: Double,
     val why: String,
+    val label: String = "",
 )
 
 /**

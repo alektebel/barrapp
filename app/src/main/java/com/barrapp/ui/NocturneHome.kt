@@ -436,7 +436,9 @@ private fun uploadStages(active: com.barrapp.data.Work?): Pair<List<UploadStage>
                 " · ${w.uploadedParts.size} part(s) sent" else ""
         } ?: "The clip is on the server"),
         UploadStage("Movement recognised",
-            active?.stage?.takeIf { it.contains("recognising", true) }
+            active?.takeIf {
+                com.barrapp.data.Stage.progressIndex(it.stageCode, it.stage) == 1
+            }?.stage
                 ?: "Working out which exercise this is"),
         UploadStage("Trimming to the working set",
             "Dropping the walk-up and the drop-off"),
@@ -446,12 +448,8 @@ private fun uploadStages(active: com.barrapp.data.Work?): Pair<List<UploadStage>
     val idx = when (active?.status) {
         WorkStore.STATUS_SENDING, WorkStore.STATUS_CONNECTING -> 0
         WorkStore.STATUS_QUEUED -> 1
-        WorkStore.STATUS_MEASURING -> when {
-            active.stage.contains("recognising", true) -> 1
-            active.stage.contains("pose", true) -> 1
-            active.stage.contains("finding", true) || active.stage.contains("scoring", true) -> 3
-            else -> 2
-        }
+        WorkStore.STATUS_MEASURING ->
+            com.barrapp.data.Stage.progressIndex(active.stageCode, active.stage)
         else -> 2
     }
     return stages to idx

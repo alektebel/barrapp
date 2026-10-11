@@ -21,6 +21,7 @@ import com.barrapp.data.PartMark
 import com.barrapp.data.ProfileStore
 import com.barrapp.data.SessionStore
 import com.barrapp.data.Work
+import com.barrapp.data.Stage
 import com.barrapp.data.WorkStore
 import com.barrapp.notify.ProcessingNotifier
 import com.barrapp.notify.WeeklyReviewWorker
@@ -120,7 +121,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 // server, so this is a resume, not a failure
                 WorkStore.put(app, w.copy(
                     status = WorkStore.STATUS_WAITING,
-                    stage = "resuming the upload",
+                    stage = Stage.RESUMING.text, stageCode = Stage.RESUMING.code,
                 ).let { it.copy(log = it.log + WorkStore.Entry(
                     System.currentTimeMillis(), WorkStore.Level.INFO,
                     "the app closed mid-upload - ${w.uploadedParts.size} part(s) " +
@@ -130,7 +131,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 WorkStore.put(app, w.copy(
                     status = WorkStore.STATUS_FAILED,
                     stage = "",
-                    error = "The app closed while this clip was in the queue.",
+                    error = "La app se cerró mientras este vídeo estaba en la cola.",
                 ).let { it.copy(log = it.log + WorkStore.Entry(
                     System.currentTimeMillis(), WorkStore.Level.WARN,
                     "interrupted — the app closed; retry to send it again")) })
@@ -661,7 +662,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 onProgress(sent.coerceAtMost(total), total)
                 WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
                     uploadedParts = done.map { PartMark(it.key, it.value) },
-                    stage = "sending the clip (${sent.coerceAtMost(total)}/$total parts)"))
+                    stage = Stage.sending(sent.coerceAtMost(total), total), stageCode = Stage.SENDING.code))
                 publishWorks()
             } catch (err: Exception) {
                 val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
@@ -671,7 +672,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 if (!transient) throw err
                 WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
                     status = WorkStore.STATUS_CONNECTING,
-                    stage = "waiting for a connection - ${done.size}/$total parts are safe",
+                    stage = Stage.connecting(done.size, total), stageCode = Stage.CONNECTING.code,
                     uploadedParts = done.map { PartMark(it.key, it.value) },
                     log = (WorkStore.get(app, workId)?.log ?: emptyList()) +
                         WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.WARN,
@@ -689,7 +690,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
         WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
             uploadId = "", partSize = 0, uploadedParts = emptyList(),
-            stage = "queued on the server"))
+            stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code))
     }
 
     private suspend fun runWork(work: Work) {
@@ -736,7 +737,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
 
         val clip = java.io.File(work.clipPath)
-        update { it.copy(status = WorkStore.STATUS_WAITING, stage = "waiting to be sent",
+        update { it.copy(status = WorkStore.STATUS_WAITING, stage = Stage.WAITING.text, stageCode = Stage.WAITING.code,
             error = null) }
         try {
             if (!clip.exists() || clip.length() == 0L) {
@@ -752,17 +753,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
             }.job.id
             update { it.copy(jobId = jobId, status = WorkStore.STATUS_SENDING,
-                stage = "sending the clip") }
+                stage = Stage.SENDING.text, stageCode = Stage.SENDING.code) }
             log(WorkStore.Level.INFO,
                 if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
                 else "job $jobId created — sending the clip " +
                     "(%.1f MB)".format(clip.length() / 1e6))
-            ProcessingNotifier.stage(app, "Sending the clip")
+            ProcessingNotifier.stage(app, Stage.SENDING.text)
             try {
                 uploadResumable(work.id, jobId, clip) { sent, total ->
                     update {
                         it.copy(status = WorkStore.STATUS_SENDING,
-                            stage = "sending the clip ($sent/$total parts)")
+                            stage = Stage.sending(sent, total), stageCode = Stage.SENDING.code)
                     }
                 }
             } catch (_: PauseUpload) {
@@ -772,9 +773,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 // sent, on the server, by part number.
                 return
             }
-            update { it.copy(status = WorkStore.STATUS_QUEUED, stage = "queued on the server") }
+            update { it.copy(status = WorkStore.STATUS_QUEUED, stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code) }
             log(WorkStore.Level.INFO, "uploaded — queued on the server")
-            ProcessingNotifier.stage(app, "Queued on the server")
+            ProcessingNotifier.stage(app, Stage.QUEUED.text)
             withRetry("queueing on the server", work.id) {
                 withContext(Dispatchers.IO) { api.submit(jobId) }
             }
@@ -842,19 +843,18 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                             return
                         }
                         "failed" -> {
-                            fail(j.error ?: "The server could not use that clip.",
+                            fail(j.error ?: "El servidor no pudo usar este vídeo.",
                                 j.result?.traceId.orEmpty())
                             return
                         }
                         else -> {
-                            val stage = j.stage.ifBlank {
-                                if (j.status == "queued") "queued on the server" else "measuring"
-                            }
+                            val stage = Stage.display(j)
                             update {
                                 it.copy(
                                     status = if (j.status == "processing")
                                         WorkStore.STATUS_MEASURING else WorkStore.STATUS_QUEUED,
                                     stage = stage,
+                                    stageCode = Stage.code(j),
                                 )
                             }
                             ProcessingNotifier.stage(app, stage.replaceFirstChar { c -> c.uppercaseChar() })
@@ -999,7 +999,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             paused.forEach { w ->
                 WorkStore.put(app, w.copy(status = WorkStore.STATUS_WAITING,
-                    stage = "waiting to be sent",
+                    stage = Stage.WAITING.text, stageCode = Stage.WAITING.code,
                     log = w.log + WorkStore.Entry(System.currentTimeMillis(),
                         WorkStore.Level.INFO, "connection is back - resuming the upload")))
             }

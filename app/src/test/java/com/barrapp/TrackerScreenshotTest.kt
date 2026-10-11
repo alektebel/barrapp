@@ -180,6 +180,33 @@ class TrackerScreenshotTest {
         snap("tracker-record-results")
     }
 
+    /** A clip with nothing counted must say why (before: "0 reps" and silence). */
+    @Test
+    fun recordResultsNothingCounted() {
+        rule.setContent {
+            BarrappTheme {
+                TrackerShell(TrackerTab.RECORD, {}, Modifier.fillMaxSize()) {
+                    TrackerRecord(
+                        phase = RecordPhase.RESULTS,
+                        stages = emptyList(), activeStage = 0,
+                        results = ResultsData(
+                            headline = "Dominada: nada que contar",
+                            narrative = "Reconocido como dominada, pero no se pudo separar ninguna repetición.",
+                            blockers = listOf("Ningún cambio de dirección destacó sobre el ruido"),
+                            nextSession = "Que se vea la repetición entera en el encuadre, de arriba abajo.",
+                            movement = "Dominada", setsLabel = "1 serie", reps = 0, score = null,
+                            faults = emptyList(), repCards = emptyList(), xp = 0, aboveAverage = null,
+                        ),
+                        lastAnalyzed = null,
+                        standard = "", camera = "",
+                        onStandard = {}, onCamera = {}, onRecord = {}, onPick = {}, onDone = {},
+                    )
+                }
+            }
+        }
+        snap("tracker-record-results-empty")
+    }
+
     @Test
     fun progress() {
         rule.setContent {

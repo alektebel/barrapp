@@ -376,6 +376,8 @@ class BarraApi(context: Context) {
                 createdAt = json.optString("createdAt"),
                 error = json.textOrNull("error"),
                 stage = json.optString("stage"),
+                stageCode = json.optString("stageCode"),
+                stageText = json.optString("stageText"),
                 result = resultJson?.let { parseAnalysis(it) },
             )
         }
@@ -430,6 +432,7 @@ class BarraApi(context: Context) {
                                 value = if (c.isNull("value")) null else c.optDouble("value").orZero(),
                                 weight = c.optDouble("weight", 0.0).orZero(),
                                 why = c.optString("why"),
+                                label = c.optString("label"),
                             )
                         },
                         asides = row.optJSONArray("aside").mapObjects { a ->
@@ -437,6 +440,7 @@ class BarraApi(context: Context) {
                                 name = a.optString("name"),
                                 value = a.optDouble("value", 0.0).orZero(),
                                 why = a.optString("why"),
+                                label = a.optString("label"),
                             )
                         },
                         penalties = row.optJSONArray("penalties").mapObjects { p ->
@@ -445,6 +449,7 @@ class BarraApi(context: Context) {
                                 value = if (p.isNull("value")) null else p.optDouble("value").orZero(),
                                 weight = p.optDouble("weight", 0.0).orZero(),
                                 why = p.optString("why"),
+                                label = p.optString("label"),
                             )
                         },
                         trace = row.optJSONArray("trace").let { t ->
