@@ -1,0 +1,1010 @@
+{
+ "version": 1,
+ "families": {
+  "push": "Empuje",
+  "pull": "Tirón",
+  "core": "Core",
+  "legs": "Piernas",
+  "balance": "Equilibrio",
+  "bar": "Barra"
+ },
+ "skills": [
+  {
+   "id": "wall_push_up",
+   "name": "Flexión en pared",
+   "family": "push",
+   "requires": [],
+   "tier": 0,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "incline_push_up",
+   "name": "Flexión inclinada",
+   "family": "push",
+   "requires": [
+    "wall_push_up"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "knee_push_up",
+   "name": "Flexión de rodillas",
+   "family": "push",
+   "requires": [
+    "wall_push_up"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "push_up",
+   "name": "Flexión",
+   "family": "push",
+   "requires": [
+    "incline_push_up",
+    "knee_push_up"
+   ],
+   "tier": 2,
+   "measurable": true,
+   "standard": {
+    "reps": 15,
+    "quality": 47,
+    "days": 2
+   }
+  },
+  {
+   "id": "wide_push_up",
+   "name": "Flexión abierta",
+   "family": "push",
+   "requires": [
+    "push_up"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "diamond_push_up",
+   "name": "Flexión diamante",
+   "family": "push",
+   "requires": [
+    "push_up"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "decline_push_up",
+   "name": "Flexión declinada",
+   "family": "push",
+   "requires": [
+    "push_up"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "archer_push_up",
+   "name": "Flexión arquero",
+   "family": "push",
+   "requires": [
+    "diamond_push_up"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "pseudo_planche_push_up",
+   "name": "Flexión pseudo plancha",
+   "family": "push",
+   "requires": [
+    "decline_push_up",
+    "planche_lean"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "one_arm_push_up",
+   "name": "Flexión a una mano",
+   "family": "push",
+   "requires": [
+    "archer_push_up"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "bench_dip",
+   "name": "Fondo en banco",
+   "family": "push",
+   "requires": [],
+   "tier": 0,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "dip",
+   "name": "Fondo",
+   "family": "push",
+   "requires": [
+    "bench_dip",
+    "push_up"
+   ],
+   "tier": 3,
+   "measurable": true,
+   "standard": {
+    "reps": 10,
+    "quality": 47,
+    "days": 2
+   }
+  },
+  {
+   "id": "weighted_dip",
+   "name": "Fondo lastrado",
+   "family": "push",
+   "requires": [
+    "dip"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "ring_dip",
+   "name": "Fondo en anillas",
+   "family": "push",
+   "requires": [
+    "dip"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "korean_dip",
+   "name": "Fondo coreano",
+   "family": "push",
+   "requires": [
+    "dip"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "dead_hang",
+   "name": "Colgado pasivo",
+   "family": "pull",
+   "requires": [],
+   "tier": 0,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "scapular_pull",
+   "name": "Retracción escapular",
+   "family": "pull",
+   "requires": [
+    "dead_hang"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "australian_row",
+   "name": "Remo australiano",
+   "family": "pull",
+   "requires": [],
+   "tier": 0,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "negative_pull_up",
+   "name": "Dominada negativa",
+   "family": "pull",
+   "requires": [
+    "scapular_pull",
+    "australian_row"
+   ],
+   "tier": 2,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "chin_up",
+   "name": "Dominada supina",
+   "family": "pull",
+   "requires": [
+    "negative_pull_up"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "pull_up",
+   "name": "Dominada",
+   "family": "pull",
+   "requires": [
+    "negative_pull_up"
+   ],
+   "tier": 3,
+   "measurable": true,
+   "standard": {
+    "reps": 8,
+    "quality": 47,
+    "days": 2
+   }
+  },
+  {
+   "id": "chest_to_bar",
+   "name": "Dominada al pecho",
+   "family": "pull",
+   "requires": [
+    "pull_up"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "weighted_pull_up",
+   "name": "Dominada lastrada",
+   "family": "pull",
+   "requires": [
+    "pull_up"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "typewriter_pull_up",
+   "name": "Dominada máquina de escribir",
+   "family": "pull",
+   "requires": [
+    "chest_to_bar"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "archer_pull_up",
+   "name": "Dominada arquero",
+   "family": "pull",
+   "requires": [
+    "chest_to_bar"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "one_arm_negative",
+   "name": "Negativa a una mano",
+   "family": "pull",
+   "requires": [
+    "archer_pull_up"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "assisted_one_arm_pull_up",
+   "name": "Dominada a una mano asistida",
+   "family": "pull",
+   "requires": [
+    "one_arm_negative"
+   ],
+   "tier": 7,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "one_arm_pull_up",
+   "name": "Dominada a una mano",
+   "family": "pull",
+   "requires": [
+    "assisted_one_arm_pull_up"
+   ],
+   "tier": 8,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "explosive_pull_up",
+   "name": "Dominada explosiva",
+   "family": "bar",
+   "requires": [
+    "pull_up"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "transition_drill",
+   "name": "Ejercicio de transición",
+   "family": "bar",
+   "requires": [
+    "explosive_pull_up"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "kipping_muscle_up",
+   "name": "Muscle-up con impulso",
+   "family": "bar",
+   "requires": [
+    "transition_drill",
+    "dip"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "muscle_up",
+   "name": "Muscle-up",
+   "family": "bar",
+   "requires": [
+    "kipping_muscle_up"
+   ],
+   "tier": 7,
+   "measurable": true,
+   "standard": {
+    "reps": 5,
+    "quality": 73,
+    "days": 2
+   }
+  },
+  {
+   "id": "strict_muscle_up",
+   "name": "Muscle-up estricto",
+   "family": "bar",
+   "requires": [
+    "muscle_up"
+   ],
+   "tier": 8,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "weighted_muscle_up",
+   "name": "Muscle-up lastrado",
+   "family": "bar",
+   "requires": [
+    "strict_muscle_up"
+   ],
+   "tier": 9,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "ring_muscle_up",
+   "name": "Muscle-up en anillas",
+   "family": "bar",
+   "requires": [
+    "strict_muscle_up"
+   ],
+   "tier": 9,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "hefesto",
+   "name": "Hefesto",
+   "family": "bar",
+   "requires": [
+    "strict_muscle_up",
+    "back_lever"
+   ],
+   "tier": 9,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "bar_360",
+   "name": "Dominada 360",
+   "family": "bar",
+   "requires": [
+    "kipping_muscle_up"
+   ],
+   "tier": 7,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "plank",
+   "name": "Plancha abdominal",
+   "family": "core",
+   "requires": [],
+   "tier": 0,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "hollow_hold",
+   "name": "Hollow hold",
+   "family": "core",
+   "requires": [
+    "plank"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "knee_raise",
+   "name": "Elevación de rodillas colgado",
+   "family": "core",
+   "requires": [
+    "dead_hang",
+    "hollow_hold"
+   ],
+   "tier": 2,
+   "measurable": true,
+   "standard": {
+    "reps": 12,
+    "quality": 47,
+    "days": 2
+   }
+  },
+  {
+   "id": "leg_raise",
+   "name": "Elevación de piernas colgado",
+   "family": "core",
+   "requires": [
+    "knee_raise"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "toes_to_bar",
+   "name": "Pies a la barra",
+   "family": "core",
+   "requires": [
+    "leg_raise"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "l_sit",
+   "name": "L-sit",
+   "family": "core",
+   "requires": [
+    "hollow_hold",
+    "dip"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "ab_wheel",
+   "name": "Rueda abdominal",
+   "family": "core",
+   "requires": [
+    "hollow_hold"
+   ],
+   "tier": 2,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "dragon_flag",
+   "name": "Dragon flag",
+   "family": "core",
+   "requires": [
+    "hollow_hold",
+    "leg_raise"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "v_sit",
+   "name": "V-sit",
+   "family": "core",
+   "requires": [
+    "l_sit",
+    "toes_to_bar"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "manna",
+   "name": "Manna",
+   "family": "core",
+   "requires": [
+    "v_sit"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "tuck_front_lever",
+   "name": "Front lever agrupado",
+   "family": "core",
+   "requires": [
+    "pull_up",
+    "hollow_hold"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "adv_tuck_front_lever",
+   "name": "Front lever agrupado avanzado",
+   "family": "core",
+   "requires": [
+    "tuck_front_lever"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "straddle_front_lever",
+   "name": "Front lever con piernas abiertas",
+   "family": "core",
+   "requires": [
+    "adv_tuck_front_lever"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "half_front_lever",
+   "name": "Front lever a media lay",
+   "family": "core",
+   "requires": [
+    "straddle_front_lever"
+   ],
+   "tier": 7,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "front_lever",
+   "name": "Front lever",
+   "family": "core",
+   "requires": [
+    "half_front_lever"
+   ],
+   "tier": 8,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "front_lever_pull_up",
+   "name": "Dominada en front lever",
+   "family": "core",
+   "requires": [
+    "front_lever"
+   ],
+   "tier": 9,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "one_arm_front_lever",
+   "name": "Front lever a una mano",
+   "family": "core",
+   "requires": [
+    "front_lever"
+   ],
+   "tier": 9,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "skin_the_cat",
+   "name": "Skin the cat",
+   "family": "core",
+   "requires": [
+    "dead_hang"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "tuck_back_lever",
+   "name": "Back lever agrupado",
+   "family": "core",
+   "requires": [
+    "skin_the_cat"
+   ],
+   "tier": 2,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "adv_tuck_back_lever",
+   "name": "Back lever agrupado avanzado",
+   "family": "core",
+   "requires": [
+    "tuck_back_lever"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "straddle_back_lever",
+   "name": "Back lever con piernas abiertas",
+   "family": "core",
+   "requires": [
+    "adv_tuck_back_lever"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "back_lever",
+   "name": "Back lever",
+   "family": "core",
+   "requires": [
+    "straddle_back_lever"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "planche_lean",
+   "name": "Inclinación de plancha",
+   "family": "balance",
+   "requires": [
+    "push_up"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "frog_stand",
+   "name": "Postura de la rana",
+   "family": "balance",
+   "requires": [
+    "planche_lean"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "tuck_planche",
+   "name": "Plancha agrupada",
+   "family": "balance",
+   "requires": [
+    "frog_stand"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "adv_tuck_planche",
+   "name": "Plancha agrupada avanzada",
+   "family": "balance",
+   "requires": [
+    "tuck_planche"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "straddle_planche",
+   "name": "Plancha con piernas abiertas",
+   "family": "balance",
+   "requires": [
+    "adv_tuck_planche",
+    "pseudo_planche_push_up"
+   ],
+   "tier": 7,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "full_planche",
+   "name": "Plancha completa",
+   "family": "balance",
+   "requires": [
+    "straddle_planche"
+   ],
+   "tier": 8,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "planche_push_up",
+   "name": "Flexión en plancha",
+   "family": "balance",
+   "requires": [
+    "full_planche"
+   ],
+   "tier": 9,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "wall_plank",
+   "name": "Plancha en pared",
+   "family": "balance",
+   "requires": [
+    "plank"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "chest_to_wall_handstand",
+   "name": "Pino de cara a la pared",
+   "family": "balance",
+   "requires": [
+    "wall_plank"
+   ],
+   "tier": 2,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "freestanding_handstand",
+   "name": "Pino libre",
+   "family": "balance",
+   "requires": [
+    "chest_to_wall_handstand"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "wall_hspu",
+   "name": "Flexión en pino contra la pared",
+   "family": "balance",
+   "requires": [
+    "chest_to_wall_handstand",
+    "dip"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "freestanding_hspu",
+   "name": "Flexión en pino libre",
+   "family": "balance",
+   "requires": [
+    "freestanding_handstand",
+    "wall_hspu"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "deficit_hspu",
+   "name": "Flexión en pino con déficit",
+   "family": "balance",
+   "requires": [
+    "freestanding_hspu"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "press_to_handstand",
+   "name": "Subida a pino",
+   "family": "balance",
+   "requires": [
+    "freestanding_handstand",
+    "tuck_planche"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "one_arm_handstand",
+   "name": "Pino a una mano",
+   "family": "balance",
+   "requires": [
+    "press_to_handstand"
+   ],
+   "tier": 7,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "ninety_degree_push_up",
+   "name": "Flexión a 90 grados",
+   "family": "balance",
+   "requires": [
+    "freestanding_hspu",
+    "straddle_planche"
+   ],
+   "tier": 8,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "elbow_lever",
+   "name": "Palanca de codos",
+   "family": "balance",
+   "requires": [
+    "frog_stand"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "vertical_flag",
+   "name": "Bandera vertical",
+   "family": "balance",
+   "requires": [
+    "pull_up",
+    "hollow_hold"
+   ],
+   "tier": 4,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "tuck_human_flag",
+   "name": "Bandera humana agrupada",
+   "family": "balance",
+   "requires": [
+    "vertical_flag"
+   ],
+   "tier": 5,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "straddle_human_flag",
+   "name": "Bandera humana con piernas abiertas",
+   "family": "balance",
+   "requires": [
+    "tuck_human_flag"
+   ],
+   "tier": 6,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "human_flag",
+   "name": "Bandera humana",
+   "family": "balance",
+   "requires": [
+    "straddle_human_flag"
+   ],
+   "tier": 7,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "squat",
+   "name": "Sentadilla",
+   "family": "legs",
+   "requires": [],
+   "tier": 0,
+   "measurable": true,
+   "standard": {
+    "reps": 20,
+    "quality": 47,
+    "days": 2
+   }
+  },
+  {
+   "id": "split_squat",
+   "name": "Sentadilla split",
+   "family": "legs",
+   "requires": [
+    "squat"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "jump_squat",
+   "name": "Sentadilla con salto",
+   "family": "legs",
+   "requires": [
+    "squat"
+   ],
+   "tier": 1,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "bulgarian_split_squat",
+   "name": "Sentadilla búlgara",
+   "family": "legs",
+   "requires": [
+    "split_squat"
+   ],
+   "tier": 2,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "sissy_squat",
+   "name": "Sentadilla sissy",
+   "family": "legs",
+   "requires": [
+    "split_squat"
+   ],
+   "tier": 2,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "shrimp_squat",
+   "name": "Sentadilla gamba",
+   "family": "legs",
+   "requires": [
+    "bulgarian_split_squat"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "pistol_squat",
+   "name": "Sentadilla pistol",
+   "family": "legs",
+   "requires": [
+    "bulgarian_split_squat"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  },
+  {
+   "id": "nordic_curl",
+   "name": "Curl nórdico",
+   "family": "legs",
+   "requires": [
+    "bulgarian_split_squat"
+   ],
+   "tier": 3,
+   "measurable": false,
+   "standard": null
+  }
+ ]
+}
