@@ -136,6 +136,22 @@ class BuildIsStamped(unittest.TestCase):
         self.assertRegex(docker, r"ARG BARRA_COMMIT")
         self.assertRegex(docker, r"ENV BARRA_COMMIT=\$\{?BARRA_COMMIT\}?")
 
+    def test_the_commit_stamp_survives_set_e_on_a_clean_tree(self):
+        # Run deploy.sh's own lines, up to the stamp, in a throwaway clean repo.
+        import subprocess
+        import tempfile
+        text = (SERVER / "deploy.sh").read_text()
+        start = text.index("# Production was built from an uncommitted tree")
+        end = text.index('echo "deploying commit $COMMIT"') + len('echo "deploying commit $COMMIT"')
+        with tempfile.TemporaryDirectory() as d:
+            git = ["git", "-C", d, "-c", "user.email=t@t", "-c", "user.name=t"]
+            subprocess.run(git[:3] + ["init", "-q"], check=True)
+            subprocess.run(git + ["commit", "-q", "--allow-empty", "-m", "x"], check=True)
+            out = subprocess.run(["bash", "-c", "set -euo pipefail\ncd \"$1\"\n" + text[start:end], "_", d],
+                                 capture_output=True, text=True)
+        self.assertEqual(out.returncode, 0, out.stderr)
+        self.assertRegex(out.stdout, r"deploying commit [0-9a-f]{7}$")
+
     def test_deploy_passes_the_commit_and_refuses_a_dirty_tree(self):
         deploy = (SERVER / "deploy.sh").read_text()
         self.assertIn("--build-arg BARRA_COMMIT=", deploy)

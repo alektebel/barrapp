@@ -25,7 +25,13 @@ if [ -n "$(git status --porcelain)" ] && [ "${ALLOW_DIRTY:-}" != "1" ]; then
   echo "the working tree has uncommitted changes; commit them (or ALLOW_DIRTY=1)" >&2
   exit 1
 fi
-COMMIT="$(git rev-parse --short HEAD)$( [ -n "$(git status --porcelain)" ] && echo +dirty )"
+# An explicit if: `$( [ -n ... ] && echo +dirty )` exits 1 on a CLEAN tree,
+# and under set -e that killed the deploy without a word (2026-10-11).
+COMMIT="$(git rev-parse --short HEAD)"
+if [ -n "$(git status --porcelain)" ]; then
+  COMMIT="$COMMIT+dirty"
+fi
+echo "deploying commit $COMMIT"
 
 bash vendor_barra.sh
 
