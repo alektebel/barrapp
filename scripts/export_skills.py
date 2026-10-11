@@ -28,6 +28,9 @@ def export() -> dict:
         skills.append({
             "id": s.id,
             "name": NAME_ES[s.id],
+            # barra/skills.py orders ties by the English name (next_up); the app
+            # uses it for the same order, never for display.
+            "nameEn": s.name,
             "family": s.family,
             "requires": list(s.requires),
             "tier": tiers[s.id],

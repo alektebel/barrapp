@@ -1,0 +1,73 @@
+[
+ {
+  "verified": [
+   "pull_up"
+  ],
+  "target": "muscle_up",
+  "states": {
+   "australian_row": "claimed",
+   "bench_dip": "available",
+   "dead_hang": "claimed",
+   "dip": "locked",
+   "explosive_pull_up": "available",
+   "incline_push_up": "locked",
+   "kipping_muscle_up": "locked",
+   "knee_push_up": "locked",
+   "muscle_up": "locked",
+   "negative_pull_up": "claimed",
+   "pull_up": "verified",
+   "push_up": "locked",
+   "scapular_pull": "claimed",
+   "transition_drill": "locked",
+   "wall_push_up": "available"
+  },
+  "next": "bench_dip"
+ },
+ {
+  "verified": [
+   "dip",
+   "pull_up"
+  ],
+  "target": "muscle_up",
+  "states": {
+   "australian_row": "claimed",
+   "bench_dip": "claimed",
+   "dead_hang": "claimed",
+   "dip": "verified",
+   "explosive_pull_up": "available",
+   "incline_push_up": "claimed",
+   "kipping_muscle_up": "locked",
+   "knee_push_up": "claimed",
+   "muscle_up": "locked",
+   "negative_pull_up": "claimed",
+   "pull_up": "verified",
+   "push_up": "claimed",
+   "scapular_pull": "claimed",
+   "transition_drill": "locked",
+   "wall_push_up": "claimed"
+  },
+  "next": "explosive_pull_up"
+ },
+ {
+  "verified": [],
+  "target": "muscle_up",
+  "states": {
+   "australian_row": "available",
+   "bench_dip": "available",
+   "dead_hang": "available",
+   "dip": "locked",
+   "explosive_pull_up": "locked",
+   "incline_push_up": "locked",
+   "kipping_muscle_up": "locked",
+   "knee_push_up": "locked",
+   "muscle_up": "locked",
+   "negative_pull_up": "locked",
+   "pull_up": "locked",
+   "push_up": "locked",
+   "scapular_pull": "locked",
+   "transition_drill": "locked",
+   "wall_push_up": "available"
+  },
+  "next": "australian_row"
+ }
+]

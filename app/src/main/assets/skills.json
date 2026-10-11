@@ -12,6 +12,7 @@
   {
    "id": "wall_push_up",
    "name": "Flexión en pared",
+   "nameEn": "Wall push-up",
    "family": "push",
    "requires": [],
    "tier": 0,
@@ -21,6 +22,7 @@
   {
    "id": "incline_push_up",
    "name": "Flexión inclinada",
+   "nameEn": "Incline push-up",
    "family": "push",
    "requires": [
     "wall_push_up"
@@ -32,6 +34,7 @@
   {
    "id": "knee_push_up",
    "name": "Flexión de rodillas",
+   "nameEn": "Knee push-up",
    "family": "push",
    "requires": [
     "wall_push_up"
@@ -43,6 +46,7 @@
   {
    "id": "push_up",
    "name": "Flexión",
+   "nameEn": "Push-up",
    "family": "push",
    "requires": [
     "incline_push_up",
@@ -59,6 +63,7 @@
   {
    "id": "wide_push_up",
    "name": "Flexión abierta",
+   "nameEn": "Wide push-up",
    "family": "push",
    "requires": [
     "push_up"
@@ -70,6 +75,7 @@
   {
    "id": "diamond_push_up",
    "name": "Flexión diamante",
+   "nameEn": "Diamond push-up",
    "family": "push",
    "requires": [
     "push_up"
@@ -81,6 +87,7 @@
   {
    "id": "decline_push_up",
    "name": "Flexión declinada",
+   "nameEn": "Decline push-up",
    "family": "push",
    "requires": [
     "push_up"
@@ -92,6 +99,7 @@
   {
    "id": "archer_push_up",
    "name": "Flexión arquero",
+   "nameEn": "Archer push-up",
    "family": "push",
    "requires": [
     "diamond_push_up"
@@ -103,6 +111,7 @@
   {
    "id": "pseudo_planche_push_up",
    "name": "Flexión pseudo plancha",
+   "nameEn": "Pseudo planche push-up",
    "family": "push",
    "requires": [
     "decline_push_up",
@@ -115,6 +124,7 @@
   {
    "id": "one_arm_push_up",
    "name": "Flexión a una mano",
+   "nameEn": "One-arm push-up",
    "family": "push",
    "requires": [
     "archer_push_up"
@@ -126,6 +136,7 @@
   {
    "id": "bench_dip",
    "name": "Fondo en banco",
+   "nameEn": "Bench dip",
    "family": "push",
    "requires": [],
    "tier": 0,
@@ -135,6 +146,7 @@
   {
    "id": "dip",
    "name": "Fondo",
+   "nameEn": "Dip",
    "family": "push",
    "requires": [
     "bench_dip",
@@ -151,6 +163,7 @@
   {
    "id": "weighted_dip",
    "name": "Fondo lastrado",
+   "nameEn": "Weighted dip",
    "family": "push",
    "requires": [
     "dip"
@@ -162,6 +175,7 @@
   {
    "id": "ring_dip",
    "name": "Fondo en anillas",
+   "nameEn": "Ring dip",
    "family": "push",
    "requires": [
     "dip"
@@ -173,6 +187,7 @@
   {
    "id": "korean_dip",
    "name": "Fondo coreano",
+   "nameEn": "Korean dip",
    "family": "push",
    "requires": [
     "dip"
@@ -184,6 +199,7 @@
   {
    "id": "dead_hang",
    "name": "Colgado pasivo",
+   "nameEn": "Dead hang",
    "family": "pull",
    "requires": [],
    "tier": 0,
@@ -193,6 +209,7 @@
   {
    "id": "scapular_pull",
    "name": "Retracción escapular",
+   "nameEn": "Scapular pull",
    "family": "pull",
    "requires": [
     "dead_hang"
@@ -204,6 +221,7 @@
   {
    "id": "australian_row",
    "name": "Remo australiano",
+   "nameEn": "Australian row",
    "family": "pull",
    "requires": [],
    "tier": 0,
@@ -213,6 +231,7 @@
   {
    "id": "negative_pull_up",
    "name": "Dominada negativa",
+   "nameEn": "Negative pull-up",
    "family": "pull",
    "requires": [
     "scapular_pull",
@@ -225,6 +244,7 @@
   {
    "id": "chin_up",
    "name": "Dominada supina",
+   "nameEn": "Chin-up",
    "family": "pull",
    "requires": [
     "negative_pull_up"
@@ -236,6 +256,7 @@
   {
    "id": "pull_up",
    "name": "Dominada",
+   "nameEn": "Pull-up",
    "family": "pull",
    "requires": [
     "negative_pull_up"
@@ -251,6 +272,7 @@
   {
    "id": "chest_to_bar",
    "name": "Dominada al pecho",
+   "nameEn": "Chest-to-bar pull-up",
    "family": "pull",
    "requires": [
     "pull_up"
@@ -262,6 +284,7 @@
   {
    "id": "weighted_pull_up",
    "name": "Dominada lastrada",
+   "nameEn": "Weighted pull-up",
    "family": "pull",
    "requires": [
     "pull_up"
@@ -273,6 +296,7 @@
   {
    "id": "typewriter_pull_up",
    "name": "Dominada máquina de escribir",
+   "nameEn": "Typewriter pull-up",
    "family": "pull",
    "requires": [
     "chest_to_bar"
@@ -284,6 +308,7 @@
   {
    "id": "archer_pull_up",
    "name": "Dominada arquero",
+   "nameEn": "Archer pull-up",
    "family": "pull",
    "requires": [
     "chest_to_bar"
@@ -295,6 +320,7 @@
   {
    "id": "one_arm_negative",
    "name": "Negativa a una mano",
+   "nameEn": "One-arm negative",
    "family": "pull",
    "requires": [
     "archer_pull_up"
@@ -306,6 +332,7 @@
   {
    "id": "assisted_one_arm_pull_up",
    "name": "Dominada a una mano asistida",
+   "nameEn": "Assisted one-arm pull-up",
    "family": "pull",
    "requires": [
     "one_arm_negative"
@@ -317,6 +344,7 @@
   {
    "id": "one_arm_pull_up",
    "name": "Dominada a una mano",
+   "nameEn": "One-arm pull-up",
    "family": "pull",
    "requires": [
     "assisted_one_arm_pull_up"
@@ -328,6 +356,7 @@
   {
    "id": "explosive_pull_up",
    "name": "Dominada explosiva",
+   "nameEn": "Explosive pull-up",
    "family": "bar",
    "requires": [
     "pull_up"
@@ -339,6 +368,7 @@
   {
    "id": "transition_drill",
    "name": "Ejercicio de transición",
+   "nameEn": "Transition drill",
    "family": "bar",
    "requires": [
     "explosive_pull_up"
@@ -350,6 +380,7 @@
   {
    "id": "kipping_muscle_up",
    "name": "Muscle-up con impulso",
+   "nameEn": "Kipping muscle-up",
    "family": "bar",
    "requires": [
     "transition_drill",
@@ -362,6 +393,7 @@
   {
    "id": "muscle_up",
    "name": "Muscle-up",
+   "nameEn": "Muscle-up",
    "family": "bar",
    "requires": [
     "kipping_muscle_up"
@@ -377,6 +409,7 @@
   {
    "id": "strict_muscle_up",
    "name": "Muscle-up estricto",
+   "nameEn": "Strict muscle-up",
    "family": "bar",
    "requires": [
     "muscle_up"
@@ -388,6 +421,7 @@
   {
    "id": "weighted_muscle_up",
    "name": "Muscle-up lastrado",
+   "nameEn": "Weighted muscle-up",
    "family": "bar",
    "requires": [
     "strict_muscle_up"
@@ -399,6 +433,7 @@
   {
    "id": "ring_muscle_up",
    "name": "Muscle-up en anillas",
+   "nameEn": "Ring muscle-up",
    "family": "bar",
    "requires": [
     "strict_muscle_up"
@@ -410,6 +445,7 @@
   {
    "id": "hefesto",
    "name": "Hefesto",
+   "nameEn": "Hefesto",
    "family": "bar",
    "requires": [
     "strict_muscle_up",
@@ -422,6 +458,7 @@
   {
    "id": "bar_360",
    "name": "Dominada 360",
+   "nameEn": "360 pull-up",
    "family": "bar",
    "requires": [
     "kipping_muscle_up"
@@ -433,6 +470,7 @@
   {
    "id": "plank",
    "name": "Plancha abdominal",
+   "nameEn": "Plank",
    "family": "core",
    "requires": [],
    "tier": 0,
@@ -442,6 +480,7 @@
   {
    "id": "hollow_hold",
    "name": "Hollow hold",
+   "nameEn": "Hollow hold",
    "family": "core",
    "requires": [
     "plank"
@@ -453,6 +492,7 @@
   {
    "id": "knee_raise",
    "name": "Elevación de rodillas colgado",
+   "nameEn": "Hanging knee raise",
    "family": "core",
    "requires": [
     "dead_hang",
@@ -469,6 +509,7 @@
   {
    "id": "leg_raise",
    "name": "Elevación de piernas colgado",
+   "nameEn": "Hanging leg raise",
    "family": "core",
    "requires": [
     "knee_raise"
@@ -480,6 +521,7 @@
   {
    "id": "toes_to_bar",
    "name": "Pies a la barra",
+   "nameEn": "Toes to bar",
    "family": "core",
    "requires": [
     "leg_raise"
@@ -491,6 +533,7 @@
   {
    "id": "l_sit",
    "name": "L-sit",
+   "nameEn": "L-sit",
    "family": "core",
    "requires": [
     "hollow_hold",
@@ -503,6 +546,7 @@
   {
    "id": "ab_wheel",
    "name": "Rueda abdominal",
+   "nameEn": "Ab wheel rollout",
    "family": "core",
    "requires": [
     "hollow_hold"
@@ -514,6 +558,7 @@
   {
    "id": "dragon_flag",
    "name": "Dragon flag",
+   "nameEn": "Dragon flag",
    "family": "core",
    "requires": [
     "hollow_hold",
@@ -526,6 +571,7 @@
   {
    "id": "v_sit",
    "name": "V-sit",
+   "nameEn": "V-sit",
    "family": "core",
    "requires": [
     "l_sit",
@@ -538,6 +584,7 @@
   {
    "id": "manna",
    "name": "Manna",
+   "nameEn": "Manna",
    "family": "core",
    "requires": [
     "v_sit"
@@ -549,6 +596,7 @@
   {
    "id": "tuck_front_lever",
    "name": "Front lever agrupado",
+   "nameEn": "Tuck front lever",
    "family": "core",
    "requires": [
     "pull_up",
@@ -561,6 +609,7 @@
   {
    "id": "adv_tuck_front_lever",
    "name": "Front lever agrupado avanzado",
+   "nameEn": "Advanced tuck front lever",
    "family": "core",
    "requires": [
     "tuck_front_lever"
@@ -572,6 +621,7 @@
   {
    "id": "straddle_front_lever",
    "name": "Front lever con piernas abiertas",
+   "nameEn": "Straddle front lever",
    "family": "core",
    "requires": [
     "adv_tuck_front_lever"
@@ -583,6 +633,7 @@
   {
    "id": "half_front_lever",
    "name": "Front lever a media lay",
+   "nameEn": "Half-lay front lever",
    "family": "core",
    "requires": [
     "straddle_front_lever"
@@ -594,6 +645,7 @@
   {
    "id": "front_lever",
    "name": "Front lever",
+   "nameEn": "Front lever",
    "family": "core",
    "requires": [
     "half_front_lever"
@@ -605,6 +657,7 @@
   {
    "id": "front_lever_pull_up",
    "name": "Dominada en front lever",
+   "nameEn": "Front lever pull-up",
    "family": "core",
    "requires": [
     "front_lever"
@@ -616,6 +669,7 @@
   {
    "id": "one_arm_front_lever",
    "name": "Front lever a una mano",
+   "nameEn": "One-arm front lever",
    "family": "core",
    "requires": [
     "front_lever"
@@ -627,6 +681,7 @@
   {
    "id": "skin_the_cat",
    "name": "Skin the cat",
+   "nameEn": "Skin the cat",
    "family": "core",
    "requires": [
     "dead_hang"
@@ -638,6 +693,7 @@
   {
    "id": "tuck_back_lever",
    "name": "Back lever agrupado",
+   "nameEn": "Tuck back lever",
    "family": "core",
    "requires": [
     "skin_the_cat"
@@ -649,6 +705,7 @@
   {
    "id": "adv_tuck_back_lever",
    "name": "Back lever agrupado avanzado",
+   "nameEn": "Advanced tuck back lever",
    "family": "core",
    "requires": [
     "tuck_back_lever"
@@ -660,6 +717,7 @@
   {
    "id": "straddle_back_lever",
    "name": "Back lever con piernas abiertas",
+   "nameEn": "Straddle back lever",
    "family": "core",
    "requires": [
     "adv_tuck_back_lever"
@@ -671,6 +729,7 @@
   {
    "id": "back_lever",
    "name": "Back lever",
+   "nameEn": "Back lever",
    "family": "core",
    "requires": [
     "straddle_back_lever"
@@ -682,6 +741,7 @@
   {
    "id": "planche_lean",
    "name": "Inclinación de plancha",
+   "nameEn": "Planche lean",
    "family": "balance",
    "requires": [
     "push_up"
@@ -693,6 +753,7 @@
   {
    "id": "frog_stand",
    "name": "Postura de la rana",
+   "nameEn": "Frog stand",
    "family": "balance",
    "requires": [
     "planche_lean"
@@ -704,6 +765,7 @@
   {
    "id": "tuck_planche",
    "name": "Plancha agrupada",
+   "nameEn": "Tuck planche",
    "family": "balance",
    "requires": [
     "frog_stand"
@@ -715,6 +777,7 @@
   {
    "id": "adv_tuck_planche",
    "name": "Plancha agrupada avanzada",
+   "nameEn": "Advanced tuck planche",
    "family": "balance",
    "requires": [
     "tuck_planche"
@@ -726,6 +789,7 @@
   {
    "id": "straddle_planche",
    "name": "Plancha con piernas abiertas",
+   "nameEn": "Straddle planche",
    "family": "balance",
    "requires": [
     "adv_tuck_planche",
@@ -738,6 +802,7 @@
   {
    "id": "full_planche",
    "name": "Plancha completa",
+   "nameEn": "Full planche",
    "family": "balance",
    "requires": [
     "straddle_planche"
@@ -749,6 +814,7 @@
   {
    "id": "planche_push_up",
    "name": "Flexión en plancha",
+   "nameEn": "Planche push-up",
    "family": "balance",
    "requires": [
     "full_planche"
@@ -760,6 +826,7 @@
   {
    "id": "wall_plank",
    "name": "Plancha en pared",
+   "nameEn": "Wall plank",
    "family": "balance",
    "requires": [
     "plank"
@@ -771,6 +838,7 @@
   {
    "id": "chest_to_wall_handstand",
    "name": "Pino de cara a la pared",
+   "nameEn": "Chest-to-wall handstand",
    "family": "balance",
    "requires": [
     "wall_plank"
@@ -782,6 +850,7 @@
   {
    "id": "freestanding_handstand",
    "name": "Pino libre",
+   "nameEn": "Freestanding handstand",
    "family": "balance",
    "requires": [
     "chest_to_wall_handstand"
@@ -793,6 +862,7 @@
   {
    "id": "wall_hspu",
    "name": "Flexión en pino contra la pared",
+   "nameEn": "Wall handstand push-up",
    "family": "balance",
    "requires": [
     "chest_to_wall_handstand",
@@ -805,6 +875,7 @@
   {
    "id": "freestanding_hspu",
    "name": "Flexión en pino libre",
+   "nameEn": "Freestanding handstand push-up",
    "family": "balance",
    "requires": [
     "freestanding_handstand",
@@ -817,6 +888,7 @@
   {
    "id": "deficit_hspu",
    "name": "Flexión en pino con déficit",
+   "nameEn": "Deficit handstand push-up",
    "family": "balance",
    "requires": [
     "freestanding_hspu"
@@ -828,6 +900,7 @@
   {
    "id": "press_to_handstand",
    "name": "Subida a pino",
+   "nameEn": "Press to handstand",
    "family": "balance",
    "requires": [
     "freestanding_handstand",
@@ -840,6 +913,7 @@
   {
    "id": "one_arm_handstand",
    "name": "Pino a una mano",
+   "nameEn": "One-arm handstand",
    "family": "balance",
    "requires": [
     "press_to_handstand"
@@ -851,6 +925,7 @@
   {
    "id": "ninety_degree_push_up",
    "name": "Flexión a 90 grados",
+   "nameEn": "90-degree push-up",
    "family": "balance",
    "requires": [
     "freestanding_hspu",
@@ -863,6 +938,7 @@
   {
    "id": "elbow_lever",
    "name": "Palanca de codos",
+   "nameEn": "Elbow lever",
    "family": "balance",
    "requires": [
     "frog_stand"
@@ -874,6 +950,7 @@
   {
    "id": "vertical_flag",
    "name": "Bandera vertical",
+   "nameEn": "Vertical flag",
    "family": "balance",
    "requires": [
     "pull_up",
@@ -886,6 +963,7 @@
   {
    "id": "tuck_human_flag",
    "name": "Bandera humana agrupada",
+   "nameEn": "Tuck human flag",
    "family": "balance",
    "requires": [
     "vertical_flag"
@@ -897,6 +975,7 @@
   {
    "id": "straddle_human_flag",
    "name": "Bandera humana con piernas abiertas",
+   "nameEn": "Straddle human flag",
    "family": "balance",
    "requires": [
     "tuck_human_flag"
@@ -908,6 +987,7 @@
   {
    "id": "human_flag",
    "name": "Bandera humana",
+   "nameEn": "Human flag",
    "family": "balance",
    "requires": [
     "straddle_human_flag"
@@ -919,6 +999,7 @@
   {
    "id": "squat",
    "name": "Sentadilla",
+   "nameEn": "Bodyweight squat",
    "family": "legs",
    "requires": [],
    "tier": 0,
@@ -932,6 +1013,7 @@
   {
    "id": "split_squat",
    "name": "Sentadilla split",
+   "nameEn": "Split squat",
    "family": "legs",
    "requires": [
     "squat"
@@ -943,6 +1025,7 @@
   {
    "id": "jump_squat",
    "name": "Sentadilla con salto",
+   "nameEn": "Jump squat",
    "family": "legs",
    "requires": [
     "squat"
@@ -954,6 +1037,7 @@
   {
    "id": "bulgarian_split_squat",
    "name": "Sentadilla búlgara",
+   "nameEn": "Bulgarian split squat",
    "family": "legs",
    "requires": [
     "split_squat"
@@ -965,6 +1049,7 @@
   {
    "id": "sissy_squat",
    "name": "Sentadilla sissy",
+   "nameEn": "Sissy squat",
    "family": "legs",
    "requires": [
     "split_squat"
@@ -976,6 +1061,7 @@
   {
    "id": "shrimp_squat",
    "name": "Sentadilla gamba",
+   "nameEn": "Shrimp squat",
    "family": "legs",
    "requires": [
     "bulgarian_split_squat"
@@ -987,6 +1073,7 @@
   {
    "id": "pistol_squat",
    "name": "Sentadilla pistol",
+   "nameEn": "Pistol squat",
    "family": "legs",
    "requires": [
     "bulgarian_split_squat"
@@ -998,6 +1085,7 @@
   {
    "id": "nordic_curl",
    "name": "Curl nórdico",
+   "nameEn": "Nordic curl",
    "family": "legs",
    "requires": [
     "bulgarian_split_squat"
