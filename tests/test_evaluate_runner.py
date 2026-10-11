@@ -7,8 +7,10 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
+sys.path.insert(0, str(ROOT / "server"))
 
 import evaluate_technique_pipeline as run  # noqa: E402
+import vision  # noqa: E402
 from barra.movements import MOVEMENTS  # noqa: E402
 from barra.rules import all_rule_ids  # noqa: E402
 
@@ -107,8 +109,9 @@ def test_metrics_score_forbidden_phase_scoped_and_false_retained():
 
 
 def test_vision_mode_refuses_to_run_without_an_endpoint(monkeypatch, tmp_path):
-    for k in ("BARRA_VISION_BASE_URL", "BARRA_VISION_API_KEY", "NAN_BASE_URL", "NAN_API_KEY"):
+    for k in ("BARRA_VISION_BASE_URL", "BARRA_VISION_API_KEY", "NAN_BASE_URL", "NAN_API_KEY", "NAN_SECRET_ID"):
         monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(vision, "_config", lambda: None)
     clip = tmp_path / "x.mp4"
     clip.write_bytes(b"")
     assert run.main(["--mode", "vision", "--out", str(tmp_path / "out"), str(clip)]) == 3

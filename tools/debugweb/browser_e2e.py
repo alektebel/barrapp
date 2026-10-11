@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import time
+import urllib.request
 from pathlib import Path
 from urllib.request import urlopen
 from playwright.sync_api import sync_playwright
@@ -103,15 +104,35 @@ def main():
             page.set_viewport_size({'width':390, 'height':844})
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), 'horizontal overflow'
             page.screenshot(path=str(out/'mobile.png'), full_page=True)
-            # Import a real video through the user-facing file control, then
-            # remove only this test's uniquely named copy.
-            page.set_input_files('#upload', str(ROOT/'VID-20260827-WA0010.mp4'))
+            # Import a video through the user-facing file control, then remove
+            # exactly this test's copy. The clip is GENERATED fresh per run:
+            # the library dedupes by content hash, so uploading a video the
+            # shelf already holds exercises the rejection path, never the copy
+            # path this step is here to verify - an assertion on the sample's
+            # uniquified name could not pass against a library that already
+            # knows that sample.
+            qa_name = f'qa-import-{int(time.time())}.mp4'
+            qa_src = out / qa_name
+            subprocess.run(['ffmpeg', '-y', '-loglevel', 'error', '-f', 'lavfi',
+                            '-i', 'testsrc2=size=320x240:rate=30:duration=1',
+                            '-c:v', 'libx264', '-pix_fmt', 'yuv420p',
+                            '-movflags', '+faststart', str(qa_src)], check=True)
+            page.set_input_files('#upload', str(qa_src))
             page.wait_for_function("document.querySelector('#status').textContent.includes('Video imported')", timeout=60000)
             imported = page.locator('#clip').input_value()
-            assert imported.startswith('VID-20260827-WA0010-') and imported.endswith('.mp4')
+            assert imported == qa_name, f'imported as {imported!r}'
             assert page.locator('#right').inner_text() == ''
-            assert (ROOT/'data/videos'/imported).stat().st_size == (ROOT/'VID-20260827-WA0010.mp4').stat().st_size
-            (ROOT/'data/videos'/imported).unlink()
+            assert (ROOT/'data/videos'/imported).stat().st_size == qa_src.stat().st_size
+            # Forget the copy through the library's own deletion route, so the
+            # shelf and its provenance are as clean as the disk afterwards.
+            vids = json.loads(urlopen(f'{args.base}/api/videos').read())['videos']
+            qa_id = next(v['id'] for v in vids if v['name'] == qa_name)
+            drop = urllib.request.Request(
+                f'{args.base}/api/videos/{qa_id}',
+                data=json.dumps({'_delete': True, 'deleteFile': True}).encode(),
+                method='POST', headers={'Content-Type': 'application/json'})
+            assert urlopen(drop).status == 200
+            assert not (ROOT/'data/videos'/imported).exists()
             assert not errors, errors
             print(f'PASS: real 2-rep run, pinned pose, phase seeking, frame stepping, review persistence, export, comparison, network failure recovery, mobile layout, real video import. Artifacts: {out}')
             browser.close()

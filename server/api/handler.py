@@ -10,14 +10,18 @@ from pathlib import Path
 
 import boto3
 from boto3.dynamodb.conditions import Attr, Key
+from botocore.exceptions import ClientError
 
 import auth
+import referral
+import uploads
 
 s3 = boto3.client("s3")
 ddb = boto3.resource("dynamodb")
 lam = boto3.client("lambda")
 table = ddb.Table(os.environ["JOBS_TABLE"])
 feedback_table = ddb.Table(os.environ["FEEDBACK_TABLE"])
+referrals_table = ddb.Table(os.environ["REFERRALS_TABLE"])
 BUCKET = os.environ["VIDEO_BUCKET"]
 WORKER = os.environ.get("WORKER_FUNCTION", "")
 
@@ -94,6 +98,10 @@ def _item(job_id: str) -> dict | None:
 
 
 STALE_AFTER_MIN = 30
+# Below this an "upload" is not a clip. The shortest real capture the
+# phone produces is a couple of hundred KB; 8 KB only ever means a
+# stream that ended before it started.
+MIN_CLIP_BYTES = 8 * 1024
 
 
 def _reap_stale(item: dict | None) -> dict | None:
@@ -132,6 +140,9 @@ def _reap_stale(item: dict | None) -> dict | None:
             ":e": "%s (stuck for %d min)" % (reason, int(age_min)),
         },
     )
+    uploads.record(item["id"], item.get("owner") or "", "reaped", reason,
+                   level="error", previousStatus=item.get("status"),
+                   ageMin=int(age_min))
     item = dict(item)
     item["status"] = "failed"
     item["error"] = reason
@@ -190,6 +201,79 @@ def _feedback(owner: str, body: dict) -> tuple[int, dict]:
     feedback_table.put_item(Item=_to_ddb(item))
     out.pop("owner", None)
     return 201, out
+
+
+class _ReferralStore:
+    """The `referral` module's storage interface, over DynamoDB.
+
+    `put_new` is a conditional insert rather than get-then-put: two taps on a
+    flaky connection are how a redemption is normally attempted twice, and a
+    check-then-write loses that race every time. `bump` uses ADD for the same
+    reason - two redemptions racing must not read the same balance and write
+    back the same number.
+    """
+
+    def __init__(self, table):
+        self._t = table
+
+    def get(self, key):
+        return self._t.get_item(Key={"id": key}).get("Item")
+
+    def put_new(self, item):
+        try:
+            self._t.put_item(Item=_to_ddb(item),
+                             ConditionExpression=Attr("id").not_exists())
+            return True
+        except ClientError as exc:
+            code = exc.response.get("Error", {}).get("Code")
+            if code == "ConditionalCheckFailedException":
+                return False
+            raise
+
+    def delete(self, key):
+        self._t.delete_item(Key={"id": key})
+
+    def bump(self, key, adds, init):
+        expr, names, values = _bump_expression(adds, init)
+        resp = self._t.update_item(
+            Key={"id": key}, UpdateExpression=expr,
+            ExpressionAttributeNames=names, ExpressionAttributeValues=values,
+            ReturnValues="ALL_NEW")
+        return resp.get("Attributes")
+
+
+def _bump_expression(adds: dict, init: dict) -> tuple[str, dict, dict]:
+    """The DynamoDB update that adds to a balance and defaults the rest.
+
+    `ADD` initialises a missing number to zero, so only the non-added fields
+    need an `if_not_exists` SET. Split out so the expression itself can be
+    asserted: a malformed update here fails at runtime, on a redemption.
+    """
+    names = {f"#{k}": k for k in set(adds) | set(init)}
+    setters = [k for k in init if k not in adds]
+    clauses = []
+    values = {}
+    if setters:
+        clauses.append("SET " + ", ".join(
+            f"#{k} = if_not_exists(#{k}, :d_{k})" for k in setters))
+        values.update({f":d_{k}": _to_ddb(init[k]) for k in setters})
+    if adds:
+        clauses.append("ADD " + ", ".join(f"#{k} :a_{k}" for k in adds))
+        values.update({f":a_{k}": _to_ddb(v) for k, v in adds.items()})
+    return " ".join(clauses), names, values
+
+
+def _referral_store() -> _ReferralStore:
+    return _ReferralStore(referrals_table)
+
+
+def _referral(owner: str) -> tuple[int, dict]:
+    return 200, referral.status(_referral_store(), owner)
+
+
+def _redeem(owner: str, body: dict) -> tuple[int, dict]:
+    code = body.get("code") if isinstance(body.get("code"), str) else ""
+    return referral.redeem(_referral_store(), owner, code)
 
 
 def _claim(owner: str, device_id: str) -> dict:
@@ -298,12 +382,25 @@ def _route(event):
             value = (body.get(key) or "").strip() if isinstance(body.get(key), str) else ""
             if value:
                 item[key] = value
+        # A clip costs a credit only where the deployment charges for clips.
+        # Off by default, so a phone in the field never hits a wall it did not
+        # have yesterday; on, the balance is what referrals are worth.
+        allowed, credits = referral.charge(_referral_store(), owner)
+        if not allowed:
+            return _resp(402, {
+                "error": "no measurements left - invite a friend to earn more",
+                "credits": credits,
+            })
         table.put_item(Item=item)
         upload = s3.generate_presigned_url(
             "put_object",
             Params={"Bucket": BUCKET, "Key": f"{owner}/{job_id}.mp4", "ContentType": "video/mp4"},
             ExpiresIn=3600,
         )
+        uploads.record(job_id, owner, "job-created",
+                       f"exercise={item['exercise']}",
+                       variant=item.get("variant"), view=item.get("view"),
+                       userAgent=_header(event, "user-agent")[:120])
         pub = _public(item)
         pub["uploadUrl"] = upload
         pub["uploadMethod"] = "PUT"
@@ -355,6 +452,14 @@ def _route(event):
         code, payload = _feedback(owner, body)
         return _resp(code, payload)
 
+    if method == "GET" and path.rstrip("/") == "/v1/referral":
+        code, payload = _referral(owner)
+        return _resp(code, payload)
+
+    if method == "POST" and path.rstrip("/") == "/v1/referral/redeem":
+        code, payload = _redeem(owner, body)
+        return _resp(code, payload)
+
     parts = [p for p in path.split("/") if p]
 
     if method == "GET" and len(parts) == 3 and parts[0] == "v1" and parts[1] == "jobs":
@@ -384,6 +489,9 @@ def _route(event):
         if action == "start":
             if item.get("uploadId"):
                 upload_id = item["uploadId"]
+                uploads.record(parts[2], owner, "upload-resumed",
+                               "the phone came back to an upload already in progress",
+                               uploadId=upload_id)
             else:
                 upload = s3.create_multipart_upload(
                     Bucket=BUCKET, Key=f"{owner}/{parts[2]}.mp4",
@@ -396,6 +504,8 @@ def _route(event):
                     ExpressionAttributeNames={"#u": "uploadId"},
                     ExpressionAttributeValues={":u": upload_id},
                 )
+                uploads.record(parts[2], owner, "upload-started", "",
+                               uploadId=upload_id)
             return _resp(201, {"uploadId": upload_id, "partSize": 8 * 1024 * 1024})
         if action == "part":
             part_number = int((body or {}).get("partNumber") or 0)
@@ -412,6 +522,9 @@ def _route(event):
                 },
                 ExpiresIn=3600,
             )
+            uploads.record(parts[2], owner, "part-presigned", "",
+                           partNumber=part_number)
+            uploads.trim(parts[2])
             return _resp(200, {"url": url, "partNumber": part_number})
         if action == "complete":
             upload_id = item.get("uploadId")
@@ -422,16 +535,53 @@ def _route(event):
                  for p in (body or {}).get("parts") or []),
                 key=lambda x: x["PartNumber"],
             )
-            s3.complete_multipart_upload(
-                Bucket=BUCKET, Key=f"{owner}/{parts[2]}.mp4",
-                UploadId=upload_id, MultipartUpload={"Parts": s3parts},
-            )
+            key = f"{owner}/{parts[2]}.mp4"
+            try:
+                s3.complete_multipart_upload(
+                    Bucket=BUCKET, Key=key,
+                    UploadId=upload_id, MultipartUpload={"Parts": s3parts},
+                )
+            except Exception as exc:  # noqa: BLE001
+                uploads.record(parts[2], owner, "upload-failed", str(exc),
+                               level="error", partCount=len(s3parts))
+                return _resp(502, {"error": "the upload could not be assembled"})
+
+            # S3 assembles whatever parts it is handed, and a client that
+            # streamed nothing still gets a 200 and an object. A 17-byte .mp4
+            # sat in this bucket from exactly that: the failure surfaced much
+            # later, inside the worker, as a clip OpenCV could not open. Check
+            # the size at the seam where it is still an upload problem.
+            size = 0
+            try:
+                size = int(s3.head_object(Bucket=BUCKET, Key=key)["ContentLength"])
+            except Exception as exc:  # noqa: BLE001 - unknown size is not a refusal
+                uploads.record(parts[2], owner, "size-check-skipped", str(exc),
+                               level="warn")
+            if size and size < MIN_CLIP_BYTES:
+                uploads.record(parts[2], owner, "upload-too-small",
+                               f"{size} bytes assembled from {len(s3parts)} part(s)",
+                               level="error", bytes=size)
+                table.update_item(
+                    Key={"id": parts[2]},
+                    UpdateExpression="REMOVE #u SET #s = :s, #e = :e",
+                    ExpressionAttributeNames={"#u": "uploadId", "#s": "status",
+                                              "#e": "error"},
+                    ExpressionAttributeValues={
+                        ":s": "failed",
+                        ":e": "the clip arrived empty or truncated. Retry.",
+                    },
+                )
+                return _resp(400, {"error": "the clip arrived empty or truncated",
+                                   "bytes": size})
+
             table.update_item(
                 Key={"id": parts[2]},
                 UpdateExpression="REMOVE #u SET #s = :s",
                 ExpressionAttributeNames={"#u": "uploadId", "#s": "status"},
                 ExpressionAttributeValues={":s": "uploaded"},
             )
+            uploads.record(parts[2], owner, "upload-complete", "",
+                           partCount=len(s3parts), bytes=size)
             return _resp(200, {"ok": True})
         if action == "abort":
             upload_id = item.get("uploadId")
@@ -443,7 +593,30 @@ def _route(event):
                     UpdateExpression="REMOVE #u",
                     ExpressionAttributeNames={"#u": "uploadId"},
                 )
+                uploads.record(parts[2], owner, "upload-aborted",
+                               "the client abandoned this upload", level="warn")
             return _resp(200, {"ok": True})
+
+    # The phone's log of this upload, shipped as it happens. A dropped
+    # connection, a retried part, a process the system killed: none of it is
+    # visible from here, and all of it is what a "never finished uploading"
+    # row needs to stop being a guess.
+    if method == "POST" and len(parts) == 5 and parts[0] == "v1" \
+            and parts[1] == "jobs" and parts[3] == "upload" and parts[4] == "event":
+        item = _item(parts[2])
+        if not _owned(item, owner):
+            return _resp(404, {"error": "unknown job"})
+        name = (body.get("event") or "client").strip()[:64]
+        detail = (body.get("detail") or "")[:400]
+        level = (body.get("level") or "info").strip().lower()
+        if level not in {"info", "warn", "error"}:
+            level = "info"
+        stored = uploads.record(parts[2], owner, f"client:{name}", detail,
+                                level=level,
+                                partNumber=body.get("partNumber"),
+                                attempt=body.get("attempt"))
+        uploads.trim(parts[2])
+        return _resp(202, {"ok": True, "stored": stored})
 
     if method == "POST" and len(parts) == 4 and parts[-1] == "submit":
         job_id = parts[2]
@@ -464,9 +637,41 @@ def _route(event):
             )
         else:
             worker({"job_id": job_id, "owner": owner}, None)
+        uploads.record(job_id, owner, "submitted",
+                       "handed to the worker" if WORKER else "measured in-process")
         return _resp(202, _public(_item(job_id)) or {"id": job_id, "status": "queued"})
 
     return _resp(404, {"error": "not found"})
+
+
+def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
+                        end_s: float, duration_s: float | None = None) -> bool:
+    """Cut the located window out of the clip and overwrite the stored object.
+
+    Best-effort by design: if there is no cutter, the cut fails, or the upload
+    fails, the original stays in S3 and the job still succeeds. A localization
+    that cannot be stored is not a reason to lose the measurement.
+    """
+    try:
+        from barra.frames import trim_clip
+    except ImportError:
+        return False
+    margin = 1.0
+    start = max(0.0, float(start_s) - margin)
+    end = float(end_s) + margin
+    if duration_s:
+        end = min(end, float(duration_s))
+    if end - start < 2.0:
+        return False
+    out = Path("/tmp") / f"{job_id}-exercise.mp4"
+    if trim_clip(src, start, end, out) is None:
+        return False
+    try:
+        s3.upload_file(str(out), BUCKET, f"{owner}/{job_id}.mp4",
+                       ExtraArgs={"ContentType": "video/mp4"})
+        return True
+    except Exception:  # noqa: BLE001 - keep the original on any upload failure
+        return False
 
 
 def worker(event, _context):
@@ -490,6 +695,7 @@ def worker(event, _context):
             put_failure(job_id, "worker", str(exc))
         except Exception:  # noqa: BLE001
             pass
+        uploads.record(job_id, owner, "worker-failed", str(exc), level="error")
 
     try:
         # Inside the try on purpose: a broken image (missing module, bad
@@ -503,6 +709,7 @@ def worker(event, _context):
                 ExpressionAttributeNames={"#st": "stage"},
                 ExpressionAttributeValues={":st": name},
             )
+            uploads.record(job_id, owner, "stage", name)
 
         _stage("receiving the clip")
         s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))
@@ -515,13 +722,72 @@ def worker(event, _context):
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":s": "processing"},
         )
+
+        # Locate the exercise before anything is measured, the way the offline
+        # labeller does it, and store only that window. The measurement itself
+        # still runs on the FULL clip: every reported timestamp is in the
+        # source video's time, and the phone seeks its own local copy with
+        # them, so shortening the video the geometry sees would shift every
+        # offset on the client. Localization decides what is kept, not what is
+        # measured.
+        localization = None
+        vision_label = None
+        _stage("locating the exercise")
+        try:
+            from vision import locate_exercise
+
+            located = locate_exercise(dest, Path("/tmp") / f"{job_id}-locate",
+                                      item.get("exercise"))
+        except Exception:  # noqa: BLE001 - localization never fails a job
+            located = None
+        if located:
+            # Keep the name even when the window is not usable for trimming —
+            # fusion still wants the vision vote on auto-detect.
+            vision_label = located.get("exercise") or None
+            if vision_label and str(vision_label).lower() in ("none", "unknown", ""):
+                vision_label = None
+        if located and located.get("usable"):
+            loc = dict(located)
+            loc["source"] = "vision"
+            loc["trimmed"] = _store_trimmed_clip(
+                dest, owner, job_id, located["startS"], located["endS"],
+                located.get("durationS"))
+            localization = loc
+
+        if vision_label:
+            item = dict(item)
+            item["visionLabel"] = vision_label
+
         result = process_job(item, dest, on_stage=_stage)
+
+        # Vision unavailable or it found no window: fall back to the geometric
+        # working set the measurement already computed.
+        if localization is None:
+            trim = result.get("trim") or {}
+            s, e = trim.get("startS"), trim.get("endS")
+            if s is not None and e is not None and e > s:
+                if _store_trimmed_clip(dest, owner, job_id, s, e,
+                                       result.get("duration_s")):
+                    localization = {"source": "geometry", "startS": s, "endS": e,
+                                    "durationS": result.get("duration_s"),
+                                    "trimmed": True}
+        if localization is not None:
+            result["localization"] = localization
+            print(f"[barra] stored clip localized by {localization.get('source')} "
+                  f"{localization.get('startS')}-{localization.get('endS')}s "
+                  f"trimmed={localization.get('trimmed')}", flush=True)
+        else:
+            print("[barra] localization skipped; storing the raw clip", flush=True)
+
         table.update_item(
             Key={"id": job_id},
             UpdateExpression="SET #s = :s, #r = :r",
             ExpressionAttributeNames={"#s": "status", "#r": "result"},
             ExpressionAttributeValues={":s": "done", ":r": _to_ddb(result)},
         )
+        uploads.record(job_id, owner, "done",
+                       f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
+        uploads.trim(job_id)
     except Exception as exc:  # noqa: BLE001
         _fail(exc)
     return {"ok": True}

@@ -10,3 +10,8 @@ pandas==2.2.3
 opencv-contrib-python==4.10.0.84
 mediapipe==0.10.21
 boto3
+# A static ffmpeg for cutting the located exercise out of the raw clip (and for
+# the technique artifacts). The worker image has no system ffmpeg: AL2023 does
+# not carry a reliable one, and bundling it via the wheel keeps the image
+# reproducible. barra/frames.py resolves PATH first, then this.
+imageio-ffmpeg

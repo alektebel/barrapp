@@ -139,8 +139,9 @@ def test_observations_that_are_not_a_list_are_dropped_wholesale(tmp_path):
 
 
 def test_no_endpoint_means_no_note_and_no_call(monkeypatch, tmp_path):
-    for k in ("BARRA_VISION_BASE_URL", "BARRA_VISION_API_KEY", "NAN_BASE_URL", "NAN_API_KEY"):
+    for k in ("BARRA_VISION_BASE_URL", "BARRA_VISION_API_KEY", "NAN_BASE_URL", "NAN_API_KEY", "NAN_SECRET_ID"):
         monkeypatch.delenv(k, raising=False)
+    monkeypatch.setattr(vision, "_config", lambda: None)
     calls = []
     monkeypatch.setattr(vision, "_chat", lambda *a, **k: calls.append(a) or None)
     assert vision.technique_note(_art(tmp_path), _report()) is None

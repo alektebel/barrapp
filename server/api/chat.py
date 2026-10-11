@@ -12,7 +12,11 @@ import os
 import urllib.error
 import urllib.request
 
-NAN_API_KEY = os.environ.get("NAN_API_KEY", "")
+try:  # worker/task root and the API package both put this module beside chat
+    from nan_secret import get_nan_key
+except ImportError:  # local dev imports `api.chat` with server/ on the path
+    from api.nan_secret import get_nan_key
+
 NAN_BASE_URL = os.environ.get("NAN_BASE_URL", "").rstrip("/")
 NAN_MODEL = os.environ.get("NAN_MODEL", "qwen3.8-flash")
 
@@ -42,7 +46,8 @@ GOAL_KEYS = ("name", "age", "activity", "goal", "focusExercise")
 
 def chat(messages: list[dict]) -> dict:
     """Return {'reply': str, 'goals': dict | None} for one conversation turn."""
-    if not NAN_API_KEY.strip() or not NAN_BASE_URL:
+    nan_api_key = get_nan_key()
+    if not nan_api_key or not NAN_BASE_URL:
         return {"reply": _offline_first_question(), "goals": None}
 
     body = json.dumps(
@@ -56,7 +61,7 @@ def chat(messages: list[dict]) -> dict:
         f"{NAN_BASE_URL}/chat/completions",
         data=body,
         headers={
-            "Authorization": f"Bearer {NAN_API_KEY}",
+            "Authorization": f"Bearer {nan_api_key}",
             "Content-Type": "application/json",
             # The provider's edge blocks requests whose client looks like a
             # script; without this the model call comes back HTTP 403.

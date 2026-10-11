@@ -30,12 +30,26 @@ import base64
 import json
 import os
 import re
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
 
+try:  # worker/task root
+    from nan_secret import get_nan_key
+except ImportError:  # tests / local dev with `server/` on the path
+    from api.nan_secret import get_nan_key
+
 REQUEST_TIMEOUT = 60
 SOURCE_VISION = "vision-advisory"
+
+# Localization is the one place the model is asked about time, not technique:
+# where in the clip the set actually happens. Defaults to MiMo, the model the
+# offline labeller (scripts/label_calisthenics.py) measured this task with.
+LOCALIZE_MODEL_DEFAULT = "mimo-v2.5"
+LOCALIZE_TIMEOUT = 120
+MIN_WINDOW_S = 4.0
+MAX_WINDOW_FRAC = 0.95
 
 # Statuses an observation may carry. `uncertain` is the model's abstention on
 # one specific check; leaving a check out entirely is abstention as well.
@@ -63,8 +77,8 @@ give precise timings from sparse stills.
 - For each technique error you can judge, give an observation with: errorId \
 (from the list provided, exactly), rep (a label from the list), phase, status \
 (observed / not_observed / unobservable / uncertain), frames (the file names \
-of the stills that show it) and one sentence describing what is visible. \
-Leaving an error out means you could not judge it. That is allowed.
+of the stills that show it) and description (one sentence saying what is \
+visible). Leaving an error out means you could not judge it. That is allowed.
 - Second person, plain sentences, no coaching slogans, no filler.
 Return one JSON object with keys: headline (one line), narrative (short \
 paragraphs), nextSession (one sentence on what to film or attempt next), \
@@ -79,16 +93,36 @@ def _config() -> tuple[str, str, str] | None:
     """(base_url, key, model) when a vision endpoint is configured."""
     base = (os.environ.get("BARRA_VISION_BASE_URL")
             or os.environ.get("NAN_BASE_URL") or "").rstrip("/")
-    key = os.environ.get("BARRA_VISION_API_KEY") or os.environ.get("NAN_API_KEY") or ""
-    model = os.environ.get("BARRA_VISION_MODEL", "glm5.3-flash")
-    if base and key.strip():
-        return base, key.strip(), model
+    key = (os.environ.get("BARRA_VISION_API_KEY") or get_nan_key()).strip()
+    model = os.environ.get("BARRA_VISION_MODEL", "mimo-v2.5")
+    # The key comes from nan.builders; an unset base should mean that provider,
+    # not "vision off". A deployment that pointed BARRA_VISION_BASE_URL
+    # elsewhere still wins, because that variable is checked first.
+    if not base:
+        base = "https://api.nan.builders/v1"
+    if key:
+        return base, key, model
     return None
 
 
+# The provider's edge 403s clients that look like a script. The labellers use a
+# browser UA for exactly this reason; the vision calls do too.
+USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+              "(KHTML, like Gecko) Chrome/128.0 Safari/537.36")
+
+# Empty replies are a real, observed failure of the reasoning model: it spends
+# the completion budget on reasoning tokens and returns a 200 whose content is
+# "". Retrying is cheap next to dropping the pass.
+CHAT_ATTEMPTS = 3
+
+
 def _chat(base: str, key: str, model: str, system: str, content: list[dict],
-          timeout: int = REQUEST_TIMEOUT) -> str | None:
-    """One OpenAI-compatible call; None on any failure, never a raise."""
+          timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS) -> str | None:
+    """One OpenAI-compatible call; None on any failure, never a raise.
+
+    Retries transient transport failures and empty replies. A malformed reply
+    is returned to the caller to parse - only a missing reply is retried here.
+    """
     body = json.dumps({
         "model": model,
         "messages": [{"role": "system", "content": system},
@@ -98,19 +132,37 @@ def _chat(base: str, key: str, model: str, system: str, content: list[dict],
     req = urllib.request.Request(
         f"{base}/chat/completions", data=body,
         headers={"Authorization": f"Bearer {key}", "Content-Type": "application/json",
-                 # Same lesson as the objectives chat: a script-looking client
-                 # is answered by the provider's edge with a 403.
-                 "User-Agent": "barrapp-vision/1.0"},
+                 "User-Agent": USER_AGENT},
         method="POST",
     )
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:
-            data = json.loads(resp.read().decode())
-        text = data["choices"][0]["message"]["content"]
-        return text if isinstance(text, str) else None
-    except (urllib.error.URLError, KeyError, IndexError, TypeError,
-            json.JSONDecodeError, TimeoutError, OSError):
-        return None
+    for attempt in range(max(1, attempts)):
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode())
+            text = data["choices"][0]["message"]["content"]
+        except (urllib.error.URLError, KeyError, IndexError, TypeError,
+                json.JSONDecodeError, TimeoutError, OSError):
+            if attempt < attempts - 1:
+                time.sleep(0.8 * (attempt + 1))
+                continue
+            return None
+        if isinstance(text, str) and text.strip():
+            return text
+        if attempt < attempts - 1:
+            time.sleep(0.8 * (attempt + 1))
+    return None
+
+
+def _strip_keys(obj):
+    """Whitespace around a JSON key is never intentional - MiMo emitted
+    `" narrative"` on a real reply, which silently failed every `.get(
+    "narrative")` and dropped the whole note. Normalized once, here."""
+    if isinstance(obj, dict):
+        return {(k.strip() if isinstance(k, str) else k): _strip_keys(v)
+                for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_strip_keys(v) for v in obj]
+    return obj
 
 
 def parse_json_object(text: str | None) -> dict | None:
@@ -132,7 +184,7 @@ def parse_json_object(text: str | None) -> dict | None:
             obj = json.loads(s[start:end + 1])
         except json.JSONDecodeError:
             return None
-    return obj if isinstance(obj, dict) else None
+    return _strip_keys(obj) if isinstance(obj, dict) else None
 
 
 def _images(paths) -> list[dict]:
@@ -157,7 +209,8 @@ def _known_rules(report: dict | None) -> list[dict]:
         return []
     movement = (report or {}).get("exercise") or ""
     return [{"errorId": r.id, "name": r.name, "phase": r.phase,
-             "observable": r.observable} for r in rules_for(movement)]
+             "observable": r.observable, "correction": r.correction}
+            for r in rules_for(movement)]
 
 
 def _rep_summary(rep: dict) -> str:
@@ -181,6 +234,15 @@ def _rep_summary(rep: dict) -> str:
             for a in blocked))
     if rep.get("assessmentBlocked"):
         parts.append(f"whole rep blocked: {rep['assessmentBlocked']}")
+    # The per-rep biometrics the geometry produced. These are what the model
+    # is meant to reason over: a rubric question ("is the lockout complete?")
+    # answered with the number the camera measured behind it, not a stranger's
+    # impression of a few stills. They stay evidence, never ground truth.
+    metrics = rep.get("metrics") or []
+    if metrics:
+        parts.append("measured: " + "; ".join(str(m) for m in metrics))
+    if rep.get("score") is not None:
+        parts.append(f"rep score {rep['score']}/100 ({rep.get('band', '')})".strip())
     return " | ".join(parts)
 
 
@@ -207,11 +269,18 @@ def _user_text(art, report: dict | None) -> str:
         lines.append("Sampled repetitions (all times are in the source video):")
         for rep in reps:
             lines.append("- " + _rep_summary(rep))
+    if report.get("sessionScore") is not None:
+        lines.append(f"Session score: {report['sessionScore']}/100 "
+                     f"({report.get('sessionBand', '')}).")
+    if report.get("consistency"):
+        lines.append("Set consistency (coefficient of variation): "
+                     + json.dumps(report["consistency"]))
     rules = _known_rules(report)
     if rules:
         lines.append("Technique errors you may report, by errorId (use these exactly):")
         for r in rules:
-            lines.append(f"- {r['errorId']} [{r['phase']}]: {r['name']} - {r['observable']}")
+            lines.append(f"- {r['errorId']} [{r['phase']}]: {r['name']} - "
+                         f"{r['observable']} Fix: {r['correction']}")
     lines.append("Stills, in order (file: rep, phase, moment, timestamp):")
     for s in getattr(art, "frames", []):
         lines.append(f"- {s.path.name}: {s.rep or 'window'}, {s.phase}, {s.moment}, {s.t_s:.2f}s")
@@ -467,3 +536,198 @@ def technique_second_opinion(art) -> str | None:
     if len(content) < 2:
         return None
     return parse_verdict(_chat(base, key, SECOND_MODEL, SYSTEM, content))
+
+
+# ---- localizing the exercise inside the raw clip --------------------------
+# The offline labeller (scripts/label_calisthenics.py) already does this with
+# MiMo: sample timestamped frames and ask for the window where the technique
+# is actually performed, excluding intros and talking heads. This is that same
+# question, asked in the worker so the stored clip can be the set and not the
+# walk to the bar.
+
+LOCALIZE_SYSTEM = """You find where an exercise is actually performed inside \
+one training clip.
+
+You are shown stills sampled at fixed timestamps from a single clip, in time \
+order. Clips often open or close with an intro, a talking head, a title card, \
+a person walking to the equipment, or resting. Return the time window that \
+contains ONLY the active performance of the exercise.
+
+Rules:
+- technique_start is the first sampled timestamp where the person is visibly \
+performing the exercise.
+- technique_end is the last sampled timestamp where the exercise is still \
+visible.
+- Exclude intros, talking heads, text cards, rest between sets, and walking.
+- If the exercise is never performed, set detected_exercise to "none" and \
+technique_start = technique_end = 0.
+- Both timestamps must come from the list of frame timestamps you were given.
+Return ONE JSON object, no markdown fences:
+{"detected_exercise": "<movement name or none>", "agrees": true|false, \
+"technique_start": <seconds>, "technique_end": <seconds>, \
+"reps_estimate": <integer>, "description": "<one sentence: viewpoint, \
+equipment, what happens>"}"""
+
+
+CLASSIFY_SYSTEM = """You identify a calisthenics movement from stills of one \
+clip, by answering ONE question at a time.
+
+You are shown frames sampled in time order from a single clip. Answer only the \
+question you are asked, from the options given, describing what the frames \
+actually show. Do not name the exercise; later questions will narrow it down.
+
+Choose "unclear" whenever the frames do not settle the question. That is a \
+real answer and a useful one - a wrong confident choice sends every later \
+question down the wrong branch, and there is no way back up."""
+
+
+def classify_movement(frames, log=None) -> dict | None:
+    """Name the movement by walking the decision tree, one small question each.
+
+    Returns the walk as a dict - the skill id when it reached one, and always
+    the path of questions and answers that got there - or None when no vision
+    endpoint is configured.
+
+    The path is the reason this exists. The single-shot classifier it replaces
+    answered with a free-text name and a confidence, so a wrong answer could
+    not be attributed to anything; here a muscle-up misread as a pull-up is
+    visibly a wrong answer to "what is happening while hanging", which is a
+    question you can improve.
+
+    `frames` is a list of image paths, already sampled. `log` is an optional
+    callable for one line per question, which the labelling tools use to show
+    the reasoning as it happens.
+    """
+    from barra.movement_tree import prompt_for, walk
+
+    cfg = _config()
+    if cfg is None:
+        return None
+    base, key, model = cfg
+    images = _images(list(frames))
+    if not images:
+        return None
+
+    def ask(node) -> str:
+        content = [{"type": "text", "text": prompt_for(node)}] + images
+        text = _chat(base, key, model, CLASSIFY_SYSTEM, content)
+        parsed = parse_json_object(text) or {}
+        choice = str(parsed.get("choice") or "").strip()
+        if log:
+            log(f"{node.id}: {choice or '(no answer)'} "
+                f"- {str(parsed.get('why') or '')[:80]}")
+        return choice
+
+    result = walk(ask)
+    out = result.as_trace()
+    out["model"] = model
+    return out
+
+
+def _as_float(value) -> float | None:
+    if isinstance(value, bool) or value is None:
+        return None
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def window_from_verdict(parsed: dict, duration: float,
+                        model: str = "") -> dict:
+    """Turn a localization reply into a window, or a `usable: False` record.
+
+    The window must be a real stretch of footage (at least MIN_WINDOW_S) that
+    is meaningfully shorter than the clip - a reply covering the whole clip is
+    not a localization and trimming to it would only re-encode for nothing.
+    """
+    start = _as_float(parsed.get("technique_start"))
+    end = _as_float(parsed.get("technique_end"))
+    detected = str(parsed.get("detected_exercise")
+                   or parsed.get("detected_trick") or "").strip()
+    out = {
+        "exercise": detected,
+        "startS": start,
+        "endS": end,
+        "durationS": round(float(duration), 2),
+        "repsEstimate": (int(parsed["reps_estimate"])
+                         if isinstance(parsed.get("reps_estimate"), (int, float))
+                         and not isinstance(parsed.get("reps_estimate"), bool)
+                         else None),
+        "description": str(parsed.get("description") or "").strip()[:300],
+        "model": model,
+        "agrees": (bool(parsed["agrees"])
+                   if isinstance(parsed.get("agrees"), bool) else None),
+        "usable": False,
+    }
+    if start is None or end is None or duration <= 0:
+        return out
+    start = max(0.0, min(start, duration))
+    end = max(0.0, min(end, duration))
+    out["startS"], out["endS"] = round(start, 2), round(end, 2)
+    span = end - start
+    out["usable"] = bool(MIN_WINDOW_S <= span < duration * MAX_WINDOW_FRAC)
+    return out
+
+
+def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | None:
+    """Where the exercise is: MiMo's window over sampled stills, or None.
+
+    Reads duration with OpenCV and grabs frames with the same decoder the pose
+    path uses, so it needs no ffmpeg/ffprobe. Any failure - no endpoint, no
+    frames, malformed reply - returns None and the caller keeps the raw clip.
+    """
+    cfg = _config()
+    if cfg is None:
+        print("[barra] locate: no vision endpoint/key; keeping the raw clip",
+              flush=True)
+        return None
+    if os.environ.get("BARRA_LOCALIZE", "1").strip().lower() in (
+            "0", "false", "no", "off"):
+        return None
+    base, key, _ = cfg
+    model = os.environ.get("BARRA_LOCALIZE_MODEL", LOCALIZE_MODEL_DEFAULT)
+    try:
+        from barra.frames import grab_frames
+        from barra.ingest import probe_video
+    except ImportError:
+        return None
+
+    try:
+        info = probe_video(Path(video_path))
+        duration = float(info.get("duration_s") or 0.0)
+        if not info.get("ok") or duration <= 0:
+            return None
+        n = 10 if duration > 40 else 6
+        moments = [round(duration * (i + 0.5) / n, 2) for i in range(n)]
+        grabbed = grab_frames(Path(video_path), moments, Path(out_dir), prefix="locate")
+        if not grabbed:
+            return None
+        frames = sorted(((moments[i], p) for i, p in grabbed), key=lambda x: x[0])
+    except Exception as exc:  # noqa: BLE001 - localization is best-effort
+        print(f"[barra] locate: could not sample frames: {exc}", flush=True)
+        return None
+
+    frame_list = "\n".join(f"  frame {i + 1}: t={t}s"
+                           for i, (t, _) in enumerate(frames))
+    claimed = (f'\nThe athlete says the movement is "{movement}".'
+               if movement and movement != "auto" else "")
+    user = (f"These frames were sampled at fixed timestamps from ONE clip, in "
+            f"time order (claimed duration {duration:.1f}s):\n{frame_list}{claimed}\n\n"
+            "Return the JSON object described in the system message.")
+    content: list[dict] = [{"type": "text", "text": user}]
+    content += _images([p for _, p in frames])
+    if len(content) < 2:
+        return None
+    text = _chat(base, key, model, LOCALIZE_SYSTEM, content,
+                 timeout=LOCALIZE_TIMEOUT)
+    parsed = parse_json_object(text)
+    if parsed is None:
+        print(f"[barra] locate: no JSON in the {model} reply "
+              f"({len(text or '')} chars)", flush=True)
+        return None
+    out = window_from_verdict(parsed, duration, model)
+    print(f"[barra] locate: {out.get('exercise') or '?'} "
+          f"{out.get('startS')}-{out.get('endS')}s of {duration:.1f}s "
+          f"usable={out['usable']}", flush=True)
+    return out

@@ -22,12 +22,20 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "api"))
 
 from process import process_job  # noqa: E402
+import referral  # noqa: E402
 
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 JOBS: dict[str, dict] = {}
 FEEDBACK: dict[str, dict] = {}
+# The same referral engine the Lambda runs, on the in-memory store. Sharing
+# the module is what keeps a code redeemed on the LAN and on AWS the same
+# program rather than two that drift.
+REFERRALS = referral.MemoryStore()
 LOCK = threading.Lock()
+# The same floor handler.py applies: below this an "upload" is a stream
+# that ended before it started, not a clip.
+MIN_CLIP_BYTES = 8 * 1024
 
 
 def _now() -> str:
@@ -120,6 +128,8 @@ class Handler(BaseHTTPRequestHandler):
                     if j.get("owner") == owner and j.get("status") == "done"
                 ]
             return self._send(200, {"history": history})
+        if path == "/v1/referral":
+            return self._send(200, referral.status(REFERRALS, owner))
         parts = [p for p in path.split("/") if p]
         if len(parts) == 3 and parts[0] == "v1" and parts[1] == "jobs":
             with LOCK:
@@ -161,14 +171,24 @@ class Handler(BaseHTTPRequestHandler):
                 "result": None,
                 "error": None,
             }
+            allowed, credits = referral.charge(REFERRALS, owner)
+            if not allowed:
+                return self._send(402, {
+                    "error": "no measurements left - invite a friend to earn more",
+                    "credits": credits,
+                })
             with LOCK:
                 JOBS[job_id] = job
             return self._send(201, _dump(job))
-
         if path == "/v1/chat":
             from chat import chat
 
             return self._send(200, chat(body.get("messages") or []))
+
+        if path == "/v1/referral/redeem":
+            code = body.get("code") if isinstance(body.get("code"), str) else ""
+            status, payload = referral.redeem(REFERRALS, owner, code)
+            return self._send(status, payload)
 
         if path == "/v1/feedback":
             message = (body.get("message") or "").strip() if isinstance(body.get("message"), str) else ""
@@ -260,10 +280,28 @@ class Handler(BaseHTTPRequestHandler):
             for part in part_dir.glob("*"):
                 part.unlink()
             part_dir.rmdir()
+            size = dest.stat().st_size if dest.exists() else 0
+            if size < MIN_CLIP_BYTES:
+                with LOCK:
+                    JOBS[job_id]["status"] = "failed"
+                    JOBS[job_id]["error"] = "the clip arrived empty or truncated. Retry."
+                    JOBS[job_id].pop("uploadId", None)
+                return self._send(400, {"error": "the clip arrived empty or truncated",
+                                        "bytes": size})
             with LOCK:
                 JOBS[job_id]["status"] = "uploaded"
                 JOBS[job_id].pop("uploadId", None)
             return self._send(200, {"ok": True})
+        if action == "event":
+            # Parity with the deployed API, which keeps an UploadsTable row
+            # per job. There is no such table here, so the phone's line goes
+            # to the console - which is where a LAN test is being watched
+            # from anyway, and is enough to stop the client seeing a 404 on
+            # every event it ships.
+            print(f"[upload {job_id}] {(body or {}).get('level', 'info')}: "
+                  f"{(body or {}).get('event', 'client')} "
+                  f"{(body or {}).get('detail', '')}".rstrip(), flush=True)
+            return self._send(202, {"ok": True, "stored": False})
         if action == "abort":
             part_dir = self._part_dir(job_id)
             for part in part_dir.glob("*"):
@@ -297,6 +335,31 @@ class Handler(BaseHTTPRequestHandler):
                     remaining -= len(chunk)
             self._send(200, {"ok": True, "partNumber": n,
                              "etag": f'"{n:05d}"'})
+            return
+        # A feedback clip lands on the same presigned-PUT contract as a job
+        # upload, so the phone needs no second code path. On AWS that PUT goes
+        # straight to S3; here it has to be a real route, or attaching a clip
+        # to feedback works in production and 404s on the LAN.
+        m = re.fullmatch(r"/v1/feedback/([0-9a-f]+)/video", path)
+        if m:
+            feedback_id = m.group(1)
+            with LOCK:
+                item = FEEDBACK.get(feedback_id)
+            if not item or item.get("owner") != owner:
+                return self._send(404, {"error": "unknown feedback"})
+            length = int(self.headers.get("Content-Length") or 0)
+            dest = DATA / f"feedback-{feedback_id}.mp4"
+            with dest.open("wb") as fh:
+                remaining = length
+                while remaining > 0:
+                    chunk = self.rfile.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    fh.write(chunk)
+                    remaining -= len(chunk)
+            with LOCK:
+                item["videoBytes"] = dest.stat().st_size
+            self._send(200, {"ok": True, "id": feedback_id})
             return
         if not (path.startswith("/v1/jobs/") and path.endswith("/video")):
             return self._send(404, {"error": "not found"})
@@ -348,8 +411,52 @@ def _run(job_id: str) -> None:
         with LOCK:
             JOBS[job_id]["stage"] = name
 
+    # Local parity with the worker: locate the exercise with MiMo, keep the
+    # measurement on the full clip, then replace the stored file with the
+    # located window. Best-effort throughout.
+    localization = None
+    vision_label = None
+    try:
+        from vision import locate_exercise
+
+        located = locate_exercise(video, DATA / f"{job_id}-locate",
+                                  job.get("exercise"))
+    except Exception:  # noqa: BLE001
+        located = None
+    if located:
+        vision_label = located.get("exercise") or None
+        if vision_label and str(vision_label).lower() in ("none", "unknown", ""):
+            vision_label = None
+    if located and located.get("usable"):
+        localization = dict(located)
+        localization["source"] = "vision"
+
+    if vision_label:
+        job = dict(job)
+        job["visionLabel"] = vision_label
+
     try:
         result = process_job(job, video, on_stage=stage)
+        from barra.frames import trim_clip
+
+        if localization is None:
+            t = result.get("trim") or {}
+            if t.get("startS") is not None and t.get("endS") is not None:
+                localization = {"source": "geometry", "startS": t["startS"],
+                                "endS": t["endS"], "durationS": result.get("duration_s")}
+        if localization and localization.get("startS") is not None:
+            margin = 1.0
+            start = max(0.0, float(localization["startS"]) - margin)
+            end = float(localization["endS"]) + margin
+            dur = localization.get("durationS") or result.get("duration_s")
+            if dur:
+                end = min(end, float(dur))
+            cut = trim_clip(video, start, end, DATA / f"{job_id}-exercise.mp4")
+            if cut is not None:
+                cut.replace(video)
+                localization["trimmed"] = True
+        if localization is not None:
+            result["localization"] = localization
         with LOCK:
             JOBS[job_id]["result"] = result
             JOBS[job_id]["exercise"] = result.get("exercise") or job.get("exercise")

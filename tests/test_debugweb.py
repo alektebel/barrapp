@@ -49,7 +49,11 @@ def test_fault_spec_thresholds_are_the_config_values():
         for r in rows:
             assert r["op"] in ("<", "<=", ">", ">="), r
             if r["key"] == "lockout_pct":
-                assert r["threshold"] == THRESHOLDS.lockout_min * 100
+                # Pull-ups share the primitive but not the muscle-up bar.
+                if r.get("id") == "pull_up.incomplete_lockout":
+                    assert r["threshold"] == THRESHOLDS.pull_up_lockout_pct
+                else:
+                    assert r["threshold"] == THRESHOLDS.lockout_min * 100
             if r["key"] == "hang_pct":
                 assert r["threshold"] == THRESHOLDS.hang_min * 100
 
@@ -208,7 +212,7 @@ def test_model_card_exposes_live_thresholds_with_source_notes():
     model = next(s for s in card["pipeline"] if s["key"] == "model")
     fusion = next(s for s in card["pipeline"] if s["key"] == "fusion")
     assert any(c["name"] == "FEATURE_NAMES" for c in model["constants"])
-    assert any(c["name"] == "MODEL_ACCEPT_CONFIDENCE" for c in fusion["constants"])
+    assert any(c["name"] == "MODEL_MIN_CONFIDENCE" for c in fusion["constants"])
 
 
 def test_debug_runner_uses_the_production_process_job_path():

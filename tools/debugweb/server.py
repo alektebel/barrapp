@@ -998,8 +998,9 @@ PIPELINE = [
      "emits": ["exercise", "status", "reason", "geometry", "model", "nan"],
      "fails": "too much trust in a learned model, or too little. Fusion states "
               "the status instead of hiding the disagreement.",
-     "look": "`detected.fusion`. `model-overrides-weak-geometry` and "
-             "`geometry-reviewed` are the cases that need a human look."},
+     "look": "`detected.fusion`. `vision-decides` and `model-decides` are "
+             "the cases where a detector overruled the others - the ones "
+             "that need a human look."},
     {"key": "signal", "name": "Build the tracking signal",
      "module": "barra/movements.py", "fn": "tracking_signal",
      "reads": ["barra.movements:PAIR_CONF", "barra.movements:MIN_PAIRED_FRAC",

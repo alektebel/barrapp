@@ -8,11 +8,14 @@ Parameters:
     Default: ""
     NoEcho: true
     Description: Leave blank until you have a DeepSeek key.
-  NanApiKey:
+  AlarmEmail:
     Type: String
     Default: ""
-    NoEcho: true
-    Description: Key for the objectives intake chat (nan.builder). Leave blank to fall back.
+    Description: >-
+      Where the dead-letter alarm is sent. Leave blank and the alarm still
+      exists and still fires - it just has nowhere to go, which is how the
+      "No module named 'auth'" deploy managed to fail every clip for a day
+      with the evidence sitting unread in the queue.
   NanBaseUrl:
     Type: String
     Default: ""
@@ -36,14 +39,26 @@ Globals:
         DEEPSEEK_API_KEY: !Ref DeepSeekApiKey
         DEEPSEEK_BASE_URL: https://api.deepseek.com
         DEEPSEEK_MODEL: deepseek-chat
-        NAN_API_KEY: !Ref NanApiKey
+        NAN_SECRET_ID: barrapp/nan-api-key
         NAN_BASE_URL: !Ref NanBaseUrl
         NAN_MODEL: qwen3.8-flash
         BARRA_ROOT: /opt/barra
         TRACES_TABLE: !Ref TracesTable
+        UPLOADS_TABLE: !Ref UploadsTable
         FEEDBACK_TABLE: !Ref FeedbackTable
+        REFERRALS_TABLE: !Ref ReferralsTable
+        # The referral program's knobs. Credits are only SPENT when
+        # REQUIRE_CREDITS is "1"; off, the program grants and shows a balance
+        # but never refuses a clip, so turning it on is a deployment decision.
+        STARTING_CREDITS: "3"
+        REFERRAL_REWARD: "3"
+        WELCOME_CREDITS: "1"
+        REQUIRE_CREDITS: "0"
         USER_POOL_ID: !Ref UserPool
         USER_POOL_CLIENT_ID: !Ref UserPoolClient
+
+Conditions:
+  HasAlarmEmail: !Not [!Equals [!Ref AlarmEmail, ""]]
 
 Resources:
   VideoBucket:
@@ -63,6 +78,16 @@ Resources:
           - Id: expire-clips-30d
             Status: Enabled
             ExpirationInDays: 30
+          # An expiry rule does NOT touch the parts of an unfinished multipart
+          # upload. They do not appear in ListObjects, nothing ages them out,
+          # and they are billed: six abandoned uploads had been sitting in this
+          # bucket since the day a phone walked away from them. One day is well
+          # past the hour a presigned part url stays valid, so nothing a client
+          # could still finish is ever cut off here.
+          - Id: abort-incomplete-uploads-1d
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
       CorsConfiguration:
         CorsRules:
           - AllowedMethods: [PUT, GET, HEAD]
@@ -111,6 +136,25 @@ Resources:
         AttributeName: ttl
         Enabled: true
 
+  # One row per job, holding every step of its upload: the parts presigned,
+  # the ones S3 took, the pauses the phone shipped from its own log, the
+  # abandonment or the completion. A job row says what a clip became; this
+  # says how it got there, and for the ones that never arrived it is the only
+  # thing that ever will.
+  UploadsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: jobId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jobId
+          KeyType: HASH
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
+
   # One row per user feedback submission. No TTL on purpose: feedback stays
   # readable until reviewed, even though its clip expires from the bucket
   # after 30 days with everything else in it.
@@ -137,6 +181,22 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+
+  # The referral program. One single-key table holds three shapes of row:
+  # `acct#<owner>` is that owner's code, credit balance and tally; `code#<CODE>`
+  # is the reverse lookup a redeem does; `ref#<owner>` is the one-redemption
+  # guard, keyed by the referee so a phone can never cash two codes. No GSI
+  # because every access is a direct Get/Put/Update on `id`.
+  ReferralsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
 
   Api:
     Type: AWS::Serverless::HttpApi
@@ -170,8 +230,18 @@ Resources:
             TableName: !Ref JobsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref FeedbackTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref ReferralsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UploadsTable
         - S3CrudPolicy:
             BucketName: !Ref VideoBucket
+        # The nan.builders key is read at runtime from Secrets Manager, so it
+        # is never a template parameter or a plaintext Lambda environment value.
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:barrapp/nan-api-key-*"
         - Statement:
             - Effect: Allow
               Action: lambda:InvokeFunction
@@ -216,14 +286,32 @@ Resources:
       Environment:
         Variables:
           BARRA_POSE_MODEL: /opt/barra/models/pose_landmarker_heavy.task
-          BARRA_VISION_MODEL: glm5.3-flash
+          # MiMo does both passes in the worker: localizing the exercise in
+          # the raw clip, and the rubric error read over the stills + the
+          # geometry's measurements.
+          BARRA_VISION_MODEL: mimo-v2.5
+          BARRA_LOCALIZE: "1"
+          BARRA_LOCALIZE_MODEL: mimo-v2.5
+          # /opt/barra is read-only; artifacts and trace JSON go to /tmp.
+          BARRA_TRACE_DIR: /tmp/traces
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref TracesTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UploadsTable
         - S3ReadPolicy:
             BucketName: !Ref VideoBucket
+        # The worker overwrites the stored clip with the located exercise.
+        - Statement:
+            - Effect: Allow
+              Action: s3:PutObject
+              Resource: !Sub "${VideoBucket.Arn}/*"
+        - Statement:
+            - Effect: Allow
+              Action: secretsmanager:GetSecretValue
+              Resource: !Sub "arn:${AWS::Partition}:secretsmanager:${AWS::Region}:${AWS::AccountId}:secret:barrapp/nan-api-key-*"
         - Statement:
             - Effect: Allow
               Action:
@@ -274,10 +362,108 @@ Resources:
         IdToken: hours
         RefreshToken: days
 
+  # The clock that finishes what the phone abandoned. Reaping on read can only
+  # ever reach the jobs somebody still asks about; the abandoned upload is by
+  # definition the one nobody asks about again, which is why eight of them sat
+  # untouched in the table for a week.
+  SweeperFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Runtime: python3.11
+      Architectures: [x86_64]
+      Handler: sweeper.sweep
+      CodeUri: api/
+      Timeout: 120
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref UploadsTable
+        - S3CrudPolicy:
+            BucketName: !Ref VideoBucket
+        # S3CrudPolicy covers objects, not the bucket-level multipart listing:
+        # without this the sweep dies on
+        #   AccessDenied ... s3:ListBucketMultipartUploads
+        # and the abandoned uploads it exists to clean up are never seen.
+        - Statement:
+            - Effect: Allow
+              Action:
+                - s3:ListBucketMultipartUploads
+              Resource: !GetAtt VideoBucket.Arn
+            - Effect: Allow
+              Action:
+                - s3:AbortMultipartUpload
+                - s3:ListMultipartUploadParts
+              Resource: !Sub "${VideoBucket.Arn}/*"
+      Events:
+        EveryQuarterHour:
+          Type: Schedule
+          Properties:
+            Schedule: rate(15 minutes)
+            Description: Reap stuck jobs and abort abandoned uploads.
+
   WorkerDLQ:
     Type: AWS::SQS::Queue
     Properties:
       MessageRetentionPeriod: 1209600  # 14 days
+
+  # A dead letter nobody is told about is a log file. The queue held the
+  # "Unable to import module 'handler': No module named 'auth'" of a deploy
+  # that broke every clip it touched, and the first anyone knew of it was the
+  # next time someone went looking.
+  OpsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: barrapp alarms
+
+  OpsSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlarmEmail
+    Properties:
+      TopicArn: !Ref OpsTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  WorkerDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: >-
+        A clip reached the dead-letter queue: the worker failed it three times
+        and the phone is showing a spinner that will never resolve.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt WorkerDLQ.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 0
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref OpsTopic
+
+  # Separate from the dead-letter alarm on purpose: an invoke that errors and
+  # then succeeds on Lambda's retry never reaches the queue, so the DLQ alarm
+  # stays silent through a fault that is failing one clip in three.
+  WorkerErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmDescription: The worker is throwing.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref WorkerFunction
+      Statistic: Sum
+      Period: 900
+      EvaluationPeriods: 1
+      Threshold: 2
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref OpsTopic
 
   WorkerAsyncConfig:
     Type: AWS::Lambda::EventInvokeConfig
@@ -302,3 +488,15 @@ Outputs:
     Value: !Sub "https://${Api}.execute-api.${AWS::Region}.amazonaws.com"
   VideoBucketName:
     Value: !Ref VideoBucket
+  UploadsTableName:
+    Description: Every upload try, per job. Read it when a clip never arrived.
+    Value: !Ref UploadsTable
+  ReferralsTableName:
+    Description: Referral codes, credit balances and redemptions.
+    Value: !Ref ReferralsTable
+  WorkerDLQUrl:
+    Description: Clips the worker failed three times.
+    Value: !Ref WorkerDLQ
+  OpsTopicArn:
+    Description: Subscribe to this to be told when a clip dead-letters.
+    Value: !Ref OpsTopic

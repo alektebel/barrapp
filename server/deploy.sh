@@ -45,10 +45,77 @@ echo "worker image $TAG pushed ($MEDIA)"
 # match what Lambda runs.
 sam build --use-container ApiFunction
 
+# SAM rejects empty NoEcho parameter overrides. Omitting a parameter lets
+# CloudFormation reuse the stack's current value instead of clearing the key.
+overrides=(
+  "WorkerImageUri=$REPO:$TAG"
+)
+if [ -n "${DEEPSEEK_API_KEY:-}" ]; then
+  overrides+=("DeepSeekApiKey=$DEEPSEEK_API_KEY")
+fi
+if [ -n "${NAN_BASE_URL:-}" ]; then
+  overrides+=("NanBaseUrl=$NAN_BASE_URL")
+fi
+
 sam deploy \
-  --image-repository "$REPO" \
-  --parameter-overrides \
-    "DeepSeekApiKey=${DEEPSEEK_API_KEY:-}" \
-    "NanApiKey=${NAN_API_KEY:-}" \
-    "NanBaseUrl=${NAN_BASE_URL:-}" \
-    "WorkerImageUri=$REPO:$TAG"
+  --no-confirm-changeset \
+  --no-fail-on-empty-changeset \
+  --parameter-overrides "${overrides[@]}"
+
+# The smoke that would have caught the deploy of 2026-09-12. That image was
+# missing api/auth.py, so every invoke died at import with
+#
+#   Unable to import module 'handler': No module named 'auth'
+#
+# before a single line of the handler ran. The stack updated cleanly, the
+# deploy reported success, and every clip after it went to the dead-letter
+# queue - unread, because nothing was watching the queue either.
+#
+# One synchronous invoke settles it. The job id is nonsense on purpose: a
+# worker that imports gets as far as looking for the clip and fails on the
+# missing object, which is a PASS here. A worker that cannot import fails
+# before that, with Runtime.ImportModuleError, and this exits non-zero.
+WORKER_FN=$(aws cloudformation describe-stack-resource \
+  --stack-name "${STACK:-sam-app}" --region "$REGION" \
+  --logical-resource-id WorkerFunction \
+  --query 'StackResourceDetail.PhysicalResourceId' --output text)
+
+echo "smoke-testing $WORKER_FN"
+OUT=$(mktemp)
+PAYLOAD=$(mktemp)
+printf '%s' '{"job_id":"deploy-smoke","owner":"deploy-smoke"}' > "$PAYLOAD"
+
+# fileb:// rather than a raw --payload string, and no --cli-binary-format:
+# that flag exists only in AWS CLI v2, and this machine runs v1, where it is
+# an "Unknown options" usage error. fileb:// is read as bytes by both.
+if ! aws lambda invoke --function-name "$WORKER_FN" --region "$REGION" \
+      --payload "fileb://$PAYLOAD" "$OUT" >/dev/null; then
+  echo "could not invoke $WORKER_FN - the smoke test did not run" >&2
+  rm -f "$OUT" "$PAYLOAD"
+  exit 1
+fi
+rm -f "$PAYLOAD"
+
+if grep -q "ImportModuleError\|No module named\|Unable to import" "$OUT"; then
+  echo "the worker image cannot import its own handler:" >&2
+  cat "$OUT" >&2
+  echo >&2
+  echo "the stack is updated but every clip will dead-letter - fix and redeploy" >&2
+  rm -f "$OUT"
+  exit 1
+fi
+echo "worker imports cleanly: $(head -c 200 "$OUT")"
+rm -f "$OUT"
+
+# The same question, asked of the API: a zip missing a module answers 502 to
+# every request, and /health is the one route that touches no AWS service, so
+# a 200 here means the package imported.
+API=$(aws cloudformation describe-stacks --stack-name "${STACK:-sam-app}" \
+  --region "$REGION" --query \
+  'Stacks[0].Outputs[?OutputKey==`ApiUrl`].OutputValue' --output text)
+CODE=$(curl -s -o /dev/null -w '%{http_code}' "$API/health")
+if [ "$CODE" != "200" ]; then
+  echo "the API answered $CODE on /health - the zip is broken" >&2
+  exit 1
+fi
+echo "api healthy at $API"

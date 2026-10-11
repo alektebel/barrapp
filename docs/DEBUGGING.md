@@ -166,6 +166,30 @@ produced its score, provided the trace file is still on the server. The id also
 appears in small type under the session itself, so it can be read off without
 opening Diagnostics at all.
 
+## When the evidence needs your eyes: the rep-review loop
+
+Tracing answers *what the pipeline measured*; it cannot answer *what actually
+happened in the clip*. That answer is the only reference allowed to overrule
+the directory a scraper chose, so the tool that produces it runs the real
+pipeline: `scripts/label_reps.py` segments each clip with the same code that
+will later be scored, and puts your verdict next to the segmenter's own rep
+windows. A movement you settle goes to `data/calisthenics/labels-adjudicated.csv`
+(read by `classify_eval.py` and `label_source_eval.py`); per-rep faults go to
+`out/fault-labels-human/` (`fault_eval.py` prefers them over the model's read
+wherever they exist).
+
+```bash
+.venv/bin/python scripts/extract_keypoints.py            # pose the corpus once; resumable
+.venv/bin/python scripts/label_reps.py --extract --from-labels --include-unknown
+.venv/bin/python scripts/label_reps.py --serve           # http://127.0.0.1:8765/review.html
+```
+
+The page refuses to commit a verdict on frames you have not looked at: every
+still must be viewed before a rep's faults unlock, and a relabel without a
+written reason is refused. `docs/LABELLING-UI-BRIEF.md` is the design brief
+behind that, and `docs/PIPELINE-ACCURACY.md` explains which numbers move when
+the sheet fills in.
+
 ## Adding tracing to new code
 
 ```python

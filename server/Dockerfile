@@ -29,6 +29,11 @@ RUN pip install --no-cache-dir -U pip \
     && pip install --no-cache-dir --only-binary=:all: -r ${LAMBDA_TASK_ROOT}/requirements-worker.txt
 
 COPY vendor/barra /opt/barra
-COPY api/handler.py api/auth.py api/chat.py process.py deepseek.py vision.py ${LAMBDA_TASK_ROOT}/
+# Every module handler.py imports, or the container starts and dies at
+# import time with `No module named '<x>'` - which is exactly how the
+# deploy of 2026-09-12 sent every clip to the dead-letter queue while
+# reporting success. deploy.sh now smoke-invokes the image for this.
+COPY api/handler.py api/auth.py api/chat.py api/nan_secret.py api/uploads.py \
+     process.py deepseek.py vision.py ${LAMBDA_TASK_ROOT}/
 
 CMD ["handler.worker"]

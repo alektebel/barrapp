@@ -113,7 +113,8 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
                            visual_count=_visual_count,
                            declared_bin=job.get("view"),
                            variant=job.get("variant"),
-                           pose=pose)
+                           pose=pose,
+                           vision_label=job.get("visionLabel"))
     report = write_report(metrics)
     # The prose model owns exactly three keys. Everything else the UI draws -
     # the detected movement, the trim window, per-rep scores and traces - is
@@ -255,15 +256,26 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
             "endS": round(min(duration_s, reps[-1]["endS"] + pad), 2),
         }
 
-    rec = recommend_for_payload({"track": movement.name, "failures": failures})
     from barra.holds import hold_assessments
-    checks = summarise(hold_assessments(reps))
+    from barra.fault_select import primary_from_assessments
+    hold_rows = hold_assessments(reps)
+    primary = primary_from_assessments(hold_rows)
+    rec = recommend_for_payload({"track": movement.name, "failures": failures})
+    if primary and primary.get("name"):
+        rec = recommend_for_payload({
+            "track": movement.name,
+            "failures": [primary["name"]] + [
+                n for n in (failures or {}) if n != primary["name"]
+            ],
+        })
+    checks = summarise(hold_rows)
     return {
         "exercise": movement.name,
         "track": movement.name,
         "detected": detected,
         "variant": variant,
         "failures": failures,
+        "primaryFault": primary,
         "recommendation": rec,
         "n_reps": len(reps),
         "n_candidates": len(reps),
@@ -324,7 +336,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                  session: str | None = None, trace=None, on_stage=None,
                  visual_count=None, pose=None,
                  declared_bin: str | None = None,
-                 variant: str | None = None) -> dict:
+                 variant: str | None = None,
+                 vision_label: str | None = None) -> dict:
     """Measure one clip. `on_stage`, when given, is called with a short human
     phrase at each step that can take real time, so a waiting phone can say
     where the work is. `visual_count`, when given, is the last resort for a
@@ -338,7 +351,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     trust it instead of the single-clip estimator. `variant` is the technique
     variant the athlete DECLARED (strict / kipping, full / tuck / straddle);
     it is never inferred from a posture, and rules written for a different
-    standard are left out rather than fired."""
+    standard are left out rather than fired. `vision_label` is an independent
+    multimodal name for the movement (typically from locate_exercise); when
+    auto-detecting it is the third vote in fuse_detection."""
     def _stage(name: str) -> None:
         if on_stage is None:
             return
@@ -474,7 +489,17 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         from barra.model import load_default, model_classify, model_load
         _model = load_default()
         if _model is not None and _model.classes:
-            _feat = getattr(detection, "features", None) or {}
+            _feat = dict(getattr(detection, "features", None) or {})
+            # The geometric detector's own feature dict is the narrow vector
+            # its thresholds need. A model trained on the wider kinematic set
+            # asks for names that dict has never held, and every one of them
+            # arrives as the not-a-number sentinel - a model answering from a
+            # third of its inputs, confidently, with nothing raising. So when
+            # the loaded model wants more than the detector computed, compute
+            # the rest from the same keypoints it already has.
+            if any(n not in _feat for n in _model.feature_names):
+                from barra.kinematics import full_features
+                _feat = {**full_features(pose.keypoints, fps), **_feat}
             model_out = {
                 "classification": model_classify(_model, _feat),
                 "load": model_load(_model, _feat),
@@ -487,7 +512,14 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         tr.stage("fusion")
         try:
             from barra.fusion import fuse_detection
-            fusion = fuse_detection(detected, (model_out or {}).get("classification"))
+            # locate_exercise already paid for a multimodal read of the clip;
+            # reuse that name as the vision vote rather than making geometry
+            # and the tiny pose model decide alone (0.556 → 0.817 measured).
+            fusion = fuse_detection(
+                detected,
+                (model_out or {}).get("classification"),
+                nan_label=vision_label,
+            )
             tr.step("fusion", **fusion)
         except Exception as exc:  # noqa: BLE001 - fusion is an improvement, not a requirement
             tr.error("could not fuse detector votes", reason=str(exc)[:200])
@@ -791,9 +823,22 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             f"({vision_count['agreement']})")
 
     clip_faults = clip_failures(reps)
+    from barra.fault_select import primary_from_assessments
+    primary = primary_from_assessments(per_rep_assessments)
     rec = recommend_for_payload({"track": movement.name, "failures": clip_faults})
+    if primary and primary.get("name"):
+        # Prefer the measured primary cue over the static PRIORITY table when
+        # recommending a fix - same fault the athlete is told about.
+        rec = recommend_for_payload({
+            "track": movement.name,
+            "failures": [primary["name"]] + [
+                n for n in (clip_faults or {}) if n != primary["name"]
+            ],
+        })
     checks = summarise(per_rep_assessments)
     tr.step("assessment summary", **checks)
+    if primary:
+        tr.step("primary fault", **primary)
     return {
         "exercise": movement.name,
         "track": movement.name,
@@ -801,6 +846,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "model": model_out,
         "variant": variant_info,
         "failures": clip_faults,
+        "primaryFault": primary,
         # Per errorId: reps observed / checked clean / could not be checked.
         # The clip-level counterpart of reps[].assessments; `failures` above
         # is its observed column only.
