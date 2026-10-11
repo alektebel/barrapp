@@ -37,6 +37,9 @@ data class Analysis(
     val reps: List<RepRow>,
     val blockers: List<String>,
     val nextSession: String,
+    /** The server measures first and adds the advisory vision note after
+     *  (visionStatus "pending"); a session opened in between is re-fetched. */
+    val visionPending: Boolean = false,
     val exercise: String = "",
     val detected: Detected? = null,
     /** The first learned model's verdict and load estimate, shipped beside the

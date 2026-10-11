@@ -451,7 +451,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         val known = _state.value.jobs.firstOrNull { it.id == jobId }
-        if (known?.result != null) {
+        // A cached result whose vision note was still on its way is fetched
+        // again, so the note appears once the server has added it.
+        if (known?.result != null && !known.result.visionPending) {
             _state.update { it.copy(analysis = known.result, current = known) }
             return
         }
@@ -599,7 +601,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun publishWorks() {
-        _state.update { it.copy(works = WorkStore.all(getApplication())) }
+        val works = WorkStore.all(getApplication())
+        _state.update { it.copy(works = works) }
+        // Keeps the process alive while a clip is active, so the upload and the
+        // measurement carry on while the athlete uses other apps.
+        com.barrapp.notify.UploadService.sync(getApplication(), works)
     }
 
     private suspend fun consumeQueue() {
@@ -758,7 +764,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
                 else "job $jobId created — sending the clip " +
                     "(%.1f MB)".format(clip.length() / 1e6))
-            ProcessingNotifier.stage(app, Stage.SENDING.text)
+            ProcessingNotifier.stage(app, Stage.SENDING.text, 0)
             try {
                 uploadResumable(work.id, jobId, clip) { sent, total ->
                     update {
@@ -775,7 +781,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             }
             update { it.copy(status = WorkStore.STATUS_QUEUED, stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code) }
             log(WorkStore.Level.INFO, "uploaded — queued on the server")
-            ProcessingNotifier.stage(app, Stage.QUEUED.text)
+            ProcessingNotifier.stage(app, Stage.QUEUED.text, 1)
             withRetry("queueing on the server", work.id) {
                 withContext(Dispatchers.IO) { api.submit(jobId) }
             }
@@ -812,15 +818,18 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                             ) {
                                 ProcessingNotifier.done(
                                     app,
-                                    "Standard cleared — ${verdict.step.towardsLabel} unlocked",
-                                    "You have now met the ${verdict.label} standard on " +
-                                        "${verdict.step.days} separate days. The Plan page has the call.",
+                                    "Estándar superado: ${verdict.step.towardsLabel} desbloqueado",
+                                    "Has cumplido el estándar de ${verdict.label} en " +
+                                        "${verdict.step.days} días distintos. Mira el Plan.",
                                 )
                             } else {
                                 ProcessingNotifier.done(
                                     app,
-                                    "Measured ${j.result?.repCount ?: 0} rep${if (j.result?.repCount == 1) "" else "s"}",
-                                    "Your ${j.result?.detected?.label ?: j.result?.exercise?.replace('_', ' ') ?: "clip"} is ready.",
+                                    "${j.result?.repCount ?: 0} " +
+                                        (if (j.result?.repCount == 1) "repetición medida" else "repeticiones medidas"),
+                                    "Tu análisis de " + com.barrapp.movementEs(
+                                        j.result?.exercise.orEmpty(), j.result?.detected?.label.orEmpty(),
+                                    ).lowercase() + " está listo.",
                                 )
                             }
                             WorkStore.forget(app, work.id)
@@ -857,7 +866,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                                     stageCode = Stage.code(j),
                                 )
                             }
-                            ProcessingNotifier.stage(app, stage.replaceFirstChar { c -> c.uppercaseChar() })
+                            ProcessingNotifier.stage(app, stage.replaceFirstChar { c -> c.uppercaseChar() },
+                                Stage.progressIndex(Stage.code(j), j.stage))
                         }
                     }
                 }, onFailure = { err ->

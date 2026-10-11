@@ -27,16 +27,18 @@ import com.barrapp.R
 object ProcessingNotifier {
 
     const val CHANNEL = "processing"
-    private const val ONGOING_ID = 4202
+    const val CHANNEL_NAME = "Análisis de vídeos"
+    const val TITLE = "Analizando tu vídeo"
+    const val ONGOING_ID = 4202
     private const val RESULT_ID = 4203
 
     // Mirrors BarrappViewModel.STAGE_* in order, so the notification's progress
     // bar can show where in the pipeline the job is.
-    private val STAGES = listOf(
-        "Uploading the clip",
-        "Finding the exercise",
-        "Trimming to the working set",
-        "Counting and measuring the reps",
+    val STAGES = listOf(
+        "Enviando el vídeo",
+        "Reconociendo el movimiento",
+        "Recortando la serie",
+        "Contando y midiendo repeticiones",
     )
 
     fun ensureChannel(context: Context) {
@@ -46,27 +48,30 @@ object ProcessingNotifier {
         manager.createNotificationChannel(
             NotificationChannel(
                 CHANNEL,
-                "Clip analysis",
+                CHANNEL_NAME,
                 NotificationManager.IMPORTANCE_LOW,
             ).apply {
-                description = "Progress and results while a clip is being measured."
+                description = "Progreso y resultado mientras se mide un vídeo."
                 setShowBadge(false)
             }
         )
     }
 
-    /** Post (or refresh) the ongoing notification for a job that is running. */
-    fun stage(context: Context, stage: String) {
-        if (!canPost(context)) return
-        val index = STAGES.indexOfFirst { it.equals(stage, ignoreCase = true) }
-            .let { if (it < 0) 0 else it }
-        val notification = builder(context, "Analyzing your clip")
+    /** The ongoing notification: what UploadService runs under. */
+    fun ongoing(context: Context, stage: String, index: Int): android.app.Notification =
+        builder(context, TITLE)
             .setContentText(stage)
             .setOngoing(true)
-            .setProgress(STAGES.size, index, false)
+            .setOnlyAlertOnce(true)
+            .setProgress(STAGES.size, index.coerceIn(0, STAGES.size - 1), false)
             .setContentIntent(openApp(context))
             .build()
-        post(context, ONGOING_ID, notification)
+
+    /** Post (or refresh) the ongoing notification for a job that is running.
+     *  `index` is the step (data/Stage.progressIndex). */
+    fun stage(context: Context, stage: String, index: Int = 0) {
+        if (!canPost(context)) return
+        post(context, ONGOING_ID, ongoing(context, stage, index))
     }
 
     /** Replace the ongoing notification with a "finished" one that opens the result. */
@@ -86,7 +91,7 @@ object ProcessingNotifier {
     fun fail(context: Context, message: String) {
         cancel(context)
         if (!canPost(context)) return
-        val notification = builder(context, "That clip could not be measured")
+        val notification = builder(context, "No se pudo medir el vídeo")
             .setContentText(message)
             .setStyle(NotificationCompat.BigTextStyle().bigText(message))
             .setAutoCancel(true)

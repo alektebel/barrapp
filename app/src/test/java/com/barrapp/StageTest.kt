@@ -79,4 +79,12 @@ class StageTest {
         assertEquals("swing", rep.asides.single().name)
         assertEquals("balanceo", rep.asides.single().label)
     }
+
+    @Test
+    fun `a session whose vision note is still coming is marked so`() {
+        val a = BarraApi.parseAnalysis(JSONObject("""{"visionStatus":"pending"}"""))
+        assertEquals(true, a.visionPending)
+        assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{"visionStatus":"done"}""")).visionPending)
+        assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{}""")).visionPending)
+    }
 }
