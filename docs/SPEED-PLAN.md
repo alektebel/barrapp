@@ -107,6 +107,29 @@ table in this document.
 
 ---
 
+**Shipped (2026-10-12, deployed to sam-app, smoke green: worker imports, api
+/health 200, WorkerFunction MemorySize=10240 confirmed):**
+
+| Step | Commit | State |
+|---|---|---|
+| A untranslated_text | `032d8b2` | deployed |
+| B prose after result (`proseStatus`) | `c66ed71` | deployed |
+| C trim before upload (app) | `e68c246` | built; needs an APK install to reach users |
+| D worker 6 vCPU + gate | `ed48f31` | memory deployed; chunks OFF (gate DEVIATES) |
+
+Baselines (`scripts/job_timing.py`, server persistence only): job
+`7135be1d598a` 375 s total (pose 127 s, measure+report 174 s); job
+`31103ccedfc3` 202 s upload-end→result (pose 134 s, report 21 s, +44 s clip
+cut); job `cd6f518ec47d` 149 s upload-end→result (pose 127 s, report 16 s,
+vision note +135 s after result).
+
+**The next real phone job is the measurement:** with the app-side trim
+installed, a 30 s clip poses ~6 s of working set instead of 30 s — pose is
+the only remaining >10 s stage and its time scales with the clip sent.
+On-device verification of the trim UI and the prose/trim re-fetch path is
+outstanding (no JDK/emulator in this shell; B's Kotlin edits are mirrored
+visionPending and compile-checked only).
+
 # Round 2 — the 15-second goal (2026-10-11, evening)
 
 **Goal: a random 30 s clip the athlete picks is measured, end to end, in under
