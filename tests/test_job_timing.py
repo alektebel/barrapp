@@ -9,6 +9,7 @@ stored clip).
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 import unittest
 from pathlib import Path
@@ -42,6 +43,9 @@ class Durations(unittest.TestCase):
         # upload-complete 16:17:15 -> done 16:20:37
         self.assertEqual(self.d["upload end -> result"], 202)
 
+    def test_round_two_includes_upload_in_the_server_total(self):
+        self.assertEqual(self.d["upload start -> server result"], 271)
+
     def test_vision_after_the_result(self):
         self.assertEqual(self.d["vision (after result)"], 68)
         self.assertEqual(self.d["total"], 339)
@@ -57,6 +61,81 @@ class Durations(unittest.TestCase):
         text = job_timing.table(self.d)
         for k in ("upload", "pose", "upload end -> result", "total"):
             self.assertIn(k, text)
+
+
+class RoundTwoTiming(unittest.TestCase):
+    def test_fractional_seconds_cannot_turn_a_slow_result_into_a_pass(self):
+        events = [
+            {"event": "upload-started", "at": "2026-10-12T10:00:00.950Z"},
+            {"event": "upload-complete", "at": "2026-10-12T10:00:03.125Z"},
+            {"event": "submitted", "at": "2026-10-12T10:00:03.225Z"},
+            {"event": "stage", "detail": "receiving the clip",
+             "at": "2026-10-12T10:00:03.475Z"},
+            {"event": "stage", "detail": "opening the clip",
+             "at": "2026-10-12T10:00:03.800Z"},
+            {"event": "done", "at": "2026-10-12T10:00:15.960Z"},
+        ]
+        result = job_timing.durations(events, None)
+        self.assertAlmostEqual(result["upload"], 2.175)
+        self.assertAlmostEqual(result["submit"], 0.100)
+        self.assertAlmostEqual(result["queue"], 0.250)
+        self.assertAlmostEqual(result["download+dispatch"], 0.325)
+        self.assertAlmostEqual(result["upload start -> server result"], 15.010)
+        self.assertIn("15.010", job_timing.table(result))
+
+    def test_offsets_and_append_order_do_not_change_the_first_result(self):
+        events = [
+            {"event": "done", "at": "2026-10-12T12:00:20.000+02:00"},
+            {"event": "upload-started", "at": "2026-10-12T10:00:00.100Z"},
+            {"event": "done", "at": "2026-10-12T10:00:14.999Z"},
+        ]
+        result = job_timing.durations(events, None)
+        self.assertAlmostEqual(result["upload start -> server result"], 14.899)
+
+    def test_missing_start_cannot_be_substituted_with_upload_completion(self):
+        events = [
+            {"event": "upload-complete", "at": "2026-10-12T10:00:10Z"},
+            {"event": "done", "at": "2026-10-12T10:00:20Z"},
+        ]
+        self.assertNotIn("upload start -> server result", job_timing.durations(events, None))
+
+    def test_deferred_prose_does_not_move_the_first_result(self):
+        events = [
+            {"event": "job-created", "at": "2026-10-12T10:00:00Z"},
+            {"event": "upload-started", "at": "2026-10-12T10:00:00Z"},
+            {"event": "done", "at": "2026-10-12T10:00:14Z"},
+            {"event": "vision", "at": "2026-10-12T10:00:17Z"},
+            {"event": "prose", "at": "2026-10-12T10:00:25.100Z"},
+        ]
+        result = job_timing.durations(events, None)
+        self.assertEqual(result["upload start -> server result"], 14.0)
+        self.assertAlmostEqual(result["prose (after result)"], 11.1)
+        self.assertAlmostEqual(result["total"], 25.1)
+
+    def test_fusion_wait_is_visible_inside_measurement(self):
+        trace = {"entries": [
+            {"message": "entered probe", "atMs": 50},
+            {"message": "pose backend", "atMs": 8050},
+            {"message": "entered fusion", "stage": "fusion", "atMs": 8100},
+            {"message": "fusion", "stage": "fusion", "atMs": 20000},
+            {"message": "entered payload", "atMs": 20125},
+            # The deferred passes append another payload; first result wins.
+            {"message": "entered payload", "atMs": 30000},
+        ]}
+        result = job_timing.durations([], trace)
+        self.assertAlmostEqual(result["fusion (includes vision wait)"], 11.9)
+        self.assertAlmostEqual(result["measure+report"], 12.075)
+        self.assertAlmostEqual(result["pose"], 8.0)
+
+    def test_fixture_cli_needs_no_aws_and_does_not_claim_phone_latency(self):
+        completed = subprocess.run(
+            [sys.executable, str(ROOT / "scripts" / "job_timing.py"),
+             "--fixture", str(ROOT / "tests" / "fixtures" / "job_timing_31103ccedfc3.json")],
+            capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+        self.assertIn("upload start -> server result", completed.stdout)
+        self.assertIn("phone rendering is not measured", completed.stdout)
 
 
 if __name__ == "__main__":

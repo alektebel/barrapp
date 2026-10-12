@@ -76,6 +76,17 @@ class FakeTable:
 class TestRecorder(unittest.TestCase):
     """uploads.record must never be the reason an upload fails."""
 
+    def test_record_keeps_subsecond_time_for_the_fifteen_second_budget(self):
+        table = FakeTable(key="jobId")
+        patch, uploads = self._module(table)
+        instant = datetime(2026, 10, 12, 10, 0, 15, 960000, tzinfo=timezone.utc)
+        with patch, mock.patch.object(uploads, "datetime") as clock:
+            clock.now.return_value = instant
+            self.assertTrue(uploads.record("job1", "dev1", "done"))
+        recorded = table.updates[0]["ExpressionAttributeValues"][":one"][0]["at"]
+        self.assertEqual(datetime.fromisoformat(recorded), instant)
+        self.assertTrue(recorded.endswith("Z"))
+
     def _module(self, table):
         import uploads
         return mock.patch.object(uploads, "_table", table), uploads

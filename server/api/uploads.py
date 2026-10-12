@@ -42,7 +42,9 @@ _table = _ddb.Table(_TABLE_NAME) if _TABLE_NAME else None
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    # Whole seconds hide budget overruns and subsecond dispatch/write costs.
+    # This log is diagnostic; the phone uses its own monotonic clock for E2E.
+    return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
 def record(job_id: str, owner: str, event: str, detail: str = "",

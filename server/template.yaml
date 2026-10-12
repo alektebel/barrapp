@@ -309,7 +309,12 @@ Resources:
       PackageType: Image
       ImageUri: !Ref WorkerImageUri
       Timeout: 600
-      MemorySize: 3008
+      # Lambda rations CPU by memory (1769 MB per vCPU): 10240 MB is exactly
+      # six, what pose in parallel chunks needs to stay inside the round-2
+      # budget (docs/SPEED-PLAN.md steps 2-3). BARRA_POSE_WORKERS is unset on
+      # purpose - switching chunked pose on is a deploy decision, one line,
+      # documented in the plan next to the gate results.
+      MemorySize: 10240
       EphemeralStorage:
         Size: 2048
       Environment:

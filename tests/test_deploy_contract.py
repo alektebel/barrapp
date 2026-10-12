@@ -108,6 +108,32 @@ class StackDefinesWhatTheCodeRequires(unittest.TestCase):
         self.assertEqual(missing, [])
 
 
+class WorkerFunctionGetsItsCores(unittest.TestCase):
+    """Lambda rations CPU by memory: 1769 MB buys one vCPU, 10240 MB is the
+    exact six. Pose in parallel chunks (docs/SPEED-PLAN.md steps 2-3) is why:
+    sequential MediaPipe measured 3.6 s per second of video on ~2 cores, and
+    the round-2 goal needs six. A raise this size is invisible until a deploy,
+    so the stack states it - and BARRA_POSE_WORKERS stays OUT of the template:
+    switching chunked pose on is the deploy decision recorded in the plan,
+    not a default that ships by accident."""
+
+    def setUp(self):
+        self.t = (SERVER / "template.yaml").read_text()
+
+    def _worker_memory(self) -> int:
+        m = re.search(r"\n  WorkerFunction:.*?MemorySize: (\d+)", self.t, re.DOTALL)
+        self.assertIsNotNone(m, "the WorkerFunction resource has no MemorySize")
+        return int(m.group(1))
+
+    def test_the_worker_buys_exactly_six_cores(self):
+        self.assertEqual(self._worker_memory(), 10240)
+
+    def test_pose_workers_stay_unset_until_the_deploy_flip(self):
+        # The YAML key, not the name: a comment explaining the flip may name
+        # it, an entry under Environment: Variables: may not exist yet.
+        self.assertIsNone(re.search(r"BARRA_POSE_WORKERS\s*:", self.t))
+
+
 class ApiHasAStableName(unittest.TestCase):
     """The app talks to api.barrapp.fit, not to the API Gateway id: a phone
     could not resolve *.execute-api.amazonaws.com on 2026-10-11, and the id
