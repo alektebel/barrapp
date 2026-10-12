@@ -54,6 +54,9 @@ data class UiState(
     /** Every clip on its way to being a session: the works in progress, the
      *  ones waiting, and the ones that went wrong with their reason. */
     val works: List<Work> = emptyList(),
+    /** El clip que espera a que el atleta confirme (o mueva) la ventana de
+     *  recorte antes de subirse. Uno como mucho: la cola es de uno. */
+    val pendingTrim: Work? = null,
     val workLogId: String? = null,
     val error: String? = null,
     val chat: List<ChatTurn> = emptyList(),
@@ -89,6 +92,11 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     /** Works currently in the channel or being processed, so a connectivity
      *  pulse cannot enqueue the same one twice. */
     private val inFlight = mutableSetOf<String>()
+
+    /** Quién corta el clip. Real en producción, fake en las pruebas unitarias
+     *  de la decisión (la vía real del Transformer necesita un dispositivo). */
+    internal var trimmer: com.barrapp.media.ClipTrimmer =
+        com.barrapp.media.DefaultClipTrimmer(getApplication())
 
     /** Fires when a VALIDATED network appears: paused uploads resume here. */
     private val netCallback = object : android.net.ConnectivityManager.NetworkCallback() {
@@ -537,10 +545,26 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     dest.length() > 0
                 }
             }.getOrElse { false }
+            // La ventana que el teléfono PROPONE. Se muestrea sobre la copia
+            // ya guardada, no sobre el uri (que puede caducar); si el
+            // muestreo falla, el clip se sube entero y nadie se entera.
+            val suggestion = if (kept) runCatching {
+                withContext(Dispatchers.IO) {
+                    com.barrapp.media.MediaMetadataSampler().suggest(app,
+                        android.net.Uri.fromFile(dest))
+                }
+            }.getOrElse { null } else null
+            val doTrim = com.barrapp.data.TrimPlan.shouldTrim(
+                suggestion?.second, suggestion?.first?.durationS ?: 0.0)
+            val win = suggestion?.second
             val work = Work(
                 id = workId,
                 createdAt = System.currentTimeMillis(),
-                status = if (kept) WorkStore.STATUS_WAITING else WorkStore.STATUS_FAILED,
+                status = when {
+                    !kept -> WorkStore.STATUS_FAILED
+                    win != null && doTrim -> WorkStore.STATUS_PENDING
+                    else -> WorkStore.STATUS_WAITING
+                },
                 clipPath = dest.absolutePath,
                 error = if (kept) null else "The clip could not be kept on the phone.",
                 // The server's vocabularies: variants are lower_snake
@@ -549,6 +573,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 // as unspecified / UNKNOWN with the word kept beside it.
                 variant = variant.trim().lowercase(),
                 view = view.trim().uppercase(),
+                trimStartS = if (win != null && doTrim) win.startS else 0.0,
+                trimEndS = if (win != null && doTrim) win.endS else 0.0,
+                trimmed = false,   // only true once the athlete confirms
+                clipDurationS = suggestion?.first?.durationS ?: 0.0,
                 log = buildList {
                     val declared = listOfNotNull(
                         variant.takeIf { it.isNotBlank() }?.let { "$it standard declared" },
@@ -556,6 +584,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     )
                     add(WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.INFO,
                         (listOf("clip added to the queue") + declared).joinToString(" · ")))
+                    if (win != null) {
+                        add(WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.INFO,
+                            "serie sugerida: %.1f s–%.1f s".format(win.startS, win.endS)))
+                    }
                     if (!kept) add(WorkStore.Entry(System.currentTimeMillis(),
                         WorkStore.Level.ERROR, "the clip could not be read or kept"))
                 },
@@ -563,8 +595,56 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             WorkStore.put(app, work)
             EventLog.info(app, "clip added to the queue", workId)
             publishWorks()
-            if (kept) queue.send(workId)
+            // Un clip PENDIENTE espera al atleta: la cola no lo recoge hasta
+            // que confirma (o descarta) la ventana de recorte.
+            if (kept && work.status != WorkStore.STATUS_PENDING) queue.send(workId)
         }
+    }
+
+    /** El atleta movió los tiradores del deslizador. Grueso vale: 0,1 s. */
+    fun setTrimWindow(workId: String, startS: Double, endS: Double) {
+        val app = getApplication<Application>()
+        val work = WorkStore.get(app, workId) ?: return
+        WorkStore.put(app, work.copy(
+            trimStartS = startS.coerceIn(0.0, work.clipDurationS),
+            trimEndS = endS.coerceIn(startS, work.clipDurationS),
+        ))
+        publishWorks()
+    }
+
+    /** Confirmación: la ventana que hay en el work manda. A subir. */
+    fun confirmTrim(workId: String) {
+        val app = getApplication<Application>()
+        val work = WorkStore.get(app, workId) ?: return
+        val keepTrim = work.trimEndS > work.trimStartS
+        WorkStore.put(app, work.copy(
+            status = WorkStore.STATUS_WAITING,
+            trimmed = keepTrim,
+            trimStartS = if (keepTrim) work.trimStartS else 0.0,
+            trimEndS = if (keepTrim) work.trimEndS else 0.0,
+            log = work.log + WorkStore.Entry(System.currentTimeMillis(),
+                WorkStore.Level.INFO, if (keepTrim)
+                    "recorte confirmado: %.1f s–%.1f s".format(
+                        work.trimStartS, work.trimEndS)
+                else "se sube el clip entero"),
+        ))
+        publishWorks()
+        viewModelScope.launch { queue.send(workId) }
+    }
+
+    /** Cancelar el recorte y subir el clip entero, sin pasarlo por el
+     *  transcodificador: mismo camino de siempre. */
+    fun discardTrim(workId: String) {
+        val app = getApplication<Application>()
+        val work = WorkStore.get(app, workId) ?: return
+        WorkStore.put(app, work.copy(
+            status = WorkStore.STATUS_WAITING,
+            trimmed = false, trimStartS = 0.0, trimEndS = 0.0,
+            log = work.log + WorkStore.Entry(System.currentTimeMillis(),
+                WorkStore.Level.INFO, "se sube el clip entero"),
+        ))
+        publishWorks()
+        viewModelScope.launch { queue.send(workId) }
     }
 
     /** Transient network failures - an unresolvable host on weak wifi above
@@ -602,7 +682,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
     private fun publishWorks() {
         val works = WorkStore.all(getApplication())
-        _state.update { it.copy(works = works) }
+        _state.update { it.copy(works = works,
+            pendingTrim = works.firstOrNull { w -> w.status == WorkStore.STATUS_PENDING }) }
         // Keeps the process alive while a clip is active, so the upload and the
         // measurement carry on while the athlete uses other apps.
         com.barrapp.notify.UploadService.sync(getApplication(), works)
@@ -699,6 +780,55 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code))
     }
 
+    /**
+     * El clip que se sube: el recorte a 720p cuando hay ventana que valga la
+     * pena, el original cuando no, y TAMBIÉN el original cuando el
+     * transcodificador falla por cualquier motivo (códec ausente, sin
+     * espacio, excepción, más de tres minutos). El recorte es una mejora, no
+     * una condición: jamás bloquea ni hace fallar una subida.
+     *
+     * Devuelve el fichero a subir y deja el work con la ventana final y la
+     * marca de recortado. La ventana es la que el atleta dejó ajustada en la
+     * UI (trimStartS/trimEndS del work), no la sugerencia cruda.
+     */
+    internal suspend fun trimForUpload(
+        work: Work,
+        clip: java.io.File,
+        update: ((Work) -> Work) -> Unit = { t -> WorkStore.put(getApplication(), t(WorkStore.get(getApplication(), work.id) ?: work)) },
+    ): java.io.File {
+        if (!work.trimmed || work.trimEndS <= work.trimStartS) return clip
+        update { it.copy(stage = "Recortando la serie",
+            stageCode = Stage.WAITING.code) }
+        val cut = java.io.File(clip.parent, clip.nameWithoutExtension + "-trim.mp4")
+        return try {
+            trimmer.export(clip, cut, work.trimStartS, work.trimEndS)
+            if (!cut.exists() || cut.length() == 0L) {
+                cut.delete()
+                WorkStore.append(getApplication(), work.id, WorkStore.Level.WARN,
+                    "el recorte no produjo fichero — se sube el clip entero")
+                update { it.copy(trimmed = false,
+                    trimStartS = 0.0, trimEndS = 0.0) }
+                clip
+            } else {
+                // El fichero que viaja es el recortado: el work pasa a
+                // apuntar a él, así un reintento o una reanudación suben lo
+                // mismo que la primera vez.
+                update { it.copy(clipPath = cut.absolutePath) }
+                WorkStore.append(getApplication(), work.id, WorkStore.Level.INFO,
+                    "recortado a %.1f s–%.1f s (%.1f MB)".format(
+                        work.trimStartS, work.trimEndS, cut.length() / 1e6))
+                cut
+            }
+        } catch (err: Exception) {
+            cut.delete()
+            WorkStore.append(getApplication(), work.id, WorkStore.Level.WARN,
+                "el recorte falló (${err.message.orEmpty()}) — se sube el clip entero")
+            update { it.copy(trimmed = false,
+                trimStartS = 0.0, trimEndS = 0.0) }
+            clip
+        }
+    }
+
     private suspend fun runWork(work: Work) {
         val app = getApplication<Application>()
 
@@ -750,6 +880,14 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 fail("The clip is no longer on the phone.")
                 return
             }
+            // EL RECORTE, antes de crear el trabajo. work.trimmed dice si la
+            // ventana sugerida merecía la pena (la UI la preselecciona y el
+            // atleta puede ajustarla; los valores finales quedan en el work).
+            // Cualquier fallo del transcodificador deja `clip` intacto: el
+            // original es lo que se sube, como siempre. El recorte nunca
+            // bloquea ni hace fallar una subida.
+            val clipToUpload = trimForUpload(work, clip, ::update)
+
             // A work that stopped mid-upload keeps its job: the parts already
             // on the server belong to that job's multipart session, and a new
             // job would strand them under a key nothing points at. Only a
@@ -763,10 +901,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             log(WorkStore.Level.INFO,
                 if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
                 else "job $jobId created — sending the clip " +
-                    "(%.1f MB)".format(clip.length() / 1e6))
+                    "(%.1f MB)".format(clipToUpload.length() / 1e6))
             ProcessingNotifier.stage(app, Stage.SENDING.text, 0)
             try {
-                uploadResumable(work.id, jobId, clip) { sent, total ->
+                uploadResumable(work.id, jobId, clipToUpload) { sent, total ->
                     update {
                         it.copy(status = WorkStore.STATUS_SENDING,
                             stage = Stage.sending(sent, total), stageCode = Stage.SENDING.code)
@@ -802,8 +940,13 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                                 " — trace ${j.result?.traceId.orEmpty()}")
                             // The clip answers to its job id from here on, so
                             // replay and delete keep working the way they did.
+                            // The one renamed is the one UPLOADED - the 720p
+                            // cut when the trim held, the original otherwise -
+                            // so the replay screen plays exactly what the
+                            // server measured, timestamps included.
                             withContext(Dispatchers.IO) {
-                                clip.renameTo(clipFile(app, j.id))
+                                clipToUpload.renameTo(clipFile(app, j.id))
+                                if (clipToUpload != clip) clip.delete()
                             }
                             EventLog.info(app,
                                 "measured ${j.result?.repCount ?: 0} rep(s) of " +
@@ -919,6 +1062,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             WorkStore.put(app, work.copy(status = WorkStore.STATUS_WAITING, error = null,
                 stage = "waiting to be sent", traceId = "",
                 jobId = "", uploadId = "", partSize = 0, uploadedParts = emptyList(),
+                // El recorte ya pasó: clipPath apunta al recortado y trimmed
+                // conserva su valor, así el reintento sube exactamente lo mismo.
                 log = work.log + WorkStore.Entry(System.currentTimeMillis(),
                     WorkStore.Level.INFO, "retry requested")))
             publishWorks()

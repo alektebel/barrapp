@@ -126,6 +126,18 @@ fun TrackerRoot(
         return
     }
 
+    // Un clip esperando la ventana: la decisión va primero, siempre visible
+    // por encima de cualquier pestaña.
+    state.pendingTrim?.let { pending ->
+        TrimScreen(
+            work = pending,
+            onWindow = { s, e -> vm.setTrimWindow(pending.id, s, e) },
+            onConfirm = { vm.confirmTrim(pending.id) },
+            onDiscard = { vm.discardTrim(pending.id) },
+        )
+        return
+    }
+
     TrackerShell(tab, { tab = it }) {
         Column(Modifier.fillMaxSize()) {
             // The queue stays visible under every tab: a failed upload's Retry

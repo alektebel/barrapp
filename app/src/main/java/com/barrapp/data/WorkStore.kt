@@ -41,6 +41,14 @@ data class Work(
      *  with the job, blank when not declared; the server never infers them. */
     val variant: String = "",
     val view: String = "",
+    /** La ventana que el teléfono propuso recortar, y si lo hizo. `trimStart`
+     *  queda en 0 para un clip ya recortado: el servidor mide el fichero que
+     *  recibe, y su propio `trim` en la respuesta habla del fichero recibido. */
+    val trimStartS: Double = 0.0,
+    val trimEndS: Double = 0.0,
+    val trimmed: Boolean = false,
+    /** Duración del clip original, en segundos: la escala del deslizador. */
+    val clipDurationS: Double = 0.0,
 ) {
     val active: Boolean
         get() = status in setOf(
@@ -65,6 +73,8 @@ data class Work(
 data class PartMark(val partNumber: Int, val etag: String?)
 
 object WorkStore {
+    const val STATUS_PENDING = "pending"        // on the phone; the athlete
+                                                // is choosing the trim window
     const val STATUS_WAITING = "waiting"        // known locally, not yet sent
     const val STATUS_SENDING = "sending"        // upload in flight
     const val STATUS_QUEUED = "queued"          // the server holds the clip
@@ -105,6 +115,10 @@ object WorkStore {
                 clipPath = o.optString("clipPath"),
                 uploadId = o.optString("uploadId"),
                 partSize = o.optLong("partSize"),
+                trimmed = o.optBoolean("trimmed"),
+                trimStartS = o.optDouble("trimStartS", 0.0),
+                trimEndS = o.optDouble("trimEndS", 0.0),
+                clipDurationS = o.optDouble("clipDurationS", 0.0),
                 variant = o.optString("variant"),
                 view = o.optString("view"),
                 uploadedParts = (o.optJSONArray("uploadedParts") ?: JSONArray())
@@ -148,6 +162,9 @@ object WorkStore {
                 .put("clipPath", w.clipPath)
                 .put("uploadId", w.uploadId).put("partSize", w.partSize)
                 .put("variant", w.variant).put("view", w.view)
+                .put("trimmed", w.trimmed)
+                .put("trimStartS", w.trimStartS).put("trimEndS", w.trimEndS)
+                .put("clipDurationS", w.clipDurationS)
                 .put("uploadedParts", parts).put("log", log))
         }
         file(context).writeText(arr.toString())

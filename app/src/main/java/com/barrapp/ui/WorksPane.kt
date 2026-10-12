@@ -94,13 +94,14 @@ private fun WorkRow(
             }
             Pill(
                 when (work.status) {
-                    WorkStore.STATUS_FAILED -> "failed"
-                    WorkStore.STATUS_SENDING -> "sending"
-                    WorkStore.STATUS_CONNECTING -> "paused"
-                    WorkStore.STATUS_QUEUED -> "queued"
-                    WorkStore.STATUS_MEASURING -> "measuring"
-                    WorkStore.STATUS_DONE -> "done"
-                    else -> "waiting"
+                    WorkStore.STATUS_PENDING -> "recortar"
+                    WorkStore.STATUS_FAILED -> "fallo"
+                    WorkStore.STATUS_SENDING -> "enviando"
+                    WorkStore.STATUS_CONNECTING -> "en pausa"
+                    WorkStore.STATUS_QUEUED -> "en cola"
+                    WorkStore.STATUS_MEASURING -> "midiendo"
+                    WorkStore.STATUS_DONE -> "hecho"
+                    else -> "en espera"
                 },
                 color = when {
                     work.status == WorkStore.STATUS_FAILED ->
@@ -112,11 +113,11 @@ private fun WorkRow(
         }
         if (work.status == WorkStore.STATUS_FAILED) {
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { onRetry(work.id) }) { Text("Retry") }
+                TextButton(onClick = { onRetry(work.id) }) { Text("Reintentar") }
                 if (work.log.isNotEmpty()) {
-                    TextButton(onClick = { onOpenLog(work.id) }) { Text("Log") }
+                    TextButton(onClick = { onOpenLog(work.id) }) { Text("Registro") }
                 }
-                TextButton(onClick = { onDismiss(work.id) }) { Text("Dismiss") }
+                TextButton(onClick = { onDismiss(work.id) }) { Text("Descartar") }
             }
         }
     }

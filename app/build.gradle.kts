@@ -123,6 +123,12 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.8.7")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    // Media3 Transformer: recorta el clip a la serie (720p H.264 ~4 Mbit/s)
+    // antes de subirlo. Solo el recorte; la reproducción sigue siendo
+    // VideoView/MediaPlayer, sin ExoPlayer.
+    implementation("androidx.media3:media3-transformer:1.4.1")
+    implementation("androidx.media3:media3-effect:1.4.1")
+    implementation("androidx.media3:media3-common:1.4.1")
     implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     // Weekly review notification. Scheduled by the system, so it survives the
     // app being killed - which is the whole point of a weekly nudge.
@@ -134,6 +140,7 @@ dependencies {
     // Robolectric Compose screenshot tests: render the real composables to
     // PNG on the JVM, no emulator, so an agent (or a vision model) can look at
     // the actual UI. See app/src/test/java/com/barrapp/UiScreenshotTest.kt.
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("junit:junit:4.13.2")
     testImplementation("androidx.test:core:1.6.1")
     testImplementation("androidx.test.ext:junit:1.2.1")
