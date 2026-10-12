@@ -9,6 +9,10 @@ is only used if it keeps the rules the old prompt only asked for:
   * every number in the headline and narrative exists in the measurement - a
     model that writes "12 reps" for a set of 3 is not used, whatever its prose.
 Anything else falls back to the deterministic text, and says why.
+
+Since the prose moved off the result's critical path (docs/SPEED-PLAN.md B),
+`write_prose` is the deferred half of the same judgement: it returns the
+judged prose for `process.finish_prose` to apply, or why it was not used.
 """
 from __future__ import annotations
 
@@ -110,6 +114,47 @@ class UsesTheModel(unittest.TestCase):
         self.assertIn("Nunca inventes", report.SYSTEM)
 
 
+class FinishProse(unittest.TestCase):
+    """The deferred pass: the model path taken off the result's critical path
+    (docs/SPEED-PLAN.md B), with the same judgement as `write_report`."""
+
+    def test_a_faithful_reply_is_the_prose(self):
+        with mock.patch.object(llm, "config", return_value=("https://nan.test/v1", "k")), \
+                mock.patch.object(llm, "complete", return_value=answer()) as c:
+            out = report.write_prose(payload())
+        self.assertEqual(out["status"], "done")
+        self.assertEqual(out["prose"]["headline"], "3 dominadas verificadas, sólidas")
+        self.assertEqual(out["prose"]["nextSession"],
+                         "Graba cinco o seis repeticiones con la cámara fija.")
+        self.assertEqual(c.call_args.args[0], report.REPORT_MODEL)
+
+    def test_an_invented_number_is_not_the_prose(self):
+        with mock.patch.object(llm, "config", return_value=("https://nan.test/v1", "k")), \
+                mock.patch.object(llm, "complete",
+                                  return_value=answer(narrative="Hiciste 12 repeticiones perfectas.")):
+            out = report.write_prose(payload())
+        self.assertEqual(out["status"], "fallback")
+        self.assertIn("invented_number", out["reason"])
+        self.assertNotIn("prose", out)
+
+    def test_a_failed_call_is_failed(self):
+        reply = llm.ChatResult(model=report.REPORT_MODEL, error="401 no access", status=401)
+        with mock.patch.object(llm, "config", return_value=("https://nan.test/v1", "k")), \
+                mock.patch.object(llm, "complete", side_effect=[reply, reply]) as c:
+            out = report.write_prose(payload())
+        self.assertEqual(out["status"], "failed")
+        self.assertIn("401", out["reason"])
+        self.assertEqual([call.args[0] for call in c.call_args_list],
+                         [report.REPORT_MODEL, report.BACKUP_MODEL])
+
+    def test_unconfigured_is_never_pending(self):
+        with mock.patch.object(llm, "config", return_value=None):
+            out = report.write_prose(payload())
+        self.assertEqual(out["status"], "fallback")
+        self.assertEqual(out["reason"], "not_configured")
+        self.assertNotIn("prose", out)
+
+
 class FallsBack(unittest.TestCase):
     def test_unconfigured_uses_the_deterministic_text(self):
         with mock.patch.object(llm, "config", return_value=None):
@@ -124,7 +169,7 @@ class FallsBack(unittest.TestCase):
     def test_the_old_writer_is_gone(self):
         self.assertFalse((ROOT / "server" / "deepseek.py").exists())
         self.assertNotIn("DEEPSEEK", (ROOT / "server" / "template.yaml").read_text())
-        self.assertIn("from report import write_report", (ROOT / "server" / "process.py").read_text())
+        self.assertIn("from report import fallback_report", (ROOT / "server" / "process.py").read_text())
 
 
 if __name__ == "__main__":

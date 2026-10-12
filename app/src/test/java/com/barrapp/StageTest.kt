@@ -87,4 +87,12 @@ class StageTest {
         assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{"visionStatus":"done"}""")).visionPending)
         assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{}""")).visionPending)
     }
+
+    @Test
+    fun `a session whose model prose is still coming is marked so`() {
+        val a = BarraApi.parseAnalysis(JSONObject("""{"proseStatus":"pending"}"""))
+        assertEquals(true, a.prosePending)
+        assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{"proseStatus":"done"}""")).prosePending)
+        assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{}""")).prosePending)
+    }
 }

@@ -791,8 +791,8 @@ def worker(event, _context):
         result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote)
 
         # The measurement reaches the phone now. Cutting and re-uploading the
-        # stored clip (~44 s on 2026-10-11) and the advisory vision note come
-        # after it (visionStatus pending -> done/skipped/failed).
+        # stored clip (~44 s on 2026-10-11), the model prose (~10-15 s,
+        # docs/SPEED-PLAN.md B) and the advisory vision note come after it.
         _write_result(job_id, result)
         uploads.record(job_id, owner, "done",
                        f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
@@ -836,6 +836,17 @@ def worker(event, _context):
                 result = {**result, "visionStatus": "failed"}
                 print(f"[barra] vision pass failed: {exc}", flush=True)
             uploads.record(job_id, owner, "vision", result.get("visionStatus", ""))
+
+        # The model prose, like the vision note: after the result, judged,
+        # the fallback text standing until a good reply replaces it.
+        from process import finish_prose
+        if result.get("proseStatus") == "pending":
+            try:
+                result = finish_prose(item, result)
+            except Exception as exc:  # noqa: BLE001 - the fallback text stands
+                result = {**result, "proseStatus": "failed"}
+                print(f"[barra] prose pass failed: {exc}", flush=True)
+            uploads.record(job_id, owner, "prose", result.get("proseStatus", ""))
         _write_result(job_id, result)
         uploads.trim(job_id)
     except Exception as exc:  # noqa: BLE001

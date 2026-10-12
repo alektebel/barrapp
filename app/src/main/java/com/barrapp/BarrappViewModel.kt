@@ -459,9 +459,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             return
         }
         val known = _state.value.jobs.firstOrNull { it.id == jobId }
-        // A cached result whose vision note was still on its way is fetched
-        // again, so the note appears once the server has added it.
-        if (known?.result != null && !known.result.visionPending) {
+        // A cached result whose vision note or model prose was still on its
+        // way is fetched again, so both appear once the server has added them.
+        if (known?.result != null && !known.result.visionPending && !known.result.prosePending) {
             _state.update { it.copy(analysis = known.result, current = known) }
             return
         }

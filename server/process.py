@@ -11,8 +11,13 @@ from pathlib import Path
 
 from barra import sentinel
 from barra.i18n import localize_payload
-from report import write_report
+from report import fallback_report, write_prose
 from vision import technique_note, technique_second_opinion, count_from_clip
+
+try:
+    import llm
+except ImportError:  # tests / local dev with `server/` on the path
+    from api import llm
 
 from barra.evidence import declared_view, estimate_view, rep_evidence
 from barra.faults_taxonomy import classify_faults
@@ -178,11 +183,19 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
                            variant=job.get("variant"),
                            pose=pose,
                            vision_label=vision_label)
-    report = write_report(metrics)
-    # The prose model owns exactly three keys. Everything else the UI draws -
-    # the detected movement, the trim window, per-rep scores and traces - is
-    # carried through untouched.
-    #
+    # The model prose is OFF the critical path (docs/SPEED-PLAN.md B): the
+    # result reaches the phone with the deterministic Spanish text and
+    # `proseStatus: "pending"`, and `finish_prose` upgrades it afterwards,
+    # exactly like `add_vision` does for the vision note. The prose model
+    # owns exactly three keys; everything else the UI draws - the detected
+    # movement, the trim window, per-rep scores and traces - is carried
+    # through untouched from `metrics` below.
+    pending = llm.config() is not None
+    report = {**fallback_report(metrics),
+              "proseStatus": "pending" if pending else "done",
+              "proseSource": "fallback"}
+    if not pending:
+        report["proseRejected"] = "not_configured"
     # Inverted on purpose: an allow-list of measurement keys has to be updated
     # every time one is added, and the failure mode is a field that silently
     # never reaches the phone. A deny-list of the three prose keys cannot drift.
@@ -274,6 +287,61 @@ def add_vision(job: dict, video_path: Path, report: dict) -> dict:
         if trace is not None:
             trace.error("vision pass failed", reason=str(exc)[:200])
     return _finish(trace, report, job, requested)
+
+
+def finish_prose(job: dict, report: dict) -> dict:
+    """The model prose, after the result (docs/SPEED-PLAN.md B): the sibling
+    of `add_vision`, off the critical path. Asks the report model for the
+    three prose keys, judges the reply by the same rules `write_report`
+    applies, and only then replaces the fallback text. Whatever happens, the
+    headline is never left empty, and `proseStatus` never stays pending:
+    done, failed or fallback. Everything else in the payload is untouched.
+    """
+    report = dict(report)
+    trace, requested = _TRACES.get(str(report.get("traceId") or ""), (None, "auto"))
+    if report.get("proseStatus") != "pending":
+        return report
+    # What the model is offered: the measured payload, without the prose keys
+    # it would echo and the statuses it must not see. `digest` picks what it
+    # actually uses, exactly as `write_report` did from `metrics`.
+    prose_keys = {"headline", "narrative", "nextSession", "proseStatus",
+                  "proseSource", "proseRejected"}
+    metrics = {k: v for k, v in report.items() if k not in prose_keys}
+    try:
+        out = write_prose(metrics)
+        if out["status"] == "done":
+            # Only the three prose keys move; a measured number cannot change
+            # here because the judgement rejects prose with invented numbers.
+            report.update(out["prose"])
+            report["proseSource"] = out["source"]
+            report["proseStatus"] = "done"
+            report.pop("proseRejected", None)
+        elif out["status"] == "fallback":
+            # The fallback text already stands; record why the model's did not.
+            report["proseSource"] = "fallback"
+            report["proseStatus"] = "fallback"
+            report["proseRejected"] = out["reason"]
+        else:
+            report["proseSource"] = "fallback"
+            report["proseStatus"] = "failed"
+            report["proseRejected"] = out["reason"]
+        if trace is not None:
+            trace.stage("prose")
+            trace.step("model prose",
+                       status=report["proseStatus"], source=report["proseSource"],
+                       rejected=report.get("proseRejected"))
+            # The same payload contract the measurement ran: Spanish prose,
+            # no invented numbers, nothing missing.
+            sentinel.watch(trace, "payload", {"payload": report},
+                           inputs={"job": job.get("id"), "requested": requested})
+            _write_trace(trace, str(job.get("id") or ""))
+    except Exception as exc:  # noqa: BLE001 - advisory: the fallback stands
+        report["proseSource"] = "fallback"
+        report["proseStatus"] = "failed"
+        report["proseRejected"] = str(exc)[:200]
+        if trace is not None:
+            trace.error("prose pass failed", reason=str(exc)[:200])
+    return report
 
 
 def _new_trace(job: dict, video_path: Path, requested: str):

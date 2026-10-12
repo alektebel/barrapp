@@ -40,13 +40,9 @@ def measured():
 
 class ProcessJob(unittest.TestCase):
     def run_job(self, note=None):
-        report = {"headline": "Ninguna repetición contada", "narrative": "No se contó nada.",
-                  "nextSession": "Graba de lado.", "proseSource": "llm:deepseek-v4-flash",
-                  "sessions": [], "reps": [], "blockers": measured()["blockers"]}
         art = mock.Mock(clip=None, stills=["s1.jpg"])
         art.as_trace_data.return_value = {}
         with mock.patch.object(process, "analyze_clip", return_value=measured()), \
-                mock.patch.object(process, "write_report", return_value=dict(report)), \
                 mock.patch.object(process, "technique_artifacts", return_value=art), \
                 mock.patch.object(process, "technique_note", return_value=note), \
                 mock.patch.object(process, "technique_second_opinion", return_value="clean"), \
@@ -64,10 +60,13 @@ class ProcessJob(unittest.TestCase):
         note = {"headline": "The stills show a floor push-up", "narrative": "English paragraph.",
                 "nextSession": "Film more.", "visionObservations": [{"rep": "r1"}]}
         out = self.run_job(note)
-        self.assertEqual(out["headline"], "Ninguna repetición contada")
-        self.assertEqual(out["proseSource"], "llm:deepseek-v4-flash")
+        # The deterministic Spanish prose stands; the note is advisory.
+        self.assertEqual(out["headline"], "Ningún ejercicio que barra pueda medir")
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertEqual(out["proseStatus"], "pending")
         self.assertEqual(out["visionNote"]["headline"], "The stills show a floor push-up")
         self.assertEqual(out["visionObservations"], [{"rep": "r1"}])
+
 
 
 class Defaults(unittest.TestCase):

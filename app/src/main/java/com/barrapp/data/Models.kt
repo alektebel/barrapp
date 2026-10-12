@@ -40,6 +40,9 @@ data class Analysis(
     /** The server measures first and adds the advisory vision note after
      *  (visionStatus "pending"); a session opened in between is re-fetched. */
     val visionPending: Boolean = false,
+    /** Same for the model prose (proseStatus "pending"): the fallback
+     *  Spanish text is there from the first write, the model's replaces it. */
+    val prosePending: Boolean = false,
     /** The three things to improve, most important first, as the server
      *  ranked them (barra/fault_select.top_fixes). Empty = nothing to fix,
      *  or an older server (see ui/tracker fixItems for the fallback). */

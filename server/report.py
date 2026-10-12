@@ -165,26 +165,51 @@ def _fallback(payload: dict) -> dict:
     }
 
 
-def write_report(payload: dict) -> dict:
-    """{headline, narrative, nextSession, sessions, reps, blockers,
-    proseSource, proseRejected}. process_job carries every other measurement
-    key through untouched."""
-    base = {"sessions": payload.get("sessions") or [], "reps": payload.get("reps") or [],
-            "blockers": payload.get("blockers") or []}
+def write_prose(payload: dict) -> dict:
+    """The model's judged prose, or why it was not used - the deferred half of
+    `write_report` (docs/SPEED-PLAN.md B). The payload is the measured report;
+    `process.finish_prose` applies the answer. One of:
+      {"status": "done",     "prose": {headline, narrative, nextSession},
+       "source": "llm:<model>"}
+      {"status": "failed",   "reason": "..."}   # the call never produced prose
+      {"status": "fallback", "reason": "..."}   # not_configured or rejected
+    """
     if llm.config() is None:
-        return {**base, **_fallback(payload), "proseSource": "fallback",
-                "proseRejected": "not_configured"}
-
+        return {"status": "fallback", "reason": "not_configured"}
     facts = digest(payload)
     user = [{"role": "user", "content": "Datos de la serie:\n"
              + json.dumps(facts, ensure_ascii=False)}]
     reasons = []
+    unanswered = False
     for model in dict.fromkeys((REPORT_MODEL, BACKUP_MODEL)):
         result = llm.complete(model, user, system=SYSTEM, json_mode=True, temperature=0.2)
         prose, why = _judge(result, facts)
         if prose is not None:
-            return {**base, **prose, "proseSource": f"llm:{result.model}"}
+            return {"status": "done", "prose": prose, "source": f"llm:{result.model}"}
+        unanswered = unanswered or not result.ok
         reasons.append(why)
         print(f"[barra] report rejected {why}", flush=True)
-    return {**base, **_fallback(payload), "proseSource": "fallback",
-            "proseRejected": "; ".join(reasons)}
+    # A call that never produced prose (transport, auth, quota) is not the
+    # same signal as a reply that arrived and failed judgement.
+    if unanswered:
+        return {"status": "failed", "reason": "; ".join(reasons)}
+    return {"status": "fallback", "reason": "; ".join(reasons)}
+
+
+def fallback_report(payload: dict) -> dict:
+    """The deterministic report: base keys plus the fixed Spanish prose.
+    `measure_job` writes this immediately; `write_report` falls back to it."""
+    base = {"sessions": payload.get("sessions") or [], "reps": payload.get("reps") or [],
+            "blockers": payload.get("blockers") or []}
+    return {**base, **_fallback(payload)}
+
+
+def write_report(payload: dict) -> dict:
+    """{headline, narrative, nextSession, sessions, reps, blockers,
+    proseSource, proseRejected}. process_job carries every other measurement
+    key through untouched."""
+    out = write_prose(payload)
+    if out["status"] == "done":
+        return {**fallback_report(payload), **out["prose"], "proseSource": out["source"]}
+    return {**fallback_report(payload), "proseSource": "fallback",
+            "proseRejected": out["reason"]}

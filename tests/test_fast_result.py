@@ -4,17 +4,22 @@ A real job on 2026-10-11 took 375 s: 57 s locating the exercise with a vision
 model, 128 s of pose, under 1 s of measuring, and ~145 s of vision note and
 second opinion after it. The note is advisory and separately sourced, so:
 
-  * `measure_job` returns the payload the phone renders - reps, score, report,
     Spanish, sentinel-checked - with `visionStatus: "pending"` (or "skipped"
-    when no vision endpoint is configured);
+    when no vision endpoint is configured) and `proseStatus` tracking the
+    model prose the same way;
   * `add_vision` adds the note and second opinion afterwards and sets
     `visionStatus: "done"` (or "skipped"/"failed", never left "pending");
+  * the result carries the deterministic Spanish prose at once
+    (`proseStatus: "pending"`, `proseSource: "fallback"`); `finish_prose`
+    upgrades it afterwards with the model's prose, judged, or leaves the
+    fallback standing with the reason;
   * the worker writes `done` with the measurement first, then the vision;
   * localization runs alongside pose: fusion asks for the vision vote only
     when it needs it, by which time the 57 s call has finished.
 """
 from __future__ import annotations
 
+import json
 import os
 import sys
 import threading
@@ -29,6 +34,7 @@ for k, v in {"JOBS_TABLE": "t-jobs", "FEEDBACK_TABLE": "t-fb", "REFERRALS_TABLE"
              "UPLOADS_TABLE": "t-up", "VIDEO_BUCKET": "t-bucket", "AWS_DEFAULT_REGION": "eu-west-1"}.items():
     os.environ.setdefault(k, v)
 
+import llm  # noqa: E402
 import process  # noqa: E402
 
 
@@ -41,17 +47,13 @@ def measured():
     }
 
 
-REPORT = {"headline": "3 flexiones", "narrative": "Bien.", "nextSession": "Otra.",
-          "proseSource": "llm:deepseek-v4-flash", "sessions": [], "reps": [], "blockers": []}
-
-
 class Split(unittest.TestCase):
     def patches(self, note=None, configured=True):
         art = mock.Mock(clip=None, stills=["s.jpg"])
         art.as_trace_data.return_value = {}
         return [
             mock.patch.object(process, "analyze_clip", return_value=measured()),
-            mock.patch.object(process, "write_report", side_effect=lambda m: dict(REPORT)),
+            mock.patch.object(process.llm, "config", return_value=None),
             mock.patch.object(process, "technique_artifacts", return_value=art),
             mock.patch.object(process, "technique_note", return_value=note),
             mock.patch.object(process, "technique_second_opinion", return_value="clean"),
@@ -96,7 +98,7 @@ class Split(unittest.TestCase):
         self.assertEqual(out["visionStatus"], "done")
         self.assertEqual(out["visionObservations"], [{"rep": "r1"}])
         self.assertEqual(out["visionVerdict"], "clean")
-        self.assertEqual(out["headline"], "3 flexiones")  # the report keeps the headline
+        self.assertEqual(out["headline"], "3 flexiones verificadas, sólida")  # the report keeps the headline
 
     def test_a_vision_failure_never_leaves_it_pending(self):
         def go():
@@ -111,6 +113,7 @@ class Split(unittest.TestCase):
         out = self.run_with(lambda: process.process_job({"id": "j"}, Path("/tmp/x.mp4")),
                             note={"visionObservations": []})
         self.assertEqual(out["visionStatus"], "done")
+        self.assertEqual(out["proseStatus"], "done")
 
 
 class VisionInParallel(Split):
@@ -157,6 +160,132 @@ class LazyVisionVote(unittest.TestCase):
         def broken():
             raise RuntimeError("locate died")
         self.assertIsNone(process._resolve_vote(broken))
+
+
+class FastProse(unittest.TestCase):
+    """The model prose follows the result, like the vision note.
+
+    A measured number must never wait for a sentence: the report model cost
+    ~10-15 s of the critical path (docs/SPEED-PLAN.md B). The deterministic
+    Spanish text goes out first and the model's prose replaces it only when
+    it lands and passes the same judgement `report.write_report` applies.
+    """
+
+    def patches(self, configured=True, llm_configured=None):
+        art = mock.Mock(clip=None, stills=[])
+        art.as_trace_data.return_value = {}
+        ps = [
+            mock.patch.object(process, "analyze_clip", return_value=measured()),
+            mock.patch.object(process, "technique_artifacts", return_value=art),
+            mock.patch.object(process, "technique_note", return_value=None),
+            mock.patch.object(process, "technique_second_opinion", return_value=None),
+            mock.patch.object(process, "_vision_configured", return_value=configured),
+            mock.patch.object(process, "_write_trace"),
+        ]
+        if llm_configured is not None:
+            ps.insert(1, mock.patch.object(process.llm, "config",
+                                           return_value=("u", "k") if llm_configured else None))
+        return ps
+
+    def run_with(self, fn, ps=None):
+        for p in ps or self.patches():
+            p.start()
+        try:
+            return fn()
+        finally:
+            for p in ps or []:
+                p.stop()
+
+    def test_first_write_has_fallback_prose_and_no_model_call(self):
+        """The payload written for the phone carries usable Spanish prose
+        immediately, and no model was asked before it was written."""
+        with mock.patch.object(llm, "complete") as complete:
+            out = self.run_with(lambda: process.measure_job({"id": "j"}, Path("/tmp/x.mp4")),
+                                ps=self.patches(llm_configured=True))
+        complete.assert_not_called()
+        self.assertEqual(out["proseStatus"], "pending")
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertTrue(out["headline"])
+        self.assertTrue(out["narrative"])
+        self.assertTrue(out["nextSession"])
+        from barra.i18n import english_words
+        for k in ("headline", "narrative", "nextSession"):
+            self.assertEqual(english_words(out[k]), [], out[k])
+
+    def test_finish_prose_upgrades_with_judged_model_prose(self):
+        good = json.dumps({"headline": "3 dominadas verificadas, sólidas",
+                           "narrative": "Hiciste 3 repeticiones bien verificadas.",
+                           "nextSession": "Graba cinco o seis repeticiones."}, ensure_ascii=False)
+
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            self.assertEqual(out["proseStatus"], "pending")
+            return process.finish_prose({"id": "j"}, out)
+        with mock.patch.object(llm, "complete",
+                               return_value=llm.ChatResult(model="deepseek-v4-flash", text=good)):
+            out = self.run_with(go, ps=self.patches(llm_configured=True))
+        self.assertEqual(out["proseStatus"], "done")
+        self.assertEqual(out["proseSource"], "llm:deepseek-v4-flash")
+        self.assertEqual(out["headline"], "3 dominadas verificadas, sólidas")
+
+    def test_finish_prose_rejects_an_invented_number(self):
+        bad = json.dumps({"headline": "3 dominadas",
+                          "narrative": "Hiciste 12 repeticiones perfectas.",
+                          "nextSession": "Graba cinco o seis repeticiones."}, ensure_ascii=False)
+
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            return process.finish_prose({"id": "j"}, out)
+        with mock.patch.object(llm, "complete",
+                               return_value=llm.ChatResult(model="m", text=bad)):
+            out = self.run_with(go, ps=self.patches(llm_configured=True))
+        self.assertEqual(out["proseStatus"], "fallback")
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertIn("invented_number", out["proseRejected"])
+        # The fallback stands; never an empty headline.
+        self.assertTrue(out["headline"])
+        self.assertEqual(out["n_reps"], 3)
+
+    def test_finish_prose_on_a_failure_leaves_the_fallback(self):
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            return process.finish_prose({"id": "j"}, out)
+        with mock.patch.object(llm, "complete",
+                               return_value=llm.ChatResult(model="m", error="401 no access", status=401)):
+            out = self.run_with(go, ps=self.patches(llm_configured=True))
+        self.assertEqual(out["proseStatus"], "failed")
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertTrue(out["headline"])
+
+    def test_without_an_llm_there_is_no_pending_state(self):
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            self.assertEqual(out["proseStatus"], "done")
+            self.assertEqual(out["proseSource"], "fallback")
+            out2 = process.finish_prose({"id": "j"}, out)
+            self.assertEqual(out2["proseStatus"], "done")
+            return out2
+        out = self.run_with(go, ps=self.patches(llm_configured=False))
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertEqual(out["proseRejected"], "not_configured")
+
+    def test_finish_prose_keeps_the_trace_keys(self):
+        """The deferred pass must not rebuild the payload's provenance from
+        nothing: the `_finish` keys the phone already read stay."""
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            return process.finish_prose({"id": "j"}, out)
+        out = self.run_with(go)
+        self.assertIn("traceId", out)
+        self.assertIn("provenance", out)
+        self.assertIn("i18n", out)
+
+    def test_process_job_is_still_both(self):
+        # No note configured: the vision pass is skipped, the prose is done.
+        out = self.run_with(lambda: process.process_job({"id": "j"}, Path("/tmp/x.mp4")),
+                            ps=self.patches(llm_configured=False))
+        self.assertEqual(out["visionStatus"], "skipped")
+        self.assertEqual(out["proseStatus"], "done")
 
 
 class Worker(unittest.TestCase):
@@ -243,6 +372,46 @@ class Worker(unittest.TestCase):
             self.h.worker({"job_id": "j1", "owner": "o"}, None)
         self.assertTrue(seen["started_before_measure"])
         self.assertEqual(seen["vote"], "push-up")
+
+    def test_prose_pass_runs_after_the_first_result_write(self):
+        order = []
+        payload = {**measured(), "visionStatus": "skipped", "proseStatus": "pending",
+                   "proseSource": "fallback", "traceId": "t"}
+        self.table.update_item.side_effect = lambda **kw: order.append(
+            ("write", kw.get("ExpressionAttributeValues", {}).get(":s")))
+
+        def finish_prose(job, result, **k):
+            order.append(("prose", self.statuses()[-1]))
+            return {**result, "proseStatus": "done", "proseSource": "llm:deepseek-v4-flash",
+                    "headline": "3 flexiones del modelo"}
+
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=dict(payload)), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r), \
+                mock.patch("process.finish_prose", side_effect=finish_prose):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        first_done = order.index(("write", "done"))
+        # When the prose pass ran, the phone could already read a done result.
+        self.assertEqual(order[first_done + 1][0], "prose")
+        self.assertEqual(order[first_done + 1][1][0], "done")
+        final = self.table.update_item.call_args.kwargs["ExpressionAttributeValues"][":r"]
+        self.assertEqual(final["proseStatus"], "done")
+        self.assertEqual(final["headline"], "3 flexiones del modelo")
+
+    def test_a_prose_failure_does_not_fail_the_job(self):
+        payload = {**measured(), "visionStatus": "skipped", "proseStatus": "pending",
+                   "proseSource": "fallback", "traceId": "t"}
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=dict(payload)), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r), \
+                mock.patch("process.finish_prose", side_effect=RuntimeError("boom")):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        final = self.table.update_item.call_args.kwargs["ExpressionAttributeValues"][":r"]
+        # The pass failed, not the job: the fallback text stands.
+        self.assertEqual(final["proseStatus"], "failed")
+        self.assertEqual(final["n_reps"], 3)
+        self.assertEqual(self.statuses()[-1][0], "done")
+
 
 
 if __name__ == "__main__":
