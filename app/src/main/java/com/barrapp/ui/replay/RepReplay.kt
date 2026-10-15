@@ -263,8 +263,10 @@ fun RepReplay(
     }
 
     val done = plan.repsDoneBy(positionS)
-    val verdict = plan.verdictAt(positionS)
-        ?: if (!playing) plan.activeRepAt(positionS)?.takeIf { it.index in reviewed } else null
+    // Playing, a rep's verdict follows it as it ends. Paused - on a rep someone
+    // asked to see, or a guided stop - the rep under the playhead speaks.
+    val verdict = if (playing) plan.verdictAt(positionS)
+    else plan.activeRepAt(positionS) ?: plan.verdictAt(positionS)
 
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         BoxWithConstraints(
@@ -274,7 +276,10 @@ fun RepReplay(
                 .background(Color.Black),
             contentAlignment = Alignment.Center,
         ) {
-            val maxH = if (fullScreen) maxWidth * 1.5f else maxWidth * 1.1f
+            // Inline, the video leaves room for what to fix below it: a
+            // portrait clip at full width would fill the whole screen.
+            val screenH = androidx.compose.ui.platform.LocalConfiguration.current.screenHeightDp.dp
+            val maxH = if (fullScreen) screenH * 0.62f else screenH * 0.36f
             val h = (maxWidth / aspect.coerceIn(0.4f, 2.4f)).coerceAtMost(maxH)
             Box(
                 Modifier
