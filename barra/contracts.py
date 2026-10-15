@@ -28,6 +28,8 @@ REQUIRED = [
     "n_reps", "n_candidates", "countStatus", "fps", "duration_s",
     "reps", "sessions", "blockers",
     "topFixes",
+    # Where the athlete was on the apparatus; the replay skips what is not.
+    "activeSpans",
 ]
 
 REP_REQUIRED = [

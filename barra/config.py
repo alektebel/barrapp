@@ -175,6 +175,17 @@ class Thresholds:
     # the noise, and a third of the quietest real movement.
     min_span_amplitude: float = 0.15
 
+    # -- rep-to-rep variation (what the replay marks, never what is scored) --
+    # A rep is marked as unlike the rest of its own set when its amplitude or
+    # its duration sits this far from the set's median. Relative to the
+    # athlete's own reps, so no population norm is assumed; the replay only
+    # points at the rep, the score is untouched.
+    rep_amplitude_outlier: float = 0.20
+    rep_tempo_outlier: float = 0.25
+    # A set whose amplitude and tempo CVs both sit at or under this is
+    # "estable"; above it on either is "irregular".
+    set_steady_cv: float = 0.15
+
 
 def thresholds_from_environment(
     environ: Mapping[str, str] | None = None,

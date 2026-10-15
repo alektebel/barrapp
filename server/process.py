@@ -451,6 +451,8 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
         "rescued": False,
         "countedBy": None,
         "consistency": None,
+        "consistencyBand": None,
+        "activeSpans": [],
         "blockers": [],
         "fps": round(float(fps), 3),
         "duration_s": duration_s,
@@ -494,6 +496,8 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
         "fps": 0.0,
         "duration_s": 0.0,
         "trim": None,
+        "activeSpans": [],
+        "consistencyBand": None,
         "session": date.today().isoformat(),
         "sessionScore": None,
         "sessionBand": "unmeasured",
@@ -906,12 +910,16 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     _stage("scoring the reps")
     rep_amplitudes: list[float] = []
     rep_durations: list[float] = []
+    amp_by_rep: list[float | None] = []   # parallel to `found`, None when unreadable
     per_rep_assessments = []
     for i, (start, turn, end) in enumerate(found):
         label = f"r{i + 1}"
+        rep_amp = None
         if 0 <= start < len(signal) and 0 <= turn < len(signal):
-            rep_amplitudes.append(float(signal[turn] - min(signal[start], signal[end])))
+            rep_amp = float(signal[turn] - min(signal[start], signal[end]))
+            rep_amplitudes.append(rep_amp)
         rep_durations.append((end - start) / fps)
+        amp_by_rep.append(rep_amp)
         measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement,
                                trace=tr, label=label)
         # The phases as measured - metrics narrows the muscle-up's transition
@@ -1066,6 +1074,20 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     if consistency:
         tr.step("set consistency", **consistency)
 
+    # Which rep broke the set's own pattern, for the replay to point at. The
+    # durations list is parallel to `found`; amplitudes may skip a rep whose
+    # boundaries fell outside the signal, so the parallel copy is used.
+    from barra.variation import consistency_band, rep_variation, spans_as_seconds
+    if len(reps) == len(found):
+        for rep, var in zip(reps, rep_variation(amp_by_rep, rep_durations)):
+            rep["variation"] = {"amplitude": var["amplitude"], "tempo": var["tempo"]}
+            rep["outlier"] = var["outlier"]
+    # Where the athlete was on the apparatus, as the segmenter saw it. The
+    # rep-derived `trim` stays the playback window; these spans let the
+    # phone skip the rest between two stretches of work.
+    from barra.ingest import _runs, active_mask
+    active_spans = spans_as_seconds(_runs(active_mask(pose.keypoints, fps, movement)), fps)
+
     blockers_out = list(blockers)
     counted_by = None
     if vision_count is not None and not found:
@@ -1133,6 +1155,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "rescued": rescued,
         "countedBy": counted_by,
         "consistency": consistency or None,
+        "consistencyBand": consistency_band(consistency),
+        "activeSpans": active_spans,
         "view": view.as_dict(),
         "fps": round(float(fps), 3),
         "duration_s": round(float(info.get("duration_s") or 0), 2),
