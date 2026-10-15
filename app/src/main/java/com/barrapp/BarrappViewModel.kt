@@ -85,6 +85,9 @@ data class UiState(
     val feedbackError: String? = null,
 )
 
+private const val PENDING_TEXT_POLL_MS = 2_000L
+private const val PENDING_TEXT_FOLLOW_MS = 90_000L
+
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
     private val api = BarraApi(application)
     private val retryLogMutex = Mutex()
@@ -224,7 +227,13 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     /** The locally kept copy of the current session's clip, when this phone
      *  still has it. Drives whether the replay entry point is offered. */
     fun replayClip(): java.io.File? {
-        val id = _state.value.current?.id ?: return null
+        val current = _state.value.current ?: return null
+        // The clip must be the one the analysis on screen measured: a session
+        // opened from the calendar is not the job that was uploaded last.
+        val shown = _state.value.analysis?.traceId
+        val measured = current.result?.traceId
+        if (!shown.isNullOrBlank() && !measured.isNullOrBlank() && shown != measured) return null
+        val id = current.id
         val app = getApplication<Application>()
         clipFile(app, id).takeIf { it.exists() && it.length() > 0 }?.let { return it }
         // A work's clip keeps its local name until the work finishes, so a
@@ -485,6 +494,32 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         else it.copy(current = job, analysis = job.result)
                     }
                 }
+        }
+    }
+
+    /**
+     * The result is on screen with the deterministic Spanish text; the model's
+     * prose and the vision note follow (proseStatus / visionStatus "pending").
+     * Ask again for a bounded while and swap them in when they land - only if
+     * that session is still the one on screen.
+     */
+    private fun followPendingText(jobId: String) {
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val deadline = SystemClock.elapsedRealtime() + PENDING_TEXT_FOLLOW_MS
+            while (SystemClock.elapsedRealtime() < deadline) {
+                delay(PENDING_TEXT_POLL_MS)
+                val job = runCatching { withContext(Dispatchers.IO) { api.getJob(jobId) } }
+                    .getOrNull() ?: continue
+                val result = job.result ?: continue
+                if (result.prosePending || result.visionPending) continue
+                SessionStore.record(app, job.id, result)
+                _state.update {
+                    if (it.current?.id != jobId) it
+                    else it.copy(current = job, analysis = result)
+                }
+                return@launch
+            }
         }
     }
 
@@ -1171,6 +1206,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                                 )
                             }
                             refresh()
+                            if (j.result?.prosePending == true || j.result?.visionPending == true) {
+                                followPendingText(j.id)
+                            }
                             return
                         }
                         "failed" -> {

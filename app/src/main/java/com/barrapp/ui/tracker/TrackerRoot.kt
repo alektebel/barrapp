@@ -79,14 +79,19 @@ fun TrackerRoot(
     var tab by remember { mutableStateOf(initialTab) }
     var sheet by remember { mutableStateOf(Sheet.NONE) }
     var repsOpen by remember { mutableStateOf(false) }
-    var standard by remember { mutableStateOf("") }
-    var camera by remember { mutableStateOf("") }
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val declared = remember { com.barrapp.data.ProfileStore.declaration(context) }
+    var standard by remember { mutableStateOf(declared.first) }
+    var camera by remember { mutableStateOf(declared.second) }
     // The trace the record tab was looking at when the clip was sent. The
     // results phase waits for a DIFFERENT one, so a failed upload falls back
     // to the idle screen instead of re-presenting the previous session under
     // the heading "análisis".
     var sentFrom by remember { mutableStateOf<String?>(null) }
     var showResults by remember { mutableStateOf(false) }
+    // The full-screen replay opens over whatever was showing and closes back
+    // to it - the results, or the session sheet - rather than to Home.
+    var replayOpen by remember { mutableStateOf(false) }
 
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -120,9 +125,19 @@ fun TrackerRoot(
         }
     }
 
+    if (replayOpen) {
+        com.barrapp.ui.ReplayScreen(
+            analysis = state.analysis,
+            clip = remember(state.analysis?.traceId, state.current?.id) { vm.replayClip() },
+            onBack = { replayOpen = false },
+        )
+        return
+    }
+
     if (sheet != Sheet.NONE) {
         SheetHost(vm, state, sheet, repsOpen, { repsOpen = !repsOpen },
-            onOpenSession = { sheet = Sheet.SESSION }) { sheet = Sheet.NONE }
+            onOpenSession = { sheet = Sheet.SESSION },
+            onReplay = { replayOpen = true }) { sheet = Sheet.NONE }
         return
     }
 
@@ -179,8 +194,14 @@ fun TrackerRoot(
                             lastAnalyzed = lastAnalyzed(state.days),
                             standard = standard,
                             camera = camera,
-                            onStandard = { standard = it },
-                            onCamera = { camera = it },
+                            onStandard = {
+                                standard = it
+                                com.barrapp.data.ProfileStore.saveDeclaration(context, standard, camera)
+                            },
+                            onCamera = {
+                                camera = it
+                                com.barrapp.data.ProfileStore.saveDeclaration(context, standard, camera)
+                            },
                             onRecord = { pickVideo.launch("video/*") },
                             onPick = { pickVideo.launch("video/*") },
                             onDone = {
@@ -194,6 +215,11 @@ fun TrackerRoot(
                             resultTraceId = state.analysis?.traceId.orEmpty(),
                             currentResultTraceId = state.current?.result?.traceId,
                             onResultRendered = vm::markResultRendered,
+                            replayAnalysis = state.analysis,
+                            replayClip = remember(state.analysis?.traceId, state.current?.id) {
+                                vm.replayClip()
+                            },
+                            onExpandReplay = { replayOpen = true },
                         )
                     }
 
@@ -226,6 +252,7 @@ private fun SheetHost(
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
     onOpenSession: () -> Unit,
+    onReplay: () -> Unit,
     onClose: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().background(Tk.bg)) {
@@ -247,7 +274,7 @@ private fun SheetHost(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 when (sheet) {
-                    Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onClose)
+                    Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onReplay, onClose)
                     Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenSession)
                     Sheet.LADDER -> LadderSheet(state, onClose)
                     Sheet.SKILLS -> SkillsSheet(state, onClose)
@@ -264,6 +291,7 @@ private fun SessionSheet(
     state: UiState,
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
+    onReplay: () -> Unit,
     onClose: () -> Unit,
 ) {
     val a = state.analysis
@@ -299,7 +327,7 @@ private fun SessionSheet(
         // fault names would silently leave the sheet in English.
         cues = com.barrapp.faultCounts(a).mapNotNull { (fault, _) -> cueEs(fault) }.take(3)
             .ifEmpty { listOf("Nada que señalar en las comprobaciones que se pudieron hacer.") },
-        onWatchReplay = state.current?.let { { vm.openReplay() } },
+        onWatchReplay = if (vm.replayClip() != null) onReplay else null,
         reps = a.reps.map { rep ->
             RepCardData(
                 title = movementEs(rep.label, rep.label),

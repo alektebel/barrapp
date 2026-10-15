@@ -48,6 +48,27 @@ class TrimDecisionTest {
         assertTrue(TrimPlan.shouldTrim(TrimSuggestion(0.5, 12.5, 20.0), 20.0))
     }
 
+    /**
+     * WA0014 at the phone's 1 Hz cadence (an OpenCV mirror of the sampler).
+     * The loudest steady stretch, 1-7 s, is the walk to the bar - the review
+     * shows approach, a static hang, then the walk away. Pixel motion cannot
+     * tell a walk from a set, which is why a suggested cut is always shown to
+     * the athlete (with its first and last frame) rather than applied.
+     */
+    @Test
+    fun `a pixel-motion window can be the walk, so a cut is proposed, never applied`() {
+        val scores = listOf(44, 50, 43, 49, 51, 27, 12, 10, 4, 3, 3, 4, 8, 4, 2, 3, 5, 1, 1,
+            1, 1, 7, 9, 4, 8, 5, 2, 2, 2, 1, 4, 4, 4, 7, 10, 39, 26, 64, 99)
+        // The last sample is the loudest, so the walk away is found as a run
+        // of its own; the approach is longer and wins.
+        // The 1 s frame only seeds the difference: the first sample is at 2 s.
+        val samples = scores.mapIndexed { i, v -> com.barrapp.data.MotionSample(i + 2.0, v.toDouble()) }
+        val s = TrimPlan.suggest(samples, 40.4)!!
+        assertTrue(TrimPlan.shouldTrim(s, 40.4))
+        assertEquals(1.0, s.startS, 1e-9)
+        assertEquals(7.0, s.endS, 1e-9)
+    }
+
     private class FakeTrimmer(
         private val fail: Boolean = false,
     ) : ClipTrimmer {

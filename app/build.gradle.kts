@@ -132,11 +132,15 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.7")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     // Media3 Transformer: recorta el clip a la serie (720p H.264 ~4 Mbit/s)
-    // antes de subirlo. Solo el recorte; la reproducción sigue siendo
-    // VideoView/MediaPlayer, sin ExoPlayer.
+    // antes de subirlo.
     implementation("androidx.media3:media3-transformer:1.4.1")
     implementation("androidx.media3:media3-effect:1.4.1")
     implementation("androidx.media3:media3-common:1.4.1")
+    // ExoPlayer para la repetición: búsqueda precisa al fotograma y una
+    // posición que se puede leer en cada frame, para que el contador suba
+    // con la rep que se ve. Misma versión que el Transformer.
+    implementation("androidx.media3:media3-exoplayer:1.4.1")
+    implementation("androidx.media3:media3-ui:1.4.1")
     implementation("com.squareup.okhttp3:okhttp-dnsoverhttps:4.12.0")
     // Weekly review notification. Scheduled by the system, so it survives the
     // app being killed - which is the whole point of a weekly nudge.

@@ -506,6 +506,9 @@ class BarraApi(context: Context) {
                             p.keys().asSequence().associateWith { k -> p.optJSONArray(k).doubles() }
                         } ?: emptyMap(),
                         assessmentBlocked = row.textOrNull("assessmentBlocked"),
+                        amplitudeVsSet = row.optJSONObject("variation")?.numberOrNull("amplitude"),
+                        tempoVsSet = row.optJSONObject("variation")?.numberOrNull("tempo"),
+                        outlier = row.optBoolean("outlier", false),
                     )
                 },
                 blockers = (0 until blockers.length()).map { blockers.getString(it) },
@@ -547,6 +550,14 @@ class BarraApi(context: Context) {
                 trim = json.optJSONObject("trim")?.let { t ->
                     Trim(t.optDouble("startS", 0.0).orZero(), t.optDouble("endS", 0.0).orZero())
                 },
+                activeSpans = json.optJSONArray("activeSpans")?.let { arr ->
+                    (0 until arr.length()).mapNotNull { arr.optJSONObject(it) }.map { t ->
+                        Trim(t.optDouble("startS", 0.0).orZero(), t.optDouble("endS", 0.0).orZero())
+                    }.filter { it.endS > it.startS }
+                } ?: emptyList(),
+                amplitudeCV = json.optJSONObject("consistency")?.numberOrNull("amplitudeCV"),
+                tempoCV = json.optJSONObject("consistency")?.numberOrNull("tempoCV"),
+                consistencyBand = json.textOrNull("consistencyBand"),
                 sessionDate = json.optString("session"),
                 sessionScore = if (json.isNull("sessionScore")) null else json.optInt("sessionScore"),
                 sessionBand = json.optString("sessionBand").ifBlank { "unmeasured" },
@@ -603,6 +614,11 @@ class BarraApi(context: Context) {
         /** JSONObject.optDouble returns NaN for a missing key, which then
          *  propagates silently into every arithmetic result downstream. */
         private fun Double.orZero(): Double = if (isNaN() || isInfinite()) 0.0 else this
+
+        /** A finite number, or null when the key is missing, null or not one. */
+        private fun JSONObject.numberOrNull(key: String): Double? =
+            if (!has(key) || isNull(key)) null
+            else optDouble(key, Double.NaN).takeIf { !it.isNaN() && !it.isInfinite() }
 
         /** A string the server may send as JSON `null`. `optString` renders
          *  that as the four letters "null", which then reads as a real reason

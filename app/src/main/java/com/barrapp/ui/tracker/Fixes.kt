@@ -1,6 +1,11 @@
 package com.barrapp.ui.tracker
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,8 +30,14 @@ import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.mono
 
-/** One of the three things to improve, ready to show. */
-data class FixItem(val title: String, val cue: String?, val where: String)
+/** One of the three things to improve, ready to show. [repIndex] is the rep
+ *  that shows it worst, for "Ver en la rep N"; null when none does. */
+data class FixItem(
+    val title: String,
+    val cue: String?,
+    val where: String,
+    val repIndex: Int? = null,
+)
 
 /**
  * The three things to improve, most important first (docs/UX-PLAN.md).
@@ -37,19 +48,22 @@ data class FixItem(val title: String, val cue: String?, val where: String)
  * for a set that had faults. Never more than three, never padded.
  */
 fun fixItems(a: Analysis): List<FixItem> {
+    val plan = com.barrapp.ui.replay.ReplayPlan.from(a, a.durationS)
     if (a.topFixes.isNotEmpty()) {
         return a.topFixes.take(3).map {
             FixItem(faultEs(it.name), cueEs(it.name),
-                "en ${it.observedReps} de ${it.judgedReps} repeticiones")
+                "en ${it.observedReps} de ${it.judgedReps} repeticiones",
+                plan.worstRepFor(it.name)?.index)
         }
     }
     return faultCounts(a).take(3).map { (name, n) ->
-        FixItem(faultEs(name), cueEs(name), "en $n de ${a.reps.size} repeticiones")
+        FixItem(faultEs(name), cueEs(name), "en $n de ${a.reps.size} repeticiones",
+            plan.worstRepFor(name)?.index)
     }
 }
 
 @Composable
-internal fun FixesCard(fixes: List<FixItem>) {
+internal fun FixesCard(fixes: List<FixItem>, onShowRep: ((Int) -> Unit)? = null) {
     TkCard(accent = true) {
         Eyebrow("Lo que mejorar")
         if (fixes.isEmpty()) {
@@ -74,6 +88,18 @@ internal fun FixesCard(fixes: List<FixItem>) {
                     fix.cue?.let { Text(it, style = T.bodyS, modifier = Modifier.padding(top = 2.dp)) }
                     Spacer(Modifier.height(2.dp))
                     Text(fix.where, style = mono(9, 0.05f, Tk.amber))
+                    if (onShowRep != null && fix.repIndex != null) {
+                        val rep = fix.repIndex
+                        Text(
+                            "Ver en la rep ${rep + 1} →",
+                            style = mono(11, 0.05f, Tk.primaryLight),
+                            modifier = Modifier
+                                .heightIn(min = 48.dp)
+                                .semantics { role = Role.Button }
+                                .clickable { onShowRep(rep) }
+                                .padding(vertical = 14.dp),
+                        )
+                    }
                 }
             }
         }

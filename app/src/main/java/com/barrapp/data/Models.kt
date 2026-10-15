@@ -55,6 +55,14 @@ data class Analysis(
     val model: ModelVerdict? = null,
     /** The stretch of the clip that is actually the exercise, in seconds. */
     val trim: Trim? = null,
+    /** Where the athlete was on the apparatus, as the segmenter saw it. Lets
+     *  the replay skip the rest between two stretches of work. */
+    val activeSpans: List<Trim> = emptyList(),
+    /** How even the set was: coefficient of variation of rep amplitude and
+     *  rep duration, and the server's band for them ("estable"/"irregular"). */
+    val amplitudeCV: Double? = null,
+    val tempoCV: Double? = null,
+    val consistencyBand: String? = null,
     val sessionDate: String = "",
     val sessionScore: Int? = null,
     val sessionBand: String = "unmeasured",
@@ -287,6 +295,14 @@ data class RepRow(
     /** Non-null when the whole rep was withheld from assessment - an
      *  implausible pose, too little tracking - with the reason. */
     val assessmentBlocked: String? = null,
+    /** This rep's amplitude and duration over its own set's median, minus one
+     *  (0.3 = 30 % more). Null on sets too short for a median, or on payloads
+     *  that predate the field. */
+    val amplitudeVsSet: Double? = null,
+    val tempoVsSet: Double? = null,
+    /** The rep broke its set's own pattern - the replay marks it. Never a
+     *  score; a pointer at a moment worth watching. */
+    val outlier: Boolean = false,
 ) {
     val checked: Int get() = assessments.count { it.status != Assessment.UNOBSERVABLE }
     val unobservable: List<Assessment> get() = assessments.filter { it.status == Assessment.UNOBSERVABLE }

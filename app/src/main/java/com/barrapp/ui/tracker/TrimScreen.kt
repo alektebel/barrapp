@@ -1,5 +1,6 @@
 package com.barrapp.ui.tracker
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -20,6 +21,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
 import com.barrapp.data.Work
 import com.barrapp.ui.theme.T
@@ -70,6 +73,15 @@ fun TrimScreen(
         )
         Spacer(Modifier.height(28.dp))
 
+        // What the cut keeps, as pictures: the frame it starts on and the
+        // frame it ends on. A window that starts on the walk to the bar is
+        // obvious here and invisible in two numbers.
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            FramePeek(work.clipPath, start, "Empieza", Modifier.weight(1f))
+            FramePeek(work.clipPath, end, "Termina", Modifier.weight(1f))
+        }
+        Spacer(Modifier.height(16.dp))
+
         TkCard {
             Eyebrow("La ventana")
             Spacer(Modifier.height(16.dp))
@@ -116,5 +128,50 @@ fun TrimScreen(
         TkPrimaryButton("Recortar y subir", onConfirm)
         Spacer(Modifier.height(10.dp))
         TkSecondaryButton("Subir el clip entero", onDiscard)
+    }
+}
+
+/** The clip's frame at [atS], fetched off the main thread once the slider
+ *  rests for a moment. Blank while loading or when the frame cannot be read. */
+@Composable
+private fun FramePeek(clipPath: String, atS: Double, label: String, modifier: Modifier = Modifier) {
+    var frame by remember(clipPath) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    androidx.compose.runtime.LaunchedEffect(clipPath, atS) {
+        kotlinx.coroutines.delay(250)
+        frame = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+            runCatching {
+                val r = android.media.MediaMetadataRetriever()
+                try {
+                    r.setDataSource(clipPath)
+                    val us = (atS * 1_000_000).toLong()
+                    val bmp = if (android.os.Build.VERSION.SDK_INT >= 27)
+                        r.getScaledFrameAtTime(us, android.media.MediaMetadataRetriever.OPTION_CLOSEST, 320, 320)
+                    else r.getFrameAtTime(us, android.media.MediaMetadataRetriever.OPTION_CLOSEST)
+                    bmp?.asImageBitmap()
+                } finally {
+                    runCatching { r.release() }
+                }
+            }.getOrNull()
+        }
+    }
+    Column(modifier) {
+        androidx.compose.foundation.layout.Box(
+            Modifier
+                .fillMaxWidth()
+                .height(140.dp)
+                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .background(Tk.card),
+            contentAlignment = Alignment.Center,
+        ) {
+            frame?.let {
+                androidx.compose.foundation.Image(
+                    it,
+                    contentDescription = "Fotograma en el que ${label.lowercase()} el recorte",
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
+        }
+        Text("$label · %.1f s".format(atS), style = mono(10, 0.05f), modifier = Modifier.padding(top = 6.dp))
     }
 }

@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.body
+import kotlinx.coroutines.launch
 import com.barrapp.ui.theme.mono
 import com.barrapp.ui.theme.scoreInk
 import com.barrapp.ui.theme.scoreLabel
@@ -86,6 +88,10 @@ val STANDARDS_ES = listOf(
     Choice("Kipping", "kipping"),
 )
 
+/** The label a stored value wears; the blank choice when it is unknown. */
+fun List<Choice>.label(value: String): String =
+    (firstOrNull { it.value == value } ?: first()).label
+
 val CAMERAS_ES = listOf(
     Choice("No lo sé", ""),
     Choice("De lado", "SAGITTAL"),
@@ -119,6 +125,11 @@ fun TrackerRecord(
     resultTraceId: String = "",
     currentResultTraceId: String? = null,
     onResultRendered: ((String, String) -> Unit)? = null,
+    /** The measurement and the phone's copy of the clip it measured. Both
+     *  present: the results lead with the set playing back. */
+    replayAnalysis: com.barrapp.data.Analysis? = null,
+    replayClip: java.io.File? = null,
+    onExpandReplay: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(phase, results != null, resultJobId, resultTraceId, currentResultTraceId) {
@@ -145,7 +156,9 @@ fun TrackerRecord(
                 lastAnalyzed, standard, camera, onStandard, onCamera, onRecord, onPick,
             )
             RecordPhase.ANALYZING -> AnalyzingPhase(stages, activeStage)
-            RecordPhase.RESULTS -> results?.let { ResultsPhase(it, onDone) }
+            RecordPhase.RESULTS -> results?.let {
+                ResultsPhase(it, onDone, replayAnalysis, replayClip, onExpandReplay)
+            }
                 ?: IdlePhase(lastAnalyzed, standard, camera, onStandard, onCamera, onRecord, onPick)
         }
     }
@@ -214,24 +227,44 @@ private fun IdlePhase(
         Spacer(Modifier.height(20.dp))
         // The declaration. Blank is always allowed and always first: a check
         // that depends on a standard nobody declared is marked as such, never
-        // assumed one way.
+        // assumed one way. Folded to one line - the last choice is
+        // remembered, so most sets need no answer at all.
+        var declaring by androidx.compose.runtime.saveable.rememberSaveable {
+            androidx.compose.runtime.mutableStateOf(false)
+        }
         TkCard {
-            Eyebrow("Antes del clip")
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Lo que declares aquí cambia qué se puede juzgar. Dejarlo en blanco " +
-                    "también vale: las comprobaciones que dependen de ello se marcan, " +
-                    "no se asumen.",
-                style = T.noteTiny,
-            )
-            Spacer(Modifier.height(12.dp))
-            Eyebrow("Estándar", style = T.eyebrowNine)
-            Spacer(Modifier.height(6.dp))
-            ChoiceRow(STANDARDS_ES, standard, onStandard)
-            Spacer(Modifier.height(12.dp))
-            Eyebrow("Cámara", style = T.eyebrowNine)
-            Spacer(Modifier.height(6.dp))
-            ChoiceRow(CAMERAS_ES, camera, onCamera)
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .noRipple { declaring = !declaring },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    "Estándar: " + STANDARDS_ES.label(standard) +
+                        " · Cámara: " + (if (camera.isBlank()) "auto" else CAMERAS_ES.label(camera).lowercase()),
+                    style = T.bodyInk,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(if (declaring) "Listo" else "Cambiar", style = mono(11, 0.05f, Tk.primaryLight))
+            }
+            if (declaring) {
+                Text(
+                    "Lo que declares aquí cambia qué se puede juzgar. Dejarlo en blanco " +
+                        "también vale: las comprobaciones que dependen de ello se marcan, " +
+                        "no se asumen.",
+                    style = T.noteTiny,
+                    modifier = Modifier.padding(top = 8.dp),
+                )
+                Spacer(Modifier.height(12.dp))
+                Eyebrow("Estándar", style = T.eyebrowNine)
+                Spacer(Modifier.height(6.dp))
+                ChoiceRow(STANDARDS_ES, standard, onStandard)
+                Spacer(Modifier.height(12.dp))
+                Eyebrow("Cámara", style = T.eyebrowNine)
+                Spacer(Modifier.height(6.dp))
+                ChoiceRow(CAMERAS_ES, camera, onCamera)
+            }
         }
 
         Spacer(Modifier.height(16.dp))
@@ -315,8 +348,8 @@ private fun AnalyzingPhase(stages: List<String>, activeStage: Int) {
         )
         Spacer(Modifier.height(8.dp))
         Text(
-            "Sin porcentaje, porque no habría uno honesto. Cuatro etapas con nombre, " +
-                "y la que va por delante.",
+            "Puedes salir de la app: te avisamos cuando esté. Después verás tu serie " +
+                "con cada repetición marcada.",
             style = T.noteTiny,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
         )
@@ -366,15 +399,36 @@ internal fun WhatHappened(results: ResultsData) {
 }
 
 @Composable
-private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
+private fun ResultsPhase(
+    results: ResultsData,
+    onDone: () -> Unit,
+    analysis: com.barrapp.data.Analysis? = null,
+    clip: java.io.File? = null,
+    onExpandReplay: (() -> Unit)? = null,
+) {
+    val scroll = rememberScrollState()
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val replay = com.barrapp.ui.replay.rememberRepReplayState()
+    // The set itself comes first: the counter rising rep by rep over the
+    // video is the result, the cards below explain it.
+    val playable = analysis != null && clip != null && results.reps > 0 &&
+        analysis.reps.any { it.endS > it.startS }
     Column(
         Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             .padding(horizontal = 16.dp)
             .padding(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        if (playable) {
+            com.barrapp.ui.replay.RepReplay(
+                analysis = analysis!!,
+                clip = clip!!,
+                state = replay,
+                onExpand = onExpandReplay,
+            )
+        }
         SlideUp {
             TkCard(accent = true) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -404,7 +458,15 @@ private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
         // Short by default (docs/UX-PLAN.md): what to fix, in order. A set
         // with nothing counted says why instead. Everything else is one tap away.
         if (results.reps > 0) {
-            SlideUp(delayMillis = 60) { FixesCard(results.fixes) }
+            SlideUp(delayMillis = 60) {
+                FixesCard(
+                    results.fixes,
+                    onShowRep = if (playable) { index ->
+                        replay.showRep(index)
+                        scope.launch { scroll.animateScrollTo(0) }
+                    } else null,
+                )
+            }
         } else if (results.headline.isNotBlank() || results.blockers.isNotEmpty()) {
             SlideUp(delayMillis = 60) { WhatHappened(results) }
         }
