@@ -15,8 +15,10 @@ import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
+import androidx.media3.transformer.DefaultEncoderFactory
 import androidx.media3.transformer.Transformer
 import androidx.media3.transformer.TransformationRequest
+import androidx.media3.transformer.VideoEncoderSettings
 
 /**
  * El corte real, con Media3 Transformer: [startS,endS) del clip a 720p
@@ -32,13 +34,14 @@ object Media3ClipExporter {
 
     private const val TIMEOUT_MS = 3L * 60 * 1000
     private const val TARGET_HEIGHT = 720
+    private const val TARGET_VIDEO_BITRATE_BPS = 4_000_000
 
     /** Cualquier fallo del transcodificador, con su causa dentro. */
     class ExportFailed(cause: Throwable) : Exception(cause.message, cause)
 
     @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
-    suspend fun export(context: Context, src: File, dst: File, startS: Double, endS: Double) {
-        withContext(Dispatchers.IO) {
+    suspend fun export(context: Context, src: File, dst: File, startS: Double, endS: Double): Int? {
+        return withContext(Dispatchers.IO) {
             dst.parentFile?.mkdirs()
             dst.delete()
 
@@ -62,12 +65,18 @@ object Media3ClipExporter {
                     listOf(Presentation.createForHeight(TARGET_HEIGHT))))
                 .build()
 
+            val encoderFactory = DefaultEncoderFactory.Builder(context)
+                .setRequestedVideoEncoderSettings(VideoEncoderSettings.Builder()
+                    .setBitrate(TARGET_VIDEO_BITRATE_BPS)
+                    .build())
+                .build()
             val transformer = Transformer.Builder(context)
                 .setTransformationRequest(request)
+                .setEncoderFactory(encoderFactory)
                 .build()
 
             try {
-                withTimeoutOrNull(TIMEOUT_MS) {
+                val result = withTimeoutOrNull(TIMEOUT_MS) {
                     kotlinx.coroutines.suspendCancellableCoroutine<ExportResult> { cont ->
                         transformer.addListener(object : Transformer.Listener {
                             override fun onCompleted(
@@ -86,6 +95,7 @@ object Media3ClipExporter {
                     }
                 } ?: throw java.util.concurrent.TimeoutException(
                     "el recorte superó los 3 minutos")
+                result.averageVideoBitrate.takeIf { it > 0 }
             } catch (err: Throwable) {
                 runCatching { transformer.cancel() }
                 dst.delete()

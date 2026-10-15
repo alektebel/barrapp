@@ -20,16 +20,33 @@ sealed class TrimError(message: String) : Exception(message) {
 /** Cómo se corta un clip. La abstracción existe para las pruebas: un fake la
  *  implementa sin transcodificar nada. */
 interface ClipTrimmer {
-    /** Corta [startS,endS) a 720p H.264 ~4 Mbit/s. Escribe en [dst]. */
-    suspend fun export(src: File, dst: File, startS: Double, endS: Double)
+    /** Corta [startS,endS) a 720p H.264, solicitando 4 Mbit/s. Devuelve el
+     * bitrate medio de vídeo que informa el codificador, si está disponible. */
+    suspend fun export(src: File, dst: File, startS: Double, endS: Double): Int?
 }
 
 /** Lo que una pasada de muestreo sabe de un clip. */
 data class ClipProbe(val durationS: Double, val samples: List<MotionSample>)
 
 /**
+ * A one-second nearest-frame cadence halves random decoder seeks versus the
+ * former 0.5 s scan. Reviewed emulator screens found it preserves wide/no-trim
+ * windows for positive clips while avoiding a short false trim on WA0020.
+ * Keep this cadence separate from the server's measurement frame rate: it is
+ * only a phone-side trim suggestion.
+ */
+internal object MotionSamplerPlan {
+    const val STEP_S = 1.0
+
+    fun timestamps(durationS: Double): Sequence<Double> {
+        if (!durationS.isFinite() || durationS <= STEP_S) return emptySequence()
+        return generateSequence(STEP_S) { it + STEP_S }.takeWhile { it < durationS }
+    }
+}
+
+/**
  * Muestreo de movimiento con [MediaMetadataRetriever]: miniaturas pequeñas
- * cada 0,5 s, diferencia media de píxeles entre fotogramas consecutivos como
+ * cada segundo, diferencia media de píxeles entre fotogramas consecutivos como
  * puntuación. Suficiente para separar una caminata de una serie de dominadas;
  * nada aquí toca un número medido — el servidor mide lo que recibe.
  */
@@ -47,22 +64,19 @@ class MediaMetadataSampler {
                 MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L
             if (durationMs <= 0L) return ClipProbe(0.0, emptyList())
             val durationS = durationMs / 1000.0
-            val stepS = 0.5
-            // Un paso de retardo para poder comparar cada muestra con la
-            // anterior: la primera puntuación útil es la del segundo paso.
             var prev: android.graphics.Bitmap? = null
             val out = mutableListOf<MotionSample>()
-            var t = stepS
-            while (t < durationS) {
+            // The first frame seeds the difference; every later frame adds
+            // one sample at this cadence.
+            for (t in MotionSamplerPlan.timestamps(durationS)) {
                 val bmp = retriever.getFrameAtTime(
                     (t * 1_000_000).toLong(),
-                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC) ?: break
+                    MediaMetadataRetriever.OPTION_CLOSEST) ?: break
                 val small = downscale(bmp)
                 bmp.recycle()
                 prev?.let { p -> out.add(MotionSample(t, frameDifference(p, small))) }
                 if (prev !== small) prev?.recycle()
                 prev = small
-                t += stepS
             }
             prev?.recycle()
             return ClipProbe(durationS, out)
@@ -108,9 +122,9 @@ class MediaMetadataSampler {
 
 /** El recortador real. En pruebas se sustituye por un fake. */
 class DefaultClipTrimmer(private val context: Context) : ClipTrimmer {
-    override suspend fun export(src: File, dst: File, startS: Double, endS: Double) {
+    override suspend fun export(src: File, dst: File, startS: Double, endS: Double): Int? {
         try {
-            Media3ClipExporter.export(context, src, dst, startS, endS)
+            return Media3ClipExporter.export(context, src, dst, startS, endS)
         } catch (err: Exception) {
             throw TrimError.Transcode(err)
         }

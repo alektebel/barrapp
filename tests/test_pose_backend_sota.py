@@ -43,3 +43,14 @@ def test_resolve_weights_prefers_local_stronger_weights(monkeypatch, tmp_path):
     (tmp_path / "yolo11m-pose.pt").write_bytes(b"")
     (tmp_path / "yolo11s-pose.pt").write_bytes(b"")
     assert UltralyticsBackend().weights == str(tmp_path / "yolo11m-pose.pt")
+
+
+def test_resolve_weights_uses_baked_default_checkpoint_without_network_fallback(
+    monkeypatch, tmp_path,
+):
+    import barra.pose.ultralytics_backend as ub
+    monkeypatch.delenv("BARRA_YOLO_POSE_WEIGHTS", raising=False)
+    monkeypatch.setattr(ub, "_ROOT", tmp_path)
+    checkpoint = tmp_path / "yolo11n-pose.pt"
+    checkpoint.write_bytes(b"pinned checkpoint")
+    assert UltralyticsBackend().weights == str(checkpoint)

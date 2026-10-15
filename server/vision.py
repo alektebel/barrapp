@@ -33,6 +33,7 @@ import re
 import time
 import urllib.error
 import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 try:  # worker/task root
@@ -149,15 +150,19 @@ def skip_reason() -> str:
 
 
 def _chat_result(base: str, key: str, model: str, system: str, content: list[dict],
-                 timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS) -> ChatResult:
+                 timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS,
+                 check_model: bool = True) -> ChatResult:
     return llm.complete(model, [{"role": "user", "content": content}], system=system,
-                        base=base, key=key, timeout=timeout, attempts=attempts)
+                        base=base, key=key, timeout=timeout, attempts=attempts,
+                        check_model=check_model)
 
 
 def _chat(base: str, key: str, model: str, system: str, content: list[dict],
-          timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS) -> str | None:
+          timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS,
+          check_model: bool = True) -> str | None:
     """The reply text, or None; the cause of a None is in last_error()."""
-    return _chat_result(base, key, model, system, content, timeout, attempts).text
+    return _chat_result(base, key, model, system, content, timeout, attempts,
+                        check_model=check_model).text
 
 
 def _strip_keys(obj):
@@ -492,17 +497,24 @@ def count_from_clip(video_path, out_dir) -> dict | None:
     if len(content) < 2:
         return None
 
+    models = list(dict.fromkeys((model, SECOND_MODEL)))
+
+    def ask(m: str) -> tuple[str, int | None, bool]:
+        # The completion endpoint is authoritative for model availability.
+        # Skip the standalone /models request and ask both independent count
+        # models concurrently; this path is already a last-resort rescue.
+        text = _chat(base, key, m, COUNT_SYSTEM, content, check_model=False)
+        reps = parse_count(text)
+        return m, reps, bool(text and reps is None)
+
     answers: dict[str, int] = {}
     invalid: list[str] = []
-    for m in dict.fromkeys((model, SECOND_MODEL)):
-        text = _chat(base, key, m, COUNT_SYSTEM, content)
-        if not text:
-            continue
-        reps = parse_count(text)
-        if reps is None:
-            invalid.append(m)
-            continue
-        answers[m] = reps
+    with ThreadPoolExecutor(max_workers=len(models)) as pool:
+        for m, reps, invalid_response in pool.map(ask, models):
+            if invalid_response:
+                invalid.append(m)
+            elif reps is not None:
+                answers[m] = reps
     out = reconcile_counts(answers)
     if out is not None and invalid:
         out["invalidResponses"] = invalid
@@ -727,7 +739,7 @@ def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | 
     if len(content) < 2:
         return None
     text = _chat(base, key, model, LOCALIZE_SYSTEM, content,
-                 timeout=LOCALIZE_TIMEOUT)
+                 timeout=LOCALIZE_TIMEOUT, check_model=False)
     parsed = parse_json_object(text)
     if parsed is None:
         print(f"[barra] locate: no JSON in the {model} reply "

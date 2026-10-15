@@ -60,6 +60,9 @@ data class Analysis(
     val sessionBand: String = "unmeasured",
     val repCount: Int = 0,
     val candidateCount: Int = 0,
+    /** Whether the rep count came from geometry, sparse vision, or no usable
+     *  evidence. Keeps an unavailable count from rendering as a measured zero. */
+    val countStatus: String = "geometry",
     val durationS: Double = 0.0,
     /** Ties this result to the server's saved decision chain. Shown in
      *  Diagnostics so a report can name one specific run:

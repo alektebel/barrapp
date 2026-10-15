@@ -77,6 +77,7 @@ def test_locate_exercise_with_a_stubbed_model(tmp_path, monkeypatch):
         frames.append((i, p))
 
     monkeypatch.setenv("BARRA_VISION_BASE_URL", "http://x/v1")
+    monkeypatch.setenv("BARRA_LOCALIZE_MODEL", "mimo-v2.5")
     monkeypatch.delenv("BARRA_LOCALIZE", raising=False)
     monkeypatch.setattr(vision, "_config", lambda: ("http://x/v1", "k", "mimo-v2.5"))
     monkeypatch.setattr("barra.ingest.probe_video",
@@ -167,6 +168,7 @@ def test_chat_retries_an_empty_reply(monkeypatch):
         return _Resp(_reply("" if calls["n"] == 1 else '{"ok": true}'))
 
     monkeypatch.setattr(vision.urllib.request, "urlopen", fake_urlopen)
+    monkeypatch.setattr(vision.llm, "model_listed", lambda *a: True)
     monkeypatch.setattr(vision.time, "sleep", lambda *_: None)
     assert vision._chat("http://x", "k", "m", "s",
                         [{"type": "text", "text": "hi"}]) == '{"ok": true}'

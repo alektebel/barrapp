@@ -39,6 +39,19 @@ class BackgroundUploadTest {
     }
 
     @Test
+    fun `restart resumes single PUT and multipart transfers including connecting state`() {
+        assertTrue(WorkStore.resumesUploadAfterRestart(work(WorkStore.STATUS_SENDING)
+            .copy(jobId = "j1", uploadMode = "single")))
+        assertTrue(WorkStore.resumesUploadAfterRestart(work(WorkStore.STATUS_CONNECTING)
+            .copy(jobId = "j2", uploadMode = "single", uploadComplete = true)))
+        assertTrue(WorkStore.resumesUploadAfterRestart(work(WorkStore.STATUS_CONNECTING)
+            .copy(jobId = "j3", uploadId = "multipart-1")))
+        assertFalse(WorkStore.resumesUploadAfterRestart(work(WorkStore.STATUS_SENDING)))
+        assertFalse(WorkStore.resumesUploadAfterRestart(work(WorkStore.STATUS_FAILED)
+            .copy(uploadMode = "single")))
+    }
+
+    @Test
     fun `the service is declared as a data-sync foreground service`() {
         val ctx = ApplicationProvider.getApplicationContext<android.content.Context>()
         val info = ctx.packageManager.getServiceInfo(

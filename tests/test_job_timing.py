@@ -64,6 +64,25 @@ class Durations(unittest.TestCase):
 
 
 class RoundTwoTiming(unittest.TestCase):
+    def test_dispatch_queue_and_worker_import_are_separate_intervals(self):
+        events = [
+            {"event": "dispatch-started", "at": "2026-10-12T10:00:00.000Z"},
+            {"event": "dispatch-accepted", "at": "2026-10-12T10:00:00.040Z"},
+            {"event": "worker-entry", "at": "2026-10-12T10:00:00.190Z"},
+            {"event": "worker-ready", "at": "2026-10-12T10:00:00.490Z"},
+        ]
+        result = job_timing.durations(events, None)
+        self.assertAlmostEqual(result["worker dispatch request"], 0.040)
+        self.assertAlmostEqual(result["accepted -> worker entry"], 0.150)
+        self.assertAlmostEqual(result["worker handler -> imports ready"], 0.300)
+
+    def test_clock_inversion_does_not_report_negative_dispatch(self):
+        events = [
+            {"event": "dispatch-accepted", "at": "2026-10-12T10:00:00.100Z"},
+            {"event": "worker-entry", "at": "2026-10-12T10:00:00.000Z"},
+        ]
+        self.assertNotIn("accepted -> worker entry", job_timing.durations(events, None))
+
     def test_fractional_seconds_cannot_turn_a_slow_result_into_a_pass(self):
         events = [
             {"event": "upload-started", "at": "2026-10-12T10:00:00.950Z"},
@@ -126,6 +145,57 @@ class RoundTwoTiming(unittest.TestCase):
         self.assertAlmostEqual(result["fusion (includes vision wait)"], 11.9)
         self.assertAlmostEqual(result["measure+report"], 12.075)
         self.assertAlmostEqual(result["pose"], 8.0)
+
+    def test_visual_count_rescue_duration_is_reported_from_trace(self):
+        trace = {"entries": [{
+            "message": "visual count rescue",
+            "data": {"durationMs": 2350, "outcome": "accepted"},
+        }]}
+
+        result = job_timing.durations([], trace)
+
+        self.assertAlmostEqual(result["visual count rescue"], 2.35)
+
+    def test_locator_and_fusion_vote_wait_are_reported_separately(self):
+        events = [
+            {"event": "worker-timing", "at": "2026-10-13T10:00:08.300Z",
+             "fusionWaitMs": 6300, "fusionOutcome": "ready",
+             "locatorMsAtResult": 7200, "locatorCompleteAtResult": True,
+             "stageWriteCount": 2, "stageTableUs": 21000,
+             "stageUploadLogUs": 41000, "stageTotalUs": 62000,
+             "stageSlowestName": "locating", "stageSlowestUs": 32000,
+             "clipDownloadUs": 250000, "processingStateWriteUs": 5000,
+             "resultWriteUs": 15000},
+            {"event": "locator-finished", "at": "2026-10-13T10:00:08.310Z",
+             "durationMs": 7200, "resultPersisted": True,
+             "postResultWaitMs": 0, "usable": True},
+        ]
+        result = job_timing.durations(events, None)
+        self.assertAlmostEqual(result["fusion vision wait"], 6.3)
+        self.assertAlmostEqual(result["locator before result"], 7.2)
+        self.assertAlmostEqual(result["locator after result wait"], 0.0)
+        self.assertAlmostEqual(result["stage table writes"], 0.021)
+        self.assertAlmostEqual(result["stage upload-log writes"], 0.041)
+        self.assertAlmostEqual(result["stage telemetry writes"], 0.062)
+        self.assertAlmostEqual(result["slowest stage telemetry write"], 0.032)
+        self.assertAlmostEqual(result["clip download"], 0.25)
+        self.assertAlmostEqual(result["processing status write"], 0.005)
+        self.assertAlmostEqual(result["first result write"], 0.015)
+
+    def test_late_locator_is_separated_from_first_result(self):
+        events = [
+            {"event": "worker-timing", "at": "2026-10-13T10:00:12Z",
+             "fusionWaitMs": 5000, "fusionOutcome": "timeout",
+             "locatorMsAtResult": None, "locatorCompleteAtResult": False},
+            {"event": "locator-finished", "at": "2026-10-13T10:00:16Z",
+             "durationMs": 9000, "resultPersisted": True,
+             "postResultWaitMs": 4000, "usable": True},
+        ]
+        result = job_timing.durations(events, None)
+        self.assertAlmostEqual(result["fusion vision wait"], 5.0)
+        self.assertNotIn("locator before result", result)
+        self.assertAlmostEqual(result["locator"], 9.0)
+        self.assertAlmostEqual(result["locator after result wait"], 4.0)
 
     def test_fixture_cli_needs_no_aws_and_does_not_claim_phone_latency(self):
         completed = subprocess.run(

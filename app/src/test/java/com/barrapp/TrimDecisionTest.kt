@@ -6,6 +6,7 @@ import com.barrapp.data.TrimPlan
 import com.barrapp.data.TrimSuggestion
 import com.barrapp.data.WorkStore
 import com.barrapp.media.ClipTrimmer
+import com.barrapp.media.MotionSamplerPlan
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -15,6 +16,7 @@ import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.annotation.Config
+import org.json.JSONArray
 import java.io.File
 
 /**
@@ -27,17 +29,37 @@ import java.io.File
 @Config(sdk = [34])
 class TrimDecisionTest {
 
+    @Test
+    fun `motion scan samples a 30 second clip at one second intervals`() {
+        assertEquals((1..29).map(Int::toDouble), MotionSamplerPlan.timestamps(30.0).toList())
+    }
+
+    @Test
+    fun `motion scan skips invalid and sub-second durations`() {
+        assertTrue(MotionSamplerPlan.timestamps(0.75).none())
+        assertTrue(MotionSamplerPlan.timestamps(0.0).none())
+        assertTrue(MotionSamplerPlan.timestamps(Double.NaN).none())
+        assertEquals(listOf(1.0), MotionSamplerPlan.timestamps(1.01).toList())
+    }
+
+    @Test
+    fun `coarse WA0020 window is declined while short window would crop`() {
+        assertFalse(TrimPlan.shouldTrim(TrimSuggestion(1.0, 19.0, 20.0), 20.0))
+        assertTrue(TrimPlan.shouldTrim(TrimSuggestion(0.5, 12.5, 20.0), 20.0))
+    }
+
     private class FakeTrimmer(
         private val fail: Boolean = false,
     ) : ClipTrimmer {
         var exports = 0
         var lastWindow: Pair<Double, Double>? = null
-        override suspend fun export(src: File, dst: File, startS: Double, endS: Double) {
+        override suspend fun export(src: File, dst: File, startS: Double, endS: Double): Int? {
             exports++
             lastWindow = startS to endS
             if (fail) throw RuntimeException("no such codec")
             dst.parentFile?.mkdirs()
             dst.writeBytes(ByteArray(10))
+            return 3_700_000
         }
     }
 
@@ -49,6 +71,7 @@ class TrimDecisionTest {
         // Cada prueba tiene su tienda: el works.json de una anterior no
         // puede contaminar la siguiente.
         File(app.filesDir, "works.json").delete()
+        File(app.filesDir, "round2-timings.json").delete()
         vm = BarrappViewModel(app as android.app.Application)
     }
 
@@ -72,8 +95,19 @@ class TrimDecisionTest {
             assertEquals(14.0 to 22.0, fake.lastWindow)
             // El fichero que viaja es el recortado, y el work apunta a él.
             assertTrue(out.name.endsWith("-trim.mp4"))
-            assertEquals(out.absolutePath, WorkStore.get(app, "w1")!!.clipPath)
+            val saved = WorkStore.get(app, "w1")!!
+            assertEquals(out.absolutePath, saved.clipPath)
+            assertFalse(saved.trimmed)
+            assertEquals(0.0, saved.trimStartS, 0.0)
+            assertEquals(0.0, saved.trimEndS, 0.0)
             assertTrue(out.exists())
+            val timing = JSONArray(File(app.filesDir, "round2-timings.json").readText())
+                .getJSONObject(0)
+            assertEquals(3_700_000L, timing.getLong("trimVideoBitrateBps"))
+            // A resumed upload sees the persisted one-shot window cleared and
+            // sends the same bytes without a second transcode.
+            assertEquals(out, vm.trimForUpload(saved, out))
+            assertEquals(1, fake.exports)
         }
 
     @Test

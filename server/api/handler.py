@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+import time
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -15,6 +17,17 @@ from botocore.exceptions import ClientError
 import auth
 import referral
 import uploads
+
+try:
+    from pose_warmup import (finish_pose_runtime_warmup,
+                             start_pose_runtime_warmup)
+except ImportError:  # API-only deployment packages may omit the worker helper
+    def start_pose_runtime_warmup():
+        return None
+
+    def finish_pose_runtime_warmup(_warmup):
+        return {"ready": False, "outcome": "unavailable", "elapsedMs": 0,
+                "waitMs": 0}
 
 s3 = boto3.client("s3")
 ddb = boto3.resource("dynamodb")
@@ -152,6 +165,16 @@ def _reap_stale(item: dict | None) -> dict | None:
 
 def _owned(item: dict | None, owner: str) -> bool:
     return bool(item and owner and item.get("owner") == owner)
+
+
+def _job_upload_url(owner: str, job_id: str) -> str:
+    """Mint a short-lived PUT capability for this owner's fixed job key."""
+    return s3.generate_presigned_url(
+        "put_object",
+        Params={"Bucket": BUCKET, "Key": f"{owner}/{job_id}.mp4",
+                "ContentType": "video/mp4"},
+        ExpiresIn=3600,
+    )
 
 
 def _feedback(owner: str, body: dict) -> tuple[int, dict]:
@@ -393,11 +416,7 @@ def _route(event):
                 "credits": credits,
             })
         table.put_item(Item=item)
-        upload = s3.generate_presigned_url(
-            "put_object",
-            Params={"Bucket": BUCKET, "Key": f"{owner}/{job_id}.mp4", "ContentType": "video/mp4"},
-            ExpiresIn=3600,
-        )
+        upload = _job_upload_url(owner, job_id)
         uploads.record(job_id, owner, "job-created",
                        f"exercise={item['exercise']}",
                        variant=item.get("variant"), view=item.get("view"),
@@ -477,6 +496,17 @@ def _route(event):
         s3.delete_object(Bucket=BUCKET, Key=f"{owner}/{job_id}.mp4")
         table.delete_item(Key={"id": job_id})
         return _resp(200, {"ok": True, "id": job_id})
+
+    if (method == "POST" and len(parts) == 4 and parts[0] == "v1"
+            and parts[1] == "jobs" and parts[3] == "upload-url"):
+        job_id = parts[2]
+        item = _reap_stale(_item(job_id))
+        if not _owned(item, owner):
+            return _resp(404, {"error": "unknown job"})
+        if item.get("status") != "created" or item.get("uploadId"):
+            return _resp(409, {"error": "job is not waiting for a single-file upload"})
+        return _resp(200, {"uploadUrl": _job_upload_url(owner, job_id),
+                           "uploadMethod": "PUT"})
 
     # ---- resumable upload: S3 multipart, one presigned part at a time ----
     # A phone on mobile data does not lose a 40 MB clip because a train went
@@ -624,12 +654,27 @@ def _route(event):
         item = _item(job_id)
         if not _owned(item, owner):
             return _resp(404, {"error": "unknown job"})
+        try:
+            uploaded = s3.head_object(
+                Bucket=BUCKET, Key=f"{owner}/{job_id}.mp4")
+        except ClientError as exc:
+            code = str(exc.response.get("Error", {}).get("Code", ""))
+            if code in {"404", "NoSuchKey", "NotFound"}:
+                return _resp(409, {"error": "the clip has not finished uploading"})
+            return _resp(502, {"error": "the uploaded clip could not be verified"})
+        except Exception:  # noqa: BLE001 - fail closed at the queue boundary
+            return _resp(502, {"error": "the uploaded clip could not be verified"})
+        size = int(uploaded.get("ContentLength") or 0)
+        if size < MIN_CLIP_BYTES:
+            return _resp(400, {"error": "the clip arrived empty or truncated",
+                               "bytes": size})
         table.update_item(
             Key={"id": job_id},
             UpdateExpression="SET #s = :s",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":s": "queued"},
         )
+        uploads.record(job_id, owner, "dispatch-started", "worker invoke requested")
         if WORKER:
             lam.invoke(
                 FunctionName=WORKER,
@@ -638,6 +683,8 @@ def _route(event):
             )
         else:
             worker({"job_id": job_id, "owner": owner}, None)
+        uploads.record(job_id, owner, "dispatch-accepted",
+                       "worker invoke accepted" if WORKER else "in-process worker returned")
         uploads.record(job_id, owner, "submitted",
                        "handed to the worker" if WORKER else "measured in-process")
         return _resp(202, _public(_item(job_id)) or {"id": job_id, "status": "queued"})
@@ -675,17 +722,31 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
         return False
 
 
-def _set_stage(job_id: str, owner: str, name: str) -> None:
+def _set_stage(job_id: str, owner: str, name: str,
+               timings: list[dict[str, int | str]] | None = None) -> None:
     """Where the job is. `stage` stays the English phrase the installed app
-    matches on; `stageCode` is stable and `stageText` is what to show."""
+    matches on; `stageCode` is stable and `stageText` is what to show.
+
+    When called by the worker, record the two synchronous writes separately in
+    memory. The worker emits this diagnostic after persisting the first result,
+    so measuring stage telemetry does not add another write to the measured
+    critical path.
+    """
     code, text = _i18n_stage(name)
+    table_started_ns = time.perf_counter_ns()
     table.update_item(
         Key={"id": job_id},
         UpdateExpression="SET #st = :st, #sc = :sc, #sx = :sx",
         ExpressionAttributeNames={"#st": "stage", "#sc": "stageCode", "#sx": "stageText"},
         ExpressionAttributeValues={":st": name, ":sc": code, ":sx": text},
     )
+    table_us = (time.perf_counter_ns() - table_started_ns) // 1000
+    log_started_ns = time.perf_counter_ns()
     uploads.record(job_id, owner, "stage", name)
+    log_us = (time.perf_counter_ns() - log_started_ns) // 1000
+    if timings is not None:
+        timings.append({"name": name, "tableUs": table_us, "uploadLogUs": log_us,
+                        "totalUs": table_us + log_us})
 
 
 def _i18n_stage(name: str) -> tuple[str, str]:
@@ -719,6 +780,8 @@ def worker(event, _context):
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
     dest = Path("/tmp") / f"{job_id}.mp4"
+    worker_entry = time.perf_counter()
+    uploads.record(job_id, owner, "worker-entry", "worker handler entered")
 
     def _fail(exc: Exception) -> None:
         # Any death inside this handler must land on the job record, not in a
@@ -742,26 +805,42 @@ def worker(event, _context):
         # Inside the try on purpose: a broken image (missing module, bad
         # dependency) must fail the job, not crash before the first update.
         import process  # noqa: F401
+        uploads.record(job_id, owner, "worker-ready", "process module imported",
+                       importMs=round((time.perf_counter() - worker_entry) * 1000))
+
+        stage_write_timings: list[dict[str, int | str]] = []
 
         def _stage(name: str) -> None:
-            _set_stage(job_id, owner, name)
+            _set_stage(job_id, owner, name, timings=stage_write_timings)
 
         _stage("receiving the clip")
-        s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))
+        # When Ultralytics is the configured pose backend, import its Python
+        # runtime while S3 delivers the clip. This is a no-op for MediaPipe.
+        # Model construction stays in the measured pose path.
+        pose_warmup = start_pose_runtime_warmup()
+        download_started_ns = time.perf_counter_ns()
+        try:
+            s3.download_file(BUCKET, f"{owner}/{job_id}.mp4", str(dest))
+        finally:
+            pose_warmup_timing = finish_pose_runtime_warmup(pose_warmup)
+        clip_download_us = (time.perf_counter_ns() - download_started_ns) // 1000
         if not dest.exists() or dest.stat().st_size == 0:
             raise RuntimeError("the clip never arrived in storage")
         item = _item(job_id) or {"id": job_id, "exercise": "muscle_up"}
+        processing_write_started_ns = time.perf_counter_ns()
         table.update_item(
             Key={"id": job_id},
             UpdateExpression="SET #s = :s",
             ExpressionAttributeNames={"#s": "status"},
             ExpressionAttributeValues={":s": "processing"},
         )
+        processing_write_us = (time.perf_counter_ns() - processing_write_started_ns) // 1000
 
         # Locate the exercise ALONGSIDE the pose, not before it: the vision call
         # took 57 s of a 375 s job on 2026-10-11, and pose (128 s) does not need
-        # it. Fusion asks for the vote when it gets there, by which time the
-        # call has long finished. The measurement still runs on the FULL clip:
+        # it. Fusion uses the vote only if localization finished during pose;
+        # it never extends the first-result critical path. The measurement runs
+        # on the FULL clip:
         # every reported timestamp is in the source video's time, and the
         # phone seeks its own local copy with them. Localization decides what
         # is kept, not what is measured.
@@ -770,37 +849,115 @@ def worker(event, _context):
 
         _stage("locating the exercise")
         pool = ThreadPoolExecutor(max_workers=1)
+        localization_timing = {
+            "startNs": None, "endNs": None, "outcome": "not-finished",
+            "fusionWaitMs": None, "fusionOutcome": "not-awaited",
+        }
+        localization_timing_lock = threading.Lock()
 
         def _locate():
+            started_ns = time.perf_counter_ns()
+            with localization_timing_lock:
+                localization_timing["startNs"] = started_ns
             try:
                 from vision import locate_exercise
-                return locate_exercise(dest, Path("/tmp") / f"{job_id}-locate",
-                                       item.get("exercise"))
+                located = locate_exercise(dest, Path("/tmp") / f"{job_id}-locate",
+                                           item.get("exercise"))
+                outcome = "usable" if located and located.get("usable") else "no-window"
+                return located
             except Exception:  # noqa: BLE001 - localization never fails a job
+                outcome = "error"
                 return None
+            finally:
+                with localization_timing_lock:
+                    localization_timing["endNs"] = time.perf_counter_ns()
+                    localization_timing["outcome"] = outcome
 
         located_future = pool.submit(_locate)
 
         def _vision_vote():
-            located = located_future.result(timeout=300)
-            label = (located or {}).get("exercise") or None
-            if label and str(label).lower() in ("none", "unknown", ""):
+            started_ns = time.perf_counter_ns()
+            try:
+                # Localization overlaps pose. A late vote must not turn the
+                # faster pose path into a post-pose network wait.
+                located = located_future.result(timeout=0)
+                label = (located or {}).get("exercise") or None
+                if label and str(label).lower() not in ("none", "unknown", ""):
+                    outcome = "ready"
+                    return label
+                outcome = "no-vote"
                 return None
-            return label
+            except Exception as exc:
+                outcome = "timeout" if isinstance(exc, TimeoutError) else "error"
+                raise
+            finally:
+                with localization_timing_lock:
+                    localization_timing["fusionWaitMs"] = round(
+                        (time.perf_counter_ns() - started_ns) / 1_000_000)
+                    localization_timing["fusionOutcome"] = outcome
 
         result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote)
 
         # The measurement reaches the phone now. Cutting and re-uploading the
         # stored clip (~44 s on 2026-10-11), the model prose (~10-15 s,
         # docs/SPEED-PLAN.md B) and the advisory vision note come after it.
+        result_write_started_ns = time.perf_counter_ns()
         _write_result(job_id, result)
+        result_write_us = (time.perf_counter_ns() - result_write_started_ns) // 1000
+        result_persisted_ns = time.perf_counter_ns()
+        with localization_timing_lock:
+            timing_snapshot = dict(localization_timing)
+        locator_end_ns = timing_snapshot["endNs"]
+        locator_before_result = (
+            locator_end_ns is not None and locator_end_ns <= result_persisted_ns
+        )
+        uploads.record(
+            job_id, owner, "worker-timing", "localization/fusion at first result",
+            fusionWaitMs=timing_snapshot["fusionWaitMs"],
+            fusionOutcome=timing_snapshot["fusionOutcome"],
+            locatorMsAtResult=(round((locator_end_ns - timing_snapshot["startNs"])
+                                     / 1_000_000)
+                               if locator_before_result else None),
+            locatorCompleteAtResult=locator_before_result,
+            stageWriteCount=len(stage_write_timings),
+            stageTableUs=sum(row["tableUs"] for row in stage_write_timings),
+            stageUploadLogUs=sum(row["uploadLogUs"] for row in stage_write_timings),
+            stageTotalUs=sum(row["totalUs"] for row in stage_write_timings),
+            stageSlowestName=(max(stage_write_timings,
+                                  key=lambda row: row["totalUs"])["name"]
+                              if stage_write_timings else None),
+            stageSlowestUs=(max(row["totalUs"] for row in stage_write_timings)
+                            if stage_write_timings else None),
+            clipDownloadUs=clip_download_us,
+            poseWarmupOutcome=pose_warmup_timing["outcome"],
+            poseWarmupElapsedMs=pose_warmup_timing["elapsedMs"],
+            poseWarmupWaitMs=pose_warmup_timing["waitMs"],
+            processingStateWriteUs=processing_write_us,
+            resultWriteUs=result_write_us,
+        )
         uploads.record(job_id, owner, "done",
                        f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
 
+        post_result_wait_ns = time.perf_counter_ns()
         try:
             located = located_future.result(timeout=300)
         except Exception:  # noqa: BLE001
             located = None
+        post_result_wait_ms = round(
+            (time.perf_counter_ns() - post_result_wait_ns) / 1_000_000)
+        with localization_timing_lock:
+            locator_start_ns = localization_timing["startNs"]
+            locator_end_ns = localization_timing["endNs"]
+            locator_outcome = localization_timing["outcome"]
+        uploads.record(
+            job_id, owner, "locator-finished", locator_outcome,
+            durationMs=(round((locator_end_ns - locator_start_ns) / 1_000_000)
+                        if locator_start_ns is not None and locator_end_ns is not None
+                        else None),
+            resultPersisted=True,
+            postResultWaitMs=post_result_wait_ms,
+            usable=bool(located and located.get("usable")),
+        )
         pool.shutdown(wait=False)
         localization = None
         if located and located.get("usable"):

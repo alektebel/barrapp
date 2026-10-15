@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "2026-09-08.1",
+  "version": "2026-10-14.3",
   "note": "Reviewed labels for the eight root-level sample clips. Every field records HOW it was reviewed: `contact-sheet` means sparse stills were inspected (docs/TECHNIQUE-PIPELINE-IMPLEMENTATION-PLAN.md, section 2); `unreviewed` means the value is a pipeline output kept as a suggestion, never as ground truth. Per-error intervals are given only where a reviewer marked one. Existing model outputs are annotation suggestions.",
   "labels": {
     "movement": "one of barra.movements.MOVEMENTS, or `unknown` for a clip that shows no supported movement",
@@ -9,6 +9,7 @@
     "forbidden": "[{errorId, why}] checks that must not fire on this clip",
     "phaseScoped": "[{errorId, phase, maxWindowS, why}] checks that may fire only from the named phase, over a window no longer than maxWindowS",
     "notReps": "[{intervalS, why}] intervals that must not be retained as repetitions",
+    "windows": "reviewed source-time windows with their own movement and count labels; the full source label may remain unreviewed",
     "unobservable": "checks a reviewer judged impossible from this footage, with the reason",
     "view": "SAGITTAL | OBLIQUE | FRONTAL | UNKNOWN, as reviewed",
     "reviewerConfidence": "high | medium | low",
@@ -69,9 +70,12 @@
       "errors": [],
       "unobservable": [],
       "notReps": [
-        {"intervalS": [22.61, 25.16], "why": "standing and walking around the rig; the shoulders rest 0.86 torso-lengths above the hands, which is not a hang"}
+        {"intervalS": [0.0, 30.0], "why": "2 fps contact sheet across the entire first-30-second window shows approach, static hang, then drop/walk-away; no completed muscle-up ascent/transition", "reviewMethod": "contact-sheet", "reviewerConfidence": "medium"}
       ],
-      "notes": "The interval 22.61-25.16 s must not be retained as a measured muscle-up. Recovery of true reps is assessed separately and must not come from relaxing the hand gate."
+      "windows": [
+        {"intervalS": [0.0, 30.0], "movement": "muscle_up", "reps": 0, "reviewMethod": "contact-sheet", "reviewerConfidence": "medium", "why": "2 fps contact sheet shows no completed ascent or transition anywhere in this source window"}
+      ],
+      "notes": "No completed muscle-up is visible in the first 30 s (2 fps contact sheet); the full-source count remains unreviewed. This whole-window constraint subsumes the earlier walking interval at 22.61-25.16 s and dead-hang interval at 26.6-29.9 s. Recovery of true reps is assessed separately and must not come from relaxing the hand gate."
     },
     {
       "file": "VID-20260827-WA0017.mp4",

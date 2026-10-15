@@ -375,7 +375,13 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
     tr.step("trimmed to the active spans", spans=len(spans),
             at_seconds=[[round(a / fps, 2), round(b / fps, 2)] for a, b in spans],
             active_frac=float(active.mean()),
-            dropped_frames=int(len(active) - active.sum()))
+            dropped_frames=int(len(active) - active.sum()),
+            per_span_observed=[{
+                "at_seconds": [round(a / fps, 2), round(b / fps, 2)],
+                "observed_frames": int(valid[a:b + 1].sum()),
+                "frames": int(b - a + 1),
+                "observed_frac": float(valid[a:b + 1].mean()),
+            } for a, b in spans])
 
     # Amplitude is taken PER ACTIVE SPAN, not once for the clip.
     #
@@ -485,9 +491,10 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             ((x, y, r, a) for x, y, r, a in span_stats if x <= pk <= y),
             (0, len(sig) - 1, clip_rest, clip_amplitude))
         gate = rest + 0.30 * amplitude
-        if sig[pk] < rest + 0.6 * amplitude:
+        required_peak = rest + THRESHOLDS.min_turn_peak_fraction * amplitude
+        if sig[pk] < required_peak:
             tr.reject(f"candidate at {at}s", "peak too shallow to be a turnaround",
-                      peak_value=float(sig[pk]), required=rest + 0.6 * amplitude)
+                      peak_value=float(sig[pk]), required=required_peak)
             continue
         if not valid[pk]:
             # The turnaround itself was never observed. Everything a rep record

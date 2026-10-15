@@ -1,14 +1,20 @@
-# mediapipe 0.10.x requires numpy<2. Use 1.26 wheels on Amazon Linux 2023 / cp312.
-# mediapipe already pulls opencv-contrib-python, so cv2 is non-headless and needs
-# libGL etc. (installed in the Dockerfile). Pin contrib ourselves so headless and
-# contrib are not silently competing for the `cv2` module.
+# MediaPipe 0.10.x requires numpy<2. Use 1.26 wheels on Amazon Linux 2023 / cp312.
 numpy==1.26.4
 scipy==1.14.1
 # barra's measurement core (ingest/metrics) runs on DataFrames. pandas must
 # stay compatible with the pinned numpy<2 that mediapipe requires.
 pandas==2.2.3
-opencv-contrib-python==4.10.0.84
-mediapipe==0.10.21
+# The worker uses OpenCV for video I/O, resizing and color conversion only.
+# Headless avoids carrying GUI/OpenGL libraries in the Lambda image.
+opencv-python-headless==4.10.0.84
+# MediaPipe's wheel declares JAX/GenAI and audio tooling as global dependencies.
+# This worker uses Tasks PoseLandmarker only; the small dependency set for that
+# import path is explicit here, and the pinned wheel is installed with --no-deps.
+absl-py==2.5.1
+attrs==26.1.0
+flatbuffers==25.12.19
+matplotlib==3.11.2
+protobuf==4.25.9
 boto3
 # A static ffmpeg for cutting the located exercise out of the raw clip (and for
 # the technique artifacts). The worker image has no system ffmpeg: AL2023 does

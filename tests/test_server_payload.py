@@ -38,6 +38,7 @@ class TestPayloadShape(unittest.TestCase):
         self.assertIsNone(payload["sessionScore"])
         self.assertEqual(payload["sessionBand"], "unmeasured")
         self.assertEqual(payload["n_reps"], 0)
+        self.assertEqual(payload["countStatus"], "unmeasured")
 
     def test_extra_fields_override_defaults(self):
         payload = self._empty("auto", ["x"], detected={"label": "Pull-up"})

@@ -1,0 +1,43 @@
+# Isolated Round 2 Lambda shadow image for the locally screened phone candidate.
+# Build from the repository root and do not use server/deploy.sh with this image.
+FROM public.ecr.aws/lambda/python:3.12@sha256:3856536f53e945debf4c90d0ff301cbaa837c07a4ab9b0e2c102c6e54ceb9762
+
+ENV BARRA_ROOT=/opt/barra \
+    PYTHONPATH=/opt/barra:${LAMBDA_TASK_ROOT} \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    BARRA_POSE_BACKEND=ultralytics \
+    BARRA_POSE_WORKERS=6 \
+    BARRA_POSE_WORKER_MODE=fork \
+    BARRA_POSE_CPU_THREADS=1 \
+    BARRA_YOLO_POSE_STRIDE=3 \
+    BARRA_YOLO_POSE_IMGSZ=480 \
+    BARRA_ULTRALYTICS_FUSION_POLICY=ultralytics-geometry-supported-v3 \
+    BARRA_EXPERIMENTAL_MIN_SPAN_AMPLITUDE=0.25 \
+    BARRA_YOLO_POSE_WEIGHTS=/opt/barra/models/yolo11s-pose.pt \
+    BARRA_POSE_RUNTIME_WARMUP=true
+
+COPY server/requirements-worker.txt ${LAMBDA_TASK_ROOT}/requirements-worker.txt
+COPY server/requirements-mediapipe.txt ${LAMBDA_TASK_ROOT}/requirements-mediapipe.txt
+RUN printf 'numpy==1.26.4\n' > /tmp/round2-constraints.txt \
+    && pip install --no-cache-dir pip==26.2.1 \
+    && pip install --no-cache-dir --only-binary=:all: -r ${LAMBDA_TASK_ROOT}/requirements-worker.txt \
+    && pip install --no-cache-dir --only-binary=:all: --no-deps -r ${LAMBDA_TASK_ROOT}/requirements-mediapipe.txt \
+    && pip install --no-cache-dir --only-binary=:all: -c /tmp/round2-constraints.txt \
+         --extra-index-url https://download.pytorch.org/whl/cpu \
+         torch==2.14.1+cpu torchvision==0.29.1+cpu ultralytics==8.4.166 \
+         opencv-python==4.10.0.84 \
+    && pip uninstall -y opencv-python \
+    && pip install --no-cache-dir --force-reinstall --no-deps \
+         --only-binary=:all: opencv-python-headless==4.10.0.84
+
+COPY barra/ /opt/barra/barra/
+COPY out/round2-latency/weights/yolo11s-pose.pt /opt/barra/models/yolo11s-pose.pt
+COPY server/api/*.py server/process.py server/report.py server/vision.py ${LAMBDA_TASK_ROOT}/
+
+# This is the exact checkpoint that passed the three stride-3 phone quality gates.
+RUN echo '1060bda4a27012060eca246f9b2adeea22eabb045a1e58f8d229be29b7ebc2ba  /opt/barra/models/yolo11s-pose.pt' | sha256sum -c -
+
+# Override this at build time with a clean source commit before any AWS shadow run.
+ARG BARRA_COMMIT=round2-yolo11s-stride3-shadow
+ENV BARRA_COMMIT=${BARRA_COMMIT}
+CMD ["handler.worker"]

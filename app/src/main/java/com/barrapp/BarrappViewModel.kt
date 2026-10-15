@@ -3,6 +3,7 @@ package com.barrapp
 import android.app.Application
 import android.content.Intent
 import android.net.Uri
+import android.os.SystemClock
 import android.provider.MediaStore
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -19,15 +20,21 @@ import com.barrapp.data.Job
 import com.barrapp.data.Profile
 import com.barrapp.data.PartMark
 import com.barrapp.data.ProfileStore
+import com.barrapp.data.Round2TimingStore
+import com.barrapp.data.MULTIPART_UPLOAD_CONCURRENCY
 import com.barrapp.data.SessionStore
 import com.barrapp.data.Work
 import com.barrapp.data.Stage
 import com.barrapp.data.WorkStore
+import com.barrapp.data.uploadPartsBatched
+import com.barrapp.data.chooseUploadMode
 import com.barrapp.notify.ProcessingNotifier
 import com.barrapp.notify.WeeklyReviewWorker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -80,6 +87,7 @@ data class UiState(
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
     private val api = BarraApi(application)
+    private val retryLogMutex = Mutex()
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
 
@@ -124,9 +132,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         // reason and a Retry, rather than a lie that says "measuring".
         val resumed = mutableListOf<String>()
         WorkStore.all(app).filter { it.active }.forEach { w ->
-            if (w.status == WorkStore.STATUS_SENDING && w.uploadId.isNotBlank()) {
-                // died mid-upload: the parts already sent are still on the
-                // server, so this is a resume, not a failure
+            if (WorkStore.resumesUploadAfterRestart(w)) {
+                // Multipart parts already sent remain on the server. A single
+                // PUT can safely replace the fixed object using a fresh URL.
                 WorkStore.put(app, w.copy(
                     status = WorkStore.STATUS_WAITING,
                     stage = Stage.RESUMING.text, stageCode = Stage.RESUMING.code,
@@ -535,6 +543,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val app = getApplication<Application>()
         val workId = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
         val dest = clipFile(app, workId)
+        val preparationStartedNs = SystemClock.elapsedRealtimeNanos()
         viewModelScope.launch {
             val kept = runCatching {
                 withContext(Dispatchers.IO) {
@@ -557,6 +566,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             val doTrim = com.barrapp.data.TrimPlan.shouldTrim(
                 suggestion?.second, suggestion?.first?.durationS ?: 0.0)
             val win = suggestion?.second
+            withContext(Dispatchers.IO) {
+                Round2TimingStore.preparationDuration(app, workId,
+                    ((SystemClock.elapsedRealtimeNanos() - preparationStartedNs) / 1_000_000L).coerceAtLeast(0))
+            }
             val work = Work(
                 id = workId,
                 createdAt = System.currentTimeMillis(),
@@ -576,6 +589,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 trimStartS = if (win != null && doTrim) win.startS else 0.0,
                 trimEndS = if (win != null && doTrim) win.endS else 0.0,
                 trimmed = false,   // only true once the athlete confirms
+                timingAttemptId = workId,
                 clipDurationS = suggestion?.first?.durationS ?: 0.0,
                 log = buildList {
                     val declared = listOfNotNull(
@@ -617,6 +631,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val app = getApplication<Application>()
         val work = WorkStore.get(app, workId) ?: return
         val keepTrim = work.trimEndS > work.trimStartS
+        val confirmedNs = SystemClock.elapsedRealtimeNanos()
         WorkStore.put(app, work.copy(
             status = WorkStore.STATUS_WAITING,
             trimmed = keepTrim,
@@ -629,7 +644,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 else "se sube el clip entero"),
         ))
         publishWorks()
-        viewModelScope.launch { queue.send(workId) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { Round2TimingStore.trimConfirmed(app, work.timingAttemptId.ifBlank { work.id }, confirmedNs) }
+            queue.send(workId)
+        }
     }
 
     /** Cancelar el recorte y subir el clip entero, sin pasarlo por el
@@ -637,6 +655,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     fun discardTrim(workId: String) {
         val app = getApplication<Application>()
         val work = WorkStore.get(app, workId) ?: return
+        val confirmedNs = SystemClock.elapsedRealtimeNanos()
         WorkStore.put(app, work.copy(
             status = WorkStore.STATUS_WAITING,
             trimmed = false, trimStartS = 0.0, trimEndS = 0.0,
@@ -644,7 +663,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 WorkStore.Level.INFO, "se sube el clip entero"),
         ))
         publishWorks()
-        viewModelScope.launch { queue.send(workId) }
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) { Round2TimingStore.trimConfirmed(app, work.timingAttemptId.ifBlank { work.id }, confirmedNs) }
+            queue.send(workId)
+        }
     }
 
     /** Transient network failures - an unresolvable host on weak wifi above
@@ -671,8 +693,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     err.message?.contains("502", ignoreCase = true) == true ||
                     err.message?.contains("503", ignoreCase = true) == true ||
                     err is java.io.IOException
-                WorkStore.append(getApplication(), workId, WorkStore.Level.WARN,
-                    "$what failed (attempt ${i + 1} of $attempts): ${err.message.orEmpty()}")
+                retryLogMutex.withLock {
+                    WorkStore.append(getApplication(), workId, WorkStore.Level.WARN,
+                        "$what failed (attempt ${i + 1} of $attempts): ${err.message.orEmpty()}")
+                }
                 if (!transient || i == attempts - 1) throw err
                 delay(2500L * (i + 1))
             }
@@ -701,6 +725,22 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
      *  as a failure. */
     private class PauseUpload : Exception("paused for network")
 
+    private suspend fun <T> timedRound2Phase(
+        attemptId: String,
+        phase: String,
+        block: suspend () -> T,
+    ): T {
+        val startedNs = SystemClock.elapsedRealtimeNanos()
+        try {
+            return block()
+        } finally {
+            val elapsedMs = ((SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000L).coerceAtLeast(0L)
+            withContext(Dispatchers.IO) {
+                Round2TimingStore.phaseDuration(getApplication(), attemptId, phase, elapsedMs)
+            }
+        }
+    }
+
     /** The upload, part by part, resumable from exactly where it stopped.
      *
      * Every finished part is persisted with its etag the moment the server
@@ -719,14 +759,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     ) {
         val app = getApplication<Application>()
         val current = WorkStore.get(app, workId)
+        val timingAttemptId = current?.timingAttemptId?.ifBlank { workId } ?: workId
         var uploadId = current?.uploadId.orEmpty()
         var partSize = current?.partSize ?: 0L
         val done = LinkedHashMap<Int, String?>()
         current?.uploadedParts?.forEach { done[it.partNumber] = it.etag }
 
         if (uploadId.isBlank() || partSize <= 0L) {
-            val (id, ps) = withRetry("starting the upload", workId) {
-                withContext(Dispatchers.IO) { api.startUpload(jobId) }
+            val (id, ps) = timedRound2Phase(timingAttemptId, "multipartStart") {
+                withRetry("starting the upload", workId) {
+                    withContext(Dispatchers.IO) { api.startUpload(jobId) }
+                }
             }
             uploadId = id
             partSize = ps
@@ -735,22 +778,40 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
         val total = (((clip.length() + partSize - 1) / partSize).toInt()).coerceAtLeast(1)
         var sent = done.size
-        for (n in 1..total) {
-            if (done.containsKey(n)) continue
-            val url = withRetry("sending part $n of $total", workId) {
-                withContext(Dispatchers.IO) { api.presignPart(jobId, uploadId, n) }
-            }
-            val offset = (n - 1L) * partSize
-            val length = minOf(partSize, clip.length() - offset)
+        val missing = (1..total).filterNot { done.containsKey(it) }
+        for (batch in missing.chunked(MULTIPART_UPLOAD_CONCURRENCY)) {
+            // Prepare URLs and stream bytes in bounded parallel batches.
+            // Successful sibling parts are persisted before an error pauses
+            // the upload; a resume only resends missing part numbers.
+            val urls = mutableMapOf<Int, String>()
             try {
-                val etag = withContext(Dispatchers.IO) { api.putPart(url, clip, offset, length) }
-                done[n] = etag
-                sent++
-                onProgress(sent.coerceAtMost(total), total)
-                WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
-                    uploadedParts = done.map { PartMark(it.key, it.value) },
-                    stage = Stage.sending(sent.coerceAtMost(total), total), stageCode = Stage.SENDING.code))
-                publishWorks()
+                timedRound2Phase(timingAttemptId, "presign") {
+                    uploadPartsBatched(batch, MULTIPART_UPLOAD_CONCURRENCY, uploadPart = { n ->
+                        withRetry("preparing part $n of $total", workId) {
+                            withContext(Dispatchers.IO) { api.presignPart(jobId, uploadId, n) }
+                        }
+                    }) { n, url ->
+                        urls[n] = requireNotNull(url)
+                    }
+                }
+                timedRound2Phase(timingAttemptId, "partTransfer") {
+                    uploadPartsBatched(batch, MULTIPART_UPLOAD_CONCURRENCY, uploadPart = { n ->
+                        val offset = (n - 1L) * partSize
+                        val length = minOf(partSize, clip.length() - offset)
+                        withContext(Dispatchers.IO) {
+                            api.putPart(urls.getValue(n), clip, offset, length)
+                        }
+                    }) { n, etag ->
+                        done[n] = etag
+                        sent++
+                        onProgress(sent.coerceAtMost(total), total)
+                        WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
+                            uploadedParts = done.map { PartMark(it.key, it.value) },
+                            stage = Stage.sending(sent.coerceAtMost(total), total),
+                            stageCode = Stage.SENDING.code))
+                        publishWorks()
+                    }
+                }
             } catch (err: Exception) {
                 val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
                     err.message?.contains("Failed to connect", ignoreCase = true) == true ||
@@ -761,22 +822,25 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     status = WorkStore.STATUS_CONNECTING,
                     stage = Stage.connecting(done.size, total), stageCode = Stage.CONNECTING.code,
                     uploadedParts = done.map { PartMark(it.key, it.value) },
-                    log = (WorkStore.get(app, workId)?.log ?: emptyList()) +
+                        log = (WorkStore.get(app, workId)?.log ?: emptyList()) +
                         WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.WARN,
-                            "connection lost during part $n of $total - " +
+                            "connection lost during part(s) ${batch.joinToString()} of $total - " +
                                 "${done.size} part(s) already on the server")))
                 publishWorks()
                 throw PauseUpload()
             }
         }
-        withRetry("finishing the upload", workId) {
-            withContext(Dispatchers.IO) {
-                api.completeUpload(jobId,
-                    done.map { BarraApi.PartSlot(it.key, it.value) })
+        timedRound2Phase(timingAttemptId, "multipartComplete") {
+            withRetry("finishing the upload", workId) {
+                withContext(Dispatchers.IO) {
+                    api.completeUpload(jobId,
+                        done.map { BarraApi.PartSlot(it.key, it.value) })
+                }
             }
         }
         WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
             uploadId = "", partSize = 0, uploadedParts = emptyList(),
+            uploadMode = "multipart", uploadComplete = true,
             stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code))
     }
 
@@ -799,9 +863,14 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         if (!work.trimmed || work.trimEndS <= work.trimStartS) return clip
         update { it.copy(stage = "Recortando la serie",
             stageCode = Stage.WAITING.code) }
+        val exportStartedNs = SystemClock.elapsedRealtimeNanos()
         val cut = java.io.File(clip.parent, clip.nameWithoutExtension + "-trim.mp4")
         return try {
-            trimmer.export(clip, cut, work.trimStartS, work.trimEndS)
+            val actualVideoBitrateBps = trimmer.export(clip, cut, work.trimStartS, work.trimEndS)
+            withContext(Dispatchers.IO) {
+                Round2TimingStore.trimVideoBitrate(getApplication(),
+                    work.timingAttemptId.ifBlank { work.id }, actualVideoBitrateBps)
+            }
             if (!cut.exists() || cut.length() == 0L) {
                 cut.delete()
                 WorkStore.append(getApplication(), work.id, WorkStore.Level.WARN,
@@ -813,10 +882,16 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 // El fichero que viaja es el recortado: el work pasa a
                 // apuntar a él, así un reintento o una reanudación suben lo
                 // mismo que la primera vez.
-                update { it.copy(clipPath = cut.absolutePath) }
+                // Persist the exported file as the upload source and clear
+                // the one-shot window. If Android kills the process before
+                // multipart upload finishes, the resumed work must not trim
+                // this already-trimmed file a second time.
+                update { it.copy(clipPath = cut.absolutePath,
+                    trimmed = false, trimStartS = 0.0, trimEndS = 0.0) }
                 WorkStore.append(getApplication(), work.id, WorkStore.Level.INFO,
-                    "recortado a %.1f s–%.1f s (%.1f MB)".format(
-                        work.trimStartS, work.trimEndS, cut.length() / 1e6))
+                    "recortado a %.1f s–%.1f s (%.1f MB%s)".format(
+                        work.trimStartS, work.trimEndS, cut.length() / 1e6,
+                        actualVideoBitrateBps?.let { ", %.2f Mbit/s vídeo".format(it / 1e6) }.orEmpty()))
                 cut
             }
         } catch (err: Exception) {
@@ -826,6 +901,12 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             update { it.copy(trimmed = false,
                 trimStartS = 0.0, trimEndS = 0.0) }
             clip
+        } finally {
+            val elapsedMs = ((SystemClock.elapsedRealtimeNanos() - exportStartedNs) / 1_000_000L).coerceAtLeast(0L)
+            withContext(Dispatchers.IO) {
+                Round2TimingStore.trimExportDuration(getApplication(),
+                    work.timingAttemptId.ifBlank { work.id }, elapsedMs)
+            }
         }
     }
 
@@ -886,17 +967,46 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             // Cualquier fallo del transcodificador deja `clip` intacto: el
             // original es lo que se sube, como siempre. El recorte nunca
             // bloquea ni hace fallar una subida.
+            withContext(Dispatchers.IO) {
+                Round2TimingStore.clipBytes(app,
+                    work.timingAttemptId.ifBlank { work.id }, clip.length(), 0L)
+            }
             val clipToUpload = trimForUpload(work, clip, ::update)
+            val resuming = work.jobId.isNotBlank() &&
+                (work.uploadMode.isNotBlank() || work.uploadId.isNotBlank())
+
+            // Start before the first network request that creates or sends
+            // this upload. The attempt survives process/network resume; an
+            // explicit retry receives a new ID below.
+            val timingAttemptId = work.timingAttemptId.ifBlank { work.id }
+            WorkStore.put(app, (WorkStore.get(app, work.id) ?: work).copy(
+                timingAttemptId = timingAttemptId))
+            val phoneAttemptStartedAtMs = SystemClock.elapsedRealtime()
+            withContext(Dispatchers.IO) {
+                Round2TimingStore.clipBytes(app, timingAttemptId,
+                    clip.length(), clipToUpload.length())
+                Round2TimingStore.begin(app, timingAttemptId, completeOrigin = !resuming)
+            }
 
             // A work that stopped mid-upload keeps its job: the parts already
             // on the server belong to that job's multipart session, and a new
             // job would strand them under a key nothing points at. Only a
             // work with nothing in flight asks for a fresh job.
-            val resuming = work.jobId.isNotBlank() && work.uploadId.isNotBlank()
-            val jobId = if (resuming) work.jobId else withRetry("creating the job", work.id) {
-                withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
-            }.job.id
-            update { it.copy(jobId = jobId, status = WorkStore.STATUS_SENDING,
+            val created = if (!resuming) timedRound2Phase(timingAttemptId, "jobCreate") {
+                withRetry("creating the job", work.id) {
+                    withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
+                }
+            } else null
+            val jobId = if (resuming) work.jobId else requireNotNull(created).job.id
+            val uploadMode = if (resuming) {
+                work.uploadMode.ifBlank { "multipart" }
+            } else chooseUploadMode(
+                clipToUpload.length(), BuildConfig.SINGLE_PUT_MAX_BYTES,
+                created?.uploadUrl, created?.uploadMethod)
+            withContext(Dispatchers.IO) { Round2TimingStore.bindJob(app, timingAttemptId, jobId) }
+            update { it.copy(jobId = jobId, uploadMode = uploadMode,
+                uploadComplete = if (resuming) it.uploadComplete else false,
+                status = WorkStore.STATUS_SENDING,
                 stage = Stage.SENDING.text, stageCode = Stage.SENDING.code) }
             log(WorkStore.Level.INFO,
                 if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
@@ -904,10 +1014,47 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     "(%.1f MB)".format(clipToUpload.length() / 1e6))
             ProcessingNotifier.stage(app, Stage.SENDING.text, 0)
             try {
-                uploadResumable(work.id, jobId, clipToUpload) { sent, total ->
-                    update {
-                        it.copy(status = WorkStore.STATUS_SENDING,
-                            stage = Stage.sending(sent, total), stageCode = Stage.SENDING.code)
+                val current = WorkStore.get(app, work.id)!!
+                if (!current.uploadComplete) {
+                    if (uploadMode == "single") {
+                        val uploadUrl = if (!resuming && created?.uploadUrl?.isNotBlank() == true) {
+                            created.uploadUrl to created.uploadMethod
+                        } else timedRound2Phase(timingAttemptId, "singlePutUrlRefresh") {
+                            withRetry("preparing the upload", work.id) {
+                                withContext(Dispatchers.IO) { api.refreshSingleUploadUrl(jobId) }
+                            }
+                        }
+                        try {
+                            timedRound2Phase(timingAttemptId, "singlePut") {
+                                // Whole-file retries are expensive and can
+                                // silently consume the upload budget. Persist
+                                // this job and resume on the next validated
+                                // network with a newly minted URL.
+                                withRetry("sending the clip", work.id, attempts = 1) {
+                                    withContext(Dispatchers.IO) {
+                                    api.uploadClip(clipToUpload, uploadUrl.first, uploadUrl.second)
+                                    }
+                                }
+                            }
+                            update { it.copy(uploadComplete = true) }
+                        } catch (err: Exception) {
+                            if (err is java.io.IOException || err.message?.contains("timeout", true) == true ||
+                                err.message?.contains("Failed to connect", true) == true ||
+                                err.message?.contains("resolve host", true) == true) {
+                                update { it.copy(status = WorkStore.STATUS_CONNECTING,
+                                    stage = Stage.connecting(0, 1), stageCode = Stage.CONNECTING.code) }
+                                publishWorks()
+                                throw PauseUpload()
+                            }
+                            throw err
+                        }
+                    } else {
+                        uploadResumable(work.id, jobId, clipToUpload) { sent, total ->
+                            update {
+                                it.copy(status = WorkStore.STATUS_SENDING,
+                                    stage = Stage.sending(sent, total), stageCode = Stage.SENDING.code)
+                            }
+                        }
                     }
                 }
             } catch (_: PauseUpload) {
@@ -920,22 +1067,50 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             update { it.copy(status = WorkStore.STATUS_QUEUED, stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code) }
             log(WorkStore.Level.INFO, "uploaded — queued on the server")
             ProcessingNotifier.stage(app, Stage.QUEUED.text, 1)
-            withRetry("queueing on the server", work.id) {
-                withContext(Dispatchers.IO) { api.submit(jobId) }
+            timedRound2Phase(timingAttemptId, "submit") {
+                withRetry("queueing on the server", work.id) {
+                    withContext(Dispatchers.IO) { api.submit(jobId) }
+                }
             }
+            withContext(Dispatchers.IO) { Round2TimingStore.submitted(app, timingAttemptId) }
 
             // The wait. The server says where it is; the log keeps what it
             // said, so a wrong number later has a trail to be explained by.
             var contactLost = 0
+            var pollCount = 0
+            var pollGetNs = 0L
+            var pollSleepNs = 0L
+            var pollHandleNs = 0L
             repeat(240) {
+                val pollStartedNs = SystemClock.elapsedRealtimeNanos()
                 val job = withContext(Dispatchers.IO) { runCatching { api.getJob(jobId) } }
+                pollCount++
+                pollGetNs += (SystemClock.elapsedRealtimeNanos() - pollStartedNs).coerceAtLeast(0L)
+                val pollHandleStartedNs = SystemClock.elapsedRealtimeNanos()
                 job.fold(onSuccess = { j ->
                     contactLost = 0
                     when (j.status) {
                         "done" -> {
+                            withContext(Dispatchers.IO) {
+                                Round2TimingStore.resultReceived(app, timingAttemptId,
+                                    j.result?.traceId.orEmpty(),
+                                    countStatus = j.result?.countStatus,
+                                    repCount = j.result?.repCount,
+                                    pollCount = pollCount,
+                                    pollGetMs = pollGetNs / 1_000_000L,
+                                    pollSleepMs = pollSleepNs / 1_000_000L,
+                                    pollHandleMs = pollHandleNs / 1_000_000L)
+                            }
                             j.result?.let { SessionStore.record(app, j.id, it) }
-                            log(WorkStore.Level.INFO, "measured " +
-                                "${j.result?.repCount ?: 0} rep(s) of " +
+                            val countStatus = j.result?.countStatus ?: "unmeasured"
+                            val repCount = j.result?.repCount ?: 0
+                            val countDescription = when (countStatus) {
+                                "unmeasured" -> "rep count unavailable"
+                                "vision" -> "$repCount rep(s) estimated from frames"
+                                "hold" -> "$repCount hold attempt(s) measured"
+                                else -> "$repCount rep(s) measured"
+                            }
+                            log(WorkStore.Level.INFO, "$countDescription of " +
                                 (j.result?.exercise ?: "unknown") +
                                 " — trace ${j.result?.traceId.orEmpty()}")
                             // The clip answers to its job id from here on, so
@@ -949,8 +1124,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                                 if (clipToUpload != clip) clip.delete()
                             }
                             EventLog.info(app,
-                                "measured ${j.result?.repCount ?: 0} rep(s) of " +
-                                    (j.result?.exercise ?: "unknown"),
+                                "$countDescription of ${j.result?.exercise ?: "unknown"}",
                                 "score ${j.result?.sessionScore ?: "—"}",
                                 traceId = j.result?.traceId.orEmpty(), jobId = j.id)
                             val movement = j.result?.exercise.orEmpty()
@@ -968,8 +1142,13 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                             } else {
                                 ProcessingNotifier.done(
                                     app,
-                                    "${j.result?.repCount ?: 0} " +
-                                        (if (j.result?.repCount == 1) "repetición medida" else "repeticiones medidas"),
+                                    when (countStatus) {
+                                        "unmeasured" -> "Recuento de repeticiones sin medir"
+                                        "vision" -> "$repCount rep${if (repCount == 1) "" else "s"} estimadas a partir de fotogramas"
+                                        "hold" -> "$repCount mantenimientos medidos"
+                                        else -> "$repCount " +
+                                            (if (repCount == 1) "repetición medida" else "repeticiones medidas")
+                                    },
                                     "Tu análisis de " + com.barrapp.movementEs(
                                         j.result?.exercise.orEmpty(), j.result?.detected?.label.orEmpty(),
                                     ).lowercase() + " está listo.",
@@ -1031,7 +1210,13 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         return
                     }
                 })
-                delay(1000)
+                val sleepStartedNs = SystemClock.elapsedRealtimeNanos()
+                // Response handling for a nonterminal poll is client work
+                // too: status persistence, stage updates and notifications.
+                pollHandleNs += (sleepStartedNs - pollHandleStartedNs).coerceAtLeast(0L)
+                delay(resultPollDelayMs(
+                    SystemClock.elapsedRealtime() - phoneAttemptStartedAtMs))
+                pollSleepNs += (SystemClock.elapsedRealtimeNanos() - sleepStartedNs).coerceAtLeast(0L)
             }
             fail("Still measuring after four minutes. It may yet finish on the server — " +
                 "retry to check again.")
@@ -1062,12 +1247,45 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             WorkStore.put(app, work.copy(status = WorkStore.STATUS_WAITING, error = null,
                 stage = "waiting to be sent", traceId = "",
                 jobId = "", uploadId = "", partSize = 0, uploadedParts = emptyList(),
-                // El recorte ya pasó: clipPath apunta al recortado y trimmed
-                // conserva su valor, así el reintento sube exactamente lo mismo.
+                uploadMode = "", uploadComplete = false,
+                timingAttemptId = java.util.UUID.randomUUID().toString(),
+                // El recorte ya pasó: clipPath apunta al recortado y su ventana
+                // de un solo uso ya quedó limpiada, así el reintento sube lo mismo.
                 log = work.log + WorkStore.Entry(System.currentTimeMillis(),
                     WorkStore.Level.INFO, "retry requested")))
             publishWorks()
             queue.send(workId)
+        }
+    }
+
+    /** Called by the result composable after the measured result has applied. */
+    fun markResultRendered(jobId: String, traceId: String = "") {
+        val renderedNs = SystemClock.elapsedRealtimeNanos()
+        val app = getApplication<Application>()
+        viewModelScope.launch {
+            val attempt = withContext(Dispatchers.IO) {
+                Round2TimingStore.rendered(app, jobId, traceId, renderedNs)
+            } ?: return@launch
+            val totalMs = attempt.durationMs(attempt.renderedNs)
+            val uploadMs = attempt.durationMs(attempt.submittedNs)
+            val resultMs = attempt.durationMs(attempt.resultNs)
+            val renderDelayMs = attempt.intervalMs(attempt.resultNs, attempt.renderedNs)
+            val confirmationMs = attempt.confirmedToRenderedMs(attempt.renderedNs)
+            val transportMs = attempt.phaseMs.entries.sortedBy { it.key }
+                .joinToString(", ") { "${it.key}=${it.value}ms" }
+            val countDetails = "count ${attempt.countStatus ?: "unknown"} " +
+                "(${attempt.repCount?.toString() ?: "unknown"} reps)"
+            val details = if (totalMs == null)
+                "clock changed or attempt origin missing; duration omitted, $countDetails"
+            else "${totalMs}ms total, attempt-to-submit ${uploadMs ?: -1}ms, " +
+                "attempt-to-result ${resultMs ?: -1}ms, result-to-frame ${renderDelayMs ?: -1}ms, " +
+                "preparation ${attempt.preparationMs ?: -1}ms, trim-export ${attempt.trimExportMs ?: -1}ms, " +
+                "trim-video-bitrate ${attempt.trimVideoBitrateBps?.let { "%.2fMbit/s".format(it / 1e6) } ?: "unknown"}, " +
+                "confirm-to-render ${confirmationMs ?: -1}ms, $countDetails" +
+                ", polls ${attempt.pollCount}" +
+                (if (transportMs.isBlank()) "" else ", transport [$transportMs]")
+            EventLog.info(app, "Round 2 phone timing: $details",
+                "attempt ${attempt.attemptId} · job $jobId · trace ${attempt.traceId}")
         }
     }
 

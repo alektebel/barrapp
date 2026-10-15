@@ -52,6 +52,19 @@ MODEL_MIN_CONFIDENCE = 0.25
 # either alone, which is what makes a vote worth counting at all.
 AGREEMENT_CONFIDENCE = 0.86
 
+# A screening-only calibration for the COCO-17 YOLO backend. The shipped
+# learned classifier was trained on MediaPipe features, and the saved YOLO
+# sample has different disagreement behavior. These are candidate thresholds
+# from a tiny reviewed screen, not a release calibration. Production keeps
+# `default` unless explicitly selected and the wider gate is passed.
+ULTRALYTICS_GEOMETRY_MIN_CONFIDENCE = 0.75
+ULTRALYTICS_MODEL_MIN_CONFIDENCE = 0.75
+# Experimental v2 floor: the reviewed push-up anchor's unsupported deadlift
+# vote is 0.751, while the random squat-like and reviewed unknown examples are
+# 0.262 and 0.621. This separates those cases in the current screen only; it
+# is not calibrated for promotion.
+ULTRALYTICS_UNSUPPORTED_MODEL_MIN_CONFIDENCE = 0.70
+
 
 def _label(value: Any) -> str:
     if value is None:
@@ -63,6 +76,16 @@ def _label(value: Any) -> str:
 
 def _known(label: str) -> bool:
     return _canonical(label) is not None
+
+
+def _measurable(label: str) -> bool:
+    """Whether the movement has a profile the analysis pipeline can measure."""
+    try:
+        from .movements import resolve
+        resolve(label)
+        return True
+    except SystemExit:
+        return False
 
 
 # A detector that abstains says so with one of these, and an abstention is not
@@ -123,7 +146,8 @@ def _float(value: Any, default: float = 0.0) -> float:
 
 def fuse_detection(geometry: Mapping[str, Any] | str,
                    model: Optional[Mapping[str, Any]] = None,
-                   nan_label: Any = None) -> dict:
+                   nan_label: Any = None,
+                   policy: str = "default") -> dict:
     """Return a final suggested exercise and why, without hiding disagreement.
 
     `geometry` may be a label or a `detected` dict. `model` may be a label or a
@@ -172,6 +196,97 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
                                 "model" in backers else 0.0), status,
                       f"{len(backers)} independent detectors agree on {best} "
                       f"({', '.join(sorted(backers))})")
+
+    # Candidate policy for the YOLO backend: keep its ordinary decisions for
+    # movements the pipeline can measure, but do not turn an unsupported
+    # model-only guess into a named result when geometry disagrees. The raw
+    # detector labels remain in the payload for review. This is opt-in pending
+    # a wider accuracy screen.
+    if (policy == "ultralytics-geometry-supported-v3" and not n_label
+            and _measurable(g_label) and _measurable(m_label)
+            and not _same(m_label, g_label)
+            and g_conf >= ULTRALYTICS_GEOMETRY_MIN_CONFIDENCE):
+        return answer(g_label, g_conf,
+                      "supported-geometry-over-supported-model",
+                      "strong measurable geometry took precedence over a "
+                      "conflicting measurable classifier label in the "
+                      "experimental v3 screen")
+
+    if (policy in {"ultralytics-supported-only-v2",
+                   "ultralytics-geometry-supported-v3"} and not n_label
+            and m_label and not _measurable(m_label)
+            and not _same(m_label, g_label)):
+        if (_measurable(g_label)
+                and g_conf >= ULTRALYTICS_GEOMETRY_MIN_CONFIDENCE
+                and m_conf >= ULTRALYTICS_UNSUPPORTED_MODEL_MIN_CONFIDENCE
+                and g_conf > m_conf):
+            return answer(g_label, g_conf,
+                          "supported-geometry-over-unsupported-model",
+                          "strong geometry exceeded a sufficiently strong "
+                          "unsupported model vote in the experimental v2 "
+                          "screen")
+        return answer("unknown", 0.0, "unsupported-model-abstain",
+                      "the unsupported model conflict did not clear the "
+                      "experimental v2 confidence gate")
+
+    if (policy == "ultralytics-supported-only-v1" and not n_label
+            and m_label and not _measurable(m_label)
+            and not _same(m_label, g_label) and m_conf >= MODEL_MIN_CONFIDENCE):
+        if (_measurable(g_label)
+                and g_conf >= ULTRALYTICS_GEOMETRY_MIN_CONFIDENCE
+                and g_conf > m_conf):
+            return answer(g_label, g_conf,
+                          "supported-geometry-over-unsupported-model",
+                          "strong geometry named a measurable movement while "
+                          "the conflicting model label has no profile")
+        return answer("unknown", 0.0, "unsupported-model-abstain",
+                      "the learned label has no measurement profile and "
+                      "geometry disagreed")
+
+    # A low-confidence classifier can still expose an important conflict when
+    # its top class is measurable. Geometry-only YOLO labels are especially
+    # vulnerable on footage outside the exercise domain: a transit scene was
+    # classified as one dip while the classifier weakly preferred
+    # pistol_squat. Keep this opt-in and abstain only on that combination;
+    # high-confidence model decisions and unsupported-model handling retain
+    # their existing rules.
+    if (policy == "ultralytics-supported-only-v2" and not n_label
+            and _measurable(g_label) and _measurable(m_label)
+            and not _same(m_label, g_label)
+            and m_conf < MODEL_MIN_CONFIDENCE):
+        return answer("unknown", 0.0,
+                      "low-confidence-supported-disagreement-abstain",
+                      "geometry and the classifier's weak supported label "
+                      "disagree, so neither is sufficient to identify the "
+                      "movement")
+
+    # The classifier's corpus-wide advantage does not automatically transfer
+    # to COCO-17 keypoints. This opt-in screen prefers a strong geometric label
+    # when it exceeds the learned vote, retains a very strong learned vote, and
+    # abstains on weak disagreements. Vision remains governed by the regular
+    # policy above; it is not weakened by this local calibration experiment.
+    if policy == "ultralytics-screen-v1" and not n_label:
+        g = _canonical(g_label)
+        m = _canonical(m_label)
+        if (g and g_conf >= ULTRALYTICS_GEOMETRY_MIN_CONFIDENCE
+                and g_conf > m_conf):
+            return answer(g, g_conf, "ultralytics-geometry-screen",
+                          "YOLO geometry exceeded the classifier confidence "
+                          "in the experimental backend screen")
+        if m and m_conf >= ULTRALYTICS_MODEL_MIN_CONFIDENCE:
+            return answer(m, m_conf, "ultralytics-model-screen",
+                          "the classifier cleared the experimental YOLO "
+                          "confidence gate")
+        return {
+            "exercise": "unknown",
+            "confidence": 0.0,
+            "status": "ultralytics-abstain-screen",
+            "geometry": g_label or None,
+            "model": m_label or None,
+            "nan": None,
+            "reason": "the experimental YOLO screen abstained on a weak "
+                      "geometry/classifier disagreement",
+        }
 
     # --- 2. no agreement: the most reliable detector that has an answer ----
     # Geometry keeps its say only where nothing better spoke. It is never

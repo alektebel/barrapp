@@ -7,7 +7,9 @@ dependencies = [
     "numpy",
     "scipy",
     "pandas",
-    "opencv-python",
+    # Match the Lambda worker's tested OpenCV decoder; version drift changes
+    # decoded pixels enough to alter pose detections and rep counts.
+    "opencv-python==4.10.0.84",
     "matplotlib",
     "dtaidistance",
     "jinja2",
@@ -21,7 +23,9 @@ dependencies = [
 #   uv pip install -e ".[ultralytics]"   # CPU/GPU, 17-kpt COCO, YOLO-pose
 [project.optional-dependencies]
 mediapipe = ["mediapipe>=0.10"]
-ultralytics = ["ultralytics>=8.3"]
+# The optional chunked CPU path caps torch_utils.NUM_THREADS, an Ultralytics
+# internal used by select_device(); keep the tested implementation pinned.
+ultralytics = ["ultralytics==8.4.166"]
 astra = ["astrapy>=2.0"]
 
 [project.scripts]

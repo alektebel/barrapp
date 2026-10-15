@@ -115,6 +115,7 @@ def measurement_semantics() -> dict:
             "stallRate": THRESHOLDS.stall_rate,
             "minPhaseCoverage": THRESHOLDS.min_phase_coverage,
             "restSideTolerance": THRESHOLDS.rest_side_tolerance,
+            "minSpanAmplitude": THRESHOLDS.min_span_amplitude,
         }
     except Exception as exc:  # noqa: BLE001 - provenance must never fail a job
         return {"error": f"measurement semantics unavailable: {exc}"}

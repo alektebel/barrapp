@@ -221,7 +221,8 @@ class TestPerSpanAmplitude(unittest.TestCase):
 class TestSegmentationConstants(unittest.TestCase):
     """C4 - the numbers segmentation decides on live in config.py too."""
 
-    MIRRORED = ("peak_prominence", "rescue_prominence", "max_half_rep_s")
+    MIRRORED = ("peak_prominence", "rescue_prominence", "max_half_rep_s",
+                "min_turn_peak_fraction")
 
     def test_ingest_holds_no_private_copy(self):
         src = (ROOT / "barra" / "ingest.py").read_text()
@@ -229,6 +230,7 @@ class TestSegmentationConstants(unittest.TestCase):
         # The literals these thresholds replaced, as they appeared inline.
         for literal, field in (("0.35 * amplitude", "peak_prominence"),
                                ("0.15 * amplitude", "rescue_prominence"),
+                               ("0.6 * amplitude", "min_turn_peak_fraction"),
                                ("max_half_rep_s: float = 4.0", "max_half_rep_s")):
             self.assertNotIn(literal, body,
                              f"segmentation pins {field} locally again")

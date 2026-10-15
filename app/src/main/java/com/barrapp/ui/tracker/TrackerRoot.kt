@@ -188,6 +188,12 @@ fun TrackerRoot(
                                 sentFrom = null
                                 tab = TrackerTab.HOME
                             },
+                            resultJobId = state.current?.takeIf {
+                                it.result?.traceId == state.analysis?.traceId
+                            }?.id,
+                            resultTraceId = state.analysis?.traceId.orEmpty(),
+                            currentResultTraceId = state.current?.result?.traceId,
+                            onResultRendered = vm::markResultRendered,
                         )
                     }
 
@@ -328,6 +334,9 @@ private fun SessionSheet(
             VisionLine(it.rep, it.name.ifBlank { it.errorId }, it.status, it.description)
         },
         visionDisagrees = a.visionDisagreesOnMovement,
+        renderedJobId = state.current?.takeIf { it.result?.traceId == a.traceId }?.id,
+        renderedTraceId = a.traceId,
+        onResultRendered = vm::markResultRendered,
     )
     // What to fix first, then the server's own account - which, on a clip
     // with nothing counted, is the only place the athlete learns why.

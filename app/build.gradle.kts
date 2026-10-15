@@ -15,6 +15,12 @@
  */
 import java.util.Properties
 
+val singlePutLimitProperty = project.findProperty("barrapp.singlePutMaxBytes")?.toString()
+val debugSinglePutMaxBytes = singlePutLimitProperty?.toLongOrNull()
+    ?: if (singlePutLimitProperty == null) 8L * 1024 * 1024
+    else error("barrapp.singlePutMaxBytes must be a non-negative integer")
+require(debugSinglePutMaxBytes >= 0) { "barrapp.singlePutMaxBytes must be non-negative" }
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -47,6 +53,7 @@ android {
             "API_BASE_URL",
             "\"${project.findProperty("barrapp.apiUrlDebug") ?: "http://192.168.1.120:8080"}\"",
         )
+        buildConfigField("long", "SINGLE_PUT_MAX_BYTES", "${8L * 1024 * 1024}L")
     }
 
     signingConfigs {
@@ -67,6 +74,7 @@ android {
                 "API_BASE_URL",
                 "\"${project.findProperty("barrapp.apiUrlDebug") ?: "http://192.168.1.120:8080"}\"",
             )
+            buildConfigField("long", "SINGLE_PUT_MAX_BYTES", "${debugSinglePutMaxBytes}L")
         }
         release {
             isMinifyEnabled = false

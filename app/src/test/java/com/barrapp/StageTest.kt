@@ -95,4 +95,10 @@ class StageTest {
         assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{"proseStatus":"done"}""")).prosePending)
         assertEquals(false, BarraApi.parseAnalysis(JSONObject("""{}""")).prosePending)
     }
+
+    @Test
+    fun `count status survives analysis parsing`() {
+        val a = BarraApi.parseAnalysis(JSONObject("""{"countStatus":"unmeasured","n_reps":0}"""))
+        assertEquals("unmeasured", a.countStatus)
+    }
 }

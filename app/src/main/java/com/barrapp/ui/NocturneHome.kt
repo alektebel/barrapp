@@ -362,6 +362,9 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
                         )
                     },
                     visionDisagrees = a.visionDisagreesOnMovement,
+                    renderedJobId = state.current?.takeIf { it.result?.traceId == a.traceId }?.id,
+                    renderedTraceId = a.traceId,
+                    onResultRendered = vm::markResultRendered,
                 )
             } else {
                 // No measured session is selected. Show an honest empty state

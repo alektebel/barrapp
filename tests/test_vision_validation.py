@@ -1,7 +1,10 @@
 """The vision pass cannot outrank a measurement: its replies are parsed by
 schema, validated against the request, and dropped when they are not."""
 import json
+import subprocess
 import sys
+import threading
+from types import SimpleNamespace
 from pathlib import Path
 
 import pytest
@@ -78,6 +81,34 @@ def test_count_reconciliation_is_explicit_about_disagreement():
     single = vision.reconcile_counts({"a": 4})
     assert single["reps"] == 4 and "single" in single["agreement"]
     assert vision.reconcile_counts({}) is None
+
+
+def test_count_rescue_models_run_concurrently_without_model_list_preflight(
+    monkeypatch, tmp_path
+):
+    clip = tmp_path / "clip.mp4"
+    clip.write_bytes(b"video")
+    still = tmp_path / "still.jpg"
+    still.write_bytes(b"jpeg")
+    monkeypatch.setattr(vision, "_config", lambda: ("https://vision", "key", "mimo"))
+    monkeypatch.setattr(subprocess, "run", lambda *a, **k: SimpleNamespace(stdout="12"))
+    monkeypatch.setattr("barra.frames.grab_stills", lambda *a, **k: [still])
+    monkeypatch.setattr(vision, "_images", lambda paths: [{"type": "image_url"}])
+    both = threading.Barrier(2, timeout=1)
+    replies = {"mimo": '{"reps": 5}', vision.SECOND_MODEL: '{"reps": 6}'}
+
+    def chat(base, key, model, system, content, **kwargs):
+        assert kwargs["check_model"] is False
+        both.wait()
+        return replies[model]
+
+    monkeypatch.setattr(vision, "_chat", chat)
+
+    result = vision.count_from_clip(clip, tmp_path / "out")
+
+    assert result["usable"]
+    assert result["reps"] == 5
+    assert result["models"] == {"mimo": 5, vision.SECOND_MODEL: 6}
 
 
 def test_verdict_needs_one_unambiguous_word():

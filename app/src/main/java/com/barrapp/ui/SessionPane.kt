@@ -298,10 +298,9 @@ private fun SessionHeader(
                 Spacer(Modifier.height(6.dp))
                 // The rep count is the handle for the per-rep detail: the
                 // numbers stay off the surface until this is pressed.
-                val base = "${analysis.repCount} rep${if (analysis.repCount == 1) "" else "s"} measured" +
-                    if (analysis.candidateCount > analysis.repCount)
-                        " of ${analysis.candidateCount} found" else ""
-                val line = if (onToggleReps == null) base
+                val base = countSummary(analysis.countStatus, analysis.repCount,
+                    analysis.candidateCount)
+                val line = if (onToggleReps == null || analysis.countStatus == "unmeasured") base
                 else "$base · ${if (repsExpanded) "hide each rep" else "each rep"}"
                 Text(
                     line,

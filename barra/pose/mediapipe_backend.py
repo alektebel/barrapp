@@ -36,12 +36,10 @@ COCO_FROM_BLAZE = {
     11: 23, 12: 24, 13: 25, 14: 26, 15: 27, 16: 28,
 }
 
-# BlazePose is scale-robust, so a clip does not need to be posed at its native
-# resolution. Resizing each frame to this width (aspect preserved) before
-# inference cuts the per-frame cost by roughly the pixel ratio, which is where
-# most of the "measuring the reps" wait goes. Landmarks are scaled back to the
-# original resolution afterwards, so every downstream metric sees the same
-# pixel coordinates it always has.
+# Cap larger frames at 640 px to avoid feeding unnecessary source pixels into
+# the image cropper. On 478 px-wide reviewed clips, reducing further to 320 px
+# did not produce a consistent speed-up and changed downstream measurements;
+# see the Heavy input-width screen in docs/SPEED-ROUND2-AUDIT.md.
 PROCESS_WIDTH = 640
 
 

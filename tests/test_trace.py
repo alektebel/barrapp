@@ -190,6 +190,13 @@ class TestTrimmingToTheSet(unittest.TestCase):
         self.assertIsNotNone(step, "a trim that is invisible cannot be debugged")
         self.assertGreater(step.data["dropped_frames"], 0)
         self.assertLess(step.data["active_frac"], 1.0)
+        coverage = step.data["per_span_observed"]
+        self.assertEqual(len(coverage), step.data["spans"])
+        for span in coverage:
+            self.assertGreaterEqual(span["observed_frac"], 0.0)
+            self.assertLessEqual(span["observed_frac"], 1.0)
+            self.assertEqual(span["observed_frac"],
+                             span["observed_frames"] / span["frames"])
 
 
 class TestPipelineTracing(unittest.TestCase):

@@ -8,7 +8,9 @@ file alongside its results so a post-hoc change is visible in the report.
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+import math
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 
 # --- fixed decision rule (spec section 7) ----------------------------------
@@ -157,6 +159,9 @@ class Thresholds:
     # -- segmentation (mirrored from the literals ingest.py used inline) -----
     peak_prominence: float = 0.35      # share of span amplitude for a turnaround
     rescue_prominence: float = 0.15
+    # Minimum share of a span's motion the turnaround must reach. Kept at the
+    # historical 60% default; experiments may lower it only with reviewed QA.
+    min_turn_peak_fraction: float = 0.60
     max_half_rep_s: float = 4.0        # longest half-rep the standard pass keeps
     # The least a span may move and still be a set, in torso-lengths.
     #
@@ -171,4 +176,30 @@ class Thresholds:
     min_span_amplitude: float = 0.15
 
 
-THRESHOLDS = Thresholds()
+def thresholds_from_environment(
+    environ: Mapping[str, str] | None = None,
+) -> Thresholds:
+    """Apply the explicit Round 2 shadow-only span-floor override.
+
+    The ordinary config remains pinned at 0.15. A candidate runtime may set
+    ``BARRA_EXPERIMENTAL_MIN_SPAN_AMPLITUDE`` to reproduce a screened value;
+    invalid values fail worker startup rather than silently changing behavior.
+    """
+    values = os.environ if environ is None else environ
+    raw = values.get("BARRA_EXPERIMENTAL_MIN_SPAN_AMPLITUDE")
+    if raw is None or not raw.strip():
+        return Thresholds()
+    try:
+        floor = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(
+            "BARRA_EXPERIMENTAL_MIN_SPAN_AMPLITUDE must be a finite, non-negative number"
+        ) from exc
+    if not math.isfinite(floor) or floor < 0:
+        raise ValueError(
+            "BARRA_EXPERIMENTAL_MIN_SPAN_AMPLITUDE must be a finite, non-negative number"
+        )
+    return replace(Thresholds(), min_span_amplitude=floor)
+
+
+THRESHOLDS = thresholds_from_environment()

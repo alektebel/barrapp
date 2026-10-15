@@ -1,0 +1,44 @@
+# Isolated Round 2 shadow image. Build from the repository root:
+#   docker build -f server/Dockerfile.round2-yolo -t barrapp-round2-yolo .
+# This is deliberately separate from Dockerfile and is never selected by
+# server/deploy.sh. It packages the already-screened six-core candidate for
+# Lambda-compatible runtime experiments without changing production defaults.
+FROM public.ecr.aws/lambda/python:3.12@sha256:3856536f53e945debf4c90d0ff301cbaa837c07a4ab9b0e2c102c6e54ceb9762
+
+ENV BARRA_ROOT=/opt/barra \
+    PYTHONPATH=/opt/barra:${LAMBDA_TASK_ROOT} \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    BARRA_POSE_BACKEND=ultralytics \
+    BARRA_POSE_WORKERS=6 \
+    BARRA_POSE_WORKER_MODE=fork \
+    BARRA_POSE_CPU_THREADS=1 \
+    BARRA_YOLO_POSE_STRIDE=2 \
+    BARRA_YOLO_POSE_IMGSZ=480 \
+    BARRA_ULTRALYTICS_FUSION_POLICY=ultralytics-supported-only-v2 \
+    BARRA_YOLO_POSE_WEIGHTS=/opt/barra/models/yolo11n-pose.pt
+
+COPY server/requirements-worker.txt ${LAMBDA_TASK_ROOT}/requirements-worker.txt
+COPY server/requirements-mediapipe.txt ${LAMBDA_TASK_ROOT}/requirements-mediapipe.txt
+RUN printf 'numpy==1.26.4\n' > /tmp/round2-constraints.txt \
+    && pip install --no-cache-dir pip==26.2.1 \
+    && pip install --no-cache-dir --only-binary=:all: -r ${LAMBDA_TASK_ROOT}/requirements-worker.txt \
+    && pip install --no-cache-dir --only-binary=:all: --no-deps -r ${LAMBDA_TASK_ROOT}/requirements-mediapipe.txt \
+    && pip install --no-cache-dir --only-binary=:all: -c /tmp/round2-constraints.txt \
+         --extra-index-url https://download.pytorch.org/whl/cpu \
+         torch==2.14.1+cpu torchvision==0.29.1+cpu ultralytics==8.4.166 \
+         opencv-python==4.10.0.84 \
+    && pip uninstall -y opencv-python \
+    && pip install --no-cache-dir --force-reinstall --no-deps \
+         --only-binary=:all: opencv-python-headless==4.10.0.84
+
+COPY barra/ /opt/barra/barra/
+COPY out/round2-latency/weights/yolo11n-pose.pt /opt/barra/models/yolo11n-pose.pt
+COPY server/api/*.py server/process.py server/report.py server/vision.py ${LAMBDA_TASK_ROOT}/
+
+# The exact checkpoint used by the local six-core cohort. Fail the image build
+# if a different/partial file is accidentally supplied as this artifact.
+RUN echo '869e83fcdffdc7371fa4e34cd8e51c838cc729571d1635e5141e3075e9319dc0  /opt/barra/models/yolo11n-pose.pt' | sha256sum -c -
+
+ARG BARRA_COMMIT=round2-shadow
+ENV BARRA_COMMIT=${BARRA_COMMIT}
+CMD ["handler.worker"]

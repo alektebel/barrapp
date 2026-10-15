@@ -7,7 +7,9 @@ import re
 import os
 import sys
 import threading
+import time
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -21,13 +23,14 @@ if VENV_PY.exists() and Path(sys.executable).resolve() != VENV_PY.resolve():
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "api"))
 
-from process import process_job  # noqa: E402
+from process import measure_job  # noqa: E402
 import referral  # noqa: E402
 
 DATA = ROOT / "data"
 DATA.mkdir(exist_ok=True)
 JOBS: dict[str, dict] = {}
 FEEDBACK: dict[str, dict] = {}
+POSE_WARMUPS: dict[str, object] = {}
 # The same referral engine the Lambda runs, on the in-memory store. Sharing
 # the module is what keeps a code redeemed on the LAN and on AWS the same
 # program rather than two that drift.
@@ -57,6 +60,31 @@ def _load_env() -> None:
             os.environ.setdefault(key.strip(), value.strip())
 
 
+def _start_pose_warmup(job_id: str) -> None:
+    """Overlap lazy pose-package imports with the incoming clip bytes."""
+    try:
+        from pose_warmup import start_pose_runtime_warmup
+
+        warmup = start_pose_runtime_warmup()
+    except Exception:  # noqa: BLE001 - an optimization must not fail upload
+        return
+    if warmup is not None:
+        with LOCK:
+            POSE_WARMUPS[job_id] = warmup
+
+
+def _finish_pose_warmup(job_id: str) -> dict:
+    with LOCK:
+        warmup = POSE_WARMUPS.pop(job_id, None)
+    try:
+        from pose_warmup import finish_pose_runtime_warmup
+
+        return finish_pose_runtime_warmup(warmup)
+    except Exception as exc:  # noqa: BLE001 - preserve normal lazy import path
+        return {"ready": False, "outcome": type(exc).__name__,
+                "elapsedMs": 0, "waitMs": 0}
+
+
 def _dump(job: dict) -> dict:
     body = {
         "id": job["id"],
@@ -72,12 +100,18 @@ def _dump(job: dict) -> dict:
         body["result"] = job["result"]
     if job.get("error"):
         body["error"] = job["error"]
+    if job.get("resultReadyAtEpochMs") is not None:
+        body["resultReadyAtEpochMs"] = job["resultReadyAtEpochMs"]
+        body["serverMeasurementMs"] = job.get("serverMeasurementMs")
     return body
 
 
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
-        sys.stderr.write("local-api: " + fmt % args + "\n")
+        # Millisecond wall time makes each phone poll response alignable with
+        # resultReadyAtEpochMs in the response payload.
+        sys.stderr.write(f"{int(time.time() * 1000)} local-api: "
+                         + fmt % args + "\n")
 
     def _owner(self) -> str:
         return (self.headers.get("X-Device-Id") or "").strip()
@@ -222,12 +256,31 @@ class Handler(BaseHTTPRequestHandler):
                 and parts[3] == "upload"):
             return self.do_POST_upload(parts, body, owner)
 
+        if (len(parts) == 4 and parts[0] == "v1"
+                and parts[1] == "jobs" and parts[3] == "upload-url"):
+            job_id = parts[2]
+            with LOCK:
+                job = JOBS.get(job_id)
+                if not job or job.get("owner") != owner:
+                    return self._send(404, {"error": "unknown job"})
+                if job.get("status") != "created" or job.get("uploadId"):
+                    return self._send(409, {
+                        "error": "job is not waiting for a single-file upload"})
+            return self._send(200, {
+                "uploadUrl": f"/v1/jobs/{job_id}/video",
+                "uploadMethod": "PUT",
+            })
+
         if path.endswith("/submit") and path.startswith("/v1/jobs/"):
             job_id = path.split("/")[3]
             with LOCK:
                 job = JOBS.get(job_id)
                 if not job or job.get("owner") != owner:
                     return self._send(404, {"error": "unknown job"})
+                video = DATA / f"{job_id}.mp4"
+                if not video.is_file() or video.stat().st_size < MIN_CLIP_BYTES:
+                    return self._send(409, {
+                        "error": "the clip has not finished uploading"})
                 job["status"] = "processing"
             threading.Thread(target=_run, args=(job_id,), daemon=True).start()
             return self._send(202, _dump(job))
@@ -323,6 +376,7 @@ class Handler(BaseHTTPRequestHandler):
                 job = JOBS.get(job_id)
             if not job or job.get("owner") != owner:
                 return self._send(404, {"error": "unknown job"})
+            _start_pose_warmup(job_id)
             length = int(self.headers.get("Content-Length") or 0)
             part = self._part_dir(job_id) / f"{n:05d}"
             with part.open("wb") as fh:
@@ -368,6 +422,7 @@ class Handler(BaseHTTPRequestHandler):
             job = JOBS.get(job_id)
             if not job or job.get("owner") != owner:
                 return self._send(404, {"error": "unknown job"})
+        _start_pose_warmup(job_id)
         length = int(self.headers.get("Content-Length") or 0)
         dest = DATA / f"{job_id}.mp4"
         with dest.open("wb") as fh:
@@ -378,6 +433,9 @@ class Handler(BaseHTTPRequestHandler):
                     break
                 fh.write(chunk)
                 remaining -= len(chunk)
+        if remaining > 0 or dest.stat().st_size < MIN_CLIP_BYTES:
+            dest.unlink(missing_ok=True)
+            return self._send(400, {"error": "the clip arrived empty or truncated"})
         with LOCK:
             JOBS[job_id]["status"] = "uploaded"
         self._send(200, {"ok": True, "id": job_id})
@@ -406,37 +464,70 @@ def _run(job_id: str) -> None:
     video = DATA / f"{job_id}.mp4"
     with LOCK:
         job = dict(JOBS[job_id])
+    worker_started_ns = time.perf_counter_ns()
 
     def stage(name: str) -> None:
         with LOCK:
             JOBS[job_id]["stage"] = name
 
-    # Local parity with the worker: locate the exercise with MiMo, keep the
-    # measurement on the full clip, then replace the stored file with the
-    # located window. Best-effort throughout.
-    localization = None
-    vision_label = None
+    first_result_written = False
+    locator_pool = None
+    pose_warmup_timing = {"ready": False, "outcome": "not-started",
+                          "elapsedMs": 0, "waitMs": 0}
     try:
-        from vision import locate_exercise
+        pose_warmup_timing = _finish_pose_warmup(job_id)
+        # Classification localization can overlap pose, but a late vote must
+        # never hold the first measured result. This mirrors handler.worker.
+        def _locate():
+            try:
+                from vision import locate_exercise
+                return locate_exercise(video, DATA / f"{job_id}-locate",
+                                       job.get("exercise"))
+            except Exception:  # noqa: BLE001 - localization is advisory
+                return None
 
-        located = locate_exercise(video, DATA / f"{job_id}-locate",
-                                  job.get("exercise"))
-    except Exception:  # noqa: BLE001
-        located = None
-    if located:
-        vision_label = located.get("exercise") or None
-        if vision_label and str(vision_label).lower() in ("none", "unknown", ""):
-            vision_label = None
-    if located and located.get("usable"):
-        localization = dict(located)
-        localization["source"] = "vision"
+        locator_pool = ThreadPoolExecutor(max_workers=1)
+        located_future = locator_pool.submit(_locate)
 
-    if vision_label:
-        job = dict(job)
-        job["visionLabel"] = vision_label
+        def _vision_vote():
+            try:
+                located = located_future.result(timeout=0)
+                label = (located or {}).get("exercise") or None
+                return label if str(label or "").lower() not in (
+                    "none", "unknown", "") else None
+            except Exception:  # noqa: BLE001 - a late vote is not required
+                return None
 
-    try:
-        result = process_job(job, video, on_stage=stage)
+        result = measure_job(job, video, on_stage=stage,
+                             vision_label=_vision_vote)
+        result_ready_epoch_ms = int(time.time() * 1000)
+        server_measurement_ms = round(
+            (time.perf_counter_ns() - worker_started_ns) / 1_000_000)
+        with LOCK:
+            JOBS[job_id]["result"] = result
+            JOBS[job_id]["exercise"] = result.get("exercise") or job.get("exercise")
+            JOBS[job_id]["status"] = "done"
+            JOBS[job_id]["resultReadyAtEpochMs"] = result_ready_epoch_ms
+            JOBS[job_id]["serverMeasurementMs"] = server_measurement_ms
+        first_result_written = True
+        print(f"local-api: job={job_id} event=first-result "
+              f"serverMeasurementMs={server_measurement_ms} "
+              f"poseWarmup={pose_warmup_timing['outcome']} "
+              f"poseWarmupElapsedMs={pose_warmup_timing['elapsedMs']} "
+              f"poseWarmupWaitMs={pose_warmup_timing['waitMs']} "
+              f"resultReadyAtEpochMs={result_ready_epoch_ms}", flush=True)
+
+        # Everything below is enrichment or replay storage. The phone already
+        # has the measured payload, so these operations cannot delay its result.
+        try:
+            located = located_future.result(timeout=300)
+        except Exception:  # noqa: BLE001 - localization never fails a result
+            located = None
+        locator_pool.shutdown(wait=False)
+        localization = None
+        if located and located.get("usable"):
+            localization = dict(located)
+            localization["source"] = "vision"
         from barra.frames import trim_clip
 
         if localization is None:
@@ -457,14 +548,24 @@ def _run(job_id: str) -> None:
                 localization["trimmed"] = True
         if localization is not None:
             result["localization"] = localization
+        if result.get("visionStatus") == "pending":
+            from process import add_vision
+            result = add_vision(job, video, result)
+        if result.get("proseStatus") == "pending":
+            from process import finish_prose
+            result = finish_prose(job, result)
         with LOCK:
             JOBS[job_id]["result"] = result
-            JOBS[job_id]["exercise"] = result.get("exercise") or job.get("exercise")
-            JOBS[job_id]["status"] = "done"
     except Exception as exc:  # noqa: BLE001
-        with LOCK:
-            JOBS[job_id]["status"] = "failed"
-            JOBS[job_id]["error"] = str(exc)
+        if locator_pool is not None:
+            locator_pool.shutdown(wait=False)
+        if first_result_written:
+            print(f"local-api: job={job_id} post-result enrichment failed: {exc}",
+                  flush=True)
+        else:
+            with LOCK:
+                JOBS[job_id]["status"] = "failed"
+                JOBS[job_id]["error"] = str(exc)
 
 
 def main() -> None:

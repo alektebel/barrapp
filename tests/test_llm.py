@@ -104,6 +104,13 @@ class Complete(Base):
         chat.assert_not_called()
         self.assertEqual(r.error, "model_missing: mimo-v2.5")
 
+    def test_latency_sensitive_call_can_skip_the_redundant_model_listing(self):
+        with mock.patch.object(llm, "model_listed", side_effect=AssertionError("preflight called")), \
+                mock.patch.object(llm.urllib.request, "urlopen", return_value=reply("ok")):
+            r = llm.complete("mimo-v2.6-flash", [], base=BASE, key=KEY,
+                             check_model=False)
+        self.assertEqual(r.text, "ok")
+
     def test_last_error_tracks_the_latest_call(self):
         self.call([http_error(401, "x")])
         self.assertIn("401", llm.last_error())

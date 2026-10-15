@@ -108,6 +108,13 @@ class BarraApi(context: Context) {
         return json.optString("uploadId") to json.optLong("partSize", 8L * 1024 * 1024)
     }
 
+    fun refreshSingleUploadUrl(jobId: String): Pair<String, String> {
+        val request = authed(Request.Builder().url("$baseUrl/v1/jobs/$jobId/upload-url")
+            .post("{}".toRequestBody(JSON))).build()
+        val json = call(request)
+        return json.optString("uploadUrl") to json.optString("uploadMethod", "PUT")
+    }
+
     fun presignPart(jobId: String, uploadId: String, partNumber: Int): String {
         val body = JSONObject().put("partNumber", partNumber).toString()
             .toRequestBody(JSON)
@@ -129,15 +136,7 @@ class BarraApi(context: Context) {
             override fun contentLength() = length
             override fun writeTo(sink: BufferedSink) {
                 clip.inputStream().use { input ->
-                    input.skip(offset)
-                    val buf = ByteArray(1 shl 20)
-                    var remaining = length
-                    while (remaining > 0) {
-                        val n = input.read(buf, 0, minOf(buf.size.toLong(), remaining).toInt())
-                        if (n < 0) break
-                        sink.write(buf, 0, n)
-                        remaining -= n
-                    }
+                    copyInputRangeToSink(input, sink, offset, length)
                 }
             }
         }
@@ -553,6 +552,7 @@ class BarraApi(context: Context) {
                 sessionBand = json.optString("sessionBand").ifBlank { "unmeasured" },
                 repCount = json.optInt("n_reps"),
                 candidateCount = json.optInt("n_candidates"),
+                countStatus = json.optString("countStatus", "geometry"),
                 durationS = json.optDouble("duration_s", 0.0).orZero(),
                 traceId = json.optString("traceId"),
                 provenance = json.optJSONObject("provenance")?.let { p ->

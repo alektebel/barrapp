@@ -4,6 +4,7 @@ from __future__ import annotations
 import math
 import os
 import sys
+import time
 from datetime import date
 
 import numpy as np
@@ -148,7 +149,7 @@ def _finish(trace, report: dict, job: dict, requested: str) -> dict:
 
 
 def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
-                vision_label=None) -> dict:
+                vision_label=None, pose_backend_override: str | None = None) -> dict:
     """The measurement and its report - everything the phone needs except the
     advisory vision note, which `add_vision` adds afterwards.
 
@@ -182,7 +183,8 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
                            declared_bin=job.get("view"),
                            variant=job.get("variant"),
                            pose=pose,
-                           vision_label=vision_label)
+                           vision_label=vision_label,
+                           pose_backend_override=pose_backend_override)
     # The model prose is OFF the critical path (docs/SPEED-PLAN.md B): the
     # result reaches the phone with the deterministic Spanish text and
     # `proseStatus: "pending"`, and `finish_prose` upgrades it afterwards,
@@ -444,6 +446,7 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
         "recommendation": rec,
         "n_reps": len(reps),
         "n_candidates": len(reps),
+        "countStatus": "hold",
         "reps": reps,
         "rescued": False,
         "countedBy": None,
@@ -487,6 +490,7 @@ def _empty(exercise: str, blockers: list[str], **extra) -> dict:
         "variant": {"name": "unspecified", "source": "none"},
         "n_reps": 0,
         "n_candidates": 0,
+        "countStatus": "unmeasured",
         "fps": 0.0,
         "duration_s": 0.0,
         "trim": None,
@@ -511,7 +515,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                  visual_count=None, pose=None,
                  declared_bin: str | None = None,
                  variant: str | None = None,
-                 vision_label: str | None = None) -> dict:
+                 vision_label: str | None = None,
+                 pose_backend_override: str | None = None) -> dict:
     """Measure one clip. `on_stage`, when given, is called with a short human
     phrase at each step that can take real time, so a waiting phone can say
     where the work is. `visual_count`, when given, is the last resort for a
@@ -544,6 +549,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         tr.error("no video arrived at the server", path=str(video_path))
         return _empty(exercise, ["No video arrived at the server."])
 
+    analysis_import_started = time.perf_counter_ns()
     try:
         from barra.classify import HUMAN, classify
         from barra.ingest import _clean_signal, probe_video, segment_reps_verbose
@@ -558,6 +564,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             f"barra is not importable on this host ({exc}). "
             "Use server/.venv (pip install -e ../barrapp[mediapipe])."
         ])
+    analysis_import_ms = round(
+        (time.perf_counter_ns() - analysis_import_started) / 1_000_000
+    )
 
     if pose is not None:
         # Keypoints supplied by the caller. The trace records where they came
@@ -567,7 +576,13 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                 source=getattr(pose, "source", "caller"),
                 frames=int(len(pose.keypoints)))
 
+    availability_started = time.perf_counter_ns()
     backends = available_backends()
+    backend_availability_ms = round(
+        (time.perf_counter_ns() - availability_started) / 1_000_000
+    )
+    tr.step("analysis setup timing", importsMs=analysis_import_ms,
+            backendAvailabilityMs=backend_availability_ms)
     if not backends and pose is None:
         return _empty(exercise, [
             "No pose backend installed. In server/.venv run: "
@@ -589,7 +604,11 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         order = backends
 
     _stage("estimating the pose")
+    video_probe_started = time.perf_counter_ns()
     info = probe_video(video_path)
+    tr.step("video probe timing", durationMs=round(
+        (time.perf_counter_ns() - video_probe_started) / 1_000_000
+    ))
     tr.step("container", **{k: v for k, v in info.items() if k != "ok"})
     sentinel.watch(tr, "probe", {"info": info},
                    inputs={"clip": video_path.name, "bytes": video_path.stat().st_size})
@@ -600,13 +619,43 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
     pose_error = None
-    pose_backend = getattr(pose, "source", "caller") if pose is not None else None
+    pose_backend = (pose_backend_override or getattr(pose, "source", "caller")) \
+        if pose is not None else None
     if pose is None:
         for name in order:
             try:
-                pose = get_backend(name).estimate(video_path)
+                backend_lookup_started = time.perf_counter_ns()
+                backend_impl = get_backend(name)
+                backend_lookup_ms = round(
+                    (time.perf_counter_ns() - backend_lookup_started) / 1_000_000
+                )
+                estimate_started = time.perf_counter_ns()
+                pose = backend_impl.estimate(video_path)
+                estimate_wall_ms = round(
+                    (time.perf_counter_ns() - estimate_started) / 1_000_000
+                )
                 pose_backend = name
                 tr.step("pose backend", backend=name)
+                timing = getattr(backend_impl, "last_timing", None)
+                tr.step(
+                    "pose invocation timing",
+                    backend=name,
+                    backendLookupMs=backend_lookup_ms,
+                    estimateWallMs=estimate_wall_ms,
+                    backendReportedMs=(round(float(timing.get("total_seconds", 0)) * 1000)
+                                       if timing else None),
+                )
+                if timing:
+                    workers = getattr(backend_impl, "last_worker_timing", None) or []
+                    tr.step(
+                        "pose timing",
+                        backend=name,
+                        workerMode=getattr(backend_impl, "last_worker_mode", None),
+                        stages={k: round(float(v), 4)
+                                for k, v in timing.items()},
+                        workers=[{k: round(float(v), 4) for k, v in row.items()}
+                                 for row in workers],
+                    )
                 break
             except Exception as exc:  # noqa: BLE001 - the next backend may still work
                 pose_error = exc
@@ -702,6 +751,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                 detected,
                 (model_out or {}).get("classification"),
                 nan_label=vision_label,
+                policy=(os.environ.get("BARRA_ULTRALYTICS_FUSION_POLICY", "default")
+                        if pose_backend == "ultralytics" else "default"),
             )
             tr.step("fusion", **fusion)
             sentinel.watch(tr, "fusion", {"fusion": fusion},
@@ -767,24 +818,36 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     if not found and visual_count is not None and detected.get("exercise") not in (
             None, "", "unknown"):
         _stage("counting from the frames")
+        count_started = time.perf_counter_ns()
+        count_outcome = "no_result"
         try:
             vision_count = visual_count()
+            if vision_count is not None:
+                count_outcome = "returned"
         except Exception as exc:  # noqa: BLE001 - a fallback never fails a job
+            count_outcome = "error"
             tr.error("the vision count fell over", reason=str(exc)[:200])
             vision_count = None
+        count_models = (vision_count or {}).get("models")
         # A disagreement between the two models is a result, not a lower
         # bound: it is recorded, and no count is claimed from it.
         if vision_count is not None and (not vision_count.get("usable", True)
                                          or vision_count.get("reps") is None):
+            count_outcome = "disagreement"
             tr.reject("vision count", vision_count.get("agreement", "unusable"),
                       models=vision_count.get("models"),
                       range=vision_count.get("range"))
             vision_count = None
         if vision_count is not None:
+            count_outcome = "accepted"
             tr.decision("vision count", "used the models' count",
                         reps=int(vision_count["reps"]),
                         range=vision_count.get("range"),
                         models=vision_count["models"])
+        tr.step("visual count rescue",
+                durationMs=round((time.perf_counter_ns() - count_started) / 1_000_000),
+                outcome=count_outcome,
+                models=count_models)
 
     session = session or date.today().isoformat()
     raw_signal, sig_conf = tracking_signal(pose.keypoints, movement)
@@ -1028,6 +1091,19 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             ],
         })
     checks = summarise(per_rep_assessments)
+    # Candidate boundaries are not a measured count. The physical/quality
+    # checks above can reject every geometric candidate; in that case a zero
+    # used to be mislabeled `geometry` simply because `found` was nonempty.
+    # Only usable, quality-accepted reps support a geometric count.
+    if usable > 0:
+        reported_count = usable
+        count_status = "geometry"
+    elif vision_count:
+        reported_count = vision_count["reps"]
+        count_status = "vision"
+    else:
+        reported_count = 0
+        count_status = "unmeasured"
     tr.step("assessment summary", **checks)
     if primary:
         tr.step("primary fault", **primary)
@@ -1051,8 +1127,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # has fallen over and the next one produced the numbers.
         "poseBackend": pose_backend,
         "recommendation": rec,
-        "n_reps": usable if found else (vision_count["reps"] if vision_count else 0),
+        "n_reps": reported_count,
         "n_candidates": len(found),
+        "countStatus": count_status,
         "rescued": rescued,
         "countedBy": counted_by,
         "consistency": consistency or None,
@@ -1063,7 +1140,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "session": session,
         "sessionScore": session_score,
         "sessionBand": qband(session_score),
-        "sessions": [{"date": session, "reps": usable, "note": note}],
+        "sessions": [{"date": session, "reps": reported_count, "note": note}],
         "reps": reps,
         # blockers_out, not blockers: the key was written twice in this literal
         # and the second one won, so the "the geometry could not time the reps,

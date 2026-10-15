@@ -113,7 +113,8 @@ def _fail(model: str, error: str, status: int | None = None) -> ChatResult:
 def complete(model: str, messages: list[dict], *, system: str | None = None,
              json_mode: bool = False, temperature: float = 0.3,
              timeout: int = TIMEOUT, attempts: int = ATTEMPTS,
-             base: str | None = None, key: str | None = None) -> ChatResult:
+             base: str | None = None, key: str | None = None,
+             check_model: bool = True) -> ChatResult:
     """One chat completion. `messages` is the OpenAI list; `system`, when
     given, is prepended. `base`/`key` default to config()."""
     global _last_error
@@ -122,7 +123,11 @@ def complete(model: str, messages: list[dict], *, system: str | None = None,
         if cfg is None:
             return _fail(model, "not_configured")
         base, key = cfg
-    if not model_listed(base, key, model):
+    # The preflight is useful for ordinary calls because it names retired
+    # models clearly, but it can add a separate 15 s request on a cold worker.
+    # Latency-critical callers may rely on the completion endpoint itself;
+    # its 4xx error remains explicit and non-retried.
+    if check_model and not model_listed(base, key, model):
         return _fail(model, f"model_missing: {model}")
 
     msgs = ([{"role": "system", "content": system}] if system else []) + list(messages)

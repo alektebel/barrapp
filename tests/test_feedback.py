@@ -153,6 +153,31 @@ class TestLocalFeedbackClip(unittest.TestCase):
         self.assertEqual(status, 201)
         self.assertNotIn("uploadUrl", json.loads(data))
 
+    def test_small_job_upload_can_refresh_url_and_submit_only_after_full_put(self):
+        status, data = self._req("POST", "/v1/jobs", {"exercise": "auto"})
+        self.assertEqual(status, 201)
+        job = json.loads(data)
+        path = f"/v1/jobs/{job['id']}/upload-url"
+        status, refreshed = self._req("POST", path, {})
+        self.assertEqual(status, 200)
+        upload = json.loads(refreshed)
+        self.assertEqual(upload["uploadMethod"], "PUT")
+
+        status, _ = self._req("POST", f"/v1/jobs/{job['id']}/submit", {})
+        self.assertEqual(status, 409)
+        status, _ = self._req("PUT", upload["uploadUrl"], b"x" * 20000)
+        self.assertEqual(status, 200)
+        status, _ = self._req("POST", f"/v1/jobs/{job['id']}/submit", {})
+        self.assertEqual(status, 202)
+
+    def test_another_device_cannot_refresh_a_job_upload_url(self):
+        status, data = self._req("POST", "/v1/jobs", {"exercise": "auto"})
+        self.assertEqual(status, 201)
+        job = json.loads(data)
+        status, _ = self._req("POST", f"/v1/jobs/{job['id']}/upload-url", {},
+                              device="another-device")
+        self.assertEqual(status, 404)
+
 
 if __name__ == "__main__":
     unittest.main()

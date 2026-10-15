@@ -94,6 +94,49 @@ class WorkerImageCarriesItsImports(unittest.TestCase):
                          "does not copy them: every clip would fail at import time")
 
 
+class WorkerImageAvoidsBuildOnlyPackages(unittest.TestCase):
+    def test_wheel_only_worker_install_does_not_retain_compilers(self):
+        docker = (SERVER / "Dockerfile").read_text()
+        for package in ("gcc", "gcc-c++", "make", "python3-devel"):
+            self.assertNotIn(package, docker,
+                             f"{package} only supports source builds, but the worker "
+                             "uses pip --only-binary and should not install it")
+        self.assertIn("--only-binary=:all:", docker,
+                      "if source builds are needed, this image-size invariant no longer applies")
+
+
+class WorkerImageUsesOnlyTheMediaPipePoseRuntime(unittest.TestCase):
+    def test_pose_runtime_is_pinned_and_non_pose_extras_are_not_installed(self):
+        docker = (SERVER / "Dockerfile").read_text()
+        common = (SERVER / "requirements-worker.txt").read_text()
+        mediapipe = (SERVER / "requirements-mediapipe.txt").read_text()
+        self.assertIn("mediapipe==0.10.21", mediapipe)
+        self.assertRegex(docker, r"pip install[^\n]*--no-deps[^\n]*requirements-mediapipe\.txt")
+        for dependency in ("absl-py==", "attrs==", "flatbuffers==",
+                           "matplotlib==", "protobuf=="):
+            self.assertIn(dependency, common,
+                          f"the pose runtime dependency {dependency} must be explicit")
+        self.assertNotIn("mediapipe==", common,
+                         "MediaPipe must not resolve all declared dependencies implicitly")
+        for unused in ("jax", "jaxlib", "sentencepiece", "sounddevice"):
+            self.assertNotRegex(common, rf"(?m)^\s*{unused}(?:[<=>~!;\[]|\s|$)")
+
+
+class WorkerImageUsesHeadlessOpenCV(unittest.TestCase):
+    def test_video_only_worker_uses_headless_opencv_without_graphics_system_libs(self):
+        common = (SERVER / "requirements-worker.txt").read_text()
+        docker = (SERVER / "Dockerfile").read_text()
+        project = (ROOT / "pyproject.toml").read_text()
+        self.assertIn("opencv-python-headless==4.10.0.84", common)
+        self.assertIn('"opencv-python==4.10.0.84"', project,
+                      "local inference must use the worker's tested decoder version")
+        self.assertNotIn("opencv-contrib-python", common)
+        for package in ("mesa-libGL", "mesa-libEGL", "libXext", "libXrender",
+                        "libX11", "libSM", "libICE", "fontconfig"):
+            self.assertNotIn(package, docker,
+                             f"headless video processing should not need {package}")
+
+
 class StackDefinesWhatTheCodeRequires(unittest.TestCase):
     """`os.environ["X"]` raises KeyError at import time when X is unset."""
 

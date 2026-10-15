@@ -33,6 +33,8 @@ data class Work(
     val traceId: String = "",
     val clipPath: String = "",  // the phone's copy, for retry and replay
     val uploadId: String = "",  // the server's multipart session, when sending
+    val uploadMode: String = "", // single PUT or multipart; never stores signed URLs
+    val uploadComplete: Boolean = false,
     val partSize: Long = 0,     // bytes per part, fixed at start
     val uploadedParts: List<PartMark> = emptyList(),
     val log: List<WorkStore.Entry> = emptyList(),
@@ -47,6 +49,8 @@ data class Work(
     val trimStartS: Double = 0.0,
     val trimEndS: Double = 0.0,
     val trimmed: Boolean = false,
+    /** Stable across process/network resume; replaced only for an explicit retry. */
+    val timingAttemptId: String = "",
     /** Duración del clip original, en segundos: la escala del deslizador. */
     val clipDurationS: Double = 0.0,
 ) {
@@ -86,6 +90,12 @@ object WorkStore {
     const val MAX_WORKS = 12
     const val LOG_LIMIT = 80
 
+    /** In-flight transfers survive process death. Multipart resumes by part
+     *  markers; a single PUT safely replaces its fixed object with a fresh URL. */
+    fun resumesUploadAfterRestart(work: Work): Boolean =
+        work.status in setOf(STATUS_SENDING, STATUS_CONNECTING) &&
+            (work.uploadId.isNotBlank() || work.uploadMode == "single")
+
     enum class Level { INFO, WARN, ERROR }
 
     data class Entry(
@@ -114,8 +124,11 @@ object WorkStore {
                 traceId = o.optString("traceId"),
                 clipPath = o.optString("clipPath"),
                 uploadId = o.optString("uploadId"),
+                uploadMode = o.optString("uploadMode"),
+                uploadComplete = o.optBoolean("uploadComplete"),
                 partSize = o.optLong("partSize"),
                 trimmed = o.optBoolean("trimmed"),
+                timingAttemptId = o.optString("timingAttemptId"),
                 trimStartS = o.optDouble("trimStartS", 0.0),
                 trimEndS = o.optDouble("trimEndS", 0.0),
                 clipDurationS = o.optDouble("clipDurationS", 0.0),
@@ -161,8 +174,10 @@ object WorkStore {
                 .put("error", w.error.orEmpty()).put("traceId", w.traceId)
                 .put("clipPath", w.clipPath)
                 .put("uploadId", w.uploadId).put("partSize", w.partSize)
+                .put("uploadMode", w.uploadMode).put("uploadComplete", w.uploadComplete)
                 .put("variant", w.variant).put("view", w.view)
                 .put("trimmed", w.trimmed)
+                .put("timingAttemptId", w.timingAttemptId)
                 .put("trimStartS", w.trimStartS).put("trimEndS", w.trimEndS)
                 .put("clipDurationS", w.clipDurationS)
                 .put("uploadedParts", parts).put("log", log))

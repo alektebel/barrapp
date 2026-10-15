@@ -131,3 +131,156 @@ def test_an_abstention_is_not_a_vote():
     )
     assert fused["exercise"] == "unknown"
     assert fused["status"] == "abstain"
+
+
+def test_yolo_screen_prefers_stronger_geometry_on_close_disagreement():
+    fused = fuse_detection(
+        {"exercise": "push_up", "confidence": 0.78},
+        {"exercise": "deadlift", "confidence": 0.7352},
+        policy="ultralytics-screen-v1",
+    )
+    assert fused["exercise"] == "push_up"
+    assert fused["status"] == "ultralytics-geometry-screen"
+
+
+def test_yolo_screen_abstains_on_weak_conflicting_votes():
+    fused = fuse_detection(
+        {"exercise": "split_squat", "confidence": 0.70},
+        {"exercise": "back_lever", "confidence": 0.5837},
+        policy="ultralytics-screen-v1",
+    )
+    assert fused["exercise"] == "unknown"
+    assert fused["status"] == "ultralytics-abstain-screen"
+
+
+def test_yolo_screen_keeps_a_strong_model_vote_and_respects_vision():
+    model = {"exercise": "muscle_up", "confidence": 0.80}
+    assert fuse_detection({"exercise": "unknown", "confidence": 0.0}, model,
+                          policy="ultralytics-screen-v1")["exercise"] == "muscle_up"
+    fused = fuse_detection(
+        {"exercise": "unknown", "confidence": 0.0}, model,
+        {"exercise": "push_up"}, policy="ultralytics-screen-v1")
+    assert fused["exercise"] == "push_up"
+    assert fused["status"] == "vision-decides"
+
+
+def test_supported_only_policy_abstains_on_unsupported_model_geometry_conflict():
+    fused = fuse_detection(
+        {"exercise": "split_squat", "confidence": 0.70},
+        {"exercise": "back_lever", "confidence": 0.6214,
+         "marginToRunnerUp": 0.12},
+        policy="ultralytics-supported-only-v1",
+    )
+    assert fused["exercise"] == "unknown"
+    assert fused["status"] == "unsupported-model-abstain"
+
+
+def test_supported_only_policy_preserves_supported_model_vote():
+    fused = fuse_detection(
+        {"exercise": "muscle_up", "confidence": 0.30},
+        {"exercise": "pull_up", "confidence": 0.615},
+        policy="ultralytics-supported-only-v1",
+    )
+    assert fused["exercise"] == "pull_up"
+    assert fused["status"] == "model-decides"
+
+
+def test_supported_only_policy_keeps_strong_measurable_geometry_over_unsupported_model():
+    fused = fuse_detection(
+        {"exercise": "push_up", "confidence": 0.78},
+        {"exercise": "deadlift", "confidence": 0.70},
+        policy="ultralytics-supported-only-v1",
+    )
+    assert fused["exercise"] == "push_up"
+    assert fused["status"] == "supported-geometry-over-unsupported-model"
+
+
+def test_supported_only_v2_abstains_on_weak_supported_label_conflict():
+    fused = fuse_detection(
+        {"exercise": "dip", "confidence": 0.78},
+        {"exercise": "pistol_squat", "confidence": 0.1773,
+         "marginToRunnerUp": 0.0104},
+        policy="ultralytics-supported-only-v2",
+    )
+    assert fused["exercise"] == "unknown"
+    assert fused["confidence"] == 0.0
+    assert fused["status"] == "low-confidence-supported-disagreement-abstain"
+
+
+def test_supported_only_v2_does_not_override_agreement_or_strong_model():
+    agreed = fuse_detection(
+        {"exercise": "muscle_up", "confidence": 0.98},
+        {"exercise": "muscle_up", "confidence": 0.459},
+        policy="ultralytics-supported-only-v2",
+    )
+    assert agreed["exercise"] == "muscle_up"
+    assert agreed["status"] == "geometry-model-agree"
+
+    strong = fuse_detection(
+        {"exercise": "dip", "confidence": 0.78},
+        {"exercise": "pull_up", "confidence": 0.615},
+        policy="ultralytics-supported-only-v2",
+    )
+    assert strong["exercise"] == "pull_up"
+    assert strong["status"] == "model-decides"
+
+
+def test_supported_only_v2_preserves_unsupported_label_handling():
+    unknown = fuse_detection(
+        {"exercise": "split_squat", "confidence": 0.70},
+        {"exercise": "back_lever", "confidence": 0.6214,
+         "marginToRunnerUp": 0.12},
+        policy="ultralytics-supported-only-v2",
+    )
+    assert unknown["exercise"] == "unknown"
+    assert unknown["status"] == "unsupported-model-abstain"
+
+    push_up = fuse_detection(
+        {"exercise": "push_up", "confidence": 0.78},
+        {"exercise": "deadlift", "confidence": 0.7507},
+        policy="ultralytics-supported-only-v2",
+    )
+    assert push_up["exercise"] == "push_up"
+    assert push_up["status"] == "supported-geometry-over-unsupported-model"
+
+    weak_conflict = fuse_detection(
+        {"exercise": "dip", "confidence": 0.78},
+        {"exercise": "deadlift", "confidence": 0.2619},
+        policy="ultralytics-supported-only-v2",
+    )
+    assert weak_conflict["exercise"] == "unknown"
+    assert weak_conflict["status"] == "unsupported-model-abstain"
+
+
+def test_supported_only_v3_prefers_strong_measurable_geometry_on_supported_conflict():
+    muscle_up = fuse_detection(
+        {"exercise": "muscle_up", "confidence": 0.98},
+        {"exercise": "pull_up", "confidence": 1.0},
+        policy="ultralytics-geometry-supported-v3",
+    )
+    push_up = fuse_detection(
+        {"exercise": "push_up", "confidence": 0.78},
+        {"exercise": "dip", "confidence": 0.9975},
+        policy="ultralytics-geometry-supported-v3",
+    )
+    assert muscle_up["exercise"] == "muscle_up"
+    assert muscle_up["status"] == "supported-geometry-over-supported-model"
+    assert push_up["exercise"] == "push_up"
+    assert push_up["status"] == "supported-geometry-over-supported-model"
+
+
+def test_supported_only_v3_keeps_unknown_when_geometry_is_weak_or_missing():
+    weak = fuse_detection(
+        {"exercise": "push_up", "confidence": 0.74},
+        {"exercise": "dip", "confidence": 0.9975},
+        policy="ultralytics-geometry-supported-v3",
+    )
+    missing = fuse_detection(
+        {"exercise": "unknown", "confidence": 0.0},
+        {"exercise": "handstand", "confidence": 0.94},
+        policy="ultralytics-geometry-supported-v3",
+    )
+    assert weak["exercise"] == "dip"
+    assert weak["status"] == "model-decides"
+    assert missing["exercise"] == "unknown"
+    assert missing["status"] == "unsupported-model-abstain"

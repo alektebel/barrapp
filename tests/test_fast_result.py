@@ -14,8 +14,8 @@ second opinion after it. The note is advisory and separately sourced, so:
     upgrades it afterwards with the model's prose, judged, or leaves the
     fallback standing with the reason;
   * the worker writes `done` with the measurement first, then the vision;
-  * localization runs alongside pose: fusion asks for the vision vote only
-    when it needs it, by which time the 57 s call has finished.
+  * localization runs alongside pose: fusion uses the vision vote only if it
+    finished during pose; a late vote never delays the first result.
 """
 from __future__ import annotations
 
@@ -329,6 +329,57 @@ class Worker(unittest.TestCase):
         self.assertEqual(order[1], ("vision", ("done", "pending")))
         self.assertEqual(self.statuses()[-1], ("done", "done"))
 
+    def test_worker_marks_handler_entry_before_import_ready_and_download(self):
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value={**measured(),
+                    "visionStatus": "skipped", "traceId": "t"}), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        names = [call.args[2] for call in self.h.uploads.record.call_args_list]
+        self.assertLess(names.index("worker-entry"), names.index("worker-ready"))
+        self.assertLess(names.index("worker-ready"), names.index("stage"))
+        ready = next(call for call in self.h.uploads.record.call_args_list
+                     if call.args[2] == "worker-ready")
+        self.assertIn("importMs", ready.kwargs)
+
+    def test_pose_import_warmup_overlaps_s3_download_before_measurement(self):
+        order = []
+        warmup = object()
+        payload = {**measured(), "visionStatus": "skipped", "traceId": "t"}
+        self.h.s3.download_file.side_effect = lambda *a: order.append("download")
+
+        def start_warmup():
+            order.append("warmup-start")
+            return warmup
+
+        def finish_warmup(value):
+            self.assertIs(value, warmup)
+            order.append("warmup-finish")
+            return {"ready": True, "outcome": "ready", "elapsedMs": 120,
+                    "waitMs": 5}
+
+        def measure(*args, **kwargs):
+            order.append("measure")
+            return dict(payload)
+
+        with mock.patch.object(self.h, "start_pose_runtime_warmup",
+                               side_effect=start_warmup), \
+                mock.patch.object(self.h, "finish_pose_runtime_warmup",
+                                   side_effect=finish_warmup), \
+                mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", side_effect=measure), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+
+        self.assertLess(order.index("warmup-start"), order.index("download"))
+        self.assertLess(order.index("download"), order.index("warmup-finish"))
+        self.assertLess(order.index("warmup-finish"), order.index("measure"))
+        timing = next(call for call in self.h.uploads.record.call_args_list
+                      if call.args[2] == "worker-timing").kwargs
+        self.assertEqual(timing["poseWarmupOutcome"], "ready")
+        self.assertEqual(timing["poseWarmupElapsedMs"], 120)
+        self.assertEqual(timing["poseWarmupWaitMs"], 5)
+
     def test_the_result_is_written_before_the_clip_is_cut(self):
         """Cutting and re-uploading the stored clip took ~44 s on job
         31103ccedfc3, all of it before the phone could read the result."""
@@ -362,6 +413,8 @@ class Worker(unittest.TestCase):
         def measure(job, path, on_stage=None, pose=None, vision_label=None):
             # Locate is already running when measuring starts...
             seen["started_before_measure"] = started.wait(1.0)
+            # ...and finishes while the measured pose is in flight.
+            time.sleep(0.35)
             # ...and the vote is fetched only when fusion asks for it.
             seen["vote"] = process._resolve_vote(vision_label)
             return {**measured(), "visionStatus": "skipped", "traceId": "t"}
@@ -372,6 +425,81 @@ class Worker(unittest.TestCase):
             self.h.worker({"job_id": "j1", "owner": "o"}, None)
         self.assertTrue(seen["started_before_measure"])
         self.assertEqual(seen["vote"], "push-up")
+
+    def test_locator_and_fusion_wait_durations_are_saved_after_first_result(self):
+        def slow_locate(*a, **k):
+            time.sleep(0.05)
+            return {"exercise": "push_up", "usable": True,
+                    "startS": 1.0, "endS": 8.0}
+
+        def measure(_job, _path, on_stage=None, pose=None, vision_label=None):
+            # Model the pose stage taking longer than localization. The vote
+            # is ready by fusion, so the result path must not wait here.
+            time.sleep(0.08)
+            self.assertEqual(process._resolve_vote(vision_label), "push_up")
+            return {**measured(), "visionStatus": "skipped", "traceId": "t"}
+
+        with mock.patch("vision.locate_exercise", side_effect=slow_locate), \
+                mock.patch("process.measure_job", side_effect=measure), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+
+        events = {call.args[2]: call for call in self.h.uploads.record.call_args_list}
+        timing = events["worker-timing"].kwargs
+        locator = events["locator-finished"].kwargs
+        self.assertLess(timing["fusionWaitMs"], 10)
+        self.assertEqual(timing["fusionOutcome"], "ready")
+        self.assertTrue(timing["locatorCompleteAtResult"])
+        self.assertGreaterEqual(timing["locatorMsAtResult"], 40)
+        self.assertGreaterEqual(locator["durationMs"], 40)
+        self.assertTrue(locator["resultPersisted"])
+        self.assertEqual(locator["postResultWaitMs"], 0)
+        self.assertGreaterEqual(timing["clipDownloadUs"], 0)
+        self.assertGreaterEqual(timing["processingStateWriteUs"], 0)
+        self.assertGreaterEqual(timing["resultWriteUs"], 0)
+        self.assertGreater(timing["stageWriteCount"], 0)
+        self.assertGreaterEqual(timing["stageTableUs"], 0)
+        self.assertGreaterEqual(timing["stageUploadLogUs"], 0)
+        self.assertGreaterEqual(timing["stageTotalUs"], 0)
+        self.assertGreaterEqual(timing["stageSlowestUs"], 0)
+        self.assertIsInstance(timing["stageSlowestName"], str)
+
+    def test_late_locator_time_is_recorded_after_result_without_moving_done(self):
+        started = threading.Event()
+        order = []
+
+        def slow_locate(*a, **k):
+            started.set()
+            time.sleep(0.12)
+            order.append("locator-finished")
+            return None
+
+        seen = {}
+
+        def measure(*a, vision_label=None, **k):
+            self.assertTrue(started.wait(1))
+            seen["vote"] = process._resolve_vote(vision_label)
+            return {**measured(), "visionStatus": "skipped", "traceId": "t"}
+
+        self.table.update_item.side_effect = lambda **kw: order.append(
+            "done" if kw.get("ExpressionAttributeValues", {}).get(":s") == "done"
+            else "other-write")
+        with mock.patch("vision.locate_exercise", side_effect=slow_locate), \
+                mock.patch("process.measure_job", side_effect=measure), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+
+        self.assertLess(order.index("done"), order.index("locator-finished"))
+        self.assertIsNone(seen["vote"])
+        events = {call.args[2]: call for call in self.h.uploads.record.call_args_list}
+        timing = events["worker-timing"].kwargs
+        locator = events["locator-finished"].kwargs
+        self.assertEqual(timing["fusionOutcome"], "timeout")
+        self.assertLess(timing["fusionWaitMs"], 10)
+        self.assertFalse(timing["locatorCompleteAtResult"])
+        self.assertGreaterEqual(locator["durationMs"], 100)
+        self.assertTrue(locator["resultPersisted"])
+        self.assertGreaterEqual(locator["postResultWaitMs"], 50)
 
     def test_prose_pass_runs_after_the_first_result_write(self):
         order = []

@@ -120,6 +120,7 @@ class Payload(unittest.TestCase):
 
     def measured(self, reps, **kw):
         p = self.empty(n_reps=len(reps), n_candidates=len(reps), reps=reps,
+                       countStatus="geometry",
                        duration_s=10.0, sessionScore=70, sessionBand="solid",
                        blockers=[], headline="h", narrative="n", nextSession="s")
         p.update(kw)

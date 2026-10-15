@@ -25,7 +25,7 @@ REQUIRED = [
     "headline", "narrative", "nextSession",
     "exercise", "detected", "trim", "session",
     "sessionScore", "sessionBand",
-    "n_reps", "n_candidates", "fps", "duration_s",
+    "n_reps", "n_candidates", "countStatus", "fps", "duration_s",
     "reps", "sessions", "blockers",
     "topFixes",
 ]
@@ -37,6 +37,7 @@ REP_REQUIRED = [
 ]
 
 BANDS = {"unmeasured", "strong", "solid", "shaky", "broken down"}
+COUNT_STATUSES = {"geometry", "vision", "unmeasured", "hold"}
 
 # Text that is for a developer, not an athlete. The first is the SystemExit of
 # movements.resolve that reached phones in production (2026-09-17).
@@ -182,6 +183,16 @@ def check_payload(payload: dict, expected_version: int | None = None, **_: Any) 
     if payload.get("measurementVersion") != expected_version:
         out.append(Violation("payload", "measurement_version",
                              f"{payload.get('measurementVersion')} != {expected_version}"))
+    count_status = payload.get("countStatus")
+    if count_status not in COUNT_STATUSES:
+        out.append(Violation("payload", "count_status_known",
+                             f"countStatus={count_status!r}"))
+    if count_status == "vision" and payload.get("countedBy") != "vision":
+        out.append(Violation("payload", "vision_count_source",
+                             f"countedBy={payload.get('countedBy')!r}"))
+    if count_status == "unmeasured" and payload.get("n_reps") != 0:
+        out.append(Violation("payload", "unmeasured_count_is_zero",
+                             f"n_reps={payload.get('n_reps')!r}"))
 
     score = payload.get("sessionScore")
     band = payload.get("sessionBand")

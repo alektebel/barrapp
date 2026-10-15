@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
@@ -51,7 +53,20 @@ fun SessionScreen(
     checks: List<CheckLine> = emptyList(),
     vision: List<VisionLine> = emptyList(),
     visionDisagrees: Boolean = false,
+    renderedJobId: String? = null,
+    renderedTraceId: String = "",
+    onResultRendered: ((String, String) -> Unit)? = null,
 ) {
+    LaunchedEffect(renderedJobId, renderedTraceId) {
+        val id = renderedJobId
+        if (!id.isNullOrBlank() && onResultRendered != null) {
+            // Wait for a frame after this result entered composition. The
+            // callback records elapsedRealtimeNanos itself, keeping the timing
+            // origin consistent with the upload/result timestamps.
+            withFrameNanos { }
+            onResultRendered(id, renderedTraceId)
+        }
+    }
     Column(Modifier.fillMaxWidth()) {
         androidx.compose.material3.Text("← Week", style = N.back,
             modifier = Modifier.padding(bottom = 14.dp)

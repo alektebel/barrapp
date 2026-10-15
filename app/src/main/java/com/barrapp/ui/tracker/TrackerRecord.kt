@@ -22,8 +22,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -113,8 +115,23 @@ fun TrackerRecord(
     onRecord: () -> Unit,
     onPick: () -> Unit,
     onDone: () -> Unit,
+    resultJobId: String? = null,
+    resultTraceId: String = "",
+    currentResultTraceId: String? = null,
+    onResultRendered: ((String, String) -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
+    LaunchedEffect(phase, results != null, resultJobId, resultTraceId, currentResultTraceId) {
+        if (shouldMarkResultRendered(
+                phase, results != null, resultJobId, resultTraceId, currentResultTraceId,
+            ) && onResultRendered != null
+        ) {
+            // ResultsPhase has been composed; wait for its first frame before
+            // recording the phone-visible endpoint.
+            withFrameNanos { }
+            resultJobId?.let { onResultRendered(it, resultTraceId) }
+        }
+    }
     Column(modifier.fillMaxSize()) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
             Text("BarrApp", style = T.eyebrowWide)

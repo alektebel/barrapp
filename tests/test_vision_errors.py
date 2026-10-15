@@ -68,6 +68,16 @@ class Delegation(unittest.TestCase):
         args, kw = c.call_args
         self.assertEqual(args, ("mimo-v2.6-flash", [{"role": "user", "content": content}]))
         self.assertEqual((kw["system"], kw["base"], kw["key"]), ("sys", BASE, KEY))
+        self.assertTrue(kw["check_model"])
+
+    def test_latency_critical_locator_skips_separate_models_preflight(self):
+        with mock.patch.object(vision, "_config", return_value=(BASE, KEY, "m")), \
+                mock.patch("barra.ingest.probe_video", return_value={"ok": True, "duration_s": 10}), \
+                mock.patch("barra.frames.grab_frames", return_value=[(0, Path("/tmp/frame.jpg"))]), \
+                mock.patch.object(vision, "_images", return_value=[{"type": "image_url"}]), \
+                mock.patch.object(vision, "_chat", return_value=None) as chat:
+            self.assertIsNone(vision.locate_exercise("clip.mp4", "/tmp/locate"))
+        self.assertFalse(chat.call_args.kwargs["check_model"])
 
     def test_a_401_reaches_the_trace_reason(self):
         with mock.patch.object(vision.llm, "model_listed", return_value=True), \
