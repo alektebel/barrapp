@@ -102,7 +102,7 @@ object Gamification {
 
     /** Consecutive training days ending today or yesterday. */
     fun streak(days: List<DayEntry>, today: Calendar = Calendar.getInstance()): Int {
-        val trained = days.filter { it.reps > 0 }.map { it.date }.toSet()
+        val trained = days.filter { it.verifiedReps > 0 }.map { it.date }.toSet()
         if (trained.isEmpty()) return 0
         val cursor = today.clone() as Calendar
         // A streak may end yesterday: today is not over yet.
@@ -146,7 +146,7 @@ object Gamification {
             WeekDay(
                 label = letter,
                 date = date,
-                done = (day?.reps ?: 0) > 0,
+                done = (day?.verifiedReps ?: 0) > 0,
                 today = date == todayIso,
                 score = day?.score,
             )
@@ -228,7 +228,9 @@ object Gamification {
             .orEmpty()
             .ifBlank { "tu movimiento" }
         val target = current?.step?.reps?.takeIf { it > 0 } ?: profile.repTarget
-        val doneToday = days.firstOrNull { it.date == iso(today) }?.reps ?: 0
+        // Only reps that were judged: XP gives an unscored rep nothing, so the
+        // mission must not call it done either.
+        val doneToday = days.firstOrNull { it.date == iso(today) }?.verifiedReps ?: 0
         return Mission(
             movementKey = key,
             movement = movement,

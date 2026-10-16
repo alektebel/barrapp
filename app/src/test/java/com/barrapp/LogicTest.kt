@@ -72,37 +72,44 @@ object LogicTest {
     // ---- coach -----------------------------------------------------------
     private fun coachRules() {
         val none = Coach.answer("am I getting better?", emptyList(), profile)
-        check("no data means no claim", none.contains("Nothing has been measured"), none)
+        check("no data means no claim", none.contains("Todavía no se ha medido nada"), none)
 
         val thin = listOf(day("2026-08-10", 1, 83), day("2026-08-14", 2, 78))
         val a = Coach.answer("am I getting better or is it noise?", thin, profile)
-        check("below the floor, progress is declined", a.contains("Not yet"), a)
-        check("and it says how many sessions qualify", a.contains("0 session"), a)
+        check("below the floor, progress is declined", a.contains("Todavía no"), a)
+        check("and it says how many sessions qualify", a.contains("0 sesion"), a)
 
         val flat = listOf(day("2026-08-10", 4, 78), day("2026-08-17", 4, 80))
         val b = Coach.answer("am I improving?", flat, profile)
-        check("a small change is called flat", b.contains("Flat", ignoreCase = true), b)
+        check("a small change is called flat", b.contains("Plano", ignoreCase = true), b)
 
         val up = listOf(day("2026-08-10", 4, 62), day("2026-08-17", 4, 84))
         val c = Coach.answer("am I improving?", up, profile)
-        check("a real change is reported", c.contains("22 points"), c)
-        check("and is not called proof", c.contains("not proof"), c)
+        check("a real change is reported", c.contains("22 puntos"), c)
+        check("and is not called proof", c.contains("No es una prueba"), c)
 
         val d = Coach.answer("what did my last session show?", up, profile)
         check("last session names its date", d.contains("2026-08-17"), d)
 
         val e = Coach.answer("how should I film the next one?", up, profile)
-        check("filming advice uses the profile's target", e.contains("${profile.repTarget} reps"), e)
+        check("filming advice uses the profile's target", e.contains("${profile.repTarget} repeticiones"), e)
 
         val f = Coach.answer("what is the capital of France?", up, profile)
-        check("out of scope is declined", f.contains("I only answer from what has been measured"), f)
-        check("and offers what it can do", f.contains("how to film the next one"), f)
+        check("out of scope is declined", f.contains("Sólo respondo con lo que se ha medido"), f)
+        check("and offers what it can do", f.contains("grabar la siguiente"), f)
 
         val g = Coach.answer("why did that rep get no score?", up, profile)
-        check("unscored reps get the geometric reason", g.contains("not physically possible"), g)
+        check("unscored reps get the geometric reason", g.contains("físicamente posible"), g)
+
+        check("Spanish progress question routes", Coach.answer("¿Estoy mejorando o es ruido?", up, profile).contains("puntos"))
+        check("Spanish unscored question routes", Coach.answer("¿Por qué algunas reps no tienen puntuación?", up, profile).contains("físicamente"))
+        check("Spanish filming question routes", Coach.answer("¿Cómo debería grabar la siguiente?", up, profile).contains("Cinco cosas"))
+        check("Spanish last-session question routes", Coach.answer("¿Qué mostró realmente mi última sesión?", up, profile).contains("2026-08-17"))
 
         // Every branch must produce something a person can read.
         listOf("progress", "last session", "no score", "film", "score", "how many reps", "asdf")
+            .plus(listOf("¿Estoy mejorando o es ruido?", "¿Qué mostró mi última sesión?",
+                "¿Por qué algunas reps no tienen puntuación?", "¿Cómo debería grabar la siguiente?"))
             .forEach { q ->
                 val ans = Coach.answer(q, up, profile)
                 check("answer to '$q' is substantial", ans.length > 40, "${ans.length} chars")

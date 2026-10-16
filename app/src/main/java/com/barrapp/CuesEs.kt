@@ -156,8 +156,14 @@ fun phaseEs(phase: String): String = when (phase.lowercase().replace('_', ' ')) 
     "bottom" -> "Posición baja"
     "transition" -> "Transición"
     "hold" -> "Sostén"
+    "setup" -> "Preparación"
+    "lifting" -> "Subida"
+    "lowering" -> "Bajada"
+    "support" -> "Apoyo"
+    "turnaround" -> "Cambio de sentido"
+    "supported" -> "Apoyo"
     "whole rep", "rep", "" -> "Toda la repetición"
-    else -> phase.replace('_', ' ').replaceFirstChar { it.uppercase() }
+    else -> "Otra fase"
 }
 
 /**

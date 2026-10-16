@@ -62,10 +62,33 @@ fun fixItems(a: Analysis): List<FixItem> {
     }
 }
 
+/**
+ * Why a counted set was not judged, from what the analysis already says; null
+ * when at least one rep was scored. Never reads as a clean set.
+ */
+fun unjudgedNote(a: Analysis): String? {
+    if (!a.unmeasuredSet) return null
+    val n = a.reps.size.takeIf { it > 0 } ?: a.repCount
+    val why = a.reps.firstNotNullOfOrNull { it.assessmentBlocked?.takeIf { s -> s.isNotBlank() } }
+        ?: a.reps.firstNotNullOfOrNull { it.scoreNote.takeIf { s -> s.isNotBlank() } }
+        ?: a.blockers.firstOrNull { it.isNotBlank() }
+    val head = if (n == 1) "No se pudo juzgar la repetición." else "No se pudo juzgar ninguna de las $n repeticiones."
+    val tail = "Eso no quiere decir que salieran bien: no hay nada medido que corregir ni que dar por bueno."
+    return if (why != null) "$head ${why.trim().trimEnd('.')}. $tail" else "$head $tail"
+}
+
 @Composable
-internal fun FixesCard(fixes: List<FixItem>, onShowRep: ((Int) -> Unit)? = null) {
+internal fun FixesCard(
+    fixes: List<FixItem>,
+    onShowRep: ((Int) -> Unit)? = null,
+    unjudged: String? = null,
+) {
     TkCard(accent = true) {
         Eyebrow("Lo que mejorar")
+        if (unjudged != null) {
+            Text(unjudged, style = T.bodyInk, modifier = Modifier.padding(top = 10.dp))
+            return@TkCard
+        }
         if (fixes.isEmpty()) {
             Text("Nada importante que corregir en esta serie.", style = T.bodyInk,
                 modifier = Modifier.padding(top = 10.dp))

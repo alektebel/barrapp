@@ -82,7 +82,7 @@ fun InsightPane(
 
         item {
             Panel {
-                Eyebrow("Sessions you can compare")
+                Eyebrow("Sesiones comparables")
                 Spacer(Modifier.height(10.dp))
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
@@ -94,7 +94,7 @@ fun InsightPane(
                     )
                     Spacer(Modifier.size(8.dp))
                     Text(
-                        "of ${days.size} recorded",
+                        "de ${days.size} registradas",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 5.dp),
@@ -103,13 +103,13 @@ fun InsightPane(
                 Spacer(Modifier.height(10.dp))
                 Text(
                     if (readySessions >= 2)
-                        "Two sessions of $MIN_REPS_FOR_COMPARISON or more reps is what it " +
-                            "takes to tell a real change from your ordinary rep-to-rep " +
-                            "variation. You have that."
+                        "Dos sesiones de $MIN_REPS_FOR_COMPARISON o más repeticiones es lo que hace " +
+                            "falta para distinguir un cambio real de tu variación normal " +
+                            "entre repeticiones. Ya lo tienes."
                     else
-                        "A session needs $MIN_REPS_FOR_COMPARISON measured reps before its " +
-                            "median means anything, and two such sessions before anything " +
-                            "can be compared. Aim for $repTarget reps in one set.",
+                        "Una sesión necesita $MIN_REPS_FOR_COMPARISON repeticiones medidas para que " +
+                            "su mediana signifique algo, y dos sesiones así antes de poder " +
+                            "comparar nada. Apunta a $repTarget repeticiones en una serie.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -122,12 +122,12 @@ fun InsightPane(
 
         item {
             Panel {
-                Eyebrow("Session score")
+                Eyebrow("Puntuación de la sesión")
                 Spacer(Modifier.height(4.dp))
                 if (measured.size < 2) {
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Two measured sessions before a line here means anything.",
+                        "Hacen falta dos sesiones medidas para que una línea aquí signifique algo.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -146,8 +146,8 @@ fun InsightPane(
                         )
                         Spacer(Modifier.size(10.dp))
                         Pill(
-                            if (delta == 0) "level"
-                            else "${if (delta > 0) "+" else "−"}${abs(delta)} since ${measured.first().date.takeLast(5)}",
+                            if (delta == 0) "igual"
+                            else "${if (delta > 0) "+" else "−"}${abs(delta)} desde el ${measured.first().date.takeLast(5)}",
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
@@ -155,9 +155,9 @@ fun InsightPane(
                     ScoreTrend(measured)
                     Spacer(Modifier.height(12.dp))
                     Text(
-                        "A baseline proxy from range, descent control and stalls. It is not " +
-                            "a technique grade, and a difference this size has not been " +
-                            "tested against your own variation.",
+                        "Una puntuación base a partir del recorrido, el control de la bajada y los " +
+                            "atascos. No es una nota de técnica, y una diferencia de este " +
+                            "tamaño no se ha contrastado con tu propia variación.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -168,7 +168,7 @@ fun InsightPane(
         item {
             Panel {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Eyebrow("Weekly review", modifier = Modifier.weight(1f))
+                    Eyebrow("Resumen semanal", modifier = Modifier.weight(1f))
                     if (weeklyNote != null) {
                         Box(
                             Modifier.size(7.dp).clip(CircleShape)
@@ -178,8 +178,8 @@ fun InsightPane(
                 }
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    weeklyNote ?: "Your first weekly review lands once there is a week of " +
-                        "training behind it. You will get a notification.",
+                    weeklyNote ?: "Tu primer resumen semanal llega cuando haya una semana de " +
+                        "entrenamiento detrás. Recibirás una notificación.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = if (weeklyNote != null) MaterialTheme.colorScheme.onSurface
                     else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -188,7 +188,7 @@ fun InsightPane(
                 HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
                 Spacer(Modifier.height(14.dp))
                 FilledTonalButton(onClick = onOpenCoach, modifier = Modifier.fillMaxWidth()) {
-                    Text("Ask about your training")
+                    Text("Pregunta sobre tu entrenamiento")
                 }
             }
         }
@@ -261,7 +261,7 @@ private fun RepsPerSession(days: List<DayEntry>, target: Int) {
                 color = dim,
             )
             Text(
-                "floor $MIN_REPS_FOR_COMPARISON reps",
+                "mínimo $MIN_REPS_FOR_COMPARISON reps",
                 style = MaterialTheme.typography.labelSmall,
                 color = dim,
             )
@@ -334,19 +334,19 @@ private fun ScoreTrend(measured: List<DayEntry>) {
 private fun DayByDayPanel(days: List<DayEntry>) {
     val recent = days.sortedByDescending { it.date }.take(14)
     Panel {
-        Eyebrow("Day by day")
+        Eyebrow("Día a día")
         Spacer(Modifier.height(8.dp))
         if (recent.isEmpty()) {
             Text(
-                "No sessions yet. The bar appears once something is measured.",
+                "Aún no hay sesiones. La marca aparece cuando se mida algo.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             return@Panel
         }
         Text(
-            "A day clears the bar with enough verified reps at the quality the " +
-                "standard asks for. The bar does not move until the standard is cleared.",
+            "Un día supera la marca con suficientes repeticiones verificadas a la calidad " +
+                "que pide el estándar. La marca no se mueve hasta que se supera el estándar.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -364,7 +364,7 @@ private fun DayByDayPanel(days: List<DayEntry>) {
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.weight(1f),
                     )
-                    Pill("not on the ladder", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Pill("fuera de la escalera", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 judged.forEach { j -> JudgedDayRow(day.date, j) }
@@ -413,17 +413,17 @@ private fun JudgedDayRow(date: String, j: DayJudgement) {
                 style = MaterialTheme.typography.bodyMedium,
             )
             Text(
-                "$date · ${j.verified} verified at ${j.score ?: "—"}",
+                "$date · ${j.verified} verificadas con ${j.score ?: "—"}",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         if (j.cleared) {
-            Pill("bar cleared", color = MaterialTheme.colorScheme.primary)
+            Pill("marca superada", color = MaterialTheme.colorScheme.primary)
         } else if (j.step != null) {
             Pill(
-                if (j.shortfall > 0) "short ${j.shortfall} rep${if (j.shortfall == 1) "" else "s"}"
-                else "below the bar",
+                if (j.shortfall > 0) "faltan ${j.shortfall} rep${if (j.shortfall == 1) "" else "s"}"
+                else "por debajo de la marca",
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
@@ -445,7 +445,7 @@ private fun PromotionReadinessPanel(days: List<DayEntry>) {
         .sortedByDescending { it.bestReps }
     if (verdicts.isEmpty()) return
     Panel {
-        Eyebrow("Ready for promotion?")
+        Eyebrow("¿Listo para subir de nivel?")
         Spacer(Modifier.height(10.dp))
         verdicts.forEachIndexed { i, v ->
             val step = v.step ?: return@forEachIndexed
@@ -467,8 +467,8 @@ private fun PromotionReadinessPanel(days: List<DayEntry>) {
                     )
                 }
                 Pill(
-                    if (v.ready) "ready — ${step.towardsLabel}"
-                    else "${v.qualifyingDays.size} of ${step.days} days",
+                    if (v.ready) "listo: ${step.towardsLabel}"
+                    else "${v.qualifyingDays.size} de ${step.days} días",
                     color = if (v.ready) MaterialTheme.colorScheme.primary
                     else MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -489,7 +489,7 @@ private fun PromotionReadinessPanel(days: List<DayEntry>) {
 private fun ProgressionCard(v: Progression.Verdict) {
     val step = v.step ?: return
     Panel {
-        Eyebrow(if (v.ready) "Earned" else "Working towards")
+        Eyebrow(if (v.ready) "Conseguido" else "En camino a")
         Spacer(Modifier.height(8.dp))
         Text(
             step.towardsLabel,
@@ -499,7 +499,7 @@ private fun ProgressionCard(v: Progression.Verdict) {
         )
         Spacer(Modifier.height(4.dp))
         Text(
-            "from ${v.label.lowercase()}",
+            "desde ${v.label.lowercase()}",
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -516,7 +516,7 @@ private fun ProgressionCard(v: Progression.Verdict) {
             )
             Spacer(Modifier.size(8.dp))
             Text(
-                "of ${step.reps} verified reps",
+                "de ${step.reps} repeticiones verificadas",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 5.dp),
@@ -524,8 +524,8 @@ private fun ProgressionCard(v: Progression.Verdict) {
         }
         Spacer(Modifier.height(4.dp))
         Text(
-            "Verified means barra measured the rep - not that you performed it. " +
-                "A rep it could not measure is not counted either way.",
+            "Verificada significa que barra midió la repetición, no que la hicieras. " +
+                "Una repetición que no pudo medir no cuenta ni a favor ni en contra.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -534,19 +534,19 @@ private fun ProgressionCard(v: Progression.Verdict) {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Spacer(Modifier.height(12.dp))
 
-        Eyebrow("The standard")
+        Eyebrow("El estándar")
         Spacer(Modifier.height(6.dp))
         Text(v.standard, style = MaterialTheme.typography.bodyMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            "A convention, not a measurement. It is written down so you can " +
-                "disagree with it.",
+            "Una convención, no una medición. Está escrita para que puedas " +
+                "discrepar de ella.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
         Spacer(Modifier.height(12.dp))
-        Eyebrow("Your evidence")
+        Eyebrow("Tu evidencia")
         Spacer(Modifier.height(6.dp))
         Text(v.evidence, style = MaterialTheme.typography.bodyMedium)
 

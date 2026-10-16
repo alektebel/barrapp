@@ -34,27 +34,35 @@ object Coach {
         val name = profile.firstName
 
         if (days.isEmpty()) {
-            return "Nothing has been measured yet, so there is nothing I can tell you that " +
-                "would be true. Add a clip of a set and I will have something to work with."
+            return "Todavía no se ha medido nada, así que no hay nada que pueda decirte que " +
+                "sea verdad. Añade un clip de una serie y tendré con qué trabajar."
         }
 
         return when {
-            q.containsAny("better", "progress", "improving", "improve", "trend", "noise") ->
+            q.containsAny("better", "progress", "improving", "improve", "trend", "noise",
+                "mejor", "progres", "tendencia", "ruido") ->
                 progress(days)
 
-            q.containsAny("last session", "last one", "latest", "yesterday", "today", "show") ->
+            q.containsAny("last session", "last one", "latest", "yesterday", "today", "show",
+                "última sesión", "ultima sesion", "última", "ayer", "hoy", "mostr", "muestr") ->
                 lastSession(days)
 
-            q.containsAny("no score", "not scored", "unmeasured", "why is", "rejected", "missing") ->
+            q.containsAny("no score", "not scored", "unmeasured", "why is", "rejected", "missing",
+                "sin puntuación", "sin puntuacion", "sin medir", "por qué", "por que",
+                "rechazad", "falta") ->
                 whyUnscored()
 
-            q.containsAny("film", "record", "camera", "phone", "angle", "next one") ->
+            q.containsAny("film", "record", "camera", "phone", "angle", "next one",
+                "grab", "cámara", "camara", "teléfono", "telefono", "ángulo", "angulo",
+                "siguiente") ->
                 filming(profile.repTarget)
 
-            q.containsAny("score", "quality", "number", "mean") ->
+            q.containsAny("score", "quality", "number", "mean",
+                "puntuación", "puntuacion", "calidad", "número", "numero", "significa") ->
                 whatTheScoreIs()
 
-            q.containsAny("how many", "reps", "volume", "count") ->
+            q.containsAny("how many", "reps", "volume", "count",
+                "cuántas", "cuantas", "repeticiones", "volumen", "cuenta") ->
                 volume(days)
 
             else -> fallback(name, days)
@@ -65,94 +73,105 @@ object Coach {
         val comparable = days.filter { it.reps >= FLOOR }
         if (comparable.size < 2) {
             val have = comparable.size
-            return "Not yet, and I would rather say so than guess. Comparing two sessions " +
-                "needs each of them to have at least $FLOOR measured reps — otherwise the " +
-                "session's median is one or two reps and there is no way to separate how much " +
-                "you vary between reps from a real change. You have $have session" +
-                (if (have == 1) "" else "s") + " at or above that floor."
+            return "Todavía no, y prefiero decirlo a adivinar. Para comparar dos sesiones hace " +
+                "falta que cada una tenga al menos $FLOOR repeticiones medidas; si no, la " +
+                "mediana de la sesión es una o dos repeticiones y no hay forma de separar " +
+                "cuánto varías de una repetición a otra de un cambio real. Tienes $have " +
+                "sesion" + (if (have == 1) "" else "es") + " por encima de ese mínimo."
         }
         val measured = comparable.filter { it.measured }
         if (measured.size < 2) {
-            return "You have ${comparable.size} sessions with enough reps, but fewer than two " +
-                "of them produced a score. Usually that is a filming problem rather than a " +
-                "training one — ask me how to film the next one."
+            return "Tienes ${comparable.size} sesiones con repeticiones suficientes, pero menos " +
+                "de dos produjeron una puntuación. Normalmente es un problema de grabación " +
+                "y no de entrenamiento: pregúntame cómo grabar la siguiente."
         }
         val first = measured.first()
         val last = measured.last()
         val delta = (last.score ?: 0) - (first.score ?: 0)
-        val direction = if (delta > 0) "up" else "down"
+        val direction = if (delta > 0) "sube" else "baja"
         return if (abs(delta) < 8) {
-            "Flat, within the resolution this has. The baseline proxy went from " +
-                "${first.score} on ${first.date} to ${last.score} on ${last.date}, and a gap " +
-                "that small is inside the noise of a proxy built from three bounded components. " +
-                "Stable is a real answer, not a non-answer."
+            "Plano, dentro de la resolución que tiene esto. La puntuación base pasó de " +
+                "${first.score} el ${first.date} a ${last.score} el ${last.date}, y una " +
+                "diferencia tan pequeña queda dentro del ruido de una medida construida con " +
+                "tres componentes acotados. Estable es una respuesta real, no una evasiva."
         } else {
-            "The baseline proxy is $direction ${abs(delta)} points, ${first.score} on " +
-                "${first.date} to ${last.score} on ${last.date}, across ${measured.size} " +
-                "measured sessions. Worth a look. It is not proof: that number has no null " +
-                "distribution behind it, so it has not been tested against your own " +
-                "rep-to-rep variation."
+            "La puntuación base $direction ${abs(delta)} puntos, de ${first.score} el " +
+                "${first.date} a ${last.score} el ${last.date}, en ${measured.size} sesiones " +
+                "medidas. Merece una mirada. No es una prueba: ese número no tiene una " +
+                "distribución nula detrás, así que no se ha contrastado con tu propia " +
+                "variación entre repeticiones."
         }
     }
 
     private fun lastSession(days: List<DayEntry>): String {
         val last = days.last()
         val head = "${last.date}: ${last.exerciseLabel.ifBlank { last.exercise }}, " +
-            "${last.reps} rep${if (last.reps == 1) "" else "s"} measured"
+            "${last.reps} repetici${if (last.reps == 1) "ón medida" else "ones medidas"}"
         return if (last.measured) {
-            "$head, baseline proxy ${last.score} (${last.band}). " +
+            "$head, puntuación base ${last.score} (${bandEs(last.band)}). " +
                 if (last.reps >= FLOOR)
-                    "That is enough reps for the session to take part in a comparison."
+                    "Son repeticiones suficientes para que la sesión entre en una comparación."
                 else
-                    "That is under the $FLOOR-rep floor, so it cannot be compared with another " +
-                        "session yet."
+                    "Está por debajo del mínimo de $FLOOR repeticiones, así que todavía no se " +
+                        "puede comparar con otra sesión."
         } else {
-            "$head, but nothing scored. The reps were found and then rejected — open the " +
-                "session and the reason is written on each one."
+            "$head, pero nada puntuado. Las repeticiones se encontraron y luego se " +
+                "descartaron: abre la sesión y el motivo está escrito en cada una."
         }
     }
 
+    private fun bandEs(band: String): String = when (band.lowercase()) {
+        "strong" -> "fuerte"
+        "solid" -> "sólido"
+        "shaky" -> "inestable"
+        "broken", "broken down" -> "se rompió"
+        "unmeasured", "" -> "sin medir"
+        else -> band
+    }
+
     private fun whyUnscored(): String =
-        "A rep gets no score when the pose estimate is not physically possible or too little " +
-            "of it was tracked. The commonest cause is being too far from the camera: the " +
-            "estimator returns confident nonsense rather than admitting it cannot see you. " +
-            "It is shown as an em dash rather than a low score on purpose — a filming failure " +
-            "is not bad technique, and marking it as one would be the most misleading thing " +
-            "this app could do."
+        "Una repetición se queda sin puntuación cuando la estimación de la pose no es " +
+            "físicamente posible o se siguió muy poco de ella. La causa más común es estar " +
+            "demasiado lejos de la cámara: el estimador devuelve disparates con seguridad en " +
+            "lugar de admitir que no te ve. Se muestra como un guion largo y no como una " +
+            "puntuación baja a propósito: un fallo de grabación no es mala técnica, y marcarlo " +
+            "como tal sería lo más engañoso que esta app podría hacer."
 
     private fun filming(target: Int): String =
-        "Five things, in the order they cost you:\n\n" +
-            "1. Fill the frame, and keep the top of the rep in it. A rep whose turnaround is " +
-            "not seen is discarded whole.\n" +
-            "2. Phone on a tripod, position marked on the floor. A camera that moves a few " +
-            "degrees between sessions shifts the measurement more than a real technique change.\n" +
-            "3. Same side every session. Front and behind are mirror images and cannot be " +
-            "pooled.\n" +
-            "4. $target reps in one set — above the $FLOOR-rep floor with margin.\n" +
-            "5. Start recording as you reach up, stop when you drop off."
+        "Cinco cosas, en el orden en que te cuestan:\n\n" +
+            "1. Llena el encuadre y mantén en él la parte alta de la repetición. Una " +
+            "repetición cuyo cambio de sentido no se ve se descarta entera.\n" +
+            "2. Teléfono en trípode, con la posición marcada en el suelo. Una cámara que se " +
+            "mueve unos grados entre sesiones desplaza la medida más que un cambio real de " +
+            "técnica.\n" +
+            "3. El mismo lado en cada sesión. De frente y por detrás son imágenes especulares " +
+            "y no se pueden juntar.\n" +
+            "4. $target repeticiones en una serie, por encima del mínimo de $FLOOR con margen.\n" +
+            "5. Empieza a grabar al estirarte hacia arriba y para cuando te sueltes."
 
     private fun whatTheScoreIs(): String =
-        "It is a baseline proxy, not a technique grade. Three parts: how much of the range " +
-            "your own arm length makes available you used (40%), whether the descent was " +
-            "lowered or dropped (25%), and whether the ascent stalled (35%). Open any rep and " +
-            "all three are shown with their own numbers.\n\n" +
-            "Swing and left-right asymmetry are measured but deliberately left out of it. They " +
-            "are horizontal, so including them would make the number depend on where you stood " +
-            "your phone."
+        "Es una puntuación base, no una nota de técnica. Tiene tres partes: cuánto del " +
+            "recorrido que permite la longitud de tu brazo has usado (40 %), si la bajada fue " +
+            "controlada o se dejó caer (25 %) y si la subida se atascó (35 %). Abre cualquier " +
+            "repetición y verás las tres con sus propios números.\n\n" +
+            "El balanceo y la asimetría izquierda-derecha se miden pero se dejan fuera a " +
+            "propósito. Son horizontales, así que incluirlos haría que el número dependiera " +
+            "de dónde pusiste el teléfono."
 
     private fun volume(days: List<DayEntry>): String {
         val total = days.sumOf { it.reps }
         val ready = days.count { it.reps >= FLOOR }
-        return "$total measured rep${if (total == 1) "" else "s"} across ${days.size} " +
-            "day${if (days.size == 1) "" else "s"}. $ready of those days reached the $FLOOR-rep " +
-            "floor that a comparison needs."
+        return "$total repetici${if (total == 1) "ón medida" else "ones medidas"} en " +
+            "${days.size} día${if (days.size == 1) "" else "s"}. $ready de esos días " +
+            "llegaron al mínimo de $FLOOR repeticiones que necesita una comparación."
     }
 
     private fun fallback(name: String, days: List<DayEntry>): String =
-        "I only answer from what has been measured, $name, and I cannot see that in your " +
-            "${days.size} recorded session${if (days.size == 1) "" else "s"}. Things I can " +
-            "answer: what your last session showed, whether a change is real or noise, why a " +
-            "rep got no score, what the score is made of, and how to film the next one."
+        "Sólo respondo con lo que se ha medido, $name, y no lo veo en tus " +
+            "${days.size} sesion${if (days.size == 1) "" else "es"} registrada${if (days.size == 1) "" else "s"}. " +
+            "Puedo responder: qué mostró tu última sesión, si un cambio es real o ruido, por " +
+            "qué una repetición no tiene puntuación, de qué se compone la puntuación y cómo " +
+            "grabar la siguiente."
 
     private fun String.containsAny(vararg needles: String): Boolean =
         needles.any { this.contains(it) }

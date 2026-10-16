@@ -93,7 +93,18 @@ data class Analysis(
     /** True when the vision model saw a different movement than the
      *  geometry labelled - flagged for review, never applied. */
     val visionDisagreesOnMovement: Boolean = false,
-)
+) {
+    /** Reps that got a score. A rep without one was counted, never judged. */
+    val scoredReps: Int get() = reps.count { it.score != null }
+
+    /**
+     * The server counted reps but could not score a single one. Every
+     * per-check tally ("clean in N reps") then comes from reps nobody judged,
+     * so none of it is evidence: the set is "sin juzgar", not clean.
+     */
+    val unmeasuredSet: Boolean
+        get() = (repCount > 0 || reps.isNotEmpty()) && reps.none { it.score != null }
+}
 
 data class TopFix(
     val rank: Int,

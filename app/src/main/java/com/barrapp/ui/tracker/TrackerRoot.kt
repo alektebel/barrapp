@@ -356,7 +356,11 @@ private fun SessionSheet(
         onToggleReps = onToggleReps,
         standard = "",
         checks = a.checks.map {
-            CheckLine(faultEs(it.name), it.observed, it.notObserved, it.unobservable)
+            // A set nobody scored has no judged reps behind its tallies: all of
+            // them are "no comprobable", never "limpio".
+            if (a.unmeasuredSet)
+                CheckLine(faultEs(it.name), 0, 0, it.observed + it.notObserved + it.unobservable)
+            else CheckLine(faultEs(it.name), it.observed, it.notObserved, it.unobservable)
         },
         vision = a.visionObservations.map {
             VisionLine(it.rep, it.name.ifBlank { it.errorId }, it.status, it.description)
@@ -371,7 +375,7 @@ private fun SessionSheet(
     val summary = resultsData(a, state.days)
     androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 16.dp))
     if (a.repCount > 0) {
-        com.barrapp.ui.tracker.FixesCard(summary.fixes)
+        com.barrapp.ui.tracker.FixesCard(summary.fixes, unjudged = summary.unjudged)
         androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 12.dp))
     }
     if (a.headline.isNotBlank() || a.narrative.isNotBlank() || a.blockers.isNotEmpty()) {
@@ -400,7 +404,7 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: (
         val day = byDate[key]
         val blanks = if (d == 1) firstDow else 0
         when {
-            day != null && day.reps > 0 ->
+            day != null && day.verifiedReps > 0 ->
                 CalDay(d, if (d == today) CalKind.TODAY else CalKind.MEASURED,
                     bandColor(day.band), leadingBlanks = blanks)
             day != null -> CalDay(d, CalKind.DASHED, leadingBlanks = blanks)
@@ -411,8 +415,8 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: (
         month = month.replaceFirstChar { it.uppercase() },
         year = "${cal.get(Calendar.YEAR)}",
         days = cells,
-        summaryMeasured = "${inMonth.count { it.reps > 0 }} días medidos",
-        summaryReps = "${inMonth.sumOf { it.reps }} reps en $month",
+        summaryMeasured = "${inMonth.count { it.verifiedReps > 0 }} días medidos",
+        summaryReps = "${inMonth.sumOf { it.verifiedReps }} reps medidas en $month",
         rows = inMonth.sortedByDescending { it.date }.take(3).map { day ->
             CalRow(
                 title = movementEs(day.exercise, day.exerciseLabel),
@@ -559,7 +563,8 @@ private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
         },
         // The XP this session actually earned, by the same rule the home
         // screen totals: never a round number picked to look generous.
-        xp = verifiedXp * ((a.sessionScore ?: 0) / 5) + 50,
+        xp = if (verifiedXp == 0) 0 else verifiedXp * ((a.sessionScore ?: 0) / 5) + 50,
+        unjudged = unjudgedNote(a),
         aboveAverage = priorMean?.let { (a.sessionScore ?: 0) >= it },
     )
 }
@@ -582,7 +587,7 @@ private fun progressData(state: UiState): ProgressData {
         .takeIf { it.isNotEmpty() }?.average()?.toInt()
     val month = monthPrefix()
     val best = measured.maxByOrNull { it.score ?: 0 }
-    val mostReps = state.days.maxByOrNull { it.reps }
+    val mostReps = state.days.maxByOrNull { it.verifiedReps }
     val bestMovement = state.days
         .flatMap { d -> d.byMovement.values.map { d to it } }
         .filter { it.second.score != null }
@@ -592,7 +597,7 @@ private fun progressData(state: UiState): ProgressData {
         averageScore = recentMean,
         averageDelta = if (recentMean != null && earlierMean != null) recentMean - earlierMean
                        else null,
-        repsThisMonth = state.days.filter { it.date.startsWith(month) }.sumOf { it.reps },
+        repsThisMonth = state.days.filter { it.date.startsWith(month) }.sumOf { it.verifiedReps },
         bestScore = best?.score,
         bestScoreDate = best?.date?.let { shortDate(it) }.orEmpty(),
         trend = measured.takeLast(20).map { TrendPoint(shortDate(it.date), it.score ?: 0) },
@@ -601,9 +606,9 @@ private fun progressData(state: UiState): ProgressData {
                 PersonalBest(movementEs(it.exercise, it.exerciseLabel), "Mejor día",
                     "${it.score}", "pts", shortDate(it.date))
             },
-            mostReps?.takeIf { it.reps > 0 }?.let {
+            mostReps?.takeIf { it.verifiedReps > 0 }?.let {
                 PersonalBest(movementEs(it.exercise, it.exerciseLabel), "Más reps en un día",
-                    "${it.reps}", "reps", shortDate(it.date))
+                    "${it.verifiedReps}", "reps", shortDate(it.date))
             },
             bestMovement?.let { (day, mv) ->
                 PersonalBest(movementEs(mv.exercise, mv.label), "Mejor movimiento",
@@ -662,7 +667,9 @@ private fun rules(state: UiState): List<CoachRule> {
     val ledger = FaultTrend.rows(state.faults).associateBy { it.fault }
     return a.checks.take(6).map { check ->
         val trend = ledger[check.name]
+        // Tallies from a set nobody scored are not judgements.
         val (verdict, ink) = when {
+            a.unmeasuredSet -> "Sin juzgar" to Tk.muted
             check.observed > 0 && trend?.improving == true -> "Progresando" to Tk.teal
             check.observed > 0 -> "Corregir" to Tk.amber
             check.notObserved > 0 -> "Correcto" to Tk.primaryLight
@@ -675,6 +682,9 @@ private fun rules(state: UiState): List<CoachRule> {
             verdict = verdict,
             verdictInk = ink,
             description = when {
+                a.unmeasuredSet ->
+                    "No se pudo juzgar: las reps de esta serie no se pudieron puntuar, así que " +
+                        "esta comprobación no cuenta como correcta."
                 check.observed > 0 ->
                     "Se detectó en ${check.observed} de ${check.observed + check.notObserved} " +
                         "reps juzgadas en la última serie."

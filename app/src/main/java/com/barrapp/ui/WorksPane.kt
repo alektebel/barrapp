@@ -159,7 +159,7 @@ private fun WorkRow(
 
 @Composable
 private fun rememberStamp(): SimpleDateFormat =
-    remember { SimpleDateFormat("HH:mm", Locale.UK) }
+    remember { SimpleDateFormat("HH:mm", Locale("es","ES")) }
 
 /**
  * One work's own log, oldest first: the story of a clip from the queue to the
@@ -177,7 +177,7 @@ fun WorkLogScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val stamp = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale.UK) }
+    val stamp = remember { SimpleDateFormat("MM-dd HH:mm:ss", Locale("es","ES")) }
 
     LazyColumn(
         modifier = modifier.fillMaxWidth(),
@@ -186,16 +186,16 @@ fun WorkLogScreen(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("Back") }
+                TextButton(onClick = onBack) { Text("Atrás") }
                 Spacer(Modifier.size(6.dp))
-                Text("Work log", style = MaterialTheme.typography.titleMedium)
+                Text("Registro del trabajo", style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.weight(1f))
-                TextButton(onClick = onDismissAll) { Text("Dismiss all failed") }
+                TextButton(onClick = onDismissAll) { Text("Descartar todos los fallidos") }
             }
         }
         if (work == null) {
             item {
-                Text("This work is no longer in the queue.",
+                Text("Este trabajo ya no está en la cola.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
@@ -204,14 +204,14 @@ fun WorkLogScreen(
                 Panel {
                     Eyebrow("Clip · " + stamp.format(Date(work.createdAt)))
                     Spacer(Modifier.height(6.dp))
-                    Text(work.exercise.ifBlank { "still unmeasured" },
+                    Text(work.exercise.ifBlank { "aún sin medir" },
                         style = MaterialTheme.typography.bodyMedium)
                     Spacer(Modifier.height(4.dp))
                     Text(
                         listOfNotNull(
-                            work.jobId.takeIf { it.isNotBlank() }?.let { "job $it" },
+                            work.jobId.takeIf { it.isNotBlank() }?.let { "trabajo $it" },
                             work.traceId.takeIf { it.isNotBlank() }?.let { "trace $it" },
-                        ).joinToString("  ·  ").ifBlank { "no job reached the server" },
+                        ).joinToString("  ·  ").ifBlank { "ningún trabajo llegó al servidor" },
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -219,24 +219,24 @@ fun WorkLogScreen(
                     if (work.status == WorkStore.STATUS_FAILED) {
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            "Failed: ${work.error ?: "unknown reason"}",
+                            "Falló: ${work.error ?: "motivo desconocido"}",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.error,
                         )
                         Text(
-                            "The log below ends at the step that went wrong.",
+                            "El registro de abajo termina en el paso que salió mal.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                         Spacer(Modifier.height(6.dp))
                         Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            TextButton(onClick = { onRetry(work.id) }) { Text("Retry") }
-                            TextButton(onClick = { onDismiss(work.id) }) { Text("Dismiss") }
+                            TextButton(onClick = { onRetry(work.id) }) { Text("Reintentar") }
+                            TextButton(onClick = { onDismiss(work.id) }) { Text("Descartar") }
                             TextButton(onClick = {
                                 val text = buildString {
                                     appendLine("barrapp work ${work.id} — ${work.status}")
                                     work.jobId.takeIf { it.isNotBlank() }
-                                        ?.let { appendLine("job $it") }
+                                        ?.let { appendLine("trabajo $it") }
                                     work.traceId.takeIf { it.isNotBlank() }
                                         ?.let { appendLine("trace $it") }
                                     work.log.forEach { e ->
@@ -249,12 +249,12 @@ fun WorkLogScreen(
                                     as? android.content.ClipboardManager
                                 cm?.setPrimaryClip(android.content.ClipData.newPlainText(
                                     "barrapp work log", text))
-                            }) { Text("Copy log") }
+                            }) { Text("Copiar registro") }
                         }
                     }
                 }
             }
-            item { Eyebrow("What happened, in order") }
+            item { Eyebrow("Qué pasó, en orden") }
             items(work.log) { e ->
                 Panel(padding = PaddingValues(12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -275,7 +275,7 @@ fun WorkLogScreen(
             }
             if (work.log.isEmpty()) {
                 item {
-                    Text("Nothing logged for this work.",
+                    Text("No hay nada registrado para este trabajo.",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }

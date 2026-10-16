@@ -73,6 +73,8 @@ data class ResultsData(
     val faults: List<Pair<String, Int>>,
     val repCards: List<RepCardItem>,
     val xp: Int,
+    /** Why a counted set could not be judged; null when it was. */
+    val unjudged: String? = null,
     /** null when there is no earlier training to compare against. */
     val aboveAverage: Boolean?,
 )
@@ -391,6 +393,7 @@ private fun ResultsPhase(
             SlideUp(delayMillis = 60) {
                 FixesCard(
                     results.fixes,
+                    unjudged = results.unjudged,
                     onShowRep = if (playable) { index ->
                         replay.showRep(index)
                         scope.launch { scroll.animateScrollTo(0) }

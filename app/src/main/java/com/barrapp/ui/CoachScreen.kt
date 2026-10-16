@@ -49,15 +49,15 @@ fun CoachScreen(
     Column(Modifier.fillMaxSize()) {
         // A root tab has no back link - only a detail screen does.
         if (onBackToWeek != null) {
-            androidx.compose.material3.Text("← Week", style = N.back,
+            androidx.compose.material3.Text("← Semana", style = N.back,
                 modifier = Modifier.padding(bottom = 14.dp)
                     .then(NoRipple.noRipple(onBackToWeek)))
         }
 
         androidx.compose.material3.Text("Coach", style = N.pageTitle)
         androidx.compose.material3.Text(
-            "Arithmetic over your own sessions. It cannot invent a PR, and it says " +
-                "so when the data won't answer.",
+            "Aritmética sobre tus propias sesiones. No puede inventarse un récord, y lo " +
+                "dice cuando los datos no responden.",
             style = N.bodyNote, modifier = Modifier.padding(top = 6.dp),
         )
 
@@ -66,7 +66,7 @@ fun CoachScreen(
         Column(
             Modifier.weight(1f).fillMaxWidth().verticalScroll(chatScroll),
         ) {
-        androidx.compose.material3.Text("TRY", style = N.eyebrowMuted,
+        androidx.compose.material3.Text("PRUEBA", style = N.eyebrowMuted,
             modifier = Modifier.padding(top = 20.dp, bottom = 9.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(7.dp)) {
             suggestions.take(3).forEach { s ->
@@ -109,7 +109,7 @@ fun CoachScreen(
                                 RoundedCornerShape(14.dp, 14.dp, 14.dp, 4.dp))
                             .padding(horizontal = 13.dp, vertical = 12.dp),
                     ) {
-                        androidx.compose.material3.Text("FROM YOUR DATA", style = N.bubbleLabel)
+                        androidx.compose.material3.Text("DE TUS DATOS", style = N.bubbleLabel)
                         androidx.compose.material3.Text(t.text, style = N.bubble,
                             modifier = Modifier.padding(top = 8.dp))
                         if (t.note.isNotBlank()) {
@@ -154,7 +154,7 @@ fun CoachScreen(
                     modifier = Modifier.fillMaxWidth(),
                     decorationBox = { inner ->
                         if (draft.isEmpty()) {
-                            androidx.compose.material3.Text("Ask about your training",
+                            androidx.compose.material3.Text("Pregunta sobre tu entrenamiento",
                                 style = N.input)
                         }
                         inner()

@@ -515,9 +515,9 @@ private fun PrivacyScreen(
             .padding(24.dp)
     ) {
         if (showBack) {
-            TextButton(onClick = onBack) { Text("Back") }
+            TextButton(onClick = onBack) { Text("Atrás") }
         }
-        Text("Privacy", style = MaterialTheme.typography.headlineMedium)
+        Text("Privacidad", style = MaterialTheme.typography.headlineMedium)
         Spacer(Modifier.height(14.dp))
         // The account lives on this screen because this is where the identity
         // is explained: the paragraph below says a random device id names your
@@ -526,54 +526,56 @@ private fun PrivacyScreen(
         if (showBack && onSignIn != null) {
             if (signedInAs.isBlank()) {
                 Text(
-                    "Your sessions are tied to this phone. Sign in and they follow you " +
-                        "to the next one.",
+                    "Tus sesiones están ligadas a este teléfono. Inicia sesión y te " +
+                        "siguen al siguiente.",
                     style = MaterialTheme.typography.bodyMedium,
                 )
-                TextButton(onClick = onSignIn) { Text("Sign in or create an account") }
+                TextButton(onClick = onSignIn) { Text("Iniciar sesión o crear una cuenta") }
             } else {
-                Text("Signed in as $signedInAs",
+                Text("Sesión iniciada como $signedInAs",
                     style = MaterialTheme.typography.bodyMedium)
                 if (onSignOut != null) {
-                    TextButton(onClick = onSignOut) { Text("Sign out") }
+                    TextButton(onClick = onSignOut) { Text("Cerrar sesión") }
                 }
             }
             Spacer(Modifier.height(14.dp))
         }
         Text(
-            "barrapp measures your own reps from a clip you send. It is not coaching and not " +
-                "medical advice.",
+            "barrapp mide tus propias repeticiones a partir de un clip que envías. No es " +
+                "entrenamiento personal ni consejo médico.",
             style = MaterialTheme.typography.bodyLarge,
         )
         Spacer(Modifier.height(20.dp))
         Section(
-            "What we collect",
-            "The video you upload and a random device id stored on this phone. Your name, age " +
-                "and how often you train stay on the phone and are never sent anywhere.",
+            "Qué recogemos",
+            "El vídeo que subes y un identificador aleatorio del dispositivo guardado en este " +
+                "teléfono. Tu nombre, tu edad y la frecuencia con la que entrenas se quedan en " +
+                "el teléfono y no se envían a ninguna parte.",
         )
         Section(
-            "What we do with it",
-            "The clip goes to our server, which runs pose estimation and returns numbers — " +
-                "timing, range of motion, rep count. Clips are private to this device id and " +
-                "are deleted automatically after 30 days. You can delete one from its session.",
+            "Qué hacemos con ello",
+            "El clip va a nuestro servidor, que estima la pose y devuelve números: " +
+                "tiempos, rango de movimiento, número de repeticiones. Los clips son privados " +
+                "para este identificador de dispositivo y se borran automáticamente a los 30 " +
+                "días. Puedes borrar uno desde su sesión.",
         )
         Section(
-            "What we do not do",
-            "We do not sell data, run ads, or share clips. We do not diagnose injury or score " +
-                "'good form'. Every number compares you against your own previous reps, never " +
-                "against anyone else.",
+            "Qué no hacemos",
+            "No vendemos datos, no mostramos anuncios ni compartimos clips. No diagnosticamos " +
+                "lesiones ni puntuamos la «buena técnica». Cada número te compara con tus " +
+                "propias repeticiones anteriores, nunca con las de nadie más.",
         )
         Spacer(Modifier.height(28.dp))
         if (!showBack) {
             Button(onClick = onAccept, modifier = Modifier.fillMaxWidth()) {
-                Text("I understand — continue")
+                Text("Lo entiendo, continuar")
             }
         } else {
             // Reached from the info button, which is also where someone goes
             // when something looks wrong. Diagnostics belongs behind it rather
             // than behind a hidden gesture nobody discovers.
             TextButton(onClick = onDiagnostics, modifier = Modifier.fillMaxWidth()) {
-                Text("Diagnostics")
+                Text("Diagnóstico")
             }
         }
     }

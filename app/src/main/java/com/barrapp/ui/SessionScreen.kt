@@ -68,7 +68,7 @@ fun SessionScreen(
         }
     }
     Column(Modifier.fillMaxWidth()) {
-        androidx.compose.material3.Text("← Week", style = N.back,
+        androidx.compose.material3.Text("← Semana", style = N.back,
             modifier = Modifier.padding(bottom = 14.dp)
                 .then(NoRipple.noRipple(onBackToWeek)))
 
@@ -96,7 +96,7 @@ fun SessionScreen(
                         style = N.ringBig.copy(color = if (score != null) bandColor
                             else Nocturne.fgA(0.4f)),
                     )
-                    androidx.compose.material3.Text(scoreBand.uppercase(), style = N.ringLabel,
+                    androidx.compose.material3.Text(bandEs(scoreBand).uppercase(), style = N.ringLabel,
                         modifier = Modifier.padding(top = 3.dp))
                 }
             }
@@ -110,9 +110,9 @@ fun SessionScreen(
         ) {
             val n = minOf(cues.size, 2)
             androidx.compose.material3.Text(
-                // Don't promise "TWO THINGS" above a one-item list.
-                if (n > 1) "TWO THINGS TO CARRY INTO THE NEXT SET"
-                else "WHAT TO CARRY INTO THE NEXT SET",
+                // No prometer «DOS COSAS» sobre a one-item list.
+                if (n > 1) "DOS COSAS PARA LLEVAR A LA SIGUIENTE SERIE"
+                else "QUÉ LLEVAR A LA SIGUIENTE SERIE",
                 style = N.eyebrowAccent)
             cues.take(2).forEachIndexed { i, cue ->
                 Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 12.dp else 10.dp)) {
@@ -192,7 +192,7 @@ private fun RepCard(rep: RepCardData, modifier: Modifier) {
                     rep.chipColor.copy(alpha = 0.16f), RoundedCornerShape(6.dp),
                 ).padding(horizontal = 8.dp, vertical = 3.dp),
             ) {
-                androidx.compose.material3.Text(rep.chip, style = nocturne(500, 10, 1f)
+                androidx.compose.material3.Text(bandEs(rep.chip), style = nocturne(500, 10, 1f)
                     .copy(color = rep.chipColor))
             }
             Spacer(Modifier.weight(1f))
@@ -235,7 +235,7 @@ private fun RepCard(rep: RepCardData, modifier: Modifier) {
             if (rep.asides.isNotEmpty()) {
                 Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp)
                     .background(Nocturne.fgA(0.1f)))
-                androidx.compose.material3.Text("MEASURED, NOT SCORED", style = N.eyebrowMuted)
+                androidx.compose.material3.Text("MEDIDO, SIN PUNTUAR", style = N.eyebrowMuted)
                 rep.asides.forEach { a ->
                     Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                         androidx.compose.material3.Text(a.first, style = N.asideRow,
@@ -280,7 +280,7 @@ fun ChecksPanel(
             .border(1.dp, Nocturne.hairline, RoundedCornerShape(8.dp))
             .padding(14.dp),
     ) {
-        androidx.compose.material3.Text("WHAT WAS CHECKED", style = N.eyebrowMuted)
+        androidx.compose.material3.Text("QUÉ SE COMPROBÓ", style = N.eyebrowMuted)
         if (standard.isNotBlank()) {
             androidx.compose.material3.Text(standard, style = N.cardBody,
                 modifier = Modifier.padding(top = 8.dp))
@@ -291,10 +291,10 @@ fun ChecksPanel(
                     modifier = Modifier.weight(1f))
                 val total = c.flagged + c.clean + c.blind
                 val text = when {
-                    c.flagged + c.clean == 0 -> "not checkable · $total"
-                    c.flagged == 0 -> "clean · ${c.clean}/$total"
-                    else -> "flagged · ${c.flagged}/$total" +
-                        if (c.blind > 0) " · ${c.blind} unchecked" else ""
+                    c.flagged + c.clean == 0 -> "no comprobable · $total"
+                    c.flagged == 0 -> "correcto · ${c.clean}/$total"
+                    else -> "señalado · ${c.flagged}/$total" +
+                        if (c.blind > 0) " · ${c.blind} sin comprobar" else ""
                 }
                 androidx.compose.material3.Text(
                     text,
@@ -311,14 +311,14 @@ fun ChecksPanel(
         if (vision.isNotEmpty() || visionDisagrees) {
             Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp)
                 .background(Nocturne.fgA(0.1f)))
-            androidx.compose.material3.Text("SEEN ON VIDEO · ADVISORY", style = N.eyebrowMuted)
+            androidx.compose.material3.Text("VISTO EN EL VÍDEO · ORIENTATIVO", style = N.eyebrowMuted)
             androidx.compose.material3.Text(
-                "A vision model looked at stills of these reps. What it says is " +
-                    "not a measurement and does not change the numbers above.",
+                "Un modelo de visión miró fotogramas de estas reps. Lo que dice " +
+                    "no es una medición y no cambia los números de arriba.",
                 style = N.cardBody, modifier = Modifier.padding(top = 6.dp))
             if (visionDisagrees) {
                 androidx.compose.material3.Text(
-                    "It saw a different movement than the one measured. Flagged for review.",
+                    "Vio un movimiento distinto del que se midió. Marcado para revisión.",
                     style = N.asideRow.copy(color = Nocturne.shaky),
                     modifier = Modifier.padding(top = 8.dp))
             }
@@ -326,7 +326,7 @@ fun ChecksPanel(
                 Row(Modifier.fillMaxWidth().padding(top = 8.dp)) {
                     Column(Modifier.weight(1f)) {
                         androidx.compose.material3.Text(
-                            "${v.rep} · ${v.name} · ${v.status.replace('_', ' ')}",
+                            "${v.rep} · ${v.name} · ${visionStatusEs(v.status)}",
                             style = N.asideRow)
                         if (v.text.isNotBlank()) {
                             androidx.compose.material3.Text(v.text, style = N.cardBody)
@@ -384,7 +384,7 @@ private fun ChecksBlock(rep: RepCardData) {
     Box(Modifier.fillMaxWidth().padding(vertical = 12.dp).height(1.dp)
         .background(Nocturne.fgA(0.1f)))
     if (rep.blocked != null) {
-        androidx.compose.material3.Text("NOT JUDGED", style = N.eyebrowMuted)
+        androidx.compose.material3.Text("SIN JUZGAR", style = N.eyebrowMuted)
         androidx.compose.material3.Text(rep.blocked, style = N.cardBody,
             modifier = Modifier.padding(top = 6.dp))
         return
@@ -393,7 +393,7 @@ private fun ChecksBlock(rep: RepCardData) {
     val clean = rep.checks.filter { it.status == NOT_OBSERVED }
     val blind = rep.checks.filter { it.status != OBSERVED && it.status != NOT_OBSERVED }
     if (flagged.isNotEmpty()) {
-        androidx.compose.material3.Text("FLAGGED", style = N.eyebrowAccent)
+        androidx.compose.material3.Text("SEÑALADO", style = N.eyebrowAccent)
         flagged.forEach { c ->
             Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
                 Column(Modifier.weight(1f)) {
@@ -407,14 +407,14 @@ private fun ChecksBlock(rep: RepCardData) {
         }
     }
     val summary = buildString {
-        append("${flagged.size + clean.size} of ${rep.checks.size} checks made")
-        if (clean.isNotEmpty()) append(" · ${clean.size} clean")
+        append("${flagged.size + clean.size} de ${rep.checks.size} comprobaciones hechas")
+        if (clean.isNotEmpty()) append(" · ${clean.size} correctas")
     }
     androidx.compose.material3.Text(summary, style = N.repTimes,
         modifier = Modifier.padding(top = if (flagged.isEmpty()) 0.dp else 10.dp))
     if (blind.isNotEmpty()) {
         androidx.compose.material3.Text(
-            "COULD NOT BE CHECKED", style = N.eyebrowMuted,
+            "NO SE PUDO COMPROBAR", style = N.eyebrowMuted,
             modifier = Modifier.padding(top = 10.dp))
         blind.forEach { c ->
             Row(Modifier.fillMaxWidth().padding(top = 6.dp)) {
@@ -446,4 +446,25 @@ fun RepTrace(values: List<Float>, color: Color, modifier: Modifier) {
             drawPath(path, color, style = Stroke(2f * sx, cap = StrokeCap.Round))
         }
     }
+}
+
+/** A band word as the server names it, in the app's language. Unknown words pass through. */
+private fun bandEs(band: String): String = when (band.lowercase()) {
+    "strong" -> "Fuerte"
+    "solid" -> "Sólido"
+    "shaky" -> "Inestable"
+    "broken", "broken down" -> "Se rompió"
+    "unmeasured", "" -> "Sin medir"
+    else -> band
+}
+
+/** The vision model's status word; never the raw English token. */
+private fun visionStatusEs(status: String): String = when (status.lowercase()) {
+    "observed" -> "observado"
+    "not_observed" -> "no observado"
+    "unobservable" -> "no se puede ver"
+    "agrees" -> "coincide"
+    "disagrees" -> "discrepa"
+    "uncertain" -> "incierto"
+    else -> status.replace('_', ' ')
 }

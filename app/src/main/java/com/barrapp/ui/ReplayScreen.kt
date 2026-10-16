@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -58,6 +59,8 @@ fun ReplayScreen(
             .fillMaxSize()
             .background(Tk.bg)
             .verticalScroll(rememberScrollState())
+            // Edge to edge: the last line must clear the system navigation bar.
+            .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -96,7 +99,13 @@ private fun Body(analysis: Analysis, clip: java.io.File) {
 
     val worth = plan.reps.filter { it.fault != null || it.outlier }
     if (worth.isEmpty()) {
-        Text("Ninguna repetición se salió del patrón ni mostró un fallo.", style = T.lead)
+        // Nothing to point at is only a clean set when the reps were judged.
+        Text(
+            if (plan.reps.none { it.measured })
+                "No se pudo juzgar ninguna repetición de esta serie: el contador es fiable, la técnica no se midió."
+            else "Ninguna repetición se salió del patrón ni mostró un fallo.",
+            style = T.lead,
+        )
         return
     }
     Text("Para mirar", style = T.sectionTitle)
