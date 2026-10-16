@@ -18,23 +18,14 @@ import com.barrapp.data.Goals
 import com.barrapp.data.GoalsStore
 import com.barrapp.data.Job
 import com.barrapp.data.Profile
-import com.barrapp.data.PartMark
 import com.barrapp.data.ProfileStore
 import com.barrapp.data.Round2TimingStore
-import com.barrapp.data.MULTIPART_UPLOAD_CONCURRENCY
 import com.barrapp.data.SessionStore
 import com.barrapp.data.Work
-import com.barrapp.data.Stage
 import com.barrapp.data.WorkStore
-import com.barrapp.data.uploadPartsBatched
-import com.barrapp.data.chooseUploadMode
-import com.barrapp.notify.ProcessingNotifier
 import com.barrapp.notify.WeeklyReviewWorker
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -90,24 +81,22 @@ private const val PENDING_TEXT_FOLLOW_MS = 90_000L
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
     private val api = BarraApi(application)
-    private val retryLogMutex = Mutex()
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
 
     /** The work queue. Declared before the init block below on purpose: the
-     *  consumer it launches runs on Main.immediate, which is still inside
-     *  this constructor, and a property read before its own initialiser is
-     *  the kind of crash that takes the app down on open. */
-    private val queue = Channel<String>(Channel.UNLIMITED)
-
-    /** Works currently in the channel or being processed, so a connectivity
-     *  pulse cannot enqueue the same one twice. */
-    private val inFlight = mutableSetOf<String>()
+     *  collectors it launches run on Main.immediate, which is still inside
+     *  this constructor. */
+    private val uploads = com.barrapp.upload.UploadQueue.get(application)
 
     /** Quién corta el clip. Real en producción, fake en las pruebas unitarias
      *  de la decisión (la vía real del Transformer necesita un dispositivo). */
-    internal var trimmer: com.barrapp.media.ClipTrimmer =
-        com.barrapp.media.DefaultClipTrimmer(getApplication())
+    internal var trimmer: com.barrapp.media.ClipTrimmer
+        get() = uploads.trimmer
+        set(value) { uploads.trimmer = value }
+
+    internal suspend fun trimForUpload(work: Work, clip: java.io.File): java.io.File =
+        uploads.trimForUpload(work, clip)
 
     /** Fires when a VALIDATED network appears: paused uploads resume here. */
     private val netCallback = object : android.net.ConnectivityManager.NetworkCallback() {
@@ -129,33 +118,6 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             !profile.complete -> Screen.Onboarding
             else -> Screen.Home
         }
-        // A work still marked active was mid-flight when the process died.
-        // It is not lost - the clip is on the phone - but it is not going
-        // anywhere on its own either, so it becomes a failed work with a
-        // reason and a Retry, rather than a lie that says "measuring".
-        val resumed = mutableListOf<String>()
-        WorkStore.all(app).filter { it.active }.forEach { w ->
-            if (WorkStore.resumesUploadAfterRestart(w)) {
-                // Multipart parts already sent remain on the server. A single
-                // PUT can safely replace the fixed object using a fresh URL.
-                WorkStore.put(app, w.copy(
-                    status = WorkStore.STATUS_WAITING,
-                    stage = Stage.RESUMING.text, stageCode = Stage.RESUMING.code,
-                ).let { it.copy(log = it.log + WorkStore.Entry(
-                    System.currentTimeMillis(), WorkStore.Level.INFO,
-                    "the app closed mid-upload - ${w.uploadedParts.size} part(s) " +
-                        "are safe; resuming from there")) })
-                resumed.add(w.id)
-            } else {
-                WorkStore.put(app, w.copy(
-                    status = WorkStore.STATUS_FAILED,
-                    stage = "",
-                    error = "La app se cerró mientras este vídeo estaba en la cola.",
-                ).let { it.copy(log = it.log + WorkStore.Entry(
-                    System.currentTimeMillis(), WorkStore.Level.WARN,
-                    "interrupted — the app closed; retry to send it again")) })
-            }
-        }
         _state.update {
             it.copy(
                 screen = screen,
@@ -169,8 +131,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 signedInAs = AuthStore.email(app),
             )
         }
-        viewModelScope.launch { consumeQueue() }
-        resumed.forEach { queue.trySend(it) }
+        // The queue runs in WorkManager, not here: a clip keeps going when
+        // the app is closed. The screen only follows it.
+        viewModelScope.launch {
+            uploads.works.collect { works ->
+                _state.update { it.copy(works = works,
+                    pendingTrim = works.firstOrNull { w -> w.status == WorkStore.STATUS_PENDING }) }
+            }
+        }
+        viewModelScope.launch { uploads.finished.collect { j -> showFinished(j) } }
+        // Opening the app is one more chance for a clip left mid-way to go on.
+        if (WorkStore.all(app).any { it.active }) uploads.kick()
         // The resume-on-connection watcher: a work paused mid-upload does not
         // need a human to notice the wifi came back.
         runCatching {
@@ -646,7 +617,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             publishWorks()
             // Un clip PENDIENTE espera al atleta: la cola no lo recoge hasta
             // que confirma (o descarta) la ventana de recorte.
-            if (kept && work.status != WorkStore.STATUS_PENDING) queue.send(workId)
+            if (kept && work.status != WorkStore.STATUS_PENDING) uploads.kick()
         }
     }
 
@@ -681,7 +652,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         publishWorks()
         viewModelScope.launch {
             withContext(Dispatchers.IO) { Round2TimingStore.trimConfirmed(app, work.timingAttemptId.ifBlank { work.id }, confirmedNs) }
-            queue.send(workId)
+            uploads.kick()
         }
     }
 
@@ -700,568 +671,34 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         publishWorks()
         viewModelScope.launch {
             withContext(Dispatchers.IO) { Round2TimingStore.trimConfirmed(app, work.timingAttemptId.ifBlank { work.id }, confirmedNs) }
-            queue.send(workId)
+            uploads.kick()
         }
     }
 
-    /** Transient network failures - an unresolvable host on weak wifi above
-     *  all - are not a dead clip, they are a moment. Tried again here, with a
-     *  growing pause, before the work is allowed to fail; every attempt is in
-     *  the work's log, so a later "why did this take a while" has an answer. */
-    private suspend fun <T> withRetry(
-        what: String,
-        workId: String,
-        attempts: Int = 5,
-        block: suspend () -> T,
-    ): T {
-        var last: Exception? = null
-        repeat(attempts) { i ->
-            try {
-                return block()
-            } catch (err: Exception) {
-                last = err
-                val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
-                    err.message?.contains("Failed to connect", ignoreCase = true) == true ||
-                    err.message?.contains("timeout", ignoreCase = true) == true ||
-                    err.message?.contains("unknown job", ignoreCase = true) == true ||
-                    err.message?.contains("500", ignoreCase = true) == true ||
-                    err.message?.contains("502", ignoreCase = true) == true ||
-                    err.message?.contains("503", ignoreCase = true) == true ||
-                    err is java.io.IOException
-                retryLogMutex.withLock {
-                    WorkStore.append(getApplication(), workId, WorkStore.Level.WARN,
-                        "$what failed (attempt ${i + 1} of $attempts): ${err.message.orEmpty()}")
-                }
-                if (!transient || i == attempts - 1) throw err
-                delay(2500L * (i + 1))
-            }
-        }
-        throw last ?: IllegalStateException("unreachable")
-    }
+    private fun publishWorks() = uploads.publish()
 
-    private fun publishWorks() {
-        val works = WorkStore.all(getApplication())
-        _state.update { it.copy(works = works,
-            pendingTrim = works.firstOrNull { w -> w.status == WorkStore.STATUS_PENDING }) }
-        // Keeps the process alive while a clip is active, so the upload and the
-        // measurement carry on while the athlete uses other apps.
-        com.barrapp.notify.UploadService.sync(getApplication(), works)
-    }
-
-    private suspend fun consumeQueue() {
-        for (workId in queue) {
-            val app = getApplication<Application>()
-            val work = WorkStore.get(app, workId) ?: continue
-            runWork(work.copy(status = WorkStore.STATUS_WAITING))
-        }
-    }
-
-    /** Raised when the network died mid-upload; handled locally, never shown
-     *  as a failure. */
-    private class PauseUpload : Exception("paused for network")
-
-    private suspend fun <T> timedRound2Phase(
-        attemptId: String,
-        phase: String,
-        block: suspend () -> T,
-    ): T {
-        val startedNs = SystemClock.elapsedRealtimeNanos()
-        try {
-            return block()
-        } finally {
-            val elapsedMs = ((SystemClock.elapsedRealtimeNanos() - startedNs) / 1_000_000L).coerceAtLeast(0L)
-            withContext(Dispatchers.IO) {
-                Round2TimingStore.phaseDuration(getApplication(), attemptId, phase, elapsedMs)
-            }
-        }
-    }
-
-    /** The upload, part by part, resumable from exactly where it stopped.
-     *
-     * Every finished part is persisted with its etag the moment the server
-     * acknowledges it, so a tunnel, a lift, or the app being killed costs one
-     * part - never the clip.
-     *
-     * Two ids, and they are not interchangeable: [workId] names the row in
-     * the local queue, [jobId] is what the server calls this clip. Every
-     * upload endpoint is addressed by the job id - passing the local one
-     * gets "unknown job" back on the very first part. */
-    private suspend fun uploadResumable(
-        workId: String,
-        jobId: String,
-        clip: java.io.File,
-        onProgress: (Int, Int) -> Unit,
-    ) {
+    /** A clip finished while this screen was alive: open its session. */
+    private fun showFinished(j: Job) {
         val app = getApplication<Application>()
-        val current = WorkStore.get(app, workId)
-        val timingAttemptId = current?.timingAttemptId?.ifBlank { workId } ?: workId
-        var uploadId = current?.uploadId.orEmpty()
-        var partSize = current?.partSize ?: 0L
-        val done = LinkedHashMap<Int, String?>()
-        current?.uploadedParts?.forEach { done[it.partNumber] = it.etag }
-
-        if (uploadId.isBlank() || partSize <= 0L) {
-            val (id, ps) = timedRound2Phase(timingAttemptId, "multipartStart") {
-                withRetry("starting the upload", workId) {
-                    withContext(Dispatchers.IO) { api.startUpload(jobId) }
-                }
-            }
-            uploadId = id
-            partSize = ps
-            WorkStore.put(app, WorkStore.get(app, workId)!!.copy(uploadId = id, partSize = ps))
-        }
-
-        val total = (((clip.length() + partSize - 1) / partSize).toInt()).coerceAtLeast(1)
-        var sent = done.size
-        val missing = (1..total).filterNot { done.containsKey(it) }
-        for (batch in missing.chunked(MULTIPART_UPLOAD_CONCURRENCY)) {
-            // Prepare URLs and stream bytes in bounded parallel batches.
-            // Successful sibling parts are persisted before an error pauses
-            // the upload; a resume only resends missing part numbers.
-            val urls = mutableMapOf<Int, String>()
-            try {
-                timedRound2Phase(timingAttemptId, "presign") {
-                    uploadPartsBatched(batch, MULTIPART_UPLOAD_CONCURRENCY, uploadPart = { n ->
-                        withRetry("preparing part $n of $total", workId) {
-                            withContext(Dispatchers.IO) { api.presignPart(jobId, uploadId, n) }
-                        }
-                    }) { n, url ->
-                        urls[n] = requireNotNull(url)
-                    }
-                }
-                timedRound2Phase(timingAttemptId, "partTransfer") {
-                    uploadPartsBatched(batch, MULTIPART_UPLOAD_CONCURRENCY, uploadPart = { n ->
-                        val offset = (n - 1L) * partSize
-                        val length = minOf(partSize, clip.length() - offset)
-                        withContext(Dispatchers.IO) {
-                            api.putPart(urls.getValue(n), clip, offset, length)
-                        }
-                    }) { n, etag ->
-                        done[n] = etag
-                        sent++
-                        onProgress(sent.coerceAtMost(total), total)
-                        WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
-                            uploadedParts = done.map { PartMark(it.key, it.value) },
-                            stage = Stage.sending(sent.coerceAtMost(total), total),
-                            stageCode = Stage.SENDING.code))
-                        publishWorks()
-                    }
-                }
-            } catch (err: Exception) {
-                val transient = err.message?.contains("resolve host", ignoreCase = true) == true ||
-                    err.message?.contains("Failed to connect", ignoreCase = true) == true ||
-                    err.message?.contains("timeout", ignoreCase = true) == true ||
-                    err is java.io.IOException
-                if (!transient) throw err
-                WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
-                    status = WorkStore.STATUS_CONNECTING,
-                    stage = Stage.connecting(done.size, total), stageCode = Stage.CONNECTING.code,
-                    uploadedParts = done.map { PartMark(it.key, it.value) },
-                        log = (WorkStore.get(app, workId)?.log ?: emptyList()) +
-                        WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.WARN,
-                            "connection lost during part(s) ${batch.joinToString()} of $total - " +
-                                "${done.size} part(s) already on the server")))
-                publishWorks()
-                throw PauseUpload()
-            }
-        }
-        timedRound2Phase(timingAttemptId, "multipartComplete") {
-            withRetry("finishing the upload", workId) {
-                withContext(Dispatchers.IO) {
-                    api.completeUpload(jobId,
-                        done.map { BarraApi.PartSlot(it.key, it.value) })
-                }
-            }
-        }
-        WorkStore.put(app, WorkStore.get(app, workId)!!.copy(
-            uploadId = "", partSize = 0, uploadedParts = emptyList(),
-            uploadMode = "multipart", uploadComplete = true,
-            stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code))
-    }
-
-    /**
-     * El clip que se sube: el recorte a 720p cuando hay ventana que valga la
-     * pena, el original cuando no, y TAMBIÉN el original cuando el
-     * transcodificador falla por cualquier motivo (códec ausente, sin
-     * espacio, excepción, más de tres minutos). El recorte es una mejora, no
-     * una condición: jamás bloquea ni hace fallar una subida.
-     *
-     * Devuelve el fichero a subir y deja el work con la ventana final y la
-     * marca de recortado. La ventana es la que el atleta dejó ajustada en la
-     * UI (trimStartS/trimEndS del work), no la sugerencia cruda.
-     */
-    internal suspend fun trimForUpload(
-        work: Work,
-        clip: java.io.File,
-        update: ((Work) -> Work) -> Unit = { t -> WorkStore.put(getApplication(), t(WorkStore.get(getApplication(), work.id) ?: work)) },
-    ): java.io.File {
-        if (!work.trimmed || work.trimEndS <= work.trimStartS) return clip
-        update { it.copy(stage = "Recortando la serie",
-            stageCode = Stage.WAITING.code) }
-        val exportStartedNs = SystemClock.elapsedRealtimeNanos()
-        val cut = java.io.File(clip.parent, clip.nameWithoutExtension + "-trim.mp4")
-        return try {
-            val actualVideoBitrateBps = trimmer.export(clip, cut, work.trimStartS, work.trimEndS)
-            withContext(Dispatchers.IO) {
-                Round2TimingStore.trimVideoBitrate(getApplication(),
-                    work.timingAttemptId.ifBlank { work.id }, actualVideoBitrateBps)
-            }
-            if (!cut.exists() || cut.length() == 0L) {
-                cut.delete()
-                WorkStore.append(getApplication(), work.id, WorkStore.Level.WARN,
-                    "el recorte no produjo fichero — se sube el clip entero")
-                update { it.copy(trimmed = false,
-                    trimStartS = 0.0, trimEndS = 0.0) }
-                clip
-            } else {
-                // El fichero que viaja es el recortado: el work pasa a
-                // apuntar a él, así un reintento o una reanudación suben lo
-                // mismo que la primera vez.
-                // Persist the exported file as the upload source and clear
-                // the one-shot window. If Android kills the process before
-                // multipart upload finishes, the resumed work must not trim
-                // this already-trimmed file a second time.
-                update { it.copy(clipPath = cut.absolutePath,
-                    trimmed = false, trimStartS = 0.0, trimEndS = 0.0) }
-                WorkStore.append(getApplication(), work.id, WorkStore.Level.INFO,
-                    "recortado a %.1f s–%.1f s (%.1f MB%s)".format(
-                        work.trimStartS, work.trimEndS, cut.length() / 1e6,
-                        actualVideoBitrateBps?.let { ", %.2f Mbit/s vídeo".format(it / 1e6) }.orEmpty()))
-                cut
-            }
-        } catch (err: Exception) {
-            cut.delete()
-            WorkStore.append(getApplication(), work.id, WorkStore.Level.WARN,
-                "el recorte falló (${err.message.orEmpty()}) — se sube el clip entero")
-            update { it.copy(trimmed = false,
-                trimStartS = 0.0, trimEndS = 0.0) }
-            clip
-        } finally {
-            val elapsedMs = ((SystemClock.elapsedRealtimeNanos() - exportStartedNs) / 1_000_000L).coerceAtLeast(0L)
-            withContext(Dispatchers.IO) {
-                Round2TimingStore.trimExportDuration(getApplication(),
-                    work.timingAttemptId.ifBlank { work.id }, elapsedMs)
-            }
-        }
-    }
-
-    private suspend fun runWork(work: Work) {
-        val app = getApplication<Application>()
-
-        fun update(transform: (Work) -> Work) {
-            val current = WorkStore.get(app, work.id) ?: return
-            WorkStore.put(app, transform(current))
-            publishWorks()
-        }
-
-        fun log(level: WorkStore.Level, message: String) {
-            WorkStore.append(app, work.id, level, message)
-        }
-
-        fun fail(raw: String, traceId: String = "") {
-            val message = when {
-                raw.contains("resolve host", ignoreCase = true) ->
-                    "No se encontró el servidor (falló la resolución del nombre). " +
-                        "El vídeo se guarda: pulsa Reintentar."
-                raw.contains("Failed to connect", ignoreCase = true) ->
-                    "Sin conexión a internet. El vídeo se guarda: pulsa Reintentar cuando vuelvas a tener red."
-                raw.contains("unknown job", ignoreCase = true) ->
-                    "El servidor perdió este análisis. Pulsa Reintentar y se enviará de nuevo."
-                raw.contains("timed out", ignoreCase = true) ||
-                    raw.contains("timeout", ignoreCase = true) ->
-                    "El servidor tardó demasiado en responder. Pulsa Reintentar: el vídeo se guarda."
-                else -> raw
-            }
-            log(WorkStore.Level.ERROR, message)
-            update {
-                it.copy(status = WorkStore.STATUS_FAILED, stage = "", error = message,
-                    traceId = traceId.ifBlank { it.traceId })
-            }
-            EventLog.error(app, "a work failed", message,
-                jobId = WorkStore.get(app, work.id)?.jobId.orEmpty())
-            val w = WorkStore.get(app, work.id)
-            if (w?.jobId?.isNotBlank() == true && w.uploadId.isNotBlank()) {
-                viewModelScope.launch {
-                    runCatching { withContext(Dispatchers.IO) { api.abortUpload(w.jobId) } }
-                }
-            }
-            ProcessingNotifier.fail(app, message)
-        }
-
-        val clip = java.io.File(work.clipPath)
-        update { it.copy(status = WorkStore.STATUS_WAITING, stage = Stage.WAITING.text, stageCode = Stage.WAITING.code,
-            error = null) }
-        try {
-            if (!clip.exists() || clip.length() == 0L) {
-                fail("The clip is no longer on the phone.")
-                return
-            }
-            // EL RECORTE, antes de crear el trabajo. work.trimmed dice si la
-            // ventana sugerida merecía la pena (la UI la preselecciona y el
-            // atleta puede ajustarla; los valores finales quedan en el work).
-            // Cualquier fallo del transcodificador deja `clip` intacto: el
-            // original es lo que se sube, como siempre. El recorte nunca
-            // bloquea ni hace fallar una subida.
-            withContext(Dispatchers.IO) {
-                Round2TimingStore.clipBytes(app,
-                    work.timingAttemptId.ifBlank { work.id }, clip.length(), 0L)
-            }
-            val clipToUpload = trimForUpload(work, clip, ::update)
-            val resuming = work.jobId.isNotBlank() &&
-                (work.uploadMode.isNotBlank() || work.uploadId.isNotBlank())
-
-            // Start before the first network request that creates or sends
-            // this upload. The attempt survives process/network resume; an
-            // explicit retry receives a new ID below.
-            val timingAttemptId = work.timingAttemptId.ifBlank { work.id }
-            WorkStore.put(app, (WorkStore.get(app, work.id) ?: work).copy(
-                timingAttemptId = timingAttemptId))
-            val phoneAttemptStartedAtMs = SystemClock.elapsedRealtime()
-            withContext(Dispatchers.IO) {
-                Round2TimingStore.clipBytes(app, timingAttemptId,
-                    clip.length(), clipToUpload.length())
-                Round2TimingStore.begin(app, timingAttemptId, completeOrigin = !resuming)
-            }
-
-            // A work that stopped mid-upload keeps its job: the parts already
-            // on the server belong to that job's multipart session, and a new
-            // job would strand them under a key nothing points at. Only a
-            // work with nothing in flight asks for a fresh job.
-            val created = if (!resuming) timedRound2Phase(timingAttemptId, "jobCreate") {
-                withRetry("creating the job", work.id) {
-                    withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
-                }
-            } else null
-            val jobId = if (resuming) work.jobId else requireNotNull(created).job.id
-            val uploadMode = if (resuming) {
-                work.uploadMode.ifBlank { "multipart" }
-            } else chooseUploadMode(
-                clipToUpload.length(), BuildConfig.SINGLE_PUT_MAX_BYTES,
-                created?.uploadUrl, created?.uploadMethod)
-            withContext(Dispatchers.IO) { Round2TimingStore.bindJob(app, timingAttemptId, jobId) }
-            update { it.copy(jobId = jobId, uploadMode = uploadMode,
-                uploadComplete = if (resuming) it.uploadComplete else false,
-                status = WorkStore.STATUS_SENDING,
-                stage = Stage.SENDING.text, stageCode = Stage.SENDING.code) }
-            log(WorkStore.Level.INFO,
-                if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
-                else "job $jobId created — sending the clip " +
-                    "(%.1f MB)".format(clipToUpload.length() / 1e6))
-            ProcessingNotifier.stage(app, Stage.SENDING.text, 0)
-            try {
-                val current = WorkStore.get(app, work.id)!!
-                if (!current.uploadComplete) {
-                    if (uploadMode == "single") {
-                        val uploadUrl = if (!resuming && created?.uploadUrl?.isNotBlank() == true) {
-                            created.uploadUrl to created.uploadMethod
-                        } else timedRound2Phase(timingAttemptId, "singlePutUrlRefresh") {
-                            withRetry("preparing the upload", work.id) {
-                                withContext(Dispatchers.IO) { api.refreshSingleUploadUrl(jobId) }
-                            }
-                        }
-                        try {
-                            timedRound2Phase(timingAttemptId, "singlePut") {
-                                // Whole-file retries are expensive and can
-                                // silently consume the upload budget. Persist
-                                // this job and resume on the next validated
-                                // network with a newly minted URL.
-                                withRetry("sending the clip", work.id, attempts = 1) {
-                                    withContext(Dispatchers.IO) {
-                                    api.uploadClip(clipToUpload, uploadUrl.first, uploadUrl.second)
-                                    }
-                                }
-                            }
-                            update { it.copy(uploadComplete = true) }
-                        } catch (err: Exception) {
-                            if (err is java.io.IOException || err.message?.contains("timeout", true) == true ||
-                                err.message?.contains("Failed to connect", true) == true ||
-                                err.message?.contains("resolve host", true) == true) {
-                                update { it.copy(status = WorkStore.STATUS_CONNECTING,
-                                    stage = Stage.connecting(0, 1), stageCode = Stage.CONNECTING.code) }
-                                publishWorks()
-                                throw PauseUpload()
-                            }
-                            throw err
-                        }
-                    } else {
-                        uploadResumable(work.id, jobId, clipToUpload) { sent, total ->
-                            update {
-                                it.copy(status = WorkStore.STATUS_SENDING,
-                                    stage = Stage.sending(sent, total), stageCode = Stage.SENDING.code)
-                            }
-                        }
-                    }
-                }
-            } catch (_: PauseUpload) {
-                // The network went away mid-send. Not a failure: the work sits
-                // in "connecting" and the connectivity watcher resumes it the
-                // moment a validated network appears - parts already sent stay
-                // sent, on the server, by part number.
-                return
-            }
-            update { it.copy(status = WorkStore.STATUS_QUEUED, stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code) }
-            log(WorkStore.Level.INFO, "uploaded — queued on the server")
-            ProcessingNotifier.stage(app, Stage.QUEUED.text, 1)
-            timedRound2Phase(timingAttemptId, "submit") {
-                withRetry("queueing on the server", work.id) {
-                    withContext(Dispatchers.IO) { api.submit(jobId) }
-                }
-            }
-            withContext(Dispatchers.IO) { Round2TimingStore.submitted(app, timingAttemptId) }
-
-            // The wait. The server says where it is; the log keeps what it
-            // said, so a wrong number later has a trail to be explained by.
-            var contactLost = 0
-            var pollCount = 0
-            var pollGetNs = 0L
-            var pollSleepNs = 0L
-            var pollHandleNs = 0L
-            repeat(240) {
-                val pollStartedNs = SystemClock.elapsedRealtimeNanos()
-                val job = withContext(Dispatchers.IO) { runCatching { api.getJob(jobId) } }
-                pollCount++
-                pollGetNs += (SystemClock.elapsedRealtimeNanos() - pollStartedNs).coerceAtLeast(0L)
-                val pollHandleStartedNs = SystemClock.elapsedRealtimeNanos()
-                job.fold(onSuccess = { j ->
-                    contactLost = 0
-                    when (j.status) {
-                        "done" -> {
-                            withContext(Dispatchers.IO) {
-                                Round2TimingStore.resultReceived(app, timingAttemptId,
-                                    j.result?.traceId.orEmpty(),
-                                    countStatus = j.result?.countStatus,
-                                    repCount = j.result?.repCount,
-                                    pollCount = pollCount,
-                                    pollGetMs = pollGetNs / 1_000_000L,
-                                    pollSleepMs = pollSleepNs / 1_000_000L,
-                                    pollHandleMs = pollHandleNs / 1_000_000L)
-                            }
-                            j.result?.let { SessionStore.record(app, j.id, it) }
-                            val countStatus = j.result?.countStatus ?: "unmeasured"
-                            val repCount = j.result?.repCount ?: 0
-                            val countDescription = when (countStatus) {
-                                "unmeasured" -> "rep count unavailable"
-                                "vision" -> "$repCount rep(s) estimated from frames"
-                                "hold" -> "$repCount hold attempt(s) measured"
-                                else -> "$repCount rep(s) measured"
-                            }
-                            log(WorkStore.Level.INFO, "$countDescription of " +
-                                (j.result?.exercise ?: "unknown") +
-                                " — trace ${j.result?.traceId.orEmpty()}")
-                            // The clip answers to its job id from here on, so
-                            // replay and delete keep working the way they did.
-                            // The one renamed is the one UPLOADED - the 720p
-                            // cut when the trim held, the original otherwise -
-                            // so the replay screen plays exactly what the
-                            // server measured, timestamps included.
-                            withContext(Dispatchers.IO) {
-                                clipToUpload.renameTo(clipFile(app, j.id))
-                                if (clipToUpload != clip) clip.delete()
-                            }
-                            EventLog.info(app,
-                                "$countDescription of ${j.result?.exercise ?: "unknown"}",
-                                "score ${j.result?.sessionScore ?: "—"}",
-                                traceId = j.result?.traceId.orEmpty(), jobId = j.id)
-                            val movement = j.result?.exercise.orEmpty()
-                            val verdict = if (movement.isNotBlank())
-                                Progression.assess(movement, SessionStore.days(app)) else null
-                            if (verdict?.step != null &&
-                                verdict.qualifyingDays.size == verdict.step.days
-                            ) {
-                                ProcessingNotifier.done(
-                                    app,
-                                    "Estándar superado: ${verdict.step.towardsLabel} desbloqueado",
-                                    "Has cumplido el estándar de ${verdict.label} en " +
-                                        "${verdict.step.days} días distintos. Mira el Plan.",
-                                )
-                            } else {
-                                ProcessingNotifier.done(
-                                    app,
-                                    when (countStatus) {
-                                        "unmeasured" -> "Recuento de repeticiones sin medir"
-                                        "vision" -> "$repCount rep${if (repCount == 1) "" else "s"} estimadas a partir de fotogramas"
-                                        "hold" -> "$repCount mantenimientos medidos"
-                                        else -> "$repCount " +
-                                            (if (repCount == 1) "repetición medida" else "repeticiones medidas")
-                                    },
-                                    "Tu análisis de " + com.barrapp.movementEs(
-                                        j.result?.exercise.orEmpty(), j.result?.detected?.label.orEmpty(),
-                                    ).lowercase() + " está listo.",
-                                )
-                            }
-                            WorkStore.forget(app, work.id)
-                            publishWorks()
-                            _state.update {
-                                it.copy(
-                                    screen = Screen.Home,
-                                    pane = Pane.Session,
-                                    analysis = j.result,
-                                    current = j,
-                                    selectedDate = j.result?.sessionDate
-                                        ?: SessionStore.today(),
-                                    days = SessionStore.days(app),
+        _state.update {
+            it.copy(
+                screen = Screen.Home,
+                pane = Pane.Session,
+                analysis = j.result,
+                current = j,
+                selectedDate = j.result?.sessionDate ?: SessionStore.today(),
+                days = SessionStore.days(app),
                 faults = SessionStore.faults(app),
-                                    weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
-                                    error = null,
-                                )
-                            }
-                            refresh()
-                            if (j.result?.prosePending == true || j.result?.visionPending == true) {
-                                followPendingText(j.id)
-                            }
-                            return
-                        }
-                        "failed" -> {
-                            fail(j.error ?: "El servidor no pudo usar este vídeo.",
-                                j.result?.traceId.orEmpty())
-                            return
-                        }
-                        else -> {
-                            val stage = Stage.display(j)
-                            update {
-                                it.copy(
-                                    status = if (j.status == "processing")
-                                        WorkStore.STATUS_MEASURING else WorkStore.STATUS_QUEUED,
-                                    stage = stage,
-                                    stageCode = Stage.code(j),
-                                )
-                            }
-                            ProcessingNotifier.stage(app, stage.replaceFirstChar { c -> c.uppercaseChar() },
-                                Stage.progressIndex(Stage.code(j), j.stage))
-                        }
-                    }
-                }, onFailure = { err ->
-                    val msg = err.message.orEmpty()
-                    // A job the server no longer knows about (reaped as stale,
-                    // or created under a different device) will never come back
-                    // by polling. Say so plainly and let Retry re-send it fresh.
-                    if (msg.contains("unknown job", ignoreCase = true)) {
-                        log(WorkStore.Level.WARN, "the job was lost on the server")
-                        fail("That clip's job was lost on the server. Retry to re-send it.")
-                        return
-                    }
-                    contactLost++
-                    log(WorkStore.Level.WARN,
-                        "lost contact with the server (${contactLost}) — $msg")
-                    if (contactLost >= 5) {
-                        fail("Lost contact with the server while measuring.")
-                        return
-                    }
-                })
-                val sleepStartedNs = SystemClock.elapsedRealtimeNanos()
-                // Response handling for a nonterminal poll is client work
-                // too: status persistence, stage updates and notifications.
-                pollHandleNs += (sleepStartedNs - pollHandleStartedNs).coerceAtLeast(0L)
-                delay(resultPollDelayMs(
-                    SystemClock.elapsedRealtime() - phoneAttemptStartedAtMs))
-                pollSleepNs += (SystemClock.elapsedRealtimeNanos() - sleepStartedNs).coerceAtLeast(0L)
-            }
-            fail("Still measuring after four minutes. It may yet finish on the server — " +
-                "retry to check again.")
-        } catch (err: Exception) {
-            fail(err.message ?: "That clip could not be sent.")
+                weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
+                error = null,
+            )
+        }
+        refresh()
+        if (j.result?.prosePending == true || j.result?.visionPending == true) {
+            followPendingText(j.id)
         }
     }
+
 
     /** Send a failed work again. Always the full pipeline: a fresh job, the
      *  kept clip re-uploaded - so a retry never depends on whatever state the
@@ -1292,7 +729,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 log = work.log + WorkStore.Entry(System.currentTimeMillis(),
                     WorkStore.Level.INFO, "retry requested")))
             publishWorks()
-            queue.send(workId)
+            uploads.kick()
         }
     }
 
@@ -1400,26 +837,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         super.onCleared()
     }
 
-    /** Everything paused for the network goes back in the queue, oldest
-     *  first, once. */
+    /** A validated network is back: whatever paused for it carries on. */
     private fun resumeConnectingWorks() {
-        val app = getApplication<Application>()
-        val paused = WorkStore.all(app)
-            .filter { it.status == WorkStore.STATUS_CONNECTING && it.id !in inFlight }
-        if (paused.isEmpty()) return
-        viewModelScope.launch {
-            paused.forEach { w ->
-                WorkStore.put(app, w.copy(status = WorkStore.STATUS_WAITING,
-                    stage = Stage.WAITING.text, stageCode = Stage.WAITING.code,
-                    log = w.log + WorkStore.Entry(System.currentTimeMillis(),
-                        WorkStore.Level.INFO, "connection is back - resuming the upload")))
-            }
-            publishWorks()
-            paused.forEach { w ->
-                inFlight.add(w.id)
-                queue.trySend(w.id)
-            }
-        }
+        if (WorkStore.all(getApplication()).any { it.status == WorkStore.STATUS_CONNECTING }) uploads.kick()
     }
 
     // ---- coach ------------------------------------------------------------

@@ -92,6 +92,15 @@ object WorkStore {
 
     /** In-flight transfers survive process death. Multipart resumes by part
      *  markers; a single PUT safely replaces its fixed object with a fresh URL. */
+    /** The server holds the whole clip; after a restart the work only has
+     *  to wait for it (and submit it, if it never got that far). */
+    fun waitsOnServerAfterRestart(work: Work): Boolean =
+        work.jobId.isNotBlank() && (work.uploadComplete ||
+            work.status in setOf(STATUS_QUEUED, STATUS_MEASURING))
+
+    /** Server job statuses past submit: submitting again would re-run it. */
+    val SUBMITTED_ON_SERVER = setOf("queued", "processing", "done", "failed")
+
     fun resumesUploadAfterRestart(work: Work): Boolean =
         work.status in setOf(STATUS_SENDING, STATUS_CONNECTING) &&
             (work.uploadId.isNotBlank() || work.uploadMode == "single")

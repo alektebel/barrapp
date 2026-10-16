@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -19,7 +20,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -50,10 +53,41 @@ fun WorksSection(
     modifier: Modifier = Modifier,
 ) {
     if (works.isEmpty()) return
+    // Clips on their way show in full. Failed ones fold to one line: they
+    // wait for the athlete, and must not push the record button off screen.
+    val (failed, live) = works.partition { it.status == WorkStore.STATUS_FAILED }
+    var showFailed by androidx.compose.runtime.saveable.rememberSaveable {
+        androidx.compose.runtime.mutableStateOf(false)
+    }
     com.barrapp.ui.parts.Panel(modifier.padding(horizontal = 20.dp, vertical = 10.dp)) {
-        Eyebrow("In the works")
-        Spacer(Modifier.height(8.dp))
-        works.forEach { work -> WorkRow(work, onOpenLog, onRetry, onDismiss) }
+        if (live.isNotEmpty()) {
+            Eyebrow("En curso")
+            Spacer(Modifier.height(8.dp))
+            live.forEach { work -> WorkRow(work, onOpenLog, onRetry, onDismiss) }
+        }
+        if (failed.isNotEmpty()) {
+            Row(
+                Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = 48.dp)
+                    .clickable { showFailed = !showFailed },
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    if (failed.size == 1) "1 clip no se pudo medir"
+                    else "${failed.size} clips no se pudieron medir",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.weight(1f),
+                )
+                Text(
+                    if (showFailed) "Ocultar" else "Ver",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
+            if (showFailed) failed.forEach { work -> WorkRow(work, onOpenLog, onRetry, onDismiss) }
+        }
     }
 }
 

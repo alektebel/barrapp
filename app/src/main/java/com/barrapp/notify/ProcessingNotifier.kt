@@ -57,7 +57,7 @@ object ProcessingNotifier {
         )
     }
 
-    /** The ongoing notification: what UploadService runs under. */
+    /** The ongoing notification: what upload/UploadWorker runs under. */
     fun ongoing(context: Context, stage: String, index: Int): android.app.Notification =
         builder(context, TITLE)
             .setContentText(stage)
