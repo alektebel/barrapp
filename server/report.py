@@ -9,7 +9,12 @@ A reply is used only when:
   * it is one JSON object with non-empty headline, narrative and nextSession;
   * every number in the headline and narrative exists in the measurement, at
     the precision it is written (13.4 s may read "13 s" or "13,4 s"; a set of
-    3 may not read "12"). nextSession is advice and may carry its own numbers.
+    3 may not read "12"). nextSession is advice and may carry its own numbers;
+  * headline and narrative name no technique fault the measurement did not
+    fire. The digest lists every fired fault with its rule id (errorId); a text
+    that talks of "valgo", "cadera hundida" or "balanceo" without that fault
+    among them is rejected, numbers or no numbers. A digest with no faults
+    admits no fault claim at all.
 Otherwise the next model is tried, and then the deterministic text from
 barra.summary, with `proseRejected` saying why - so a run that fell back can
 be told from one that never asked.
@@ -24,6 +29,7 @@ import json
 import math
 import os
 import re
+import unicodedata
 
 from barra import i18n
 from barra.summary import describe
@@ -44,6 +50,9 @@ español de España, en segunda persona, frases claras, sin eslóganes.
 Reglas:
 - Nunca inventes una puntuación, un récord ni un número. Cada cifra que \
 escribas en headline y narrative tiene que estar en los datos que te doy.
+- Solo puedes nombrar un error de técnica si está en la lista "faults" de los \
+datos (cada uno lleva su id). Si "faults" está vacía, no nombres ningún error \
+de técnica ni lo insinúes: di solo lo que midió la serie.
 - No digas que la persona mejora o empeora: tienes una sola sesión.
 - Si no se contó ninguna repetición, dilo y explica por qué con los motivos \
 (blockers) que te doy. Si falta algo, di qué grabar la próxima vez.
@@ -53,7 +62,67 @@ escribas en headline y narrative tiene que estar en los datos que te doy.
 
 Devuelve SOLO un objeto JSON con las claves headline, narrative, nextSession."""
 
+# Fault claims. One entry per fault NAME the rules fire (barra/rules.py, the
+# English `name` the rep payload carries as faults[].name): the Spanish label
+# the model is given, and the phrasings that count as saying it. Patterns run
+# on lowercase text with accents stripped. Wide on the negative phrasing
+# ("recorrido incompleto"), narrow on neutral words ("recorrido"): a component
+# the score reports is not a fault. A false rejection only costs the
+# deterministic text; a false accept tells someone about a fault nobody
+# measured. A negation ("sin balanceo") is rejected too - nothing measured it.
+FAULT_CLAIMS: dict[str, tuple[str, str]] = {
+    "poor range of motion": ("Recorrido incompleto",
+        r"recorrido (incompleto|corto|insuficiente|limitado)|poco recorrido|falta(n)? (de )?(recorrido|profundidad)"
+        r"|profundidad (insuficiente|escasa|corta)|no (bajas|llegas) (lo suficiente|hasta abajo)|por debajo de la horizontal"),
+    "momentum": ("Balanceo",
+        r"balance(o|as|ar|arte)\b(?! de (los )?brazos)|impulso|kipping|inercia|columpi"),
+    "lockout": ("Sin bloqueo arriba",
+        r"bloque(o|as|ar)\b|extension completa arriba|no (extiendes|estiras) (del todo|completamente)"),
+    "dead hang": ("Sin dead hang", r"dead hang|colgado (completo|muerto)"),
+    "no active hang": ("Sin colgado activo", r"colgado activo"),
+    "control": ("Caída sin control", r"sin control|descontrolad|brusc|te dejas caer|caes\b|caida"),
+    "uncontrolled descent": ("Caída sin control", r"sin control|descontrolad|brusc|te dejas caer|caes\b|caida"),
+    "stall": ("Estancamiento", r"estancamiento|estancas|atasc|punto muerto|te frenas|se frena"),
+    "poor transition": ("Transición lenta", r"transicion (es |resulta )?(muy |demasiado )?lent"),
+    "bent arms": ("Brazos sin extender", r"brazos (flexionados|doblados|sin extender)"),
+    "poor scapular retraction": ("Retracción escapular", r"escapul|retraccion"),
+    "poor scapular protraction": ("Protracción escapular", r"escapul|protraccion"),
+    "bent knees": ("Rodillas flexionadas", r"(rodillas|piernas) (flexionadas|dobladas)|flexionas las rodillas"),
+    "piked hips": ("Cadera en pica", r"\bpica\b|\bpikes?\b|cadera (flexionada|elevada)"),
+    "piked body": ("Cuerpo en pica", r"\bpica\b|\bpikes?\b|cadera (flexionada|elevada)"),
+    "sagging hips": ("Cadera hundida", r"cadera (hundida|caida|baja)|(se )?(te )?hunde(s)? (la )?cadera|hundimiento"),
+    "knee valgus": ("Rodillas hacia dentro",
+        r"valgo|rodillas? (hacia )?(se )?(van |cierran |meten |colapsan )?(hacia )?dentro|colapso"),
+    "heel raise": ("Talones levantados", r"talon|talones"),
+    "leaning back": ("Espalda echada atrás",
+        r"espalda echada|(inclin\w+|echas|tumbas) .{0,25}hacia atras|echas .{0,15}atras"),
+    "arm swing": ("Balanceo de brazos", r"balanceo de (los )?brazos|balanceas los brazos|mueves los brazos"),
+    "bounce at bottom": ("Rebote abajo", r"rebote|rebotas"),
+    "too deep": ("Demasiado profundo", r"demasiado profund|bajas demasiado|exceso de profundidad"),
+    "too fast": ("Reps lanzadas", r"reps lanzadas|demasiado rapid|muy rapid|lanzas las repeticiones"),
+}
+_CLAIMS = {label: re.compile(pat) for label, pat in
+           {v[0]: v[1] for v in reversed(FAULT_CLAIMS.values())}.items()}
+
 _NUMBER = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)?(?![\w])")
+
+
+def fault_ref(f: dict) -> dict:
+    """A fired fault as the model sees it: its rule id and its Spanish name."""
+    name = f.get("name")
+    return {"id": f.get("errorId") or name,
+            "name": FAULT_CLAIMS[name][0] if name in FAULT_CLAIMS else i18n.localize_text(name)}
+
+
+def _fired(payload: dict) -> list[dict]:
+    """Every distinct fault fired anywhere in the set, by rule id (the digest
+    shows at most 30 reps; the faults are not capped with them)."""
+    out: dict[str, dict] = {}
+    for r in payload.get("reps") or []:
+        for f in r.get("faults") or []:
+            if f.get("name"):
+                out.setdefault(f.get("errorId") or f["name"], fault_ref(f))
+    return list(out.values())
 
 
 def digest(payload: dict) -> dict:
@@ -66,7 +135,7 @@ def digest(payload: dict) -> dict:
             "plausible": r.get("plausible"),
             "metrics": {i18n.localize_text(m.get("name")): i18n.localize_value(m.get("value"))
                         for m in r.get("metrics") or [] if m.get("name")},
-            "faults": [f.get("name") for f in r.get("faults") or [] if f.get("name")],
+            "faults": [fault_ref(f) for f in r.get("faults") or [] if f.get("name")],
             "problems": [i18n.localize_text(x) for x in (r.get("problems") or [])[:3]],
         })
     # Spanish going in, so the model has no English word to echo ("solid").
@@ -79,6 +148,7 @@ def digest(payload: dict) -> dict:
         "sessionBand": i18n.band(payload.get("sessionBand")),
         "duration_s": payload.get("duration_s"),
         "blockers": [i18n.localize_text(b) for b in (payload.get("blockers") or [])[:5]],
+        "faults": _fired(payload),
         "reps": reps[:30],
     }
 
@@ -121,6 +191,20 @@ def invented_numbers(text: str, facts: dict) -> list[str]:
     return out
 
 
+def _plain(text: str) -> str:
+    t = unicodedata.normalize("NFD", (text or "").lower())
+    return "".join(c for c in t if unicodedata.category(c) != "Mn")
+
+
+def unsupported_faults(text: str, facts: dict) -> list[str]:
+    """Spanish names of the faults `text` talks about that the digest does not
+    list as fired. A digest with no faults admits none."""
+    allowed = {f.get("name") for f in facts.get("faults") or []}
+    plain = _plain(text)
+    return [label for label, pattern in _CLAIMS.items()
+            if label not in allowed and pattern.search(plain)]
+
+
 def _parse(text: str | None) -> dict | None:
     if not text:
         return None
@@ -151,6 +235,9 @@ def _judge(result, facts: dict) -> tuple[dict | None, str]:
     bad = invented_numbers(prose["headline"] + " " + prose["narrative"], facts)
     if bad:
         return None, f"{result.model}: invented_number: {', '.join(bad)}"
+    unsupported = unsupported_faults(prose["headline"] + " " + prose["narrative"], facts)
+    if unsupported:
+        return None, f"{result.model}: unsupported_fault: {', '.join(unsupported)}"
     return prose, ""
 
 

@@ -114,6 +114,77 @@ class UsesTheModel(unittest.TestCase):
         self.assertIn("Nunca inventes", report.SYSTEM)
 
 
+def fired(*names_ids):
+    return {"faults": [{"name": n, "errorId": i, "value": 1.0} for n, i in names_ids]}
+
+
+class OnlyMeasuredFaults(unittest.TestCase):
+    """Audit finding 1: a text with no numbers used to pass whatever errors it
+    attributed to the athlete."""
+
+    INVENTED = answer(headline="Tienes valgo de rodilla",
+                      narrative="Se te hunde la cadera y pierdes el control escapular.")
+
+    def setUp(self):
+        p = mock.patch.object(llm, "config", return_value=("https://nan.test/v1", "k"))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_every_rule_name_has_a_claim_vocabulary(self):
+        from barra.rules import RULES
+        names = {r.name for rules in RULES.values() for r in rules}
+        self.assertEqual(sorted(names - set(report.FAULT_CLAIMS)), [])
+
+    def test_faults_with_no_reps_are_rejected(self):
+        facts = report.digest(payload(reps=[], n_reps=0, n_candidates=0))
+        self.assertEqual(facts["faults"], [])
+        prose, why = report._judge(self.INVENTED, facts)
+        self.assertIsNone(prose)
+        self.assertIn("unsupported_fault", why)
+        self.assertIn("Rodillas hacia dentro", why)
+        self.assertIn("Cadera hundida", why)
+        self.assertIn("Retracción escapular", why)
+
+    def test_unmeasured_faults_fall_back_to_the_deterministic_text(self):
+        with mock.patch.object(llm, "complete", return_value=self.INVENTED):
+            out = report.write_report(payload())
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertIn("unsupported_fault", out["proseRejected"])
+        text = out["headline"] + " " + out["narrative"]
+        self.assertEqual(report.unsupported_faults(text, report.digest(payload())), [])
+
+    def test_a_clean_set_may_not_name_a_fault_even_by_negation_or_synonym(self):
+        facts = report.digest(payload())
+        for text in ("Notamos balanceo en la subida.", "Las rodillas se van hacia dentro.",
+                     "Levantas los talones al bajar.", "Bloqueo incompleto arriba."):
+            self.assertTrue(report.unsupported_faults(text, facts), text)
+
+    def test_a_text_naming_only_measured_faults_passes(self):
+        reps = payload()["reps"]
+        reps[0].update(fired(("momentum", "pull_up.body_swing")))
+        p = payload(reps=reps)
+        facts = report.digest(p)
+        self.assertEqual(facts["faults"], [{"id": "pull_up.body_swing", "name": "Balanceo"}])
+        reply = answer(narrative="Hiciste 3 repeticiones; en la primera hay balanceo del cuerpo.")
+        prose, why = report._judge(reply, facts)
+        self.assertEqual(why, "")
+        self.assertIn("balanceo", prose["narrative"])
+        # ... but a second, unmeasured fault in the same text still sinks it.
+        worse = answer(narrative="Hay balanceo y además rodillas hacia dentro.")
+        self.assertIn("Rodillas hacia dentro", report._judge(worse, facts)[1])
+
+    def test_neutral_words_are_not_fault_claims(self):
+        facts = report.digest(payload())
+        text = "Lo más flojo fue el recorrido, al 80 %; la mejor puntuó 61 y el control fue bueno."
+        self.assertEqual(report.unsupported_faults(text, facts), [])
+
+    def test_the_digest_lists_faults_by_rule_id_beyond_the_rep_cap(self):
+        reps = [{"label": f"r{i}", "score": 50, "band": "solid", "metrics": []} for i in range(40)]
+        reps[35].update(fired(("knee valgus", "squat.knee_medial_drift")))
+        facts = report.digest(payload(reps=reps, n_reps=40, n_candidates=40))
+        self.assertEqual(facts["faults"], [{"id": "squat.knee_medial_drift", "name": "Rodillas hacia dentro"}])
+
+
 class FinishProse(unittest.TestCase):
     """The deferred pass: the model path taken off the result's critical path
     (docs/SPEED-PLAN.md B), with the same judgement as `write_report`."""

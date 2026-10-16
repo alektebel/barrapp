@@ -69,6 +69,12 @@ android {
 
     buildTypes {
         debug {
+            // A second install beside the real one, for end-to-end runs from a
+            // fresh state (onboarding included) without wiping the phone's
+            // own sessions: -Pbarrapp.appIdSuffix=.e2e
+            (project.findProperty("barrapp.appIdSuffix") as String?)?.let {
+                applicationIdSuffix = it
+            }
             buildConfigField(
                 "String",
                 "API_BASE_URL",

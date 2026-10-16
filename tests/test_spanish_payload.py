@@ -56,6 +56,10 @@ class ProcessJob(unittest.TestCase):
         self.assertEqual(out["i18n"]["locale"], "es")
         self.assertEqual(out["i18n"]["untranslated"], [])
 
+    # "pending" is what the phone sees when a prose model is configured;
+    # without a key the prose is final at once. Pin the key so the test does
+    # not depend on the shell it runs in.
+    @mock.patch.dict(os.environ, {"NAN_API_KEY": "test-key"})
     def test_the_vision_note_does_not_take_the_headline(self):
         note = {"headline": "The stills show a floor push-up", "narrative": "English paragraph.",
                 "nextSession": "Film more.", "visionObservations": [{"rep": "r1"}]}
