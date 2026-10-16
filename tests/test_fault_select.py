@@ -31,6 +31,34 @@ def test_clip_fault_counts_relaxes_on_short_sets():
     assert THRESHOLDS.fault_min_reps >= 2
 
 
+def _lockout_row(value: float) -> dict:
+    """An assessment row for pull_up.incomplete_lockout, as a payload rep carries."""
+    return _assessment("pull_up.incomplete_lockout", OBSERVED, value).as_dict()
+
+
+def test_single_strong_lockout_is_kept():
+    # The audit's reproduction (docs/AUDITORIA-TECNICA.md, finding 6): three
+    # reps with `lockout` in only one produced an empty summary. A one-off now
+    # survives the gate when its rep sat unmistakably past the threshold -
+    # here (-27.6 - (-80)) / 27.6 ≈ 1.9 normalised thresholds past it.
+    assert 0 < THRESHOLDS.fault_single_rep_exceedance
+    strong = {"failures": ["lockout"], "assessments": [_lockout_row(-80.0)]}
+    clean = {"failures": []}
+    assert clip_fault_counts([clean, strong, clean]) == {"lockout": 1}
+
+
+def test_weak_or_unmeasured_single_rep_lockout_is_dropped():
+    # Barely over the line is pose-jitter territory, where the two-rep
+    # consensus came from: (-27.6 - (-30)) / 27.6 ≈ 0.09, under the bar.
+    # Without valid evidence on the rep there is nothing to weigh, so the
+    # gate stays shut too.
+    weak = {"failures": ["lockout"], "assessments": [_lockout_row(-30.0)]}
+    unmeasured = {"failures": ["lockout"]}
+    clean = {"failures": []}
+    assert clip_fault_counts([clean, weak, clean]) == {}
+    assert clip_fault_counts([clean, unmeasured, clean]) == {}
+
+
 def test_primary_from_assessments_picks_largest_exceedance():
     # incomplete_lockout threshold is pull_up_lockout_pct (~-27.6), comparison <.
     # value -80 is further past than -40.

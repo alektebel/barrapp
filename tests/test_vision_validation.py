@@ -143,8 +143,10 @@ def test_observations_must_reference_the_request(tmp_path):
     raw = [
         {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "phase": "support",
          "status": "observed", "frames": ["f3.jpg"], "description": "elbows stay bent"},
+        # The abstention keeps its frames, but since the audit it must also
+        # state its reason - an unexplained "not observed" is not reviewable.
         {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "status": "Not observed",
-         "frames": "f3.jpg"},                                    # normalised status
+         "frames": "f3.jpg", "description": "arms straight at the top"},
         {"errorId": "muscle_up.slow_transition", "rep": "r1", "status": "observed"},
         {"errorId": "pull_up.incomplete_lockout", "rep": "r9", "status": "observed"},
         {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "status": "likely"},
@@ -160,13 +162,102 @@ def test_observations_must_reference_the_request(tmp_path):
     assert kept[0]["name"] == "lockout" and kept[0]["frames"] == ["f3.jpg"]
     assert kept[1]["phase"] == "support"           # defaulted from the rule
     assert dropped == {"notAList": 0, "notAnObject": 1, "unknownError": 1,
-                       "unknownRep": 1, "badStatus": 1, "unknownFrame": 1,
-                       "unknownPhase": 1}
+                       "variantMismatch": 0, "unknownRep": 1, "badStatus": 1,
+                       "noFrames": 0, "unknownFrame": 1, "frameMismatch": 0,
+                       "unknownPhase": 1, "noDescription": 0}
 
 
 def test_observations_that_are_not_a_list_are_dropped_wholesale(tmp_path):
     kept, dropped = vision.validate_observations({"errorId": "x"}, _report(), _art(tmp_path))
     assert kept == [] and dropped["notAList"] == 1
+
+
+# ---------------------------------------------------------------------------
+# the evidence must correspond to the claim (auditoría #5)
+# ---------------------------------------------------------------------------
+def test_observed_without_evidence_matching_the_claim_is_dropped(tmp_path):
+    art, report = _art(tmp_path), _report()
+    desc = "los codos siguen flexionados en la parte alta"
+    raw = [
+        # a fault claimed as seen, with no still cited at all
+        {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "phase": "support",
+         "status": "observed", "description": desc},
+        # the audit's case: rep 2 in support, evidenced with rep 1's setup still
+        {"errorId": "pull_up.incomplete_lockout", "rep": "r2", "phase": "support",
+         "status": "observed", "frames": ["f1.jpg"], "description": desc},
+        # the right still cited, but the visible fact is never stated
+        {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "phase": "support",
+         "status": "observed", "frames": ["f3.jpg"], "description": "   "},
+    ]
+    kept, dropped = vision.validate_observations(raw, report, art)
+    assert kept == []
+    assert dropped["noFrames"] == 1
+    assert dropped["frameMismatch"] == 1
+    assert dropped["noDescription"] == 1
+
+
+def test_still_of_another_rep_is_a_mismatch_even_in_the_right_phase(tmp_path):
+    art, report = _art(tmp_path), _report()
+    raw = [{"errorId": "pull_up.incomplete_lockout", "rep": "r3", "phase": "support",
+            "status": "observed", "frames": ["f3.jpg"],
+            "description": "los codos siguen flexionados en la parte alta"}]
+    kept, dropped = vision.validate_observations(raw, report, art)
+    assert kept == [] and dropped["frameMismatch"] == 1
+
+
+def test_well_formed_observation_and_reasoned_abstention_pass(tmp_path):
+    art, report = _art(tmp_path), _report()
+    raw = [
+        {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "phase": "support",
+         "status": "observed", "frames": ["f3.jpg"],
+         "description": "los codos siguen flexionados en la parte alta"},
+        # an abstention needs no stills, but the reason must be stated
+        {"errorId": "pull_up.incomplete_lockout", "rep": "r3", "status": "unobservable",
+         "description": "la parte alta de r3 no aparece en ninguna imagen"},
+        {"errorId": "pull_up.incomplete_lockout", "rep": "r1", "status": "not_observed",
+         "frames": ["f3.jpg"], "description": "los brazos quedan rectos arriba"},
+    ]
+    kept, dropped = vision.validate_observations(raw, report, art)
+    assert [o["status"] for o in kept] == ["observed", "unobservable", "not_observed"]
+    assert kept[0]["frames"] == ["f3.jpg"] and kept[1]["frames"] == []
+    assert not any(dropped.values())
+
+
+def test_whole_rep_rule_accepts_any_still_of_the_rep(tmp_path):
+    art, report = _art(tmp_path), _report()
+    # A whole-rep rule that holds for every variant (body_swing is strict-only
+    # and abstains while the variant is undeclared - see the variant test).
+    raw = [{"errorId": "pull_up.dropped_descent", "rep": "r1", "status": "observed",
+            "frames": ["f2.jpg"], "description": "la bajada dura mucho menos que la subida"}]
+    kept, dropped = vision.validate_observations(raw, report, art)
+    # The claim covers the whole rep, so a lifting still of r1 shows it.
+    assert len(kept) == 1 and kept[0]["phase"] == "rep"
+
+
+def test_rule_not_defined_for_the_variant_is_dropped(tmp_path):
+    report = _report()
+    report["exercise"] = "front_lever"
+    report["variant"] = {"name": "tuck", "source": "declared"}
+    report["reps"] = [{"label": "h1", "startS": 1.0, "endS": 5.0,
+                       "phases": {"hold": [1.0, 5.0]}, "assessments": []}]
+    still = tmp_path / "h1_sustained.jpg"
+    still.write_bytes(b"\xff\xd8jpeg")
+    art = TechniqueArtifacts(clip=None,
+                             frames=[Still(still, "h1", "sustained", "sustained", 3.0)],
+                             selected_reps=["h1"])
+    raw = [
+        # bent_knees is written for the full front lever: a tuck hold is not
+        # judged against straight legs
+        {"errorId": "front_lever.bent_knees", "rep": "h1", "phase": "hold",
+         "status": "observed", "frames": ["h1_sustained.jpg"],
+         "description": "las rodillas van flexionadas"},
+        {"errorId": "front_lever.body_below_horizontal", "rep": "h1", "phase": "hold",
+         "status": "observed", "frames": ["h1_sustained.jpg"],
+         "description": "el cuerpo queda por debajo de la horizontal"},
+    ]
+    kept, dropped = vision.validate_observations(raw, report, art)
+    assert [o["errorId"] for o in kept] == ["front_lever.body_below_horizontal"]
+    assert dropped["variantMismatch"] == 1
 
 
 def test_no_endpoint_means_no_note_and_no_call(monkeypatch, tmp_path):

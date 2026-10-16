@@ -87,6 +87,19 @@ class Thresholds:
     # One-off pose jitter on a single rep was the bulk of the false-alarm storm
     # (precision 0.146 → ~0.18 with recall unchanged on the labelled corpus).
     fault_min_reps: int = 2
+    # Exception to that gate: a fault seen in a single rep is still kept when
+    # its worst rep sits this far past the threshold, in the normalised units
+    # of barra/fault_select - (value - threshold) / |threshold| - so 0.5 means
+    # half a threshold beyond the line. The consensus above exists because
+    # one-rep pose jitter clusters just past the line; asking an isolated
+    # incident to be half a threshold past it keeps that jitter out while
+    # letting through the unmistakable one-off the gate was silently deleting
+    # (audit 16-10-2026, finding 6: recurrence must order faults, not hide a
+    # clearly demonstrated one). Deliberately high so the carve-out errs
+    # toward silence: a single-rep fault is the least corroborated kind, so
+    # its evidence must be the strongest. Pinned here, before labels, like
+    # every other number in this file.
+    fault_single_rep_exceedance: float = 0.5
     # Exclude the outer share of the lifting DISPLACEMENT from the stall count:
     # leaving rest and turning around both decelerate, and neither is a stall.
     # Provenance records this convention beside the rate it modifies.

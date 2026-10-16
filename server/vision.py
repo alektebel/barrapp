@@ -13,10 +13,13 @@ measurement:
   overwrite the geometric movement label, the rep count or a calibrated score;
   a disagreement with the geometry is recorded for review, not resolved here.
 * Every response is validated against the registry: an observation must name
-  a rule the detected movement defines, a rep the payload contains, frames the
-  request actually sent and a phase the pipeline knows. Anything else is
-  dropped and counted. Malformed JSON degrades to "no note", never to a failed
-  job.
+  a rule the detected movement defines for the clip's variant, a rep the
+  payload contains and a phase the pipeline knows. A fault claimed as
+  observed must cite stills the request actually sent, each showing the rep
+  and phase the claim attributes it to, and say in words what is visible; an
+  abstention needs no stills, but its reason must be stated. Anything else
+  is dropped and counted. Malformed JSON degrades to "no note", never to a
+  failed job.
 * Pose estimates are not called ground truth in the prompt, and the model is
   told what it cannot see: forces, muscle activation, joints the camera hides,
   phases no still shows, and the count or precise timing of fast reps from a
@@ -219,9 +222,15 @@ def _known_rules(report: dict | None) -> list[dict]:
         from barra.rules import rules_for
     except ImportError:
         return []
-    movement = (report or {}).get("exercise") or ""
+    report = report or {}
+    movement = report.get("exercise") or ""
+    variant = (report.get("variant") or {}).get("name") or ""
+    # `applies` is the registry's own verdict for the clip's variant, the one
+    # the geometry assesses under: a rule written for another standard cannot
+    # be reported against this clip, whatever the model saw in the stills.
     return [{"errorId": r.id, "name": r.name, "phase": r.phase,
-             "observable": r.observable, "correction": r.correction}
+             "observable": r.observable, "correction": r.correction,
+             "applies": r.applies_to(variant)}
             for r in rules_for(movement)]
 
 
@@ -301,21 +310,39 @@ def _user_text(art, report: dict | None) -> str:
     return "\n".join(lines)
 
 
+def _frame_shows(still, rep: str, phase: str) -> bool:
+    """Whether a still can back a claim about `rep` in `phase`: it must be a
+    still of that rep, showing that phase - except for the rules scoped to
+    the whole rep or hold (phase "rep"/"hold"), whose claim covers every
+    moment of it, so any still of that rep shows what they claim."""
+    if (still.rep or "") != rep:
+        return False
+    return phase in ("rep", "hold") or still.phase == phase
+
+
 def validate_observations(raw, report: dict | None, art) -> tuple[list[dict], dict]:
-    """Keep only observations that reference things the request contained.
+    """Keep only observations that reference things the request contained, and
+    whose evidence corresponds to the claim.
 
     Returns (kept, dropped_counts). A rejected observation is counted by why
     it was rejected, so the invalid-response rate can be tracked per reason.
+
+    A fault claimed as `observed` is the strong case: it must cite at least
+    one still the request actually sent, every still it cites must show the
+    rep and the phase the claim attributes it to, and it must state the
+    visible fact in words. The abstentions (`not_observed`, `unobservable`,
+    `uncertain`) are held to less - no stills required, but the reason is.
     """
     dropped = {"notAList": 0, "notAnObject": 0, "unknownError": 0,
-               "unknownRep": 0, "badStatus": 0, "unknownFrame": 0,
-               "unknownPhase": 0}
+               "variantMismatch": 0, "unknownRep": 0, "badStatus": 0,
+               "noFrames": 0, "unknownFrame": 0, "frameMismatch": 0,
+               "unknownPhase": 0, "noDescription": 0}
     if not isinstance(raw, list):
         dropped["notAList"] = 1
         return [], dropped
     rule_ids = {r["errorId"]: r for r in _known_rules(report)}
     reps = {str(r.get("label")): r for r in (report or {}).get("reps") or []}
-    frames = {s.path.name for s in getattr(art, "frames", [])}
+    frames = {s.path.name: s for s in getattr(art, "frames", [])}
     phases = set()
     for r in reps.values():
         phases.update((r.get("phases") or {}).keys())
@@ -330,6 +357,9 @@ def validate_observations(raw, report: dict | None, art) -> tuple[list[dict], di
         if error_id not in rule_ids:
             dropped["unknownError"] += 1
             continue
+        if not rule_ids[error_id]["applies"]:
+            dropped["variantMismatch"] += 1
+            continue
         rep = str(obs.get("rep", ""))
         if rep not in reps:
             dropped["unknownRep"] += 1
@@ -338,16 +368,26 @@ def validate_observations(raw, report: dict | None, art) -> tuple[list[dict], di
         if status not in OBSERVATION_STATUSES:
             dropped["badStatus"] += 1
             continue
+        phase = str(obs.get("phase") or rule_ids[error_id]["phase"])
+        if phase not in phases:
+            dropped["unknownPhase"] += 1
+            continue
         refs = obs.get("frames") or []
         if not isinstance(refs, list):
             refs = [refs]
         refs = [str(f) for f in refs]
+        if status == "observed" and not refs:
+            dropped["noFrames"] += 1
+            continue
         if any(f not in frames for f in refs):
             dropped["unknownFrame"] += 1
             continue
-        phase = str(obs.get("phase") or rule_ids[error_id]["phase"])
-        if phase not in phases:
-            dropped["unknownPhase"] += 1
+        if any(not _frame_shows(frames[f], rep, phase) for f in refs):
+            dropped["frameMismatch"] += 1
+            continue
+        description = str(obs.get("description") or "").strip()[:300]
+        if not description:
+            dropped["noDescription"] += 1
             continue
         kept.append({
             "rep": rep,
@@ -356,7 +396,7 @@ def validate_observations(raw, report: dict | None, art) -> tuple[list[dict], di
             "phase": phase,
             "status": status,
             "frames": refs,
-            "description": str(obs.get("description") or "").strip()[:300],
+            "description": description,
             "source": SOURCE_VISION,
         })
     return kept, dropped
