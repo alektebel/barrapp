@@ -293,7 +293,7 @@ private fun LastSessionCard(
                 Eyebrow("Última sesión")
                 Text(session.movement.uppercase(), style = T.sectionTitle)
                 Text(
-                    "${session.date} · ${session.reps} reps" +
+                    "${session.date} · ${session.reps} " + (if (session.reps == 1) "rep" else "reps") +
                         if (session.score == null && session.reps > 0) " · sin puntuar" else "",
                     style = T.bodyS,
                 )

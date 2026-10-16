@@ -296,7 +296,7 @@ private fun FocusCard(focus: CoachFocus) {
                 Text(focus.fault.uppercase(), style = T.cardHeadline)
                 Text(
                     buildString {
-                        append("${focus.repsAffected} reps afectadas")
+                        append("${focus.repsAffected} " + if (focus.repsAffected == 1) "rep afectada" else "reps afectadas")
                         focus.improvementPct?.let {
                             append(if (it >= 0) " · ↓ $it% en 4 semanas" else " · ↑ ${-it}% en 4 semanas")
                         }
