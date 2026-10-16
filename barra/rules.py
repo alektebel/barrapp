@@ -24,9 +24,9 @@ that had already drifted. So each rule is a record here:
                  failure), the note says so. The label is kept for the client;
                  the record does not pretend it is what was measured.
     variants     technique variants the rule applies to; empty = all. A rule
-                 with `variant_dependent=True` is still reported when the
-                 variant is unspecified, but marked so a consumer knows it was
-                 judged against an assumed standard.
+                 with `variants` set abstains when the variant is unspecified:
+                 it is reported unobservable (reason "unsupported variant"),
+                 flagged variantDependent, and never fires.
 
 `assess()` turns the registry and one Evidence record into the assessment
 contract of the implementation plan (section 3): every applicable rule gets a
@@ -79,12 +79,19 @@ class Rule:
     variant_dependent: bool = False
 
     def applies_to(self, variant: str) -> bool:
-        """Whether this rule is defined for `variant`. An unspecified variant
-        keeps every rule; a declared one drops the rules written for a
-        different standard (a kip is not a fault of a kipping muscle-up)."""
-        if not self.variants or variant in ("", None, VARIANT_UNSPECIFIED):
+        """Whether this rule is defined for `variant`. A declared variant
+        drops the rules written for a different standard (a kip is not a fault
+        of a kipping muscle-up). An unspecified variant keeps only the rules
+        that do not depend on one: a rule written for a specific variant has
+        no standard to be judged against, so it abstains (see `abstains_for`)."""
+        if not self.variants:
             return True
         return variant in self.variants
+
+    def abstains_for(self, variant: str) -> bool:
+        """True when the rule is variant-specific and no variant was declared:
+        it is reported as not judged, never as passed and never as a fault."""
+        return bool(self.variants) and variant in ("", None, VARIANT_UNSPECIFIED)
 
     def fires(self, value: float) -> bool:
         return {
@@ -141,10 +148,13 @@ def _bar(movement: str, lockout_pct: float | None = None) -> list[Rule]:
            "the shoulders' depth below the hands at the start, as a share of "
            "the athlete's own arm reach",
            "Start every rep from a full dead hang"),
-        _r(movement, "dropped_descent", "control", "rep", "tempo_ratio", "<",
+        _r(movement, "dropped_descent", "fast descent", "rep", "tempo_ratio", "<",
            T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop from the top"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
         _r(movement, "lift_stall", "stall", "lifting", "stalled_frac", ">=",
            T.stalled_frac,
            "the share of the lift, outside its first and last 10% of travel, "
@@ -162,14 +172,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "body_line_deg", "<", T.strict_horizontal,
            "the median shoulder-hip line angle from vertical across the hold",
            "Take every rep through its full range"),
-        _r("front_lever", "bent_arms", "poor scapular retraction", "hold",
+        _r("front_lever", "bent_arms", "bent arms", "hold",
            "arms_straight_frac", "<", T.front_lever_arms_straight_frac,
            "the share of the hold with the elbow angle at or above the "
            "straight-arm threshold",
-           "Set the shoulders down and back first",
-           note="the label names the coached cause; what is measured is elbow "
-                "extension. Bent elbows do not by themselves demonstrate poor "
-                "scapular retraction."),
+           "Keep the arms straight through the hold",
+           note="the label is the observable fact (elbows bent), not a cause: bent "
+                "elbows do not demonstrate a scapular failure and none is claimed."),
         _r("front_lever", "bent_knees", "bent knees", "hold", "legs_straight_frac",
            "<", T.legs_straight_frac,
            "the share of the hold with the knee angle at or above the "
@@ -189,14 +198,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "body_line_deg", "<", T.strict_horizontal,
            "the median shoulder-hip line angle from vertical across the hold",
            "Take every rep through its full range"),
-        _r("planche", "bent_arms", "poor scapular protraction", "hold",
+        _r("planche", "bent_arms", "bent arms", "hold",
            "arms_straight_frac", "<", T.planche_arms_straight_frac,
            "the share of the hold with the elbow angle at or above the "
            "straight-arm threshold",
-           "Push the shoulders away at the top",
-           note="the label names the coached cause; what is measured is elbow "
-                "extension. Bent elbows do not by themselves demonstrate poor "
-                "scapular protraction."),
+           "Keep the arms straight through the hold",
+           note="the label is the observable fact (elbows bent), not a cause: bent "
+                "elbows do not demonstrate a scapular failure and none is claimed."),
         _r("planche", "bent_knees", "bent knees", "hold", "legs_straight_frac", "<",
            T.legs_straight_frac,
            "the share of the hold with the knee angle at or above the "
@@ -247,10 +255,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the slowest speed of the tracked point through the turnaround, in "
            "torso-lengths per second",
            "Pause at the bottom instead of bouncing out of it"),
-        _r("dip", "dropped_descent", "control", "rep", "tempo_ratio", "<",
+        _r("dip", "dropped_descent", "fast descent", "rep", "tempo_ratio", "<",
            T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop from the top"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
         _r("dip", "lift_stall", "stall", "lifting", "stalled_frac", ">=",
            T.stalled_frac,
            "the share of the lift, outside its first and last 10% of travel, "
@@ -271,10 +282,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the 90th percentile of the hips' drop below the shoulder-ankle "
            "line, in torso-lengths",
            "Hold the hips in line - squeeze the glutes"),
-        _r("push_up", "dropped_descent", "control", "rep", "tempo_ratio", "<",
+        _r("push_up", "dropped_descent", "fast descent", "rep", "tempo_ratio", "<",
            T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop from the top"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
         _r("push_up", "lift_stall", "stall", "lifting", "stalled_frac", ">=",
            T.stalled_frac,
            "the share of the lift, outside its first and last 10% of travel, "
@@ -287,10 +301,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the hips' drop from this rep's own standing height, measured over "
            "the ankles, in torso-lengths",
            "Take every rep through its full range"),
-        _r("squat", "dropped_descent", "uncontrolled descent", "rep", "tempo_ratio",
+        _r("squat", "dropped_descent", "fast descent", "rep", "tempo_ratio",
            "<", T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop into the hole"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
         _r("squat", "knee_medial_drift", "knee valgus", "rep", "knee_valgus", ">",
            T.pistol_valgus,
            "the 90th percentile of the knee's sideways offset from the hip-ankle "
@@ -331,10 +348,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the 90th percentile of the hips' horizontal lead over the shoulders, "
            "in torso-lengths (negative = hips ahead)",
            "Keep the chest up - stop leaning back out of it"),
-        _r("pistol_squat", "dropped_descent", "uncontrolled descent", "rep",
+        _r("pistol_squat", "dropped_descent", "fast descent", "rep",
            "tempo_ratio", "<", T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop into the hole"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
         _r("pistol_squat", "arm_swing", "arm swing", "rep", "swing", ">",
            T.swing_torso, "hip travel relative to the origin across the rep",
            "Keep the arms still - no swinging for balance"),
@@ -360,10 +380,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the 90th percentile of the hips' horizontal lead over the shoulders, "
            "in torso-lengths (negative = hips ahead)",
            "Keep the chest up - stop leaning back out of it"),
-        _r("split_squat", "dropped_descent", "uncontrolled descent", "rep",
+        _r("split_squat", "dropped_descent", "fast descent", "rep",
            "tempo_ratio", "<", T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop into the hole"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
     ),
     "bulgarian_split_squat": (
         _r("bulgarian_split_squat", "shallow_depth", "poor range of motion", "rep",
@@ -386,10 +409,13 @@ RULES: dict[str, tuple[Rule, ...]] = {
            "the 90th percentile of the hips' horizontal lead over the shoulders, "
            "in torso-lengths (negative = hips ahead)",
            "Keep the chest up - stop leaning back out of it"),
-        _r("bulgarian_split_squat", "dropped_descent", "uncontrolled descent", "rep",
+        _r("bulgarian_split_squat", "dropped_descent", "fast descent", "rep",
            "tempo_ratio", "<", T.controlled_tempo,
            "the lowering phase lasts less than the threshold share of the lift",
-           "Lower under control - don't drop into the hole"),
+           "Take longer on the way down - the lowering is short next to the lift",
+           note="what is measured is the duration of the descent against the "
+                "lift. A short descent is not, by itself, proof that control "
+                "was lost."),
     ),
 }
 
@@ -511,17 +537,28 @@ def assess(movement: str, ev: Evidence, variant: str = VARIANT_UNSPECIFIED,
     produce an authoritative fault label, whether or not a score was withheld.
 
     A rule written for a different declared variant is left out entirely -
-    not "not observed", which would read as a pass.
+    not "not observed", which would read as a pass. A variant-specific
+    rule under an unspecified variant is kept as unobservable, for the same
+    reason.
     """
     out: list[Assessment] = []
     for rule in rules_for(movement):
-        if not rule.applies_to(variant):
-            continue
         m = ev.get(rule.primitive)
+        if not (rule.applies_to(variant) or rule.abstains_for(variant)):
+            continue
         if blocked:
             out.append(Assessment(rule, UNOBSERVABLE, None, UNMEASURED,
                                   f"{TRACKING_LOSS}: {blocked}", m.window,
                                   m.coverage, variant))
+            continue
+        if rule.abstains_for(variant):
+            # Written for a specific variant and none was declared: not judged,
+            # whatever the number says. Marked, not assumed.
+            out.append(Assessment(
+                rule, UNOBSERVABLE, None, UNMEASURED,
+                f"{UNSUPPORTED_VARIANT}: variant not declared; this check is "
+                f"defined for {'/'.join(rule.variants)}",
+                m.window, m.coverage, variant))
             continue
         if m.state == MEASURED and m.value is not None:
             status = OBSERVED if rule.fires(m.value) else NOT_OBSERVED

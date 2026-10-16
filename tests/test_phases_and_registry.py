@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 
 from barra import config
-from barra.evidence import (INSUFFICIENT_EVIDENCE, MEASURED, PRIMITIVES,
+from barra.evidence import (INSUFFICIENT_EVIDENCE, MEASURED, PRIMITIVES, UNSUPPORTED_VARIANT,
                             UNMEASURED, Evidence, rep_evidence)
 from barra.movements import MOVEMENTS
 from barra.phases import (HAS_TRANSITION, hold_phases, phases_as_dict,
@@ -176,7 +176,7 @@ def test_assess_yields_three_statuses_and_only_observed_fires():
     ev.add("swing", 0.9, phase="rep", window=(0, 90), coverage=1.0)        # fires
     ev.add("lockout_pct", 95.0, phase="support", window=(40, 50), coverage=1.0)  # clean
     ev.add("hang_pct", 50.0, phase="setup", window=(0, 5), coverage=0.1)    # too little
-    by_id = {a.rule.id: a for a in assess("pull_up", ev)}
+    by_id = {a.rule.id: a for a in assess("pull_up", ev, "strict")}
     assert by_id["pull_up.body_swing"].status == OBSERVED
     assert by_id["pull_up.incomplete_lockout"].status == NOT_OBSERVED
     hang = by_id["pull_up.incomplete_hang"]
@@ -195,7 +195,8 @@ def test_blocked_rep_is_unobservable_everywhere_and_fires_nothing():
     assert rows and all(a.status == UNOBSERVABLE for a in rows)
     assert all("not physically possible" in a.reason for a in rows)
     # The compatibility path fires when unblocked, so the two must be told apart.
-    assert any(f.id == "pull_up.body_swing" for f in classify_faults("pull_up", ev))
+    assert any(f.id == "pull_up.body_swing"
+               for f in classify_faults("pull_up", ev, "strict"))
 
 
 def test_assessment_row_is_the_client_contract():
@@ -231,12 +232,17 @@ def test_variant_rules_are_left_out_for_another_variant_and_flagged_when_unspeci
     strict = {a.rule.id for a in assess("pull_up", ev, "strict")}
     for r in strict_only:
         assert r.id not in kipping and r.id in strict
-    # Unspecified: assessed, but the row says the verdict depends on a
-    # standard nobody declared.
+    # Unspecified: the row is present but NOT judged - unobservable with the
+    # unsupported-variant reason - and says the verdict depends on a standard
+    # nobody declared. It never fires, whatever the number.
     rows = {a.rule.id: a.as_dict("r1", 30) for a in assess("pull_up", ev, VARIANT_UNSPECIFIED)}
     for r in strict_only:
         assert rows[r.id]["variantDependent"] is True
-        assert rows[r.id]["status"] == OBSERVED
+        assert rows[r.id]["status"] == UNOBSERVABLE
+        assert rows[r.id]["availability"]["reason"] == UNSUPPORTED_VARIANT
+        assert rows[r.id]["evidence"]["value"] is None
+    assert not any(a.fired for a in assess("pull_up", ev, VARIANT_UNSPECIFIED)
+                   if a.rule in strict_only)
 
 
 def test_unknown_variant_is_reported_not_applied():
@@ -254,9 +260,40 @@ def test_summary_counts_checked_clean_and_unobservable_separately():
     ev_clean = Evidence("pull_up")
     ev_clean.add("swing", 0.1, phase="rep", window=(0, 90), coverage=1.0)
     ev_blind = Evidence("pull_up")
-    s = summarise([assess("pull_up", ev_fire), assess("pull_up", ev_clean),
-                   assess("pull_up", ev_blind)])
+    s = summarise([assess("pull_up", ev_fire, "strict"),
+                   assess("pull_up", ev_clean, "strict"),
+                   assess("pull_up", ev_blind, "strict")])
     row = next(c for c in s["checks"] if c["errorId"] == "pull_up.body_swing")
     assert (row["observed"], row["notObserved"], row["unobservable"]) == (1, 1, 1)
     assert sum(row["reasons"].values()) == 1
     assert s["version"] == ASSESSMENT_VERSION
+
+
+def test_unspecified_variant_abstains_only_on_variant_specific_rules():
+    abstaining = {r.id for rules in RULES.values() for r in rules
+                  if r.abstains_for(VARIANT_UNSPECIFIED)}
+    assert abstaining == {
+        "pull_up.body_swing", "muscle_up.body_swing",
+        "front_lever.bent_knees", "front_lever.piked_hips",
+        "planche.bent_knees", "planche.piked_body"}
+    # Everything else is judged exactly as before, and a declared variant is
+    # untouched by the abstention.
+    ev = Evidence("front_lever")
+    ev.add("swing", 0.9, phase="hold", window=(0, 90), coverage=1.0)
+    ev.add("legs_straight_frac", 0.1, phase="hold", window=(0, 90), coverage=1.0)
+    rows = {a.rule.id: a for a in assess("front_lever", ev, VARIANT_UNSPECIFIED)}
+    assert rows["front_lever.body_swing"].status == OBSERVED
+    assert rows["front_lever.bent_knees"].status == UNOBSERVABLE
+    assert rows["front_lever.bent_knees"].reason.startswith(UNSUPPORTED_VARIANT)
+    declared = {a.rule.id: a for a in assess("front_lever", ev, "full")}
+    assert declared["front_lever.bent_knees"].status == OBSERVED
+
+
+def test_labels_describe_what_is_measured_not_a_cause():
+    for rules in RULES.values():
+        for r in rules:
+            assert "scapular" not in r.name and "control" not in r.name, r.id
+            if r.primitive == "tempo_ratio":
+                assert r.name == "fast descent"
+            if r.id.endswith(".bent_arms"):
+                assert r.name == "bent arms"

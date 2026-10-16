@@ -27,7 +27,7 @@ import com.barrapp.data.RepRow
 /** The faults one rep was actually measured to have, most important first. */
 internal fun repFaults(rep: RepRow): List<String> {
     if (rep.faults.isNotEmpty()) {
-        return rep.faults.map { it.name }.sortedBy { orderOf(it) }
+        return rep.faults.map { canonicalFault(it.name) }.distinct().sortedBy { orderOf(it) }
     }
     return legacyFaults(rep)
 }
@@ -47,10 +47,26 @@ private fun legacyFaults(rep: RepRow): List<String> {
         if (it.value > LEGACY_SWING_TORSO) faults += "momentum"
     }
     rep.penalties.firstOrNull { it.name == "control" }?.let {
-        if ((it.value ?: 0.0) > 0.0) faults += "control"
+        if ((it.value ?: 0.0) > 0.0) faults += "fast descent"
     }
     return faults
 }
+
+/**
+ * Fault names the server used to send, read from sessions stored on the phone.
+ * The server renamed them (the tempo rules fire "fast descent"; the lever bent
+ * elbows fire "bent arms"); an old payload still renders, under the new name.
+ * Kept apart from the tables below, which hold only names the server emits.
+ */
+private val LEGACY_FAULTS = mapOf(
+    "control" to "fast descent",
+    "uncontrolled descent" to "fast descent",
+    "poor scapular retraction" to "bent arms",
+    "poor scapular protraction" to "bent arms",
+)
+
+/** A stored fault name, as the server names it today. */
+internal fun canonicalFault(name: String): String = LEGACY_FAULTS[name] ?: name
 
 /** The one threshold left on the phone, and only for rows measured before the
  *  server named its own faults. Not consulted for anything current. */
@@ -62,7 +78,7 @@ fun repFault(rep: RepRow): String? = when (repFaults(rep).firstOrNull()) {
     "momentum" -> "Momentum"
     "lockout" -> "Not locking out"
     "dead hang" -> "Not a dead hang"
-    "control" -> "Dropped the descent"
+    "fast descent" -> "Descent too fast"
     "stall" -> "Stalled mid-pull"
     "poor transition" -> "Slow transition"
     "bent arms" -> "Bent arms"
@@ -72,15 +88,12 @@ fun repFault(rep: RepRow): String? = when (repFaults(rep).firstOrNull()) {
     "bounce at bottom" -> "Bounced at the bottom"
     "poor range of motion" -> "Short range"
     "sagging hips" -> "Hips sagging"
-    "uncontrolled descent" -> "Dropped the descent"
     "knee valgus" -> "Knees caving in"
     "heel raise" -> "Heels lifting"
     "leaning back" -> "Leaning back"
     "arm swing" -> "Arm swing"
     "piked hips", "piked body" -> "Piked body line"
     "bent knees" -> "Bent knees"
-    "poor scapular retraction" -> "Shoulders not set"
-    "poor scapular protraction" -> "Shoulders not pushed"
     else -> null
 }
 
@@ -122,8 +135,7 @@ private val CUE_ORDER = listOf(
     "poor range of motion", "lockout", "dead hang", "too deep", "no active hang",
     "momentum", "sagging hips", "piked hips", "piked body", "bent arms",
     "bent knees", "knee valgus", "heel raise", "leaning back", "arm swing",
-    "poor scapular retraction", "poor scapular protraction",
-    "control", "uncontrolled descent", "too fast", "bounce at bottom",
+    "fast descent", "too fast", "bounce at bottom",
     "stall", "poor transition",
 )
 
@@ -134,7 +146,7 @@ private val CUES = mapOf(
     "momentum" to "Stop the swing — pull strict, no momentum",
     "lockout" to "Lock out fully at the top of every rep",
     "dead hang" to "Start every rep from a full dead hang",
-    "control" to "Lower under control — don't drop from the top",
+    "fast descent" to "Lower slower — the descent is short next to the pull",
     "stall" to "Drive through the sticking point in one arc",
     "poor transition" to "Get through the transition in one movement",
     "bent arms" to "Press out to straight arms at the top of every rep",
@@ -144,7 +156,6 @@ private val CUES = mapOf(
     "bounce at bottom" to "Pause at the bottom instead of bouncing out of it",
     "poor range of motion" to "Take every rep through its full range",
     "sagging hips" to "Hold the hips in line — squeeze the glutes",
-    "uncontrolled descent" to "Lower under control — don't drop into the hole",
     "knee valgus" to "Drive the knees out over the toes",
     "heel raise" to "Keep the heels down through the whole rep",
     "leaning back" to "Keep the chest up — stop leaning back out of it",
@@ -152,8 +163,6 @@ private val CUES = mapOf(
     "piked hips" to "Hold the body flat — no piking at the hips",
     "piked body" to "Hold the body flat — no piking at the hips",
     "bent knees" to "Keep the legs straight through the hold",
-    "poor scapular retraction" to "Set the shoulders down and back first",
-    "poor scapular protraction" to "Push the shoulders away at the top",
 )
 
 /** Advice is tied to the selected rep's measured fault. */

@@ -18,13 +18,13 @@ import com.barrapp.data.RepRow
  */
 
 /** The fault, named the way the screens say it. */
-fun faultEs(key: String): String = FAULTS_ES[key] ?: key.replaceFirstChar { it.uppercase() }
+fun faultEs(key: String): String = FAULTS_ES[canonicalFault(key)] ?: key.replaceFirstChar { it.uppercase() }
 
 /** The single line that goes over the video. */
-fun cueEs(key: String): String? = CUES_ES[key]
+fun cueEs(key: String): String? = CUES_ES[canonicalFault(key)]
 
 /** The corrective the coach screen offers for a fault. */
-fun drillEs(key: String): Drill? = DRILLS_ES[key]
+fun drillEs(key: String): Drill? = DRILLS_ES[canonicalFault(key)]
 
 data class Drill(
     val title: String,
@@ -49,10 +49,7 @@ private val FAULTS_ES = mapOf(
     "heel raise" to "Talones levantados",
     "leaning back" to "Espalda echada atrás",
     "arm swing" to "Brazos sueltos",
-    "poor scapular retraction" to "Escápulas sin retraer",
-    "poor scapular protraction" to "Escápulas sin proyectar",
-    "control" to "Descenso sin control",
-    "uncontrolled descent" to "Caída sin control",
+    "fast descent" to "Bajada rápida",
     "too fast" to "Reps lanzadas",
     "bounce at bottom" to "Rebote abajo",
     "stall" to "Estancamiento a medio tirón",
@@ -63,7 +60,7 @@ private val CUES_ES = mapOf(
     "momentum" to "Corta el balanceo — tira estricto, sin impulso.",
     "lockout" to "Bloquea del todo arriba en cada repetición.",
     "dead hang" to "Empieza cada rep desde un dead hang completo.",
-    "control" to "Baja controlando — no te sueltes desde arriba.",
+    "fast descent" to "Baja más despacio: la bajada es corta comparada con la subida.",
     "stall" to "Atraviesa el punto de estancamiento en un solo arco.",
     "poor transition" to "Pasa la transición en un único movimiento.",
     "bent arms" to "Estira los brazos del todo arriba.",
@@ -73,7 +70,6 @@ private val CUES_ES = mapOf(
     "bounce at bottom" to "Haz una pausa abajo en vez de rebotar.",
     "poor range of motion" to "Lleva cada rep por su recorrido completo.",
     "sagging hips" to "Mantén la cadera en línea — aprieta los glúteos.",
-    "uncontrolled descent" to "Baja controlando — no te dejes caer.",
     "knee valgus" to "Lleva las rodillas hacia fuera, sobre las puntas.",
     "heel raise" to "Mantén los talones en el suelo toda la repetición.",
     "leaning back" to "Pecho arriba — deja de echarte hacia atrás.",
@@ -81,8 +77,6 @@ private val CUES_ES = mapOf(
     "piked hips" to "Cuerpo plano — sin pica en la cadera.",
     "piked body" to "Cuerpo plano — sin pica en la cadera.",
     "bent knees" to "Piernas estiradas durante todo el hold.",
-    "poor scapular retraction" to "Fija los hombros abajo y atrás antes de tirar.",
-    "poor scapular protraction" to "Empuja los hombros hacia fuera al bloquear.",
 )
 
 private val DRILLS_ES = mapOf(
@@ -96,9 +90,7 @@ private val DRILLS_ES = mapOf(
         "Aprender dónde empieza la repetición", "3 min"),
     "no active hang" to Drill("Scapular pull-up", "3×8",
         "Activar el dorsal sin doblar el codo", "4 min"),
-    "control" to Drill("Negativas lentas", "3×4",
-        "Bajar en cinco segundos, sin soltarse", "5 min"),
-    "uncontrolled descent" to Drill("Negativas lentas", "3×4",
+    "fast descent" to Drill("Negativas lentas", "3×4",
         "Bajar en cinco segundos, sin soltarse", "5 min"),
     "too fast" to Drill("Tempo 3-1-3", "3×5",
         "Marcar el ritmo con la respiración", "5 min"),
@@ -124,10 +116,6 @@ private val DRILLS_ES = mapOf(
         "Pecho arriba con carga delante", "5 min"),
     "arm swing" to Drill("Series con brazos cruzados", "3×6",
         "Quitar el brazo de la ecuación", "4 min"),
-    "poor scapular retraction" to Drill("Scapular pull-up", "3×8",
-        "Bajar los hombros antes de tirar", "4 min"),
-    "poor scapular protraction" to Drill("Push-up plus", "3×10",
-        "Empujar el suelo al final de la rep", "4 min"),
     "too deep" to Drill("Fondo a paralela", "3×6",
         "Parar a noventa grados", "4 min"),
     "bounce at bottom" to Drill("Pausa abajo", "3×5",

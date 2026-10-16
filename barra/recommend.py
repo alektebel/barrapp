@@ -40,9 +40,6 @@ TRACK_CHAIN: dict[str, tuple[str, ...]] = {
 # graph; the reason is what the athlete actually has to change.
 FAILURE_FIX: dict[str, tuple[str, str]] = {
     # front lever
-    "poor scapular retraction": ("scapular_pull",
-        "The shoulders are not held down and back, so the arms take the load. "
-        "Work scapular pulls to own the retraction before you hang it out."),
     "piked hips": ("hollow_hold",
         "The hips drop out of the body line. A hollow body keeps the ribs down "
         "and the hips in line with the shoulders."),
@@ -53,9 +50,6 @@ FAILURE_FIX: dict[str, tuple[str, str]] = {
         "The body is not held horizontal. Drop to the rung you can hold at the "
         "line and build the time there."),
     # planche
-    "poor scapular protraction": ("planche_lean",
-        "The shoulders are not pushed forward and up, so the elbows bend. "
-        "Planche leans build the protraction that carries the body."),
     "piked body": ("frog_stand",
         "The hips pike. Frog stand teaches the hips to sit back into the line."),
     # muscle-up / bar
@@ -66,9 +60,9 @@ FAILURE_FIX: dict[str, tuple[str, str]] = {
         "The top is not owned. Chest-to-bar pull-ups build a full lockout."),
     "dead hang": ("dead_hang",
         "The rep does not start from a full hang. Build the dead hang first."),
-    "control": ("negative_pull_up",
-        "The descent was dropped. Negatives teach control through the whole "
-        "range."),
+    "fast descent": ("negative_pull_up",
+        "The descent is short next to the lift. Negatives teach a slower "
+        "lowering through the whole range."),
     "stall": ("explosive_pull_up",
         "The ascent grinds at the sticking point. Explosive pulls build the "
         "speed the transition needs."),
@@ -88,8 +82,6 @@ FAILURE_FIX: dict[str, tuple[str, str]] = {
         "position first."),
     "heel raise": ("squat",
         "The standing heel lifts. Build ankle mobility and squat depth."),
-    "uncontrolled descent": ("negative_pull_up",
-        "The descent was dropped. Lower under control on the way down."),
     "arm swing": ("squat",
         "The arms are used for balance. Own the squat without the swing."),
 }
@@ -104,25 +96,25 @@ FAILURE_FIX: dict[str, tuple[str, str]] = {
 # then control, then tempo. Every movement with rules is covered
 # (tests/test_top_fixes.py).
 PRIORITY: dict[str, tuple[str, ...]] = {
-    "front_lever": ("poor scapular retraction", "piked hips", "bent knees",
+    "front_lever": ("bent arms", "piked hips", "bent knees",
                     "poor range of motion", "momentum"),
-    "planche": ("poor scapular protraction", "piked body", "bent knees",
+    "planche": ("bent arms", "piked body", "bent knees",
                 "poor range of motion", "momentum"),
     "muscle_up": ("momentum", "stall", "poor transition", "lockout",
-                  "dead hang", "control", "bent arms"),
-    "pull_up": ("momentum", "lockout", "dead hang", "control", "stall",
+                  "dead hang", "fast descent", "bent arms"),
+    "pull_up": ("momentum", "lockout", "dead hang", "fast descent", "stall",
                 "no active hang", "too fast"),
-    "dip": ("too deep", "lockout", "bounce at bottom", "control", "stall"),
-    "push_up": ("sagging hips", "poor range of motion", "lockout", "control",
+    "dip": ("too deep", "lockout", "bounce at bottom", "fast descent", "stall"),
+    "push_up": ("sagging hips", "poor range of motion", "lockout", "fast descent",
                 "stall"),
     "squat": ("knee valgus", "poor range of motion", "heel raise",
-              "uncontrolled descent", "stall"),
+              "fast descent", "stall"),
     "pistol_squat": ("knee valgus", "poor range of motion", "leaning back",
-                     "heel raise", "uncontrolled descent", "arm swing"),
+                     "heel raise", "fast descent", "arm swing"),
     "split_squat": ("knee valgus", "poor range of motion", "leaning back",
-                    "heel raise", "uncontrolled descent"),
+                    "heel raise", "fast descent"),
     "bulgarian_split_squat": ("knee valgus", "poor range of motion", "leaning back",
-                              "heel raise", "uncontrolled descent"),
+                              "heel raise", "fast descent"),
 }
 
 

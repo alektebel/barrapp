@@ -313,8 +313,7 @@ _CUE_ORDER = [
     "poor range of motion", "lockout", "dead hang", "too deep", "no active hang",
     "momentum", "sagging hips", "piked hips", "piked body", "bent arms",
     "bent knees", "knee valgus", "heel raise", "leaning back", "arm swing",
-    "poor scapular retraction", "poor scapular protraction",
-    "control", "uncontrolled descent", "too fast", "bounce at bottom",
+    "fast descent", "too fast", "bounce at bottom",
     "stall", "poor transition",
 ]
 

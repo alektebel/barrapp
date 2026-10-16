@@ -732,15 +732,33 @@ def _stalled_frac(signal, start: int, turn: int, stall_rate: float) -> float:
     return stalled_fraction(signal, start, turn, stall_rate)
 
 
+# Hip-to-hip distance, in torso-lengths, below which the image does not say
+# which way is medial.
+MIN_HIP_SEPARATION = 0.1
+
+
 def _knee_valgus(kp: np.ndarray, torso: float, seg: slice) -> float:
+    """The knee's MEDIAL offset from the hip-ankle line, torso-lengths.
+
+    Signed: positive = the knee has moved toward the body's midline (valgus),
+    negative = away from it (a knee pushed out, which is not valgus and never
+    fires the rule). "Toward the midline" is resolved per leg from the other
+    hip: the left and right knees mirror each other in the image, so each is
+    measured along the direction from its own hip to the opposite hip. Frames
+    where the hips are not separated enough to say which way is medial (a
+    side-on view) are left out, not guessed.
+    """
     dev = []
-    for side in ("left", "right"):
+    for side, other in (("left", "right"), ("right", "left")):
         kx = kp[:, S.KP_INDEX[f"{side}_knee"], 0]
         hx = kp[:, S.KP_INDEX[f"{side}_hip"], 0]
         ax = kp[:, S.KP_INDEX[f"{side}_ankle"], 0]
+        ox = kp[:, S.KP_INDEX[f"{other}_hip"], 0]
         ok = (_ok(kp, f"{side}_knee") & _ok(kp, f"{side}_hip")
-              & _ok(kp, f"{side}_ankle"))
-        d = (np.abs(kx - (hx + ax) / 2.0) / torso)[seg]
+              & _ok(kp, f"{side}_ankle") & _ok(kp, f"{other}_hip"))
+        gap = (ox - hx) / torso
+        ok = ok & (np.abs(gap) >= MIN_HIP_SEPARATION)
+        d = (np.sign(ox - hx) * (kx - (hx + ax) / 2.0) / torso)[seg]
         d = d[ok[seg] & np.isfinite(d)]
         if d.size:
             dev.append(float(np.percentile(d, 90)))

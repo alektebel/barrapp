@@ -82,6 +82,9 @@ FAULT_CLAIMS: dict[str, tuple[str, str]] = {
     "no active hang": ("Sin colgado activo", r"colgado activo"),
     "control": ("Caída sin control", r"sin control|descontrolad|brusc|te dejas caer|caes\b|caida"),
     "uncontrolled descent": ("Caída sin control", r"sin control|descontrolad|brusc|te dejas caer|caes\b|caida"),
+    "fast descent": ("Bajada rápida",
+        r"bajada (muy |demasiado )?(rapida|corta)|bajas (muy |demasiado )?(rapido|deprisa)"
+        r"|sin control|descontrolad|brusc|te dejas caer|caes\b|caida"),
     "stall": ("Estancamiento", r"estancamiento|estancas|atasc|punto muerto|te frenas|se frena"),
     "poor transition": ("Transición lenta", r"transicion (es |resulta )?(muy |demasiado )?lent"),
     "bent arms": ("Brazos sin extender", r"brazos (flexionados|doblados|sin extender)"),

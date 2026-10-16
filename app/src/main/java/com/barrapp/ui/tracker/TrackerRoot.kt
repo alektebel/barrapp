@@ -682,7 +682,8 @@ private fun rules(state: UiState): List<CoachRule> {
                     "Comprobado en ${check.notObserved} reps y limpio en todas ellas."
                 else ->
                     "No se pudo comprobar en esta serie — ${check.unobservable} reps sin " +
-                        "evidencia suficiente. Cambia el ángulo de cámara y vuelve a filmar."
+                        "evidencia suficiente: el ángulo de cámara no lo deja ver, o depende de una " +
+                        "variante del ejercicio que el vídeo no aclara."
             },
             cue = cueEs(check.name).orEmpty(),
         )

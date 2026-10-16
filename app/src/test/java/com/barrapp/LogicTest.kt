@@ -524,11 +524,11 @@ object LogicTest {
         // redesigned screens fall back to a raw measurement key in front of a
         // Spanish-speaking athlete.
         val named = listOf(
-            "momentum", "lockout", "dead hang", "control", "stall", "poor transition",
+            "momentum", "lockout", "dead hang", "fast descent", "stall", "poor transition",
             "bent arms", "no active hang", "too fast", "too deep", "bounce at bottom",
-            "poor range of motion", "sagging hips", "uncontrolled descent", "knee valgus",
+            "poor range of motion", "sagging hips", "knee valgus",
             "heel raise", "leaning back", "arm swing", "piked hips", "piked body",
-            "bent knees", "poor scapular retraction", "poor scapular protraction",
+            "bent knees",
         )
         check("every measured fault has a Spanish name",
             named.all { faultEs(it) != it.replaceFirstChar { c -> c.uppercase() } },
@@ -536,6 +536,10 @@ object LogicTest {
         check("every measured fault has a Spanish cue",
             named.all { cueEs(it) != null },
             named.filter { cueEs(it) == null }.toString())
+        check("old stored names still read in Spanish, under the new name",
+            listOf("control", "uncontrolled descent").all { faultEs(it) == "Bajada rápida" } &&
+                listOf("poor scapular retraction", "poor scapular protraction")
+                    .all { faultEs(it) == faultEs("bent arms") })
         check("an unknown fault falls back to its own name rather than vanishing",
             faultEs("something new") == "Something new")
         check("ladder movements are named in Spanish",

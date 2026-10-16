@@ -68,11 +68,11 @@ class TopFixesTest {
     @Test
     fun `every fault the server can rank has a spanish name and cue`() {
         // barra/rules.py rule names (tests/test_top_fixes.py pins them to PRIORITY).
-        val names = listOf("arm swing", "bent arms", "bent knees", "bounce at bottom", "control",
+        val names = listOf("arm swing", "bent arms", "bent knees", "bounce at bottom", "fast descent",
             "dead hang", "heel raise", "knee valgus", "leaning back", "lockout", "momentum",
             "no active hang", "piked body", "piked hips", "poor range of motion",
-            "poor scapular protraction", "poor scapular retraction", "poor transition",
-            "sagging hips", "stall", "too deep", "too fast", "uncontrolled descent")
+            "poor transition",
+            "sagging hips", "stall", "too deep", "too fast")
         for (n in names) {
             assertNotEquals(n, faultEs(n).lowercase())
             assertNotNull("no cue for $n", cueEs(n))

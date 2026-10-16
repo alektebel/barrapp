@@ -130,7 +130,7 @@ def test_a_declared_view_that_is_not_a_bin_is_not_believed():
 # ---------------------------------------------------------------------------
 def test_a_fault_states_the_number_that_fired_it():
     ev = Evidence.from_values({"swing": 0.55}, track="muscle_up")
-    fault, = classify_faults("muscle_up", ev)
+    fault, = classify_faults("muscle_up", ev, "strict")
     assert fault.name == "momentum"
     assert fault.primitive == "swing"
     assert fault.value == pytest.approx(0.55)
