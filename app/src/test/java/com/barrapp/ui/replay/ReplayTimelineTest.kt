@@ -46,12 +46,22 @@ class ReplayTimelineTest {
         val segments = plan.compactSegments()
         assertEquals(2, segments.size)
         assertEquals(0.7, segments[0].start, 1e-9)
-        assertEquals(4.3, segments[0].endInclusive, 1e-9)
+        // Rep 3 ends at 4.0: the cut waits out its verdict.
+        assertEquals(5.5, segments[0].endInclusive, 1e-9)
         assertEquals(7.7, segments[1].start, 1e-9)
         assertNull(plan.compactJump(3.5))
-        assertEquals(7.7, plan.compactJump(5.0)!!, 1e-9)
-        assertTrue(plan.compactJump(10.4)!!.isNaN())
-        assertTrue(plan.compactByDefault)   // 10 s window, ~3.6 s of rest
+        assertNull(plan.compactJump(5.0))   // "Rep 3 limpia" is still on screen
+        assertEquals(7.7, plan.compactJump(6.0)!!, 1e-9)
+        assertFalse(plan.compactByDefault)  // only 2.4 s left to skip
+        val breather = ReplayPlan(listOf(rep(0, 1.0, 2.0), rep(1, 9.0, 10.0)), 0.5, 11.5)
+        assertTrue(breather.compactByDefault)  // the 2 s - 9 s rest is worth skipping
+    }
+
+    @Test fun `compact playback never skips a verdict`() {
+        for (rep in plan.reps) {
+            val holdEnd = rep.endS + ReplayPlan.VERDICT_HOLD_S - 0.01
+            if (holdEnd <= plan.windowEnd) assertNull(plan.compactJump(holdEnd))
+        }
     }
 
     @Test fun `an unbroken set is not compacted by default`() {

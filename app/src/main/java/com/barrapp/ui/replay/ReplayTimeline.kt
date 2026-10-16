@@ -73,15 +73,17 @@ class ReplayPlan(
 
     /**
      * The stretches worth playing when only the reps are wanted: each rep
-     * padded by [padS], merged with its neighbour when the rest between them
-     * is under [gapS]. This is the cut the measurement makes, applied at
+     * from [padS] before it until its verdict has been on screen for
+     * [VERDICT_HOLD_S], merged with its neighbour when the rest between them
+     * is under [gapS]. Cutting sooner would skip the verdict - the feedback
+     * the replay is for. This is the cut the measurement makes, applied at
      * playback - the file on the phone is never rewritten.
      */
     fun compactSegments(gapS: Double = COMPACT_GAP_S, padS: Double = COMPACT_PAD_S): List<ClosedFloatingPointRange<Double>> {
         val out = mutableListOf<ClosedFloatingPointRange<Double>>()
         for (rep in reps) {
             val a = (rep.startS - padS).coerceAtLeast(windowStart)
-            val b = (rep.endS + padS).coerceAtMost(windowEnd)
+            val b = (rep.endS + maxOf(padS, VERDICT_HOLD_S)).coerceAtMost(windowEnd)
             val last = out.lastOrNull()
             if (last != null && a - last.endInclusive <= gapS) {
                 out[out.lastIndex] = last.start..maxOf(last.endInclusive, b)

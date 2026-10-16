@@ -141,8 +141,8 @@ fun SessionScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 androidx.compose.material3.Text(
-                    if (onWatchReplay != null) "Watch the replay"
-                    else "Replay not kept on device",
+                    if (onWatchReplay != null) "Ver la serie en vídeo"
+                    else "El vídeo no está en este teléfono",
                     style = N.button.copy(
                         color = if (onWatchReplay != null) Nocturne.accentText
                         else Nocturne.fgA(0.4f)),
@@ -155,7 +155,7 @@ fun SessionScreen(
                     .then(NoRipple.noRipple(onToggleReps)),
                 contentAlignment = Alignment.Center,
             ) {
-                androidx.compose.material3.Text("Each rep", style = N.button
+                androidx.compose.material3.Text("Cada rep", style = N.button
                     .copy(color = Nocturne.fg))
             }
         }
