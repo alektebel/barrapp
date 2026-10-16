@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Valorar técnica</title>
+<style>
+:root{--bg:#0f1115;--panel:#181b22;--line:#2a2f3a;--tx:#e8eaf0;--mut:#8b93a5;--ac:#5aa9ff;--ok:#4cc38a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.4 system-ui,sans-serif}
+main{max-width:980px;margin:0 auto;padding:12px 16px 40px}
+.top{display:flex;flex-wrap:wrap;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.prog{color:var(--mut)} .prog b{color:var(--tx)}
+select,button,textarea{font:inherit;color:var(--tx);background:var(--panel);border:1px solid var(--line);border-radius:8px}
+select{padding:6px 8px} button{padding:8px 14px;cursor:pointer} button:hover{border-color:var(--ac)}
+button.primary{background:var(--ac);color:#06121f;border-color:var(--ac);font-weight:600}
+video{width:100%;max-height:62vh;background:#000;border-radius:10px;display:block}
+.meta{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--mut);margin:8px 0;font-size:14px}
+.meta b{color:var(--tx);font-weight:600}
+.ctl{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.ctl button.on{border-color:var(--ac);color:var(--ac)}
+label.q{display:block;font-size:18px;margin:14px 0 6px}
+textarea{width:100%;min-height:150px;padding:10px;resize:vertical}
+.row{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin:10px 0;font-size:14px}
+.stars button{padding:4px 11px} .stars button.on{background:var(--ac);color:#06121f}
+.acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.done{color:var(--ok)} small{color:var(--mut)} #msg{color:var(--mut);margin-top:8px;min-height:1.3em}
+</style></head><body><main>
+<div class="top">
+ <div class="prog" id="prog">Cargando…</div>
+ <div>
+  <select id="fview"><option value="p">Pendientes</option><option value="d">Hechos</option><option value="a">Todos</option></select>
+  <select id="fmov"><option value="">Todos los movimientos</option></select>
+ </div>
+</div>
+<video id="v" controls playsinline preload="metadata"></video>
+<div class="ctl">
+ <button data-r="0.25">0.25×</button><button data-r="0.5">0.5×</button><button data-r="1" class="on">1×</button>
+ <button id="bm">◀ fotograma ( , )</button><button id="bp">( . ) fotograma ▶</button>
+</div>
+<div class="meta" id="meta"></div>
+<label class="q" for="fb">¿Qué tal ha hecho la técnica?</label>
+<textarea id="fb" placeholder="Ej.: Rep 2 y 3: no bloquea arriba. Balanceo en todas. Bajada controlada."></textarea>
+<div class="row">
+ <span class="stars" id="stars">Nota global: <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button></span>
+ <label>Movimiento (si la carpeta está mal o falta): <select id="mv"></select></label>
+ <label><input type="checkbox" id="un"> no se puede valorar (vídeo malo / no se ve)</label>
+</div>
+<div class="acts">
+ <button id="prev">Anterior</button><button id="skip">Saltar</button>
+ <button id="save" class="primary">Guardar y siguiente (Ctrl+Enter)</button>
+</div>
+<div id="msg"></div>
+<small>Teclas (fuera del cuadro): espacio = play/pausa · , . = fotograma · 1–5 = nota</small>
+</main>
+<script>
+const NAMES={push_up:"Flexión",pull_up:"Dominada",dip:"Fondo",muscle_up:"Muscle-up",squat:"Sentadilla",
+barbell_squat:"Sentadilla con barra",bench_press:"Press banca",deadlift:"Peso muerto",handstand:"Pino",
+front_lever:"Front lever",back_lever:"Back lever",planche:"Plancha (planche)",human_flag:"Bandera humana",
+knee_raise:"Elevación de rodillas",pistol_squat:"Sentadilla pistol",split_squat:"Zancada dividida",
+bulgarian_split_squat:"Sentadilla búlgara",weighted_dip:"Fondo lastrado",weighted_pull_up:"Dominada lastrada",
+weighted_squat:"Sentadilla lastrada",own:"Propio"};
+const SRC={corpus:"corpus",app:"app",repo:"repo"};
+const nm=k=>k?(NAMES[k]||k):"";
+const $=id=>document.getElementById(id), v=$("v");
+let items=[],cur=null,rating=null,poll=null;
+const LS=k=>"evalweb:"+k;
+const lget=k=>{try{return JSON.parse(localStorage.getItem(LS(k)))}catch(e){return null}};
+const lset=(k,x)=>{try{x==null?localStorage.removeItem(LS(k)):localStorage.setItem(LS(k),JSON.stringify(x))}catch(e){}};
+const byId=s=>items.find(i=>i.sha256===s);
+const match=i=>{const w=$("fview").value,m=$("fmov").value;
+ return (w==="a"||(w==="p")===!i.done)&&(!m||(i.movementFolder||"_")===m)};
+function fmt(s){if(!isFinite(s))return"…";const m=Math.floor(s/60);return m+":"+String(Math.floor(s%60)).padStart(2,"0")}
+function progress(){const d=items.filter(i=>i.done).length;
+ $("prog").innerHTML="Valorados <b>"+d+"</b> de <b>"+items.length+"</b>"+(hashing?" <small>(calculando "+hashing+" más…)</small>":"")}
+let hashing=0;
+async function load(){
+ const r=await (await fetch("/api/videos")).json();
+ items=r.items;hashing=r.totalFiles-r.hashed;
+ const ms=[...new Set(items.map(i=>i.movementFolder||"_"))].sort();
+ const sel=$("fmov"),keep=sel.value;
+ sel.innerHTML='<option value="">Todos los movimientos</option>'+ms.map(m=>`<option value="${m}">${m==="_"?"(sin carpeta)":nm(m)}</option>`).join("");
+ sel.value=keep;
+ const all=[...new Set(items.map(i=>i.movementFolder).filter(Boolean))].sort();
+ const mv=$("mv"),mk=mv.value;
+ mv.innerHTML='<option value="">(la de la carpeta)</option>'+all.map(m=>`<option value="${m}">${nm(m)}</option>`).join("")+'<option value="otro">otro</option>';
+ mv.value=mk;
+ progress();
+ if(!cur){const f=items.find(match);if(f)show(f.sha256)}
+ if(hashing&&!poll)poll=setInterval(load,5000);
+ if(!hashing&&poll){clearInterval(poll);poll=null}
+}
+function setRating(n){rating=n;[...$("stars").querySelectorAll("button")].forEach((b,k)=>b.classList.toggle("on",k+1===n))}
+function draft(){return{fb:$("fb").value,rating,mv:$("mv").value,un:$("un").checked}}
+function saveDraft(){if(cur)lset("d:"+cur,draft())}
+function show(sha){
+ cur=sha;const it=byId(sha);if(!it)return;
+ v.src="/video/"+sha;v.playbackRate=1;rate(1);
+ const a=lget("d:"+sha)||(it.answer&&{fb:it.answer.feedback,rating:it.answer.rating,
+  mv:it.answer.movement&&it.answer.movement!==it.movementFolder?it.answer.movement:"",un:it.answer.unassessable})||{};
+ $("fb").value=a.fb||"";setRating(a.rating||null);$("mv").value=a.mv||"";$("un").checked=!!a.un;
+ const pos=items.indexOf(it)+1;
+ $("meta").innerHTML=`<span>Movimiento: <b>${it.movementFolder?nm(it.movementFolder):"sin carpeta"}</b></span>
+  <span>Fuente: <b>${SRC[it.source]}</b></span><span>Duración: <b id="dur">…</b></span>
+  <span>Vídeo <b>${pos} / ${items.length}</b></span>${it.done?'<span class="done">✓ ya valorado (puedes sobrescribir)</span>':""}`;
+ $("msg").textContent="";lset("last",sha);
+}
+v.addEventListener("loadedmetadata",()=>{const d=$("dur");if(d)d.textContent=fmt(v.duration)});
+function nav(dir){
+ const n=items.length;if(!n)return;let k=items.findIndex(i=>i.sha256===cur);
+ for(let s=0;s<n;s++){k=(k+dir+n)%n;if(match(items[k])){show(items[k].sha256);return}}
+ $("msg").textContent="No hay más vídeos con este filtro."
+}
+async function save(){
+ const fb=$("fb").value.trim();
+ if(!fb&&!rating&&!$("un").checked){$("msg").textContent="Escribe algo, pon nota o marca «no se puede valorar».";return}
+ const sha=cur;
+ const r=await fetch("/api/save",{method:"POST",body:JSON.stringify({sha256:sha,feedback:fb,rating,
+  movement:$("mv").value,unassessable:$("un").checked,durationS:v.duration})});
+ if(!r.ok){$("msg").textContent="Error al guardar: "+(await r.text());return}
+ const rec=await r.json();const it=byId(sha);it.done=true;it.answer=rec;lset("d:"+sha,null);
+ progress();nav(1);
+}
+function rate(x){v.playbackRate=x;document.querySelectorAll("[data-r]").forEach(b=>b.classList.toggle("on",+b.dataset.r===x))}
+document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>rate(+b.dataset.r));
+function step(d){v.pause();v.currentTime=Math.max(0,v.currentTime+d/30)}
+$("bm").onclick=()=>step(-1);$("bp").onclick=()=>step(1);
+$("save").onclick=save;$("skip").onclick=()=>nav(1);$("prev").onclick=()=>nav(-1);
+$("stars").querySelectorAll("button").forEach((b,k)=>b.onclick=()=>{setRating(rating===k+1?null:k+1);saveDraft()});
+["fb","mv","un"].forEach(i=>$(i).addEventListener("input",saveDraft));
+$("mv").addEventListener("change",saveDraft);$("un").addEventListener("change",saveDraft);
+$("fview").onchange=$("fmov").onchange=()=>{const f=items.find(match);if(f)show(f.sha256);else $("msg").textContent="No hay vídeos con este filtro."};
+document.addEventListener("keydown",e=>{
+ if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();return}
+ const t=e.target.tagName;if(t==="TEXTAREA"||t==="SELECT"||t==="INPUT")return;
+ if(e.key===" "){e.preventDefault();v.paused?v.play():v.pause()}
+ else if(e.key===","){step(-1)}else if(e.key==="."){step(1)}
+ else if(/^[1-5]$/.test(e.key)){setRating(+e.key);saveDraft()}
+});
+load();
+</script></body></html>
