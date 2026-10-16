@@ -68,6 +68,12 @@ data class CoachData(
     val rules: List<CoachRule>,
     val drills: List<Drill>,
     val totalMinutes: Int,
+    /** Plain statement about the last session when it could not be scored. */
+    val notice: String? = null,
+    /** "De tu última sesión puntuada: Movimiento · fecha" when the last session was not scored. */
+    val basisLabel: String? = null,
+    /** "Movimiento · fecha" of the scored session the rules and focus come from. */
+    val rulesLabel: String = "",
 )
 
 /**
@@ -105,7 +111,8 @@ fun TrackerCoach(
             Text("BarrApp", style = T.eyebrowWide)
             Text("COACH", style = T.pageTitle)
             Text(
-                if (data.sessions > 0)
+                if (data.basisLabel != null) data.basisLabel
+                else if (data.sessions > 0)
                     if (data.sessions == 1) "Basado en tu última sesión de ${data.movement}"
                     else "Basado en tus últimas ${data.sessions} sesiones de ${data.movement}"
                 else "Todavía sin sesiones que leer",
@@ -114,13 +121,25 @@ fun TrackerCoach(
             )
         }
 
+        data.notice?.let { notice ->
+            TkCard {
+                Text("SIN PUNTUAR", style = T.sectionTitle)
+                Spacer(Modifier.height(6.dp))
+                Text(notice, style = T.bodyS)
+            }
+        }
+
         if (data.focus == null) {
             TkCard {
                 Text("NADA QUE CORREGIR TODAVÍA", style = T.sectionTitle)
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "El coach solo habla de errores que se han medido. Filma una serie " +
-                        "y trabajará sobre lo que salga de ella.",
+                    if (data.notice != null)
+                        "Aún no hay ninguna sesión puntuada de la que sacar errores. " +
+                            "Filma otra serie de cuerpo entero y trabajará sobre lo que salga."
+                    else
+                        "El coach solo habla de errores que se han medido. Filma una serie " +
+                            "y trabajará sobre lo que salga de ella.",
                     style = T.bodyS,
                 )
                 Spacer(Modifier.height(16.dp))
@@ -134,7 +153,7 @@ fun TrackerCoach(
             SlideUp(delayMillis = 100) {
                 TkCard(padding = PaddingValues(0.dp)) {
                     Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
-                        Eyebrow("Reglas de técnica · ${data.movement}")
+                        Eyebrow("Reglas de técnica · ${data.rulesLabel.ifBlank { data.movement }}")
                         Text(
                             "El sistema evalúa estos criterios en cada repetición",
                             style = T.noteNine,

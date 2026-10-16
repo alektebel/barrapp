@@ -374,10 +374,12 @@ private fun ResultsPhase(
                             style = T.bodyS,
                         )
                         Text(
-                            scoreLabel(results.score) + when (results.aboveAverage) {
-                                true -> " — por encima de tu media"
-                                false -> " — algo por debajo de tu media"
-                                null -> " — tu primera medición"
+                            scoreLabel(results.score) + when {
+                                // An unscored set is not a measurement.
+                                results.score == null -> ""
+                                results.aboveAverage == true -> " — por encima de tu media"
+                                results.aboveAverage == false -> " — algo por debajo de tu media"
+                                else -> " — tu primera medición"
                             },
                             style = mono(10, 0.05f, scoreInk(results.score)),
                             modifier = Modifier.padding(top = 4.dp),

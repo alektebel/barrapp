@@ -199,7 +199,7 @@ fun TrackerRoot(
                             },
                             stages = stages,
                             activeStage = active,
-                            results = state.analysis?.let { resultsData(it, state.days) },
+                            results = state.analysis?.let { resultsData(it, state.days, state.current?.id) },
                             lastAnalyzed = lastAnalyzed(state.days),
                             standard = standard,
                             camera = camera,
@@ -381,7 +381,7 @@ private fun SessionSheet(
     )
     // What to fix first, then the server's own account - which, on a clip
     // with nothing counted, is the only place the athlete learns why.
-    val summary = resultsData(a, state.days)
+    val summary = resultsData(a, state.days, state.current?.id)
     androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 16.dp))
     if (a.repCount > 0) {
         com.barrapp.ui.tracker.FixesCard(summary.fixes, unjudged = summary.unjudged)
@@ -552,9 +552,7 @@ private fun stagesFor(state: UiState): Pair<List<String>, Int> {
     return stages to idx
 }
 
-private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
-    val priorScores = days.filter { it.date != a.sessionDate }.mapNotNull { it.score }
-    val priorMean = priorScores.takeIf { it.isNotEmpty() }?.average()
+private fun resultsData(a: Analysis, days: List<DayEntry>, jobId: String? = null): ResultsData {
     val verifiedXp = a.reps.count { it.score != null && it.complete }
     return ResultsData(
         headline = a.headline,
@@ -582,7 +580,7 @@ private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
         // screen totals: never a round number picked to look generous.
         xp = if (verifiedXp == 0) 0 else verifiedXp * ((a.sessionScore ?: 0) / 5) + 50,
         unjudged = unjudgedNote(a),
-        aboveAverage = priorMean?.let { (a.sessionScore ?: 0) >= it },
+        aboveAverage = ResultComparison.aboveAverage(a, days, jobId),
     )
 }
 
@@ -644,19 +642,29 @@ private fun progressData(state: UiState): ProgressData {
 }
 
 private fun coachData(state: UiState): CoachData {
-    val rows = FaultTrend.rows(state.faults)
-    // The movement named in the header is the one the faults below come from,
-    // not the goal: the ledger is per day, so take the movement that dominates
-    // the days it covers (scored reps first).
-    val faultDays = state.days.filter { state.faults[it.date].orEmpty().isNotEmpty() }
-    val focusKey = faultDays.flatMap { it.byMovement.values }
-        .groupBy { it.exercise }
-        .maxByOrNull { (_, v) -> v.sumOf { it.verified } * 1000 + v.sumOf { it.reps } }
-        ?.key
-        ?: state.goals?.focusExercise
-        ?: state.days.firstOrNull { it.reps > 0 }?.exercise.orEmpty()
-    val focusMovement = movementEs(focusKey)
-    val focusSessions = state.days.count { (it.byMovement[focusKey]?.verified ?: 0) > 0 }
+    val analyses = (listOfNotNull(state.analysis) +
+        state.jobs.sortedByDescending { it.createdAt }.mapNotNull { it.result })
+    val basis = CoachBasisPicker.pick(state.days, analyses)
+    val unscoredNotice = basis.unscoredLast?.let {
+        "Tu última sesión (${movementEs(it.exercise, it.label)}, ${it.reps} " +
+            (if (it.reps == 1) "rep" else "reps") + ") no se pudo puntuar: no cuenta " +
+            "como buena ni como mala."
+    }
+    val day = basis.scoredDay
+    val key = basis.scoredKey
+    if (day == null || key == null) {
+        return CoachData(
+            movement = "", sessions = 0, focus = null, secondary = null, rules = emptyList(),
+            drills = emptyList(), totalMinutes = 0, notice = unscoredNotice,
+        )
+    }
+    val movement = movementEs(key, day.byMovement[key]?.label.orEmpty())
+    val label = "$movement · ${shortDate(day.date)}"
+    // The ledger is per day, not per movement: keep only the days where this
+    // movement was actually scored.
+    val scoredDates = state.days.filter { (it.byMovement[key]?.verified ?: 0) > 0 }.map { it.date }.toSet()
+    val rows = FaultTrend.rows(state.faults.filterKeys { it in scoredDates })
+    val sessions = scoredDates.size.coerceAtMost(4)
     fun focusOf(row: FaultTrend.Row?) = row?.let {
         CoachFocus(
             fault = faultEs(it.fault),
@@ -669,29 +677,31 @@ private fun coachData(state: UiState): CoachData {
     }
     val drills: List<Drill> = rows.take(3).mapNotNull { drillEs(it.fault) }.distinctBy { it.title }
     return CoachData(
-        movement = focusMovement,
-        sessions = focusSessions.coerceAtMost(4),
+        movement = movement,
+        sessions = sessions,
         focus = focusOf(rows.firstOrNull()),
         secondary = focusOf(rows.getOrNull(1)),
-        rules = rules(state),
+        rules = basis.rulesFrom?.let { rules(it, state.faults.filterKeys { d -> d in scoredDates }) }
+            ?: emptyList(),
         drills = drills,
         totalMinutes = drills.sumOf { d -> d.duration.filter { it.isDigit() }.toIntOrNull() ?: 0 },
+        notice = unscoredNotice,
+        basisLabel = if (unscoredNotice != null) "De tu última sesión puntuada: $label"
+                     else null,
+        rulesLabel = label,
     )
 }
 
 /**
  * The technique rules, taken from the checks the pipeline actually ran on the
- * most recent measured set. A check that could not be made says so — it is
- * never rendered as a pass.
+ * given scored set. A check that could not be made says so — it is never
+ * rendered as a pass.
  */
-private fun rules(state: UiState): List<CoachRule> {
-    val a = state.analysis ?: return emptyList()
-    val ledger = FaultTrend.rows(state.faults).associateBy { it.fault }
+private fun rules(a: Analysis, faults: Map<String, Map<String, Int>>): List<CoachRule> {
+    val ledger = FaultTrend.rows(faults).associateBy { it.fault }
     return a.checks.take(6).map { check ->
         val trend = ledger[check.name]
-        // Tallies from a set nobody scored are not judgements.
         val (verdict, ink) = when {
-            a.unmeasuredSet -> "Sin juzgar" to Tk.muted
             check.observed > 0 && trend?.improving == true -> "Progresando" to Tk.teal
             check.observed > 0 -> "Corregir" to Tk.amber
             check.notObserved > 0 -> "Correcto" to Tk.primaryLight
@@ -704,16 +714,13 @@ private fun rules(state: UiState): List<CoachRule> {
             verdict = verdict,
             verdictInk = ink,
             description = when {
-                a.unmeasuredSet ->
-                    "No se pudo juzgar: las reps de esta serie no se pudieron puntuar, así que " +
-                        "esta comprobación no cuenta como correcta."
                 check.observed > 0 ->
                     "Se detectó en ${check.observed} de ${check.observed + check.notObserved} " +
-                        "reps juzgadas en la última serie."
+                        "reps juzgadas en esa serie."
                 check.notObserved > 0 ->
                     "Comprobado en ${check.notObserved} reps y limpio en todas ellas."
                 else ->
-                    "No se pudo comprobar en esta serie — ${check.unobservable} reps sin " +
+                    "No se pudo comprobar en esa serie — ${check.unobservable} reps sin " +
                         "evidencia suficiente: el ángulo de cámara no lo deja ver, o depende de una " +
                         "variante del ejercicio que el vídeo no aclara."
             },
