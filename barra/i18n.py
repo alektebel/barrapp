@@ -321,7 +321,10 @@ def english_words(text: str | None) -> list[str]:
 
 _KNOWN_SPANISH = set(MOVEMENTS.values()) | set(METRICS.values()) | set(COMPONENTS.values())
 _SPANISH = {"el", "la", "los", "las", "de", "del", "que", "en", "y", "se", "un", "una",
-            "por", "con", "para", "es", "sin", "al", "lo", "su", "más", "muy", "ya"}
+            "por", "con", "para", "es", "sin", "al", "lo", "su", "más", "muy", "ya",
+            # Determiners and negations that headlines lean on: "19 flexiones:
+            # ninguna verificada" has no accent and none of the words above.
+            "ninguna", "ninguno", "ningún", "no", "ni", "cada", "todas", "todos"}
 
 
 def looks_spanish(text: str) -> bool:
