@@ -106,6 +106,21 @@ object LogicTest {
         check("Spanish filming question routes", Coach.answer("¿Cómo debería grabar la siguiente?", up, profile).contains("Cinco cosas"))
         check("Spanish last-session question routes", Coach.answer("¿Qué mostró realmente mi última sesión?", up, profile).contains("2026-08-17"))
 
+        // Each suggested question reaches the branch it is about (the English original of
+        // the third fell through to the score explainer; the Spanish one is routed on purpose).
+        val sug = Coach.suggestions(2)
+        check("four suggestions with two or more days", sug.size == 4, sug.toString())
+        check("one fewer with a single day", Coach.suggestions(1).size == 3)
+        listOf(
+            "what did my last session actually show?",
+            "am I getting better, or is that just noise?",
+            "why did that rep get no score?",
+            "how should I film the next one?",
+        ).forEachIndexed { i, en ->
+            check("suggestion '${sug[i]}' routes like '$en'",
+                Coach.answer(sug[i], up, profile) == Coach.answer(en, up, profile), sug[i])
+        }
+
         // Every branch must produce something a person can read.
         listOf("progress", "last session", "no score", "film", "score", "how many reps", "asdf")
             .plus(listOf("¿Estoy mejorando o es ruido?", "¿Qué mostró mi última sesión?",
@@ -125,23 +140,23 @@ object LogicTest {
 
         val thin = ReviewText.compose(profile, listOf(day("2026-08-10", 2, 70)), since = "2026-08-01")
         check("a thin week is reported", thin != null)
-        check("and says nothing cleared the floor", thin!!.body.contains("None reached"), thin.body)
-        check("and names the target", thin.body.contains("${profile.repTarget} in one set"))
-        check("the title counts sessions", thin.title.contains("1 session"), thin.title)
+        check("and says nothing cleared the floor", thin!!.body.contains("Ninguna llegó"), thin.body)
+        check("and names the target", thin.body.contains("${profile.repTarget} en una serie"))
+        check("the title counts sessions", thin.title.contains("1 sesión"), thin.title)
 
         val one = ReviewText.compose(profile, listOf(day("2026-08-10", 4, 70)), since = "2026-08-01")
         check("one qualifying session says one more is needed",
-            one!!.body.contains("One session reached"), one.body)
+            one!!.body.contains("Una sesión llegó"), one.body)
 
         val two = ReviewText.compose(
             profile, listOf(day("2026-08-10", 4, 60), day("2026-08-14", 4, 85)), since = "2026-08-01")
         check("two qualifying sessions report the trend",
-            two!!.body.contains("up 25 points"), two.body)
+            two!!.body.contains("sube 25 puntos"), two.body)
 
         val level = ReviewText.compose(
             profile, listOf(day("2026-08-10", 4, 80), day("2026-08-14", 4, 83)), since = "2026-08-01")
         check("a small change is not called a trend",
-            level!!.body.contains("held level"), level.body)
+            level!!.body.contains("se mantuvieron estables"), level.body)
 
         check("a change below the threshold is not a trend",
             ReviewText.trendSentence(listOf(day("2026-08-10", 4, 80), day("2026-08-14", 4, 87))) == null)
@@ -154,12 +169,12 @@ object LogicTest {
             listOf(day("2026-08-10", 4, 80), day("2026-08-12", 3, null), day("2026-08-14", 4, 84)),
             since = "2026-08-01",
         )
-        check("an unmeasured day still counts as a session", withGap!!.title.contains("3 session"))
-        check("but is not scored as zero", !withGap.body.contains("down 80"), withGap.body)
-        check("grammar: plural days", withGap.body.contains("3 days"), withGap.body)
+        check("an unmeasured day still counts as a session", withGap!!.title.contains("3 sesiones"))
+        check("but is not scored as zero", !withGap.body.contains("baja 80"), withGap.body)
+        check("grammar: plural days", withGap.body.contains("3 días"), withGap.body)
 
         val single = ReviewText.compose(profile, listOf(day("2026-08-10", 1, 70)), since = "2026-08-01")
-        check("grammar: singular rep and day", single!!.body.startsWith("1 rep measured across 1 day."),
+        check("grammar: singular rep and day", single!!.body.startsWith("1 repetición medida en 1 día."),
             single.body)
     }
 
@@ -204,33 +219,33 @@ object LogicTest {
         val r = ReviewText.compose(profile, week + prior, since = "2026-08-22")!!
 
         check("names the movements trained",
-            r.body.lowercase().contains("push-up"), r.body)
-        check("counts reps per movement", r.body.contains("19 reps over 1 day"), r.body)
+            r.body.lowercase().contains("flexión"), r.body)
+        check("counts reps per movement", r.body.contains("19 repeticiones en 1 día"), r.body)
         check("orders by volume, heaviest first",
-            r.body.lowercase().indexOf("push-up") < r.body.lowercase().indexOf("muscle-up"),
+            r.body.lowercase().indexOf("flexión") < r.body.lowercase().indexOf("muscle-up"),
             r.body)
-        check("calls out the best day", r.body.contains("Best day was 26 Aug at 94"), r.body)
+        check("calls out the best day", r.body.contains("El mejor día fue el 26 ago, con 94"), r.body)
         check("compares volume with the week before",
-            r.body.contains("up from 6 reps"), r.body)
+            r.body.contains("sube desde las 6 repeticiones"), r.body)
 
         // A week with nothing before it must not invent a comparison.
         val alone = ReviewText.compose(profile, week, since = "2026-08-22")!!
         check("no volume claim without a prior week",
-            !alone.body.contains("week before"), alone.body)
+            !alone.body.contains("semana anterior"), alone.body)
 
         // Nor when the prior week exists but was blank.
         val blankPrior = ReviewText.compose(
             profile, week + listOf(day("2026-08-18", 0, null)), since = "2026-08-22")!!
         check("no volume claim against a zero-rep week",
-            !blankPrior.body.contains("week before"), blankPrior.body)
+            !blankPrior.body.contains("semana anterior"), blankPrior.body)
 
         val withBlank = ReviewText.compose(
             profile, week + listOf(day("2026-08-25", 0, null)), since = "2026-08-22")!!
         check("flags sessions that measured nothing",
-            withBlank.body.contains("1 session produced no measurable"), withBlank.body)
+            withBlank.body.contains("1 sesión no produjo repeticiones medibles"), withBlank.body)
 
         check("date formatting drops the leading zero",
-            ReviewText.pretty("2026-08-05") == "5 Aug", ReviewText.pretty("2026-08-05"))
+            ReviewText.pretty("2026-08-05") == "5 ago", ReviewText.pretty("2026-08-05"))
         check("date arithmetic crosses a month boundary",
             ReviewText.shiftDays("2026-09-03", -7) == "2026-08-27",
             ReviewText.shiftDays("2026-09-03", -7))
@@ -245,12 +260,12 @@ object LogicTest {
         check("weekly review reports the progression",
             withProg.body.contains("muscle-up"), withProg.body)
         check("and says it was earned",
-            withProg.body.contains("cleared the standard"), withProg.body)
+            withProg.body.contains("superado el estándar"), withProg.body)
 
         val notYet = ReviewText.compose(profile, listOf(
             progDay("2026-08-24", "pull_up", 4, 70)), since = "2026-08-22")!!
         check("or what is still missing",
-            notYet.body.contains("Towards muscle-up"), notYet.body)
+            notYet.body.contains("Camino de muscle-up"), notYet.body)
 
         println("\n  --- weekly report ---\n  ${r.title}\n  ${r.body}\n" +
             "\n  ${withProg.body}\n\n  ${notYet.body}\n")
@@ -273,14 +288,14 @@ object LogicTest {
         val one = Progression.assess("pull_up",
             listOf(progDay("2026-08-10", "pull_up", step.reps + 5, 90)))
         check("one big session is not a progression", !one.ready, one.missing)
-        check("and it says a day is missing", one.missing.contains("qualifying day"), one.missing)
+        check("and it says a day is missing", one.missing.contains("día más que cumpla"), one.missing)
 
         val two = Progression.assess("pull_up", listOf(
             progDay("2026-08-10", "pull_up", step.reps, step.quality),
             progDay("2026-08-14", "pull_up", step.reps, step.quality)))
         check("two qualifying days earn it", two.ready, two.missing)
         check("and nothing is outstanding", two.missing.isEmpty(), two.missing)
-        check("headline states the target", two.headline.contains("Ready to work"), two.headline)
+        check("headline states the target", two.headline.contains("Listo para trabajar"), two.headline)
 
         val lowQuality = Progression.assess("pull_up", listOf(
             progDay("2026-08-10", "pull_up", step.reps + 10, step.quality - 15),
@@ -300,7 +315,7 @@ object LogicTest {
 
         val none = Progression.assess("pull_up", emptyList())
         check("no reps is a starting point, not an error",
-            none.evidence.contains("No verified reps"), none.evidence)
+            none.evidence.contains("Todavía no hay repeticiones verificadas"), none.evidence)
 
         // A mixed day must count each movement on its own merits.
         val mixed = DayEntry(
@@ -343,7 +358,7 @@ object LogicTest {
         check("reps that were not fully measured do not count",
             fromPartial.bestReps == 0, "${fromPartial.bestReps}")
         check("and it reads as no evidence, not a bad session",
-            fromPartial.evidence.contains("No verified reps"), fromPartial.evidence)
+            fromPartial.evidence.contains("Todavía no hay repeticiones verificadas"), fromPartial.evidence)
 
         check("the ladder says where it stops refereeing",
             Progression.LADDER["muscle_up"]!!.targetMeasurable.not() &&
@@ -385,17 +400,17 @@ object LogicTest {
         check("flagged checks come first", checks.first().name == "Bent arms at the top",
             checks.map { it.name }.toString())
         check("a flagged check says where and when",
-            checks.first().where == "support · 5.8–6.0s", checks.first().where)
+            checks.first().where == "Apoyo · 5.8–6.0s", checks.first().where)
         check("a flagged check carries the number against the limit",
-            checks.first().detail == "141 deg, needs 160 deg", checks.first().detail)
+            checks.first().detail == "141 grados, mínimo 160 grados", checks.first().detail)
         check("an unobservable check has no window and says why",
-            checks.last().where.isBlank() && checks.last().detail == "needs a different camera angle",
+            checks.last().where.isBlank() && checks.last().detail == "necesita otro ángulo de cámara",
             checks.last().toString())
         check("a clean check keeps its evidence",
-            checks[1].status == Assessment.NOT_OBSERVED && checks[1].detail == "0.04, limit 0.15",
+            checks[1].status == Assessment.NOT_OBSERVED && checks[1].detail == "0.04, límite 0.15",
             checks[1].toString())
         check("a variant-dependent flag says the standard was not declared",
-            com.barrapp.ui.repChecks(rep(swing)).single().name.endsWith("(variant not declared)"))
+            com.barrapp.ui.repChecks(rep(swing)).single().name.endsWith("(variante sin declarar)"))
 
         // Older payloads: no assessments, so the faults stand in and the
         // page still lists what was flagged rather than going blank.
@@ -403,7 +418,7 @@ object LogicTest {
         check("a v1 rep falls back to its faults",
             com.barrapp.ui.repChecks(old).single().status == Assessment.OBSERVED)
         check("a blocked rep is not a clean rep",
-            unmeasuredNote(rep(blocked = "implausible pose")) == "This rep was not judged — implausible pose.",
+            unmeasuredNote(rep(blocked = "implausible pose")) == "Esta repetición no se juzgó — implausible pose.",
             unmeasuredNote(rep(blocked = "implausible pose")).orEmpty())
 
         fun analysis(v: Variant, version: Int = 2, vararg reps: RepRow) = Analysis(
@@ -413,22 +428,22 @@ object LogicTest {
         )
         check("a declared standard is named",
             com.barrapp.ui.standardLine(analysis(Variant("strict", "declared"), 2, rep(swing)))
-                == "Judged to the strict standard you declared.")
+                == "Juzgada con el estándar «estricto» que declaraste.")
         check("an undeclared standard is only mentioned when a check depends on it",
             com.barrapp.ui.standardLine(analysis(Variant(), 2, rep(clean))).isBlank() &&
-                com.barrapp.ui.standardLine(analysis(Variant(), 2, rep(swing))).startsWith("No standard declared"))
+                com.barrapp.ui.standardLine(analysis(Variant(), 2, rep(swing))).startsWith("Sin estándar declarado"))
         check("a declaration the movement does not define is called out",
             com.barrapp.ui.standardLine(analysis(Variant(declared = "tuck"), 2, rep(swing)))
-                .contains("not a standard for a pull up"))
+                .contains("no es un estándar de dominada"))
         check("an older run claims nothing about a standard",
             com.barrapp.ui.standardLine(analysis(Variant("strict", "declared"), 0, rep(swing))).isBlank())
         check("a variant-dependent cue says which standard it assumed",
             improvementCues(analysis(Variant(), 2, rep(swing))).single()
-                .endsWith("judged strict; declare kipping if that was the plan"),
+                .endsWith("juzgado como estricto; declara kipping si ese era el plan"),
             improvementCues(analysis(Variant(), 2, rep(swing))).toString())
         check("a declared-strict cue is plain",
             improvementCues(analysis(Variant("strict", "declared"), 2,
-                rep(swing.copy(variantDependent = false)))).single() == "Stop the swing — pull strict, no momentum")
+                rep(swing.copy(variantDependent = false)))).single() == "Corta el balanceo — tira estricto, sin impulso.")
     }
 
     /** Runs every rule set once; returns the number of failed checks. */

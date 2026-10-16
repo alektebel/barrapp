@@ -68,12 +68,12 @@ fun ObjectivesChatScreen(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("Back") }
+            TextButton(onClick = onBack) { Text("Volver") }
             Spacer(Modifier.size(6.dp))
             Column(Modifier.weight(1f)) {
-                Text("Objectives", style = MaterialTheme.typography.titleMedium)
+                Text("Objetivos", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "A short chat to set your goal and how often you train.",
+                    "Una charla corta para fijar tu objetivo y con qué frecuencia entrenas.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -90,7 +90,7 @@ fun ObjectivesChatScreen(
             if (turns.isEmpty() && !thinking) {
                 item {
                     Text(
-                        "Starting the conversation…",
+                        "Empezando la conversación…",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -105,7 +105,7 @@ fun ObjectivesChatScreen(
                     ) {
                         CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp)
                         Text(
-                            "Thinking…",
+                            "Pensando…",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -115,18 +115,18 @@ fun ObjectivesChatScreen(
             if (goals != null && goals.goal.isNotBlank()) {
                 item {
                     Column {
-                        Eyebrow("Captured")
+                        Eyebrow("Anotado")
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "Goal: ${goals.goal}" +
+                            "Objetivo: ${goals.goal}" +
                                 (goals.focusExercise
                                     .takeIf { it.isNotBlank() && it != "unknown" }
-                                    ?.let { "\nFocus: ${it.replace('_', ' ')}" } ?: ""),
+                                    ?.let { "\nMovimiento: ${com.barrapp.movementEs(it).lowercase()}" } ?: ""),
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Spacer(Modifier.height(14.dp))
                         Button(onClick = onDone, modifier = Modifier.fillMaxWidth()) {
-                            Text("Done — start training")
+                            Text("Hecho: a entrenar")
                         }
                     }
                 }
@@ -142,7 +142,7 @@ fun ObjectivesChatScreen(
             OutlinedTextField(
                 value = draft,
                 onValueChange = { draft = it },
-                placeholder = { Text("Tell me what you want") },
+                placeholder = { Text("Cuéntame qué quieres") },
                 shape = RoundedCornerShape(14.dp),
                 maxLines = 4,
                 modifier = Modifier.weight(1f),
@@ -157,7 +157,7 @@ fun ObjectivesChatScreen(
                 },
                 enabled = draft.isNotBlank() && !thinking,
             ) {
-                Text("Send", style = MaterialTheme.typography.labelLarge,
+                Text("Enviar", style = MaterialTheme.typography.labelLarge,
                     fontWeight = FontWeight.SemiBold)
             }
         }

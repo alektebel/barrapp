@@ -64,7 +64,7 @@ class BarraApi(context: Context) {
             override fun writeTo(sink: BufferedSink) {
                 cr.openInputStream(uri)?.use { input ->
                     sink.outputStream().use { out -> input.copyTo(out) }
-                } ?: error("Could not read video")
+                } ?: error("No se pudo leer el vídeo")
             }
         }
         val builder = Request.Builder()
@@ -143,7 +143,7 @@ class BarraApi(context: Context) {
         val builder = Request.Builder().url(resolved).put(body)
         if (!isS3(resolved)) builder.header("X-Device-Id", deviceId)
         client.newCall(builder.build()).execute().use { response ->
-            if (!response.isSuccessful) error("part upload failed: HTTP ${response.code}")
+            if (!response.isSuccessful) error("falló la subida de una parte: HTTP ${response.code}")
             return response.header("ETag")
                 ?: response.header("etag")
         }

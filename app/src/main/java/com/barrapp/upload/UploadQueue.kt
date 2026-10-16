@@ -78,7 +78,7 @@ class UploadQueue private constructor(private val app: Application) {
             WorkStore.put(app, w.copy(status = WorkStore.STATUS_WAITING,
                 stage = Stage.WAITING.text, stageCode = Stage.WAITING.code,
                 log = w.log + WorkStore.Entry(System.currentTimeMillis(),
-                    WorkStore.Level.INFO, "connection is back - resuming the upload")))
+                    WorkStore.Level.INFO, "vuelve la conexión: se reanuda la subida")))
         }
         publish()
         val tried = mutableSetOf<String>()
@@ -110,8 +110,8 @@ class UploadQueue private constructor(private val app: Application) {
                 stage = Stage.RESUMING.text, stageCode = Stage.RESUMING.code,
             ).let { it.copy(log = it.log + WorkStore.Entry(
                 System.currentTimeMillis(), WorkStore.Level.INFO,
-                "the app closed while job ${w.jobId} was on the server - " +
-                    "waiting for it again, not re-sending")) })
+                "la app se cerró mientras el trabajo ${w.jobId} estaba en el servidor: " +
+                    "se espera su resultado, no se reenvía")) })
         } else if (clipKept && !WorkStore.resumesUploadAfterRestart(w)) {
             // Nothing of it reached the server in a form worth keeping:
             // send it from the start, as Retry would, without asking.
@@ -122,7 +122,7 @@ class UploadQueue private constructor(private val app: Application) {
                 uploadedParts = emptyList(), uploadMode = "", uploadComplete = false,
             ).let { it.copy(log = it.log + WorkStore.Entry(
                 System.currentTimeMillis(), WorkStore.Level.INFO,
-                "the app closed before the clip was sent - sending it again")) })
+                "la app se cerró antes de enviar el clip: se envía de nuevo")) })
         } else if (WorkStore.resumesUploadAfterRestart(w)) {
             // Multipart parts already sent remain on the server. A single
             // PUT can safely replace the fixed object using a fresh URL.
@@ -131,8 +131,8 @@ class UploadQueue private constructor(private val app: Application) {
                 stage = Stage.RESUMING.text, stageCode = Stage.RESUMING.code,
             ).let { it.copy(log = it.log + WorkStore.Entry(
                 System.currentTimeMillis(), WorkStore.Level.INFO,
-                "the app closed mid-upload - ${w.uploadedParts.size} part(s) " +
-                    "are safe; resuming from there")) })
+                "la app se cerró durante la subida: ${w.uploadedParts.size} " +
+                    "parte${if (w.uploadedParts.size == 1) "" else "s"} a salvo; se reanuda desde ahí")) })
         } else {
             WorkStore.put(app, w.copy(
                 status = WorkStore.STATUS_FAILED,
@@ -140,7 +140,7 @@ class UploadQueue private constructor(private val app: Application) {
                 error = "La app se cerró mientras este vídeo estaba en la cola.",
             ).let { it.copy(log = it.log + WorkStore.Entry(
                 System.currentTimeMillis(), WorkStore.Level.WARN,
-                "interrupted — the app closed; retry to send it again")) })
+                "interrumpido: la app se cerró; pulsa Reintentar para enviarlo de nuevo")) })
         }
     }
     }
@@ -176,7 +176,7 @@ class UploadQueue private constructor(private val app: Application) {
                     err is java.io.IOException
                 retryLogMutex.withLock {
                     WorkStore.append(app, workId, WorkStore.Level.WARN,
-                        "$what failed (attempt ${i + 1} of $attempts): ${err.message.orEmpty()}")
+                        "$what falló (intento ${i + 1} de $attempts): ${err.message.orEmpty()}")
                 }
                 if (!transient || i == attempts - 1) throw err
                 delay(2500L * (i + 1))
@@ -230,7 +230,7 @@ class UploadQueue private constructor(private val app: Application) {
 
         if (uploadId.isBlank() || partSize <= 0L) {
             val (id, ps) = timedRound2Phase(timingAttemptId, "multipartStart") {
-                withRetry("starting the upload", workId) {
+                withRetry("iniciar la subida", workId) {
                     withContext(Dispatchers.IO) { api.startUpload(jobId) }
                 }
             }
@@ -250,7 +250,7 @@ class UploadQueue private constructor(private val app: Application) {
             try {
                 timedRound2Phase(timingAttemptId, "presign") {
                     uploadPartsBatched(batch, MULTIPART_UPLOAD_CONCURRENCY, uploadPart = { n ->
-                        withRetry("preparing part $n of $total", workId) {
+                        withRetry("preparar la parte $n de $total", workId) {
                             withContext(Dispatchers.IO) { api.presignPart(jobId, uploadId, n) }
                         }
                     }) { n, url ->
@@ -289,14 +289,14 @@ class UploadQueue private constructor(private val app: Application) {
                     uploadedParts = done.map { PartMark(it.key, it.value) },
                         log = (WorkStore.get(app, workId)?.log ?: emptyList()) +
                         WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.WARN,
-                            "connection lost during part(s) ${batch.joinToString()} of $total - " +
-                                "${done.size} part(s) already on the server")))
+                            "se perdió la conexión durante las partes ${batch.joinToString()} de $total: " +
+                                "${done.size} ya están en el servidor")))
                 publish()
                 throw PauseUpload()
             }
         }
         timedRound2Phase(timingAttemptId, "multipartComplete") {
-            withRetry("finishing the upload", workId) {
+            withRetry("terminar la subida", workId) {
                 withContext(Dispatchers.IO) {
                     api.completeUpload(jobId,
                         done.map { BarraApi.PartSlot(it.key, it.value) })
@@ -422,7 +422,7 @@ class UploadQueue private constructor(private val app: Application) {
             error = null) }
         try {
             if (!clip.exists() || clip.length() == 0L) {
-                fail("The clip is no longer on the phone.")
+                fail("El clip ya no está en el teléfono.")
                 return
             }
             // EL RECORTE, antes de crear el trabajo. work.trimmed dice si la
@@ -457,7 +457,7 @@ class UploadQueue private constructor(private val app: Application) {
             // job would strand them under a key nothing points at. Only a
             // work with nothing in flight asks for a fresh job.
             val created = if (!resuming) timedRound2Phase(timingAttemptId, "jobCreate") {
-                withRetry("creating the job", work.id) {
+                withRetry("crear el trabajo", work.id) {
                     withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
                 }
             } else null
@@ -473,8 +473,8 @@ class UploadQueue private constructor(private val app: Application) {
                 status = WorkStore.STATUS_SENDING,
                 stage = Stage.SENDING.text, stageCode = Stage.SENDING.code) }
             log(WorkStore.Level.INFO,
-                if (resuming) "resuming job $jobId — ${work.uploadedParts.size} part(s) already sent"
-                else "job $jobId created — sending the clip " +
+                if (resuming) "se reanuda el trabajo $jobId: ${work.uploadedParts.size} parte(s) ya enviadas"
+                else "trabajo $jobId creado: se envía el clip " +
                     "(%.1f MB)".format(clipToUpload.length() / 1e6))
             ProcessingNotifier.stage(app, Stage.SENDING.text, 0)
             try {
@@ -484,7 +484,7 @@ class UploadQueue private constructor(private val app: Application) {
                         val uploadUrl = if (!resuming && created?.uploadUrl?.isNotBlank() == true) {
                             created.uploadUrl to created.uploadMethod
                         } else timedRound2Phase(timingAttemptId, "singlePutUrlRefresh") {
-                            withRetry("preparing the upload", work.id) {
+                            withRetry("preparar la subida", work.id) {
                                 withContext(Dispatchers.IO) { api.refreshSingleUploadUrl(jobId) }
                             }
                         }
@@ -494,7 +494,7 @@ class UploadQueue private constructor(private val app: Application) {
                                 // silently consume the upload budget. Persist
                                 // this job and resume on the next validated
                                 // network with a newly minted URL.
-                                withRetry("sending the clip", work.id, attempts = 1) {
+                                withRetry("enviar el clip", work.id, attempts = 1) {
                                     withContext(Dispatchers.IO) {
                                     api.uploadClip(clipToUpload, uploadUrl.first, uploadUrl.second)
                                     }
@@ -530,7 +530,7 @@ class UploadQueue private constructor(private val app: Application) {
                 return
             }
             update { it.copy(status = WorkStore.STATUS_QUEUED, stage = Stage.QUEUED.text, stageCode = Stage.QUEUED.code) }
-            log(WorkStore.Level.INFO, "uploaded — queued on the server")
+            log(WorkStore.Level.INFO, "subido: en cola en el servidor")
             ProcessingNotifier.stage(app, Stage.QUEUED.text, 1)
             // Submit starts the worker again, so a job picked back up after a
             // restart is only submitted if the server never got that far.
@@ -539,12 +539,12 @@ class UploadQueue private constructor(private val app: Application) {
             } else null
             if (serverStatus !in WorkStore.SUBMITTED_ON_SERVER) {
                 timedRound2Phase(timingAttemptId, "submit") {
-                    withRetry("queueing on the server", work.id) {
+                    withRetry("poner en cola en el servidor", work.id) {
                         withContext(Dispatchers.IO) { api.submit(jobId) }
                     }
                 }
             } else {
-                log(WorkStore.Level.INFO, "job $jobId already $serverStatus on the server")
+                log(WorkStore.Level.INFO, "el trabajo $jobId ya está «$serverStatus» en el servidor")
             }
             withContext(Dispatchers.IO) { Round2TimingStore.submitted(app, timingAttemptId) }
 
@@ -579,14 +579,14 @@ class UploadQueue private constructor(private val app: Application) {
                             val countStatus = j.result?.countStatus ?: "unmeasured"
                             val repCount = j.result?.repCount ?: 0
                             val countDescription = when (countStatus) {
-                                "unmeasured" -> "rep count unavailable"
-                                "vision" -> "$repCount rep(s) estimated from frames"
-                                "hold" -> "$repCount hold attempt(s) measured"
-                                else -> "$repCount rep(s) measured"
+                                "unmeasured" -> "recuento de repeticiones no disponible"
+                                "vision" -> "$repCount repetici${if (repCount == 1) "ón estimada" else "ones estimadas"} a partir de fotogramas"
+                                "hold" -> "$repCount intento${if (repCount == 1) "" else "s"} de mantenimiento medido${if (repCount == 1) "" else "s"}"
+                                else -> "$repCount repetici${if (repCount == 1) "ón medida" else "ones medidas"}"
                             }
-                            log(WorkStore.Level.INFO, "$countDescription of " +
-                                (j.result?.exercise ?: "unknown") +
-                                " — trace ${j.result?.traceId.orEmpty()}")
+                            log(WorkStore.Level.INFO, "$countDescription de " +
+                                (j.result?.exercise?.let { com.barrapp.movementEs(it) } ?: "movimiento desconocido") +
+                                " — traza ${j.result?.traceId.orEmpty()}")
                             // The clip answers to its job id from here on, so
                             // replay and delete keep working the way they did.
                             // The one renamed is the one UPLOADED - the 720p
@@ -659,15 +659,15 @@ class UploadQueue private constructor(private val app: Application) {
                     // or created under a different device) will never come back
                     // by polling. Say so plainly and let Retry re-send it fresh.
                     if (msg.contains("unknown job", ignoreCase = true)) {
-                        log(WorkStore.Level.WARN, "the job was lost on the server")
-                        fail("That clip's job was lost on the server. Retry to re-send it.")
+                        log(WorkStore.Level.WARN, "el trabajo se perdió en el servidor")
+                        fail("El servidor perdió el trabajo de este clip. Pulsa Reintentar para enviarlo de nuevo.")
                         return
                     }
                     contactLost++
                     log(WorkStore.Level.WARN,
-                        "lost contact with the server (${contactLost}) — $msg")
+                        "se perdió el contacto con el servidor (${contactLost}) — $msg")
                     if (contactLost >= 5) {
-                        fail("Lost contact with the server while measuring.")
+                        fail("Se perdió el contacto con el servidor mientras se medía.")
                         return
                     }
                 })
@@ -679,14 +679,14 @@ class UploadQueue private constructor(private val app: Application) {
                     SystemClock.elapsedRealtime() - phoneAttemptStartedAtMs))
                 pollSleepNs += (SystemClock.elapsedRealtimeNanos() - sleepStartedNs).coerceAtLeast(0L)
             }
-            fail("Still measuring after four minutes. It may yet finish on the server — " +
-                "retry to check again.")
+            fail("Sigue midiéndose tras cuatro minutos. Puede que aún termine en el servidor: " +
+                "pulsa Reintentar para comprobarlo de nuevo.")
         } catch (err: kotlinx.coroutines.CancellationException) {
             // The system stopped the worker. Not a failure: the work keeps
             // its state and the next run picks it back up.
             throw err
         } catch (err: Exception) {
-            fail(err.message ?: "That clip could not be sent.")
+            fail(err.message ?: "No se pudo enviar ese clip.")
         }
     }
 

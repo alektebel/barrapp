@@ -51,12 +51,12 @@ fun PlanScreen(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            TextButton(onClick = onBack) { Text("Back") }
+            TextButton(onClick = onBack) { Text("Volver") }
             Spacer(Modifier.size(6.dp))
             Column(Modifier.weight(1f)) {
                 Text("Plan", style = MaterialTheme.typography.titleMedium)
                 Text(
-                    "What to work, and what earns the next step.",
+                    "Qué trabajar y qué te gana el siguiente paso.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -72,7 +72,7 @@ fun PlanScreen(
             val verdicts = planVerdicts(days, goals?.focusExercise)
             item {
                 Panel {
-                    Eyebrow("The plan")
+                    Eyebrow("El plan")
                     Spacer(Modifier.height(8.dp))
                     if (goals?.goal?.isNotBlank() == true) {
                         Text(
@@ -84,14 +84,14 @@ fun PlanScreen(
                     val focus = verdicts.firstOrNull()
                     if (focus == null) {
                         Text(
-                            "Film a set of any ladder movement and the referee " +
-                                "starts here: pull-ups, dips, push-ups, squats.",
+                            "Filma una serie de cualquier movimiento de la escalera y el árbitro " +
+                                "empieza aquí: dominadas, fondos, flexiones, sentadillas.",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     } else {
                         Text(
-                            "Next session: work ${focus.label.lowercase()}" +
+                            "Próxima sesión: trabaja ${focus.label.lowercase()}" +
                                 focus.nextSetTarget(),
                             style = MaterialTheme.typography.bodyMedium,
                         )
@@ -105,9 +105,9 @@ fun PlanScreen(
 
             item {
                 Text(
-                    "Every standard here is a published convention, not a measurement. " +
-                        "The reps are measured; the bar they have to clear is written down " +
-                        "so you can argue with it.",
+                    "Cada estándar de aquí es una convención publicada, no una medición. " +
+                        "Las repeticiones se miden; el listón que tienen que superar está escrito " +
+                        "para que puedas discutirlo.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -133,9 +133,9 @@ private fun Progression.Verdict.nextSetTarget(): String {
     val step = step ?: return ""
     val target = if (bestReps >= step.reps) step.reps
     else minOf(step.reps, bestReps + 2).coerceAtLeast(3)
-    return " — aim for $target verified reps in one set" +
-        if (step.days > qualifyingDays.size) ", on ${step.days - qualifyingDays.size} " +
-            "more day${if (step.days - qualifyingDays.size == 1) "" else "s"}" else ""
+    val missingDays = step.days - qualifyingDays.size
+    return " — apunta a $target repeticiones verificadas en una serie" +
+        if (missingDays > 0) ", en $missingDays día${if (missingDays == 1) "" else "s"} más" else ""
 }
 
 @Composable
@@ -147,12 +147,12 @@ private fun VerdictCard(v: Progression.Verdict) {
                 Eyebrow(v.label)
                 Spacer(Modifier.height(2.dp))
                 Text(
-                    if (v.ready) "Standard cleared" else "Working towards ${step.towardsLabel}",
+                    if (v.ready) "Estándar superado" else "Camino de ${step.towardsLabel}",
                     style = MaterialTheme.typography.titleMedium,
                 )
             }
             Pill(
-                if (v.ready) "earned" else "${v.bestReps}/${step.reps}",
+                if (v.ready) "logrado" else "${v.bestReps}/${step.reps}",
                 color = if (v.ready) MaterialTheme.colorScheme.primary
                 else MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -169,7 +169,7 @@ private fun VerdictCard(v: Progression.Verdict) {
             )
             Spacer(Modifier.size(6.dp))
             Text(
-                "best session · ${step.reps} reps at ${step.quality}+ on ${step.days} days",
+                "mejor sesión · ${step.reps} reps con ${step.quality}+ en ${step.days} días",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 3.dp),

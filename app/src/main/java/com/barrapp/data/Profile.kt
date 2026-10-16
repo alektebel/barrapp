@@ -44,8 +44,8 @@ data class Profile(
 
 enum class ActivityLevel(val label: String, val detail: String) {
     Unset("", ""),
-    New("Just starting", "New to training, or coming back after a break"),
-    Occasional("Once or twice a week", "Training happens, but not on a schedule"),
-    Regular("Three or four times a week", "A routine you mostly keep to"),
-    Daily("Five or more times a week", "Training is part of most days"),
+    New("Estoy empezando", "Nuevo en el entrenamiento, o volviendo tras un parón"),
+    Occasional("Una o dos veces por semana", "Se entrena, pero sin un horario fijo"),
+    Regular("Tres o cuatro veces por semana", "Una rutina que casi siempre cumples"),
+    Daily("Cinco o más veces por semana", "Entrenar forma parte de casi todos los días"),
 }

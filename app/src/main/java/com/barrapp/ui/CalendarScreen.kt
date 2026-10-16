@@ -52,15 +52,15 @@ fun CalendarScreen(
             MonthArrow("›", onNextMonth)
         }
         androidx.compose.material3.Text(
-            "A filled day is a measured day, painted the colour of its technique. " +
-                "A dashed day is one you filmed where nothing came out.",
+            "Un día relleno es un día medido, pintado del color de su técnica. " +
+                "Un día con trazo discontinuo es uno que filmaste y del que no salió nada.",
             style = N.bodyNote, modifier = Modifier.padding(top = 6.dp),
         )
 
         // 7 columns, gap 5, Monday first; leading blanks follow the month
         Row(Modifier.fillMaxWidth().padding(top = 16.dp),
             horizontalArrangement = Arrangement.spacedBy(5.dp)) {
-            listOf("M", "T", "W", "T", "F", "S", "S").forEach {
+            listOf("L", "M", "X", "J", "V", "S", "D").forEach {
                 androidx.compose.material3.Text(
                     it, style = N.eyebrowMuted.copy(color = Nocturne.fgA(0.4f)),
                     modifier = Modifier.weight(1f).fillMaxWidth(),

@@ -80,16 +80,16 @@ fun DiagnosticsScreen(
     ) {
         item {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                TextButton(onClick = onBack) { Text("Back") }
+                TextButton(onClick = onBack) { Text("Volver") }
                 Spacer(Modifier.size(6.dp))
-                Text("Diagnostics", style = MaterialTheme.typography.titleMedium)
+                Text("Diagnóstico", style = MaterialTheme.typography.titleMedium)
             }
         }
 
         if (latest != null && latest.traceId.isNotBlank()) {
             item {
                 Panel {
-                    Eyebrow("Last measurement")
+                    Eyebrow("Última medición")
                     Spacer(Modifier.height(8.dp))
                     Text(
                         latest.traceId,
@@ -98,9 +98,9 @@ fun DiagnosticsScreen(
                     )
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "The server saved the whole decision chain under this id — every " +
-                            "candidate rep it found, every one it rejected, and the number " +
-                            "behind each choice.",
+                        "El servidor guardó toda la cadena de decisiones bajo este id: cada " +
+                            "repetición candidata que encontró, cada una que descartó y el número " +
+                            "detrás de cada elección.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -121,19 +121,19 @@ fun DiagnosticsScreen(
                             color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
                         )
                         Spacer(Modifier.height(10.dp))
-                        Eyebrow("Produced by")
+                        Eyebrow("Producido por")
                         Spacer(Modifier.height(6.dp))
                         Text(
                             p.summary +
                                 if (latest.measurementVersion > 0)
-                                    " · measurement v${latest.measurementVersion}" else "",
+                                    " · medición v${latest.measurementVersion}" else "",
                             fontFamily = FontFamily.Monospace,
                             style = MaterialTheme.typography.bodySmall,
                         )
                         Text(
-                            "Code version, commit, and the hash of the pose model. A number " +
-                                "that changed because one of these changed is not a number " +
-                                "that changed because you did.",
+                            "Versión del código, commit y hash del modelo de pose. Un número " +
+                                "que cambió porque cambió una de estas cosas no es un número " +
+                                "que cambió porque tú mejoraste.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 6.dp),
@@ -145,11 +145,11 @@ fun DiagnosticsScreen(
 
         item {
             Panel {
-                Eyebrow("This device")
+                Eyebrow("Este dispositivo")
                 Spacer(Modifier.height(8.dp))
-                LabelledValue("device id", deviceId)
-                LabelledValue("server", apiBase)
-                LabelledValue("events kept", "${events.size} of ${EventLog.LIMIT}")
+                LabelledValue("id del dispositivo", deviceId)
+                LabelledValue("servidor", apiBase)
+                LabelledValue("eventos guardados", "${events.size} de ${EventLog.LIMIT}")
             }
         }
 
@@ -158,36 +158,36 @@ fun DiagnosticsScreen(
                 OutlinedButton(
                     onClick = { copyToClipboard(context, report()) },
                     modifier = Modifier.weight(1f),
-                ) { Text("Copy report") }
-                OutlinedButton(onClick = onClear) { Text("Clear log") }
+                ) { Text("Copiar informe") }
+                OutlinedButton(onClick = onClear) { Text("Borrar registro") }
             }
         }
 
         item {
             Panel {
-                Eyebrow("Something wrong?")
+                Eyebrow("¿Algo falla?")
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    "Send feedback with an optional clip. It lands on the server with " +
-                        "the same device id this screen shows, so it can be traced to " +
-                        "the events here.",
+                    "Envía comentarios con un clip opcional. Llega al servidor con " +
+                        "el mismo id de dispositivo que muestra esta pantalla, así que se puede " +
+                        "relacionar con los eventos de aquí.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
                 Spacer(Modifier.height(8.dp))
                 OutlinedButton(onClick = onFeedback, modifier = Modifier.fillMaxWidth()) {
-                    Text("Send feedback")
+                    Text("Enviar comentarios")
                 }
             }
         }
 
-        item { Eyebrow("Event log") }
+        item { Eyebrow("Registro de eventos") }
 
         if (events.isEmpty()) {
             item {
                 Text(
-                    "Nothing logged yet. Uploads, failures and timeouts land here — " +
-                        "including the ones that happen while the app is closed.",
+                    "Todavía no hay nada registrado. Aquí aparecen las subidas, los fallos y los " +
+                        "tiempos agotados, incluidos los que ocurren con la app cerrada.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -206,7 +206,7 @@ fun DiagnosticsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                     Spacer(Modifier.weight(1f))
-                    Pill(e.level.name, color = levelColour(e.level))
+                    Pill(when (e.level) { EventLog.Level.ERROR -> "ERROR"; EventLog.Level.WARN -> "AVISO"; EventLog.Level.INFO -> "INFO" }, color = levelColour(e.level))
                 }
                 Spacer(Modifier.height(6.dp))
                 Text(e.line, style = MaterialTheme.typography.bodyMedium)
@@ -214,8 +214,8 @@ fun DiagnosticsScreen(
                     Spacer(Modifier.height(4.dp))
                     Text(
                         listOfNotNull(
-                            e.traceId.takeIf { it.isNotBlank() }?.let { "trace $it" },
-                            e.jobId.takeIf { it.isNotBlank() }?.let { "job $it" },
+                            e.traceId.takeIf { it.isNotBlank() }?.let { "traza $it" },
+                            e.jobId.takeIf { it.isNotBlank() }?.let { "trabajo $it" },
                         ).joinToString("  ·  "),
                         fontFamily = FontFamily.Monospace,
                         style = MaterialTheme.typography.bodySmall,
@@ -257,5 +257,5 @@ private fun levelColour(level: EventLog.Level) = when (level) {
 
 private fun copyToClipboard(context: Context, text: String) {
     val cm = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-    cm?.setPrimaryClip(ClipData.newPlainText("barrapp diagnostics", text))
+    cm?.setPrimaryClip(ClipData.newPlainText("diagnóstico de barrapp", text))
 }

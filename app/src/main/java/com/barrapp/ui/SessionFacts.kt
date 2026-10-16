@@ -4,6 +4,10 @@ import com.barrapp.data.Analysis
 import com.barrapp.data.Assessment
 import com.barrapp.data.RepRow
 import com.barrapp.data.Variant
+import com.barrapp.data.unitEs
+import com.barrapp.faultEs
+import com.barrapp.movementEs
+import com.barrapp.phaseEs
 
 /**
  * Pure mappings from the server's assessment records to what the session
@@ -17,7 +21,7 @@ fun repChecks(rep: RepRow): List<RepCheck> {
     if (rep.assessments.isEmpty()) {
         return rep.faults.map { f ->
             RepCheck(
-                name = f.name.replaceFirstChar { it.uppercase() },
+                name = faultEs(f.name),
                 status = Assessment.OBSERVED,
                 where = where(f.phase, f.intervalS),
                 detail = f.evidence(),
@@ -29,8 +33,8 @@ fun repChecks(rep: RepRow): List<RepCheck> {
         .sortedBy { order[it.status] ?: 2 }
         .map { a ->
             RepCheck(
-                name = a.name.replaceFirstChar { it.uppercase() } +
-                    if (a.variantDependent && a.observed) " (variant not declared)" else "",
+                name = faultEs(a.name) +
+                    if (a.variantDependent && a.observed) " (variante sin declarar)" else "",
                 status = a.status,
                 where = if (a.status == Assessment.UNOBSERVABLE) "" else where(a.phase, a.intervalS),
                 detail = when (a.status) {
@@ -46,26 +50,27 @@ fun repChecks(rep: RepRow): List<RepCheck> {
 fun standardLine(a: Analysis): String {
     if (a.measurementVersion < 2) return ""
     val v = a.variant
-    val movement = a.exercise.replace('_', ' ').ifBlank { "this movement" }
+    val movement = if (a.exercise.isBlank()) "este movimiento" else movementEs(a.exercise).lowercase()
     // Only movements with a variant-dependent check have a standard to
     // declare; a push-up set says nothing about one.
     val dependsOnVariant = a.reps.any { r -> r.assessments.any { it.variantDependent } }
     return when {
         v.isSpecified && v.source == "declared" ->
-            "Judged to the ${v.name.replace('_', ' ')} standard you declared."
-        v.isSpecified -> "Judged to the ${v.name.replace('_', ' ')} standard."
+            "Juzgada con el estándar «${variantEs(v.name)}» que declaraste."
+        v.isSpecified -> "Juzgada con el estándar «${variantEs(v.name)}»."
         v.declared != null && v.declared != Variant.UNSPECIFIED ->
-            "You declared \"${v.declared.replace('_', ' ')}\", which is not a standard " +
-                "for a $movement, so the set was judged without one."
+            "Declaraste «${v.declared.replace('_', ' ')}», que no es un estándar " +
+                "de $movement, así que la serie se juzgó sin ninguno."
         dependsOnVariant ->
-            "No standard declared. Checks that depend on strict or kipping form " +
-                "are marked, not assumed. Declare one on the upload page next time."
+            "Sin estándar declarado. Las comprobaciones que dependen de la técnica " +
+                "estricta o con kipping se marcan, no se dan por supuestas. La próxima vez " +
+                "declara uno al subir el clip."
         else -> ""
     }
 }
 
 private fun where(phase: String, interval: List<Double>): String {
-    val p = phase.replace('_', ' ')
+    val p = phaseEs(phase)
     return when {
         interval.size >= 2 -> "%s · %.1f–%.1fs".format(p, interval[0], interval[1])
         else -> p
@@ -74,12 +79,18 @@ private fun where(phase: String, interval: List<Double>): String {
 
 private fun evidence(a: Assessment): String {
     val v = a.value ?: return ""
-    val needs = if (a.comparison.startsWith("<")) "needs" else "limit"
+    val needs = if (a.comparison.startsWith("<")) "mínimo" else "límite"
     return "${fmt(v)}${suffix(a.unit)}, $needs ${fmt(a.threshold)}${suffix(a.unit)}"
 }
 
-private fun suffix(unit: String) = if (unit.isBlank()) "" else " $unit"
+private fun suffix(unit: String) = unitEs(unit).let { if (it.isBlank()) "" else " $it" }
 
 private fun fmt(d: Double): String =
     if (d >= 10 || d == d.toLong().toDouble()) d.toLong().toString()
     else String.format("%.2f", d)
+
+private fun variantEs(name: String): String = when (name) {
+    "strict" -> "estricto"
+    "kipping" -> "con kipping"
+    else -> name.replace('_', ' ')
+}

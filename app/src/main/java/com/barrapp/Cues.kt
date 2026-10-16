@@ -75,25 +75,25 @@ private const val LEGACY_SWING_TORSO = 0.4
 /** The one fault that leads the rep's score, or null when it measured clean.
  *  These are the words that go over the video. */
 fun repFault(rep: RepRow): String? = when (repFaults(rep).firstOrNull()) {
-    "momentum" -> "Momentum"
-    "lockout" -> "Not locking out"
-    "dead hang" -> "Not a dead hang"
-    "fast descent" -> "Descent too fast"
-    "stall" -> "Stalled mid-pull"
-    "poor transition" -> "Slow transition"
-    "bent arms" -> "Bent arms"
-    "no active hang" -> "No active hang"
-    "too fast" -> "Thrown, not pulled"
-    "too deep" -> "Too deep"
-    "bounce at bottom" -> "Bounced at the bottom"
-    "poor range of motion" -> "Short range"
-    "sagging hips" -> "Hips sagging"
-    "knee valgus" -> "Knees caving in"
-    "heel raise" -> "Heels lifting"
-    "leaning back" -> "Leaning back"
-    "arm swing" -> "Arm swing"
-    "piked hips", "piked body" -> "Piked body line"
-    "bent knees" -> "Bent knees"
+    "momentum" -> "Balanceo"
+    "lockout" -> "Sin bloqueo arriba"
+    "dead hang" -> "Sin dead hang"
+    "fast descent" -> "Bajada rápida"
+    "stall" -> "Estancamiento a medio tirón"
+    "poor transition" -> "Transición lenta"
+    "bent arms" -> "Brazos doblados"
+    "no active hang" -> "Sin colgado activo"
+    "too fast" -> "Reps lanzadas"
+    "too deep" -> "Demasiado profundo"
+    "bounce at bottom" -> "Rebote abajo"
+    "poor range of motion" -> "Recorrido incompleto"
+    "sagging hips" -> "Cadera hundida"
+    "knee valgus" -> "Rodillas hacia dentro"
+    "heel raise" -> "Talones levantados"
+    "leaning back" -> "Espalda echada atrás"
+    "arm swing" -> "Brazos sueltos"
+    "piked hips", "piked body" -> "Cuerpo en pica"
+    "bent knees" -> "Rodillas dobladas"
     else -> null
 }
 
@@ -117,7 +117,7 @@ fun improvementCues(analysis: Analysis): List<String> {
             .thenBy { orderOf(it.key) })
         .mapNotNull { e ->
             CUES[e.key]?.let { cue ->
-                if (e.key in variantDependent) "$cue — judged strict; declare kipping if that was the plan"
+                if (e.key in variantDependent) "$cue — juzgado como estricto; declara kipping si ese era el plan"
                 else cue
             }
         }
@@ -143,26 +143,26 @@ private fun orderOf(name: String): Int =
     CUE_ORDER.indexOf(name).let { if (it < 0) CUE_ORDER.size else it }
 
 private val CUES = mapOf(
-    "momentum" to "Stop the swing — pull strict, no momentum",
-    "lockout" to "Lock out fully at the top of every rep",
-    "dead hang" to "Start every rep from a full dead hang",
-    "fast descent" to "Lower slower — the descent is short next to the pull",
-    "stall" to "Drive through the sticking point in one arc",
-    "poor transition" to "Get through the transition in one movement",
-    "bent arms" to "Press out to straight arms at the top of every rep",
-    "no active hang" to "Straighten the arms between reps — hang, then pull",
-    "too fast" to "Slow the pull down — these are being thrown",
-    "too deep" to "Stop at ninety degrees — deeper is shoulder, not chest",
-    "bounce at bottom" to "Pause at the bottom instead of bouncing out of it",
-    "poor range of motion" to "Take every rep through its full range",
-    "sagging hips" to "Hold the hips in line — squeeze the glutes",
-    "knee valgus" to "Drive the knees out over the toes",
-    "heel raise" to "Keep the heels down through the whole rep",
-    "leaning back" to "Keep the chest up — stop leaning back out of it",
-    "arm swing" to "Keep the arms still — no swinging for balance",
-    "piked hips" to "Hold the body flat — no piking at the hips",
-    "piked body" to "Hold the body flat — no piking at the hips",
-    "bent knees" to "Keep the legs straight through the hold",
+    "momentum" to "Corta el balanceo — tira estricto, sin impulso.",
+    "lockout" to "Bloquea del todo arriba en cada repetición.",
+    "dead hang" to "Empieza cada rep desde un dead hang completo.",
+    "fast descent" to "Baja más despacio: la bajada es corta comparada con la subida.",
+    "stall" to "Atraviesa el punto de estancamiento en un solo arco.",
+    "poor transition" to "Pasa la transición en un único movimiento.",
+    "bent arms" to "Estira los brazos del todo arriba.",
+    "no active hang" to "Estira los brazos entre reps — cuelga y luego tira.",
+    "too fast" to "Baja el ritmo — estas reps van lanzadas.",
+    "too deep" to "Párate en noventa grados — más abajo es hombro, no pecho.",
+    "bounce at bottom" to "Haz una pausa abajo en vez de rebotar.",
+    "poor range of motion" to "Lleva cada rep por su recorrido completo.",
+    "sagging hips" to "Mantén la cadera en línea — aprieta los glúteos.",
+    "knee valgus" to "Lleva las rodillas hacia fuera, sobre las puntas.",
+    "heel raise" to "Mantén los talones en el suelo toda la repetición.",
+    "leaning back" to "Pecho arriba — deja de echarte hacia atrás.",
+    "arm swing" to "Brazos quietos — no busques el equilibrio con ellos.",
+    "piked hips" to "Cuerpo plano — sin pica en la cadera.",
+    "piked body" to "Cuerpo plano — sin pica en la cadera.",
+    "bent knees" to "Piernas estiradas durante todo el hold.",
 )
 
 /** Advice is tied to the selected rep's measured fault. */
@@ -177,26 +177,26 @@ fun repAdvice(rep: RepRow): String? = repFaults(rep).firstOrNull()?.let { CUES[i
  */
 fun unmeasuredNote(rep: RepRow): String? {
     // A rep withheld from assessment altogether: no fault list is a verdict here.
-    rep.assessmentBlocked?.let { return "This rep was not judged — $it." }
+    rep.assessmentBlocked?.let { return "Esta repetición no se juzgó — $it." }
     // Measurement version 2 ships every check with its verdict; name the
     // ones that could not be made, grouped by why.
     if (rep.assessments.isNotEmpty()) {
         val blind = rep.unobservable
         if (blind.isEmpty()) return null
-        val byReason = blind.groupBy { it.reasonLabel().ifBlank { "not tracked" } }
+        val byReason = blind.groupBy { it.reasonLabel().ifBlank { "sin seguir" } }
         val parts = byReason.entries.map { (why, rows) ->
             rows.joinToString(", ") { it.name } + " ($why)"
         }
-        return "Not judged: " + parts.joinToString("; ") +
-            " — ${rep.checked} of ${rep.assessments.size} checks were made."
+        return "Sin juzgar: " + parts.joinToString("; ") +
+            " — se hicieron ${rep.checked} de ${rep.assessments.size} comprobaciones."
     }
     if (rep.viewBlocked.isNotEmpty()) {
-        return "Some checks need a different camera angle — " +
-            "${rep.viewBlocked.size} of them were not judged from this one."
+        return "Algunas comprobaciones necesitan otro ángulo de cámara — " +
+            "${rep.viewBlocked.size} no se juzgaron desde este."
     }
     if (rep.unmeasured.isNotEmpty()) {
-        return "${rep.unmeasured.size} check${if (rep.unmeasured.size == 1) "" else "s"} " +
-            "had no measurement in this clip and were left unjudged."
+        return if (rep.unmeasured.size == 1) "1 comprobación no tuvo medida en este clip y se quedó sin juzgar."
+        else "${rep.unmeasured.size} comprobaciones no tuvieron medida en este clip y se quedaron sin juzgar."
     }
     return null
 }
@@ -211,7 +211,7 @@ fun improvementLines(analysis: Analysis): List<String> {
     val cues = improvementCues(analysis)
     if (cues.isNotEmpty()) return cues
     if (analysis.reps.isEmpty()) {
-        return listOf("Nothing to flag — barra could not measure a rep in this clip.")
+        return listOf("Nada que señalar — barra no pudo medir ninguna repetición en este clip.")
     }
     // "Clean" is a claim about checks that were made. With the structured
     // assessment we know how many were: none made means nothing was judged.
@@ -220,15 +220,16 @@ fun improvementLines(analysis: Analysis): List<String> {
         val made = checks.sumOf { it.observed + it.notObserved }
         val blind = checks.sumOf { it.unobservable }
         if (made == 0) {
-            return listOf("Nothing flagged — but no check could be made on this clip " +
-                "($blind left unjudged). Film closer, side-on, with the whole body in frame.")
+            return listOf("Nada señalado — pero no se pudo hacer ninguna comprobación en este clip " +
+                "($blind sin juzgar). Filma más cerca, de lado, con todo el cuerpo en el encuadre.")
         }
         if (blind > 0) {
             return listOf(
-                "Nothing flagged on the checks that were made.",
-                "$blind check${if (blind == 1) "" else "s"} could not be made from this footage.",
+                "Nada señalado en las comprobaciones que se pudieron hacer.",
+                if (blind == 1) "1 comprobación no se pudo hacer con esta grabación."
+                else "$blind comprobaciones no se pudieron hacer con esta grabación.",
             )
         }
     }
-    return listOf("Nothing flagged — the set measured clean.")
+    return listOf("Nada señalado — la serie salió limpia en lo medido.")
 }

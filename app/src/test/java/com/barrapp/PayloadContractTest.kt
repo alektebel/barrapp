@@ -60,14 +60,14 @@ class PayloadContractTest {
         // Set-level tally, one line per rule, and the standard line names the gap.
         assertEquals(7, a.checks.size)
         assertEquals(2, a.checks.single { it.errorId == "muscle_up.incomplete_lockout" }.observed)
-        assertTrue(standardLine(a).startsWith("No standard declared"))
+        assertTrue(standardLine(a).startsWith("Sin estándar declarado"))
 
         // What the rep card renders: flagged first, with phase and window.
         val checks = repChecks(rep)
         assertEquals(Assessment.OBSERVED, checks.first().status)
-        val lockoutRow = checks.single { it.name == "Lockout" }
-        assertEquals("support · 5.8–6.0s", lockoutRow.where)
-        assertEquals("75 % of reach, needs 85 % of reach", lockoutRow.detail)
+        val lockoutRow = checks.single { it.name == "Sin bloqueo arriba" }
+        assertEquals("Apoyo · 5.8–6.0s", lockoutRow.where)
+        assertEquals("75 % del recorrido, mínimo 85 % del recorrido", lockoutRow.detail)
         assertNotNull(rep.phases["support"])
         // JSON null must read as absent, not as the word "null".
         assertTrue(a.reps.all { it.assessmentBlocked == null })
@@ -87,7 +87,7 @@ class PayloadContractTest {
         assertEquals("", standardLine(a))
         // A rep with an unobservable check does not read as fully clean.
         val partial = a.reps.first { r -> r.assessments.any { it.status == Assessment.UNOBSERVABLE } }
-        assertTrue(unmeasuredNote(partial)!!.startsWith("Not judged:"))
+        assertTrue(unmeasuredNote(partial)!!.startsWith("Sin juzgar:"))
         assertTrue(repChecks(partial).last().detail.isNotBlank())
     }
 }

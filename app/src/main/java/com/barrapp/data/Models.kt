@@ -149,8 +149,8 @@ data class Detected(
     /** How to say the number without claiming more than was measured. */
     val certaintyLabel: String
         get() = if (certainty == MARGIN_TO_THRESHOLD)
-            "${(confidence * 100).toInt()}% clear of the boundary"
-        else "${(confidence * 100).toInt()}% confident"
+            "${(confidence * 100).toInt()}% por encima del límite"
+        else "${(confidence * 100).toInt()}% de confianza"
 
     companion object {
         const val MARGIN_TO_THRESHOLD = "margin-to-threshold"
@@ -242,11 +242,11 @@ data class MeasuredFault(
     /** "76% of reach, needs 85" - the number, never re-derived here. */
     fun evidence(): String {
         val v = value ?: return ""
-        val needs = if (comparison.startsWith("<")) "needs" else "limit"
+        val needs = if (comparison.startsWith("<")) "mínimo" else "límite"
         return "${fmt(v)}${unitSuffix()}, $needs ${fmt(threshold)}${unitSuffix()}"
     }
 
-    private fun unitSuffix() = if (unit.isBlank()) "" else " $unit"
+    private fun unitSuffix() = unitEs(unit).let { if (it.isBlank()) "" else " $it" }
 
     private fun fmt(d: Double): String =
         if (d >= 10 || d == d.toLong().toDouble()) d.toLong().toString()
@@ -350,13 +350,14 @@ data class Assessment(
 
     /** Plain words for the availability reason. */
     fun reasonLabel(): String = when {
-        reason.startsWith("unsuitable view") -> "needs a different camera angle"
-        reason.startsWith("insufficient temporal evidence") -> "too little of this phase was tracked"
-        reason.startsWith("unsupported variant") -> "depends on the variant"
-        reason.startsWith("not applicable") -> "not defined for this movement"
-        reason.startsWith("tracking loss") -> "the joints it needs were lost by the tracker"
-        reason.startsWith("missing primitive") -> "no measurement of this in the clip"
-        reason.isNotBlank() -> "not tracked"
+        reason.startsWith("unsuitable view") -> "necesita otro ángulo de cámara"
+        reason.startsWith("insufficient temporal evidence") -> "se siguió muy poco de esta fase"
+        reason.startsWith("unsupported variant") -> "depende de la variante"
+        reason.startsWith("not applicable") -> "no está definido para este movimiento"
+        reason.startsWith("tracking loss") -> "el seguimiento perdió las articulaciones que necesita"
+        reason.startsWith("missing primitive") -> "no hay medida de esto en el clip"
+        reason.startsWith("torso ruler unusable") -> "la medida del torso no sirve en este vídeo"
+        reason.isNotBlank() -> "sin seguir"
         else -> ""
     }
 
@@ -382,6 +383,14 @@ data class VisionObservation(
     val description: String,
     val frames: List<String> = emptyList(),
 )
+
+/** The server's measurement units, in the app's language. Unknown units pass through. */
+internal fun unitEs(unit: String): String = when (unit) {
+    "% of reach" -> "% del recorrido"
+    "torso" -> "torsos"
+    "deg" -> "grados"
+    else -> unit
+}
 
 /** The declared technique variant, or unspecified. Never inferred. */
 data class Variant(

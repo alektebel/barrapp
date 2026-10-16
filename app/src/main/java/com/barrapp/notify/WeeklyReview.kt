@@ -91,10 +91,10 @@ class WeeklyReviewWorker(
             manager.createNotificationChannel(
                 NotificationChannel(
                     CHANNEL,
-                    "Weekly review",
+                    "Resumen semanal",
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ).apply {
-                    description = "One summary a week, only when there is something to report."
+                    description = "Un resumen a la semana, sólo cuando hay algo que contar."
                 }
             )
         }

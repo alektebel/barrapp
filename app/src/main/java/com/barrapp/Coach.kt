@@ -69,6 +69,15 @@ object Coach {
         }
     }
 
+    /** The questions offered as chips. Each one is worded so [answer] routes it
+     *  to the branch its question is about; LogicTest pins that. */
+    fun suggestions(dayCount: Int): List<String> = buildList {
+        add("¿Qué mostró realmente mi última sesión?")
+        if (dayCount >= 2) add("¿Estoy mejorando de verdad o es sólo ruido?")
+        add("¿Por qué algunas repeticiones no tienen puntuación?")
+        add("¿Cómo debería grabar la siguiente?")
+    }
+
     private fun progress(days: List<DayEntry>): String {
         val comparable = days.filter { it.reps >= FLOOR }
         if (comparable.size < 2) {
@@ -120,7 +129,7 @@ object Coach {
         }
     }
 
-    private fun bandEs(band: String): String = when (band.lowercase()) {
+    internal fun bandEs(band: String): String = when (band.lowercase()) {
         "strong" -> "fuerte"
         "solid" -> "sólido"
         "shaky" -> "inestable"

@@ -186,7 +186,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             clipFile(app, jobId).parentFile?.mkdirs()
             app.contentResolver.openInputStream(uri)?.use { input ->
                 clipFile(app, jobId).outputStream().use { output -> input.copyTo(output) }
-            } ?: error("could not open the clip")
+            } ?: error("no se pudo abrir el clip")
         }.onFailure {
             EventLog.warn(app, "the clip was not kept for replay", it.message.orEmpty())
         }
@@ -281,7 +281,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 .onFailure { err ->
                     _state.update {
                         it.copy(authBusy = false,
-                            authError = err.message ?: "That did not work. Try again.")
+                            authError = err.message ?: "Eso no ha funcionado. Inténtalo de nuevo.")
                     }
                 }
                 .onSuccess { _state.update { it.copy(authBusy = false) } }
@@ -292,7 +292,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         api.signUp(email, password)
         _state.update {
             it.copy(authStep = com.barrapp.ui.AuthStep.Confirm,
-                authNotice = "Account created. Enter the code we emailed you.")
+                authNotice = "Cuenta creada. Introduce el código que te hemos enviado por correo.")
         }
     }
 
@@ -300,20 +300,20 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         api.confirm(email, code)
         _state.update {
             it.copy(authStep = com.barrapp.ui.AuthStep.SignIn,
-                authNotice = "Confirmed. Sign in to finish.")
+                authNotice = "Confirmada. Inicia sesión para terminar.")
         }
     }
 
     fun resendCode(email: String) = authAction { _ ->
         api.resendCode(email)
-        _state.update { it.copy(authNotice = "Sent. Check your email again.") }
+        _state.update { it.copy(authNotice = "Enviado. Revisa de nuevo tu correo.") }
     }
 
     fun forgotPassword(email: String) = authAction { _ ->
         api.forgotPassword(email)
         _state.update {
             it.copy(authStep = com.barrapp.ui.AuthStep.Reset,
-                authNotice = "We emailed you a code.")
+                authNotice = "Te hemos enviado un código por correo.")
         }
     }
 
@@ -321,7 +321,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         api.resetPassword(email, code, password)
         _state.update {
             it.copy(authStep = com.barrapp.ui.AuthStep.SignIn,
-                authNotice = "Password changed. Sign in with it.")
+                authNotice = "Contraseña cambiada. Inicia sesión con ella.")
         }
     }
 
@@ -385,7 +385,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val app = getApplication<Application>()
         val text = message.trim()
         if (text.isEmpty()) {
-            _state.update { it.copy(feedbackError = "Write something first") }
+            _state.update { it.copy(feedbackError = "Escribe algo primero") }
             return
         }
         if (_state.value.feedbackBusy) return
@@ -415,7 +415,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 EventLog.error(app, "feedback failed", err.message ?: "")
                 _state.update {
                     it.copy(feedbackBusy = false,
-                        feedbackError = err.message ?: "Could not send feedback")
+                        feedbackError = err.message ?: "No se pudieron enviar los comentarios")
                 }
             }
         }
@@ -556,7 +556,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     dest.parentFile?.mkdirs()
                     app.contentResolver.openInputStream(video)?.use { input ->
                         dest.outputStream().use { output -> input.copyTo(output) }
-                    } ?: error("could not open the clip")
+                    } ?: error("no se pudo abrir el clip")
                     dest.length() > 0
                 }
             }.getOrElse { false }
@@ -585,7 +585,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                     else -> WorkStore.STATUS_WAITING
                 },
                 clipPath = dest.absolutePath,
-                error = if (kept) null else "The clip could not be kept on the phone.",
+                error = if (kept) null else "No se pudo guardar el clip en el teléfono.",
                 // The server's vocabularies: variants are lower_snake
                 // (strict, kipping, full, tuck, straddle); viewpoint bins are
                 // upper (SAGITTAL, FRONTAL, OBLIQUE). Anything else comes back
@@ -599,17 +599,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 clipDurationS = suggestion?.first?.durationS ?: 0.0,
                 log = buildList {
                     val declared = listOfNotNull(
-                        variant.takeIf { it.isNotBlank() }?.let { "$it standard declared" },
-                        view.takeIf { it.isNotBlank() }?.let { "camera $it" },
+                        variant.takeIf { it.isNotBlank() }?.let { "estándar «$it» declarado" },
+                        view.takeIf { it.isNotBlank() }?.let { "cámara $it" },
                     )
                     add(WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.INFO,
-                        (listOf("clip added to the queue") + declared).joinToString(" · ")))
+                        (listOf("clip añadido a la cola") + declared).joinToString(" · ")))
                     if (win != null) {
                         add(WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.INFO,
                             "serie sugerida: %.1f s–%.1f s".format(win.startS, win.endS)))
                     }
                     if (!kept) add(WorkStore.Entry(System.currentTimeMillis(),
-                        WorkStore.Level.ERROR, "the clip could not be read or kept"))
+                        WorkStore.Level.ERROR, "no se pudo leer ni guardar el clip"))
                 },
             )
             WorkStore.put(app, work)
@@ -708,7 +708,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val work = WorkStore.get(app, workId) ?: return
         if (!work.clipPath.let { java.io.File(it).exists() }) {
             WorkStore.append(app, workId, WorkStore.Level.ERROR,
-                "retry refused — the clip is no longer on the phone")
+                "reintento rechazado: el clip ya no está en el teléfono")
             publishWorks()
             return
         }
@@ -720,14 +720,14 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 runCatching { withContext(Dispatchers.IO) { api.abortUpload(work.jobId) } }
             }
             WorkStore.put(app, work.copy(status = WorkStore.STATUS_WAITING, error = null,
-                stage = "waiting to be sent", traceId = "",
+                stage = "Esperando para enviarse", traceId = "",
                 jobId = "", uploadId = "", partSize = 0, uploadedParts = emptyList(),
                 uploadMode = "", uploadComplete = false,
                 timingAttemptId = java.util.UUID.randomUUID().toString(),
                 // El recorte ya pasó: clipPath apunta al recortado y su ventana
                 // de un solo uso ya quedó limpiada, así el reintento sube lo mismo.
                 log = work.log + WorkStore.Entry(System.currentTimeMillis(),
-                    WorkStore.Level.INFO, "retry requested")))
+                    WorkStore.Level.INFO, "reintento solicitado")))
             publishWorks()
             uploads.kick()
         }
@@ -844,13 +844,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
 
     // ---- coach ------------------------------------------------------------
     fun suggestions(): List<String> {
-        val days = _state.value.days
-        return buildList {
-            add("What did my last session actually show?")
-            if (days.size >= 2) add("Am I getting better, or is that just noise?")
-            add("Why do some of my reps not get a score?")
-            add("How should I film the next one?")
-        }
+        return Coach.suggestions(_state.value.days.size)
     }
 
     fun ask(question: String) {
@@ -869,7 +863,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 // A crash must never leave the chat stuck thinking with no
                 // answer - say the coach fell over, and let the user retry.
                 SessionStore.appendChat(app, ChatTurn(fromUser = false,
-                    text = "I could not answer that just now. Ask again, or rephrase it."))
+                    text = "Ahora no he podido responder a eso. Vuelve a preguntar o reformula la pregunta."))
             } finally {
                 _state.update { it.copy(chat = SessionStore.chat(app), coachThinking = false) }
             }
@@ -915,8 +909,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         it.copy(
                             objectivesThinking = false,
                             objectives = listOf(
-                                ChatTurn(fromUser = false, text = "I could not reach the " +
-                                    "objectives service. Check your connection and try again.")
+                                ChatTurn(fromUser = false, text = "No he podido conectar con " +
+                                    "el servicio de objetivos. Revisa tu conexión e inténtalo de nuevo.")
                             ),
                         )
                     }

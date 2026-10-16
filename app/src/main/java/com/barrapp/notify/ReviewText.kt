@@ -36,24 +36,24 @@ object ReviewText {
         val measured = week.filter { it.measured }
         val name = profile.firstName
 
-        val title = "$name \u2014 ${week.size} session${if (week.size == 1) "" else "s"} this week"
+        val title = "$name \u2014 ${week.size} sesi${if (week.size == 1) "ón" else "ones"} esta semana"
         val body = buildString {
-            append("$reps rep${if (reps == 1) "" else "s"} measured across ")
-            append("${week.size} day${if (week.size == 1) "" else "s"}. ")
+            append("$reps repetici${if (reps == 1) "ón medida" else "ones medidas"} en ")
+            append("${week.size} día${if (week.size == 1) "" else "s"}. ")
             whatYouTrained(week)?.let { append("$it ") }
             when (comparable) {
                 0 -> append(
-                    "None reached $FLOOR measured reps, so none can be compared with another " +
-                        "session yet. Aim for ${profile.repTarget} in one set."
+                    "Ninguna llegó a $FLOOR repeticiones medidas, así que todavía no se puede comparar " +
+                        "ninguna con otra sesión. Apunta a ${profile.repTarget} en una serie."
                 )
                 1 -> append(
-                    "One session reached the $FLOOR-rep floor. One more and there is something " +
-                        "to compare it against."
+                    "Una sesión llegó al mínimo de $FLOOR repeticiones. Con una más ya hay " +
+                        "algo con lo que compararla."
                 )
                 else -> {
-                    append("$comparable sessions cleared the $FLOOR-rep floor. ")
+                    append("$comparable sesiones superaron el mínimo de $FLOOR repeticiones. ")
                     append(trendSentence(measured)
-                        ?: "Scores held level within their own spread.")
+                        ?: "Las puntuaciones se mantuvieron estables dentro de su propia dispersión.")
                 }
             }
             bestDay(measured)?.let { append(" $it") }
@@ -68,20 +68,20 @@ object ReviewText {
      *  this the report is a rep count with no idea what the reps were. */
     fun whatYouTrained(week: List<DayEntry>): String? {
         val byMovement = week.filter { it.reps > 0 && it.exerciseLabel.isNotBlank() }
-            .groupBy { it.exerciseLabel }
+            .groupBy { com.barrapp.movementEs(it.exercise, it.exerciseLabel) }
         if (byMovement.isEmpty()) return null
         val parts = byMovement.entries
             .map { (label, days) -> Triple(label, days.size, days.sumOf { it.reps }) }
             .sortedByDescending { it.third }
             .map { (label, days, reps) ->
-                "${label.lowercase()} ($reps rep${if (reps == 1) "" else "s"} over " +
-                    "$days day${if (days == 1) "" else "s"})"
+                "${label.lowercase()} ($reps repetici${if (reps == 1) "ón" else "ones"} en " +
+                    "$days día${if (days == 1) "" else "s"})"
             }
         return when (parts.size) {
-            1 -> "All of it ${parts[0]}."
-            2 -> "${parts[0].replaceFirstChar { it.uppercase() }} and ${parts[1]}."
+            1 -> "Todo fue ${parts[0]}."
+            2 -> "${parts[0].replaceFirstChar { it.uppercase() }} y ${parts[1]}."
             else -> parts.dropLast(1).joinToString(", ")
-                .replaceFirstChar { it.uppercase() } + ", and ${parts.last()}."
+                .replaceFirstChar { it.uppercase() } + " y ${parts.last()}."
         }
     }
 
@@ -97,11 +97,11 @@ object ReviewText {
         val v = Progression.focus(all) ?: return null
         val step = v.step ?: return null
         return if (v.ready)
-            "You have cleared the standard for ${step.towardsLabel.lowercase()}: " +
+            "Has superado el estándar de ${step.towardsLabel.lowercase()}: " +
                 "${v.standard.replaceFirstChar { it.lowercase() }} " +
-                "Earned on ${v.qualifyingDays.joinToString(" and ") { pretty(it) }}."
+                "Logrado el ${v.qualifyingDays.joinToString(" y el ") { pretty(it) }}."
         else
-            "Towards ${step.towardsLabel.lowercase()}: ${v.missing.replaceFirstChar { it.lowercase() }}"
+            "Camino de ${step.towardsLabel.lowercase()}: ${v.missing.replaceFirstChar { it.lowercase() }}"
     }
 
     /** The single best day, so the week has a high point to point at. */
@@ -109,7 +109,7 @@ object ReviewText {
         val best = measured.filter { it.reps >= FLOOR }.maxByOrNull { it.score ?: 0 }
             ?: return null
         val score = best.score ?: return null
-        return "Best day was ${pretty(best.date)} at $score (${best.band})."
+        return "El mejor día fue el ${pretty(best.date)}, con $score (${com.barrapp.Coach.bandEs(best.band)})."
     }
 
     /**
@@ -127,11 +127,9 @@ object ReviewText {
         if (before == 0) return null
         val delta = now - before
         return when {
-            delta > 0 -> "Volume is up from $before rep${if (before == 1) "" else "s"} " +
-                "the week before."
-            delta < 0 -> "Volume is down from $before rep${if (before == 1) "" else "s"} " +
-                "the week before."
-            else -> "Volume matched the week before exactly."
+            delta > 0 -> "El volumen sube desde las $before repeticiones de la semana anterior."
+            delta < 0 -> "El volumen baja desde las $before repeticiones de la semana anterior."
+            else -> "El volumen fue exactamente el de la semana anterior."
         }
     }
 
@@ -140,8 +138,9 @@ object ReviewText {
     fun unmeasuredSentence(week: List<DayEntry>): String? {
         val blank = week.count { !it.measured }
         if (blank == 0) return null
-        return "$blank session${if (blank == 1) "" else "s"} produced no measurable " +
-            "reps \u2014 worth checking the framing on those clips."
+        return if (blank == 1)
+            "1 sesión no produjo repeticiones medibles \u2014 conviene revisar el encuadre de ese clip."
+        else "$blank sesiones no produjeron repeticiones medibles \u2014 conviene revisar el encuadre de esos clips."
     }
 
     /** "2026-08-19" -> "19 Aug". Hand-rolled because this file stays free of
@@ -150,8 +149,8 @@ object ReviewText {
         val p = date.split("-")
         if (p.size != 3) return date
         val month = p[1].toIntOrNull() ?: return date
-        val names = listOf("Jan", "Feb", "Mar", "Apr", "May", "Jun",
-                           "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+        val names = listOf("ene", "feb", "mar", "abr", "may", "jun",
+                           "jul", "ago", "sep", "oct", "nov", "dic")
         if (month !in 1..12) return date
         return "${p[2].trimStart('0')} ${names[month - 1]}"
     }
@@ -175,10 +174,10 @@ object ReviewText {
         val delta = (ordered.last().score ?: 0) - (ordered.first().score ?: 0)
         if (kotlin.math.abs(delta) < MIN_MEANINGFUL_DELTA) return null
         return if (delta > 0)
-            "The baseline proxy is up $delta points across the week, which is worth a look " +
-                "but has not been tested against your own rep-to-rep variation."
+            "La puntuación base sube $delta puntos a lo largo de la semana. Merece una mirada, " +
+                "pero no se ha contrastado con tu propia variación entre repeticiones."
         else
-            "The baseline proxy is down ${-delta} points across the week."
+            "La puntuación base baja ${-delta} puntos a lo largo de la semana."
     }
 
     fun weekAgo(): String {

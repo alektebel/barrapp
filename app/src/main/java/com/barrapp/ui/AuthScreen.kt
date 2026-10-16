@@ -65,11 +65,11 @@ fun AuthScreen(
     ) {
         Text(
             when (step) {
-                AuthStep.SignIn -> "Sign in"
-                AuthStep.SignUp -> "Create an account"
-                AuthStep.Confirm -> "Check your email"
-                AuthStep.Forgot -> "Reset your password"
-                AuthStep.Reset -> "Choose a new password"
+                AuthStep.SignIn -> "Inicia sesión"
+                AuthStep.SignUp -> "Crea una cuenta"
+                AuthStep.Confirm -> "Revisa tu correo"
+                AuthStep.Forgot -> "Restablece tu contraseña"
+                AuthStep.Reset -> "Elige una contraseña nueva"
             },
             style = MaterialTheme.typography.displaySmall,
         )
@@ -77,15 +77,15 @@ fun AuthScreen(
         Text(
             when (step) {
                 AuthStep.SignIn ->
-                    "Your sessions follow the account, so a new phone starts where you left off."
+                    "Tus sesiones van con la cuenta, así que un teléfono nuevo continúa donde lo dejaste."
                 AuthStep.SignUp ->
-                    "Eight characters or more, with a letter and a number."
+                    "Ocho caracteres o más, con una letra y un número."
                 AuthStep.Confirm ->
-                    "We sent a code to $email. Enter it to finish."
+                    "Hemos enviado un código a $email. Introdúcelo para terminar."
                 AuthStep.Forgot ->
-                    "We will email you a code to set a new password."
+                    "Te enviaremos un código por correo para fijar una contraseña nueva."
                 AuthStep.Reset ->
-                    "Enter the code from your email and the new password."
+                    "Introduce el código de tu correo y la contraseña nueva."
             },
             style = MaterialTheme.typography.bodyMedium,
         )
@@ -95,7 +95,7 @@ fun AuthScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = { email = it.trim() },
-                label = { Text("Email") },
+                label = { Text("Correo electrónico") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Email, imeAction = ImeAction.Next),
@@ -108,7 +108,7 @@ fun AuthScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("Password") },
+                label = { Text("Contraseña") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
@@ -121,7 +121,7 @@ fun AuthScreen(
             OutlinedTextField(
                 value = code,
                 onValueChange = { code = it.trim() },
-                label = { Text("Code") },
+                label = { Text("Código") },
                 singleLine = true,
                 keyboardOptions = KeyboardOptions(
                     keyboardType = KeyboardType.Number, imeAction = ImeAction.Next),
@@ -134,7 +134,7 @@ fun AuthScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = { password = it },
-                label = { Text("New password") },
+                label = { Text("Contraseña nueva") },
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(
@@ -176,11 +176,11 @@ fun AuthScreen(
             if (busy) CircularProgressIndicator(Modifier.height(18.dp))
             else Text(
                 when (step) {
-                    AuthStep.SignIn -> "Sign in"
-                    AuthStep.SignUp -> "Create account"
-                    AuthStep.Confirm -> "Confirm"
-                    AuthStep.Forgot -> "Email me a code"
-                    AuthStep.Reset -> "Set password"
+                    AuthStep.SignIn -> "Iniciar sesión"
+                    AuthStep.SignUp -> "Crear cuenta"
+                    AuthStep.Confirm -> "Confirmar"
+                    AuthStep.Forgot -> "Enviarme un código"
+                    AuthStep.Reset -> "Fijar contraseña"
                 }
             )
         }
@@ -189,29 +189,29 @@ fun AuthScreen(
         when (step) {
             AuthStep.SignIn -> {
                 TextButton(onClick = { onStep(AuthStep.SignUp) }) {
-                    Text("No account yet? Create one")
+                    Text("¿Aún no tienes cuenta? Crea una")
                 }
                 TextButton(onClick = { onStep(AuthStep.Forgot) }) {
-                    Text("Forgot your password?")
+                    Text("¿Has olvidado la contraseña?")
                 }
             }
             AuthStep.SignUp -> TextButton(onClick = { onStep(AuthStep.SignIn) }) {
-                Text("Already have an account? Sign in")
+                Text("¿Ya tienes cuenta? Inicia sesión")
             }
             AuthStep.Confirm -> TextButton(onClick = { onResend(email) }) {
-                Text("Send the code again")
+                Text("Reenviar el código")
             }
             AuthStep.Forgot -> TextButton(onClick = { onStep(AuthStep.Reset) }) {
-                Text("I already have a code")
+                Text("Ya tengo un código")
             }
             AuthStep.Reset -> TextButton(onClick = { onStep(AuthStep.SignIn) }) {
-                Text("Back to sign in")
+                Text("Volver a iniciar sesión")
             }
         }
 
         if (onSkip != null) {
             TextButton(onClick = onSkip, modifier = Modifier.fillMaxWidth()) {
-                Text("Not now — keep training on this phone")
+                Text("Ahora no: seguir entrenando en este teléfono")
             }
         }
     }

@@ -73,36 +73,36 @@ object Progression {
      *  muscle-up they cannot hold is a shoulder. */
     val LADDER: Map<String, Step> = mapOf(
         "push_up" to Step(
-            "dip", "Dip", reps = 15, quality = SOLID, days = 2,
-            note = "Dips load the same push pattern through a longer range.",
+            "dip", "Fondo", reps = 15, quality = SOLID, days = 2,
+            note = "Los fondos cargan el mismo patrón de empuje con más recorrido.",
         ),
         "dip" to Step(
             "muscle_up", "Muscle-up", reps = 10, quality = SOLID, days = 2,
-            note = "The dip is the second half of a muscle-up. The transition " +
-                "is the other half, so a pull-up standard applies too.",
+            note = "El fondo es la segunda mitad de un muscle-up. La transición " +
+                "es la otra mitad, así que también se aplica un estándar de dominadas.",
         ),
         "pull_up" to Step(
             "muscle_up", "Muscle-up", reps = 8, quality = SOLID, days = 2,
-            note = "The transition needs the pull to finish high and under " +
-                "control, which is what the quality bar is for.",
+            note = "La transición necesita que el tirón termine alto y con " +
+                "control, que es para lo que sirve el listón de calidad.",
         ),
         "muscle_up" to Step(
-            "weighted_muscle_up", "Weighted or strict muscle-up",
+            "weighted_muscle_up", "Muscle-up lastrado o estricto",
             reps = 5, quality = STRONG, days = 2, targetMeasurable = false,
-            note = "Barra cannot verify added load from video, so it stops " +
-                "refereeing here and this becomes a training decision.",
+            note = "Barra no puede verificar la carga añadida a partir del vídeo, así que " +
+                "deja de arbitrar aquí y pasa a ser una decisión de entrenamiento.",
         ),
         "knee_raise" to Step(
             "toes_to_bar", "Toes to bar", reps = 12, quality = SOLID, days = 2,
             targetMeasurable = false,
-            note = "Toes to bar is not in the measured vocabulary yet, so barra " +
-                "can confirm you have earned the attempt but not score it.",
+            note = "Toes to bar todavía no está entre los movimientos que se miden, así que barra " +
+                "puede confirmar que te has ganado el intento pero no puntuarlo.",
         ),
         "squat" to Step(
             "pistol_squat", "Pistol squat", reps = 20, quality = SOLID, days = 2,
             targetMeasurable = false,
-            note = "A pistol is single-leg, and barra measures the hips as one " +
-                "point, so it cannot tell the two apart.",
+            note = "Un pistol es a una pierna y barra mide la cadera como un solo " +
+                "punto, así que no distingue una pierna de otra.",
         ),
     )
 
@@ -120,17 +120,17 @@ object Progression {
     ) {
         val headline: String
             get() = when {
-                step == null -> "No progression tracked for this movement"
-                ready -> "Ready to work ${step.towardsLabel}"
-                else -> "Working towards ${step.towardsLabel}"
+                step == null -> "Este movimiento no tiene progresión asociada"
+                ready -> "Listo para trabajar ${step.towardsLabel}"
+                else -> "Camino de ${step.towardsLabel}"
             }
     }
 
     private fun band(q: Int?): String = when {
-        q == null -> "unscored"
-        q >= STRONG -> "strong"
-        q >= SOLID -> "solid"
-        else -> "below the bar"
+        q == null -> "sin puntuar"
+        q >= STRONG -> "fuerte"
+        q >= SOLID -> "sólida"
+        else -> "por debajo del listón"
     }
 
     /**
@@ -153,24 +153,25 @@ object Progression {
 
     fun assess(movement: String, all: List<DayEntry>): Verdict {
         val step = LADDER[movement]
-        val label = all.firstNotNullOfOrNull { it.byMovement[movement]?.label }
-            ?: movement.replace("_", " ").replaceFirstChar { it.uppercase() }
+        // The server's label can come in English; the app names movements itself.
+        val label = movementEs(movement,
+            all.firstNotNullOfOrNull { it.byMovement[movement]?.label }.orEmpty())
         if (step == null) {
             return Verdict(
                 movement, label, null, false, emptyList(), 0, null, "",
-                "Barra has no progression ladder for this movement yet.", "",
+                "Barra todavía no tiene una escalera de progresión para este movimiento.", "",
             )
         }
-        val standard = "${step.reps} verified reps in one session at " +
-            "${step.quality} or better, on ${step.days} separate days."
+        val standard = "${step.reps} repeticiones verificadas en una sesión con " +
+            "${step.quality} o más, en ${step.days} días distintos."
 
         val days = all.mapNotNull { d -> d.byMovement[movement]?.let { d.date to it } }
             .filter { it.second.verified > 0 }
         if (days.isEmpty()) {
             return Verdict(
                 movement, label, step, false, emptyList(), 0, null, standard,
-                "No verified reps of this movement yet.",
-                "Film a set. ${step.reps} verified reps is the bar.",
+                "Todavía no hay repeticiones verificadas de este movimiento.",
+                "Filma una serie. El listón son ${step.reps} repeticiones verificadas.",
             )
         }
 
@@ -182,9 +183,9 @@ object Progression {
         val bestReps = best.second.verified
         val bestQuality = best.second.score
 
-        val evidence = "Best session: $bestReps verified rep${if (bestReps == 1) "" else "s"} " +
-            "at $bestQuality (${band(bestQuality)}) on ${best.first}. " +
-            "${qualifying.size} of ${step.days} days clear the standard."
+        val evidence = "Mejor sesión: $bestReps repetici${if (bestReps == 1) "ón verificada" else "ones verificadas"} " +
+            "con $bestQuality (${band(bestQuality)}) el ${best.first}. " +
+            "${qualifying.size} de ${step.days} días superan el estándar."
 
         if (qualifying.size >= step.days) {
             return Verdict(movement, label, step, true, qualifying, bestReps,
@@ -194,16 +195,16 @@ object Progression {
         val gaps = mutableListOf<String>()
         if (bestReps < step.reps) {
             val short = step.reps - bestReps
-            gaps += "$short more verified rep${if (short == 1) "" else "s"} in one session"
+            gaps += "${if (short == 1) "1 repetición verificada más" else "$short repeticiones verificadas más"} en una sesión"
         } else if ((bestQuality ?: 0) < step.quality) {
-            gaps += "the same volume at ${step.quality} or better (best so far $bestQuality)"
+            gaps += "el mismo volumen con ${step.quality} o más (mejor hasta ahora: $bestQuality)"
         }
         if (qualifying.isNotEmpty()) {
             val short = step.days - qualifying.size
-            gaps += "$short more qualifying day${if (short == 1) "" else "s"}"
+            gaps += if (short == 1) "1 día más que cumpla" else "$short días más que cumplan"
         }
         return Verdict(movement, label, step, false, qualifying, bestReps,
-            bestQuality, standard, evidence, "Still needed: " + gaps.joinToString(", and ") + ".")
+            bestQuality, standard, evidence, "Falta: " + gaps.joinToString(", y ") + ".")
     }
 
     /** The movement worth showing: the one with the most verified reps on

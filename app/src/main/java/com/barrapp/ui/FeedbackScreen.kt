@@ -61,17 +61,17 @@ fun FeedbackScreen(
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         item {
-            TextButton(onClick = onBack) { Text("Back") }
+            TextButton(onClick = onBack) { Text("Volver") }
         }
 
         if (sent) {
             item {
                 Panel {
-                    Eyebrow("Sent")
+                    Eyebrow("Enviado")
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "Your feedback is on the server." +
-                            if (hadVideo.value) " The clip is with it." else "",
+                        "Tus comentarios están en el servidor." +
+                            if (hadVideo.value) " El clip va con ellos." else "",
                         style = MaterialTheme.typography.bodyMedium,
                     )
                     Spacer(Modifier.height(10.dp))
@@ -81,20 +81,20 @@ fun FeedbackScreen(
                             video = null
                             hadVideo.value = false
                             onReset()
-                        }) { Text("Send more") }
-                        OutlinedButton(onClick = onBack) { Text("Done") }
+                        }) { Text("Enviar más") }
+                        OutlinedButton(onClick = onBack) { Text("Listo") }
                     }
                 }
             }
         } else {
             item {
                 Panel {
-                    Eyebrow("What went wrong?")
+                    Eyebrow("¿Qué ha fallado?")
                     Spacer(Modifier.height(8.dp))
                     Text(
-                        "A number that looked wrong, a screen that did nothing, anything. " +
-                            "The last measurement's trace id is attached automatically, so " +
-                            "\"the score is nonsense\" is something that can be replayed.",
+                        "Un número que parecía mal, una pantalla que no hizo nada, lo que sea. " +
+                            "El id de traza de la última medición se adjunta solo, así que " +
+                            "«la puntuación no tiene sentido» es algo que se puede reproducir.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -104,26 +104,26 @@ fun FeedbackScreen(
                         onValueChange = { message = it },
                         modifier = Modifier.fillMaxWidth(),
                         minLines = 4,
-                        placeholder = { Text("Tell us what happened") },
+                        placeholder = { Text("Cuéntanos qué pasó") },
                     )
                     Spacer(Modifier.height(12.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
                             onClick = { picker.launch("video/*") },
                             modifier = Modifier.weight(1f),
-                        ) { Text(if (video == null) "Attach a video" else "Replace video") }
+                        ) { Text(if (video == null) "Adjuntar un vídeo" else "Cambiar el vídeo") }
                         if (video != null) {
                             OutlinedButton(
                                 onClick = { video = null },
                                 modifier = Modifier.weight(1f),
-                            ) { Text("Remove video") }
+                            ) { Text("Quitar el vídeo") }
                         }
                     }
                     if (video != null) {
                         Spacer(Modifier.height(6.dp))
                         Text(
-                            "A clip is attached. It uploads after the message, and is " +
-                                "deleted from the server after 30 days like every clip.",
+                            "Hay un clip adjunto. Se sube después del mensaje y se borra del " +
+                                "servidor a los 30 días, como todos los clips.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -152,7 +152,7 @@ fun FeedbackScreen(
                     enabled = !busy && message.isNotBlank(),
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    Text(if (busy) "Sending…" else "Send")
+                    Text(if (busy) "Enviando…" else "Enviar")
                 }
             }
         }
