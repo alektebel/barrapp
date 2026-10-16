@@ -79,8 +79,6 @@ fun TrackerRoot(
     var tab by remember { mutableStateOf(initialTab) }
     var sheet by remember { mutableStateOf(Sheet.NONE) }
     var repsOpen by remember { mutableStateOf(false) }
-    var standard by remember { mutableStateOf("") }
-    var camera by remember { mutableStateOf("") }
     // The trace the record tab was looking at when the clip was sent. The
     // results phase waits for a DIFFERENT one, so a failed upload falls back
     // to the idle screen instead of re-presenting the previous session under
@@ -95,7 +93,7 @@ fun TrackerRoot(
             sentFrom = state.analysis?.traceId.orEmpty()
             showResults = false
             tab = TrackerTab.RECORD
-            vm.upload(uri, standard, camera)
+            vm.upload(uri)
         }
     }
     // The mockup's record button and its "subir vídeo" both land here.
@@ -164,10 +162,6 @@ fun TrackerRoot(
                             activeStage = active,
                             results = state.analysis?.let { resultsData(it, state.days) },
                             lastAnalyzed = lastAnalyzed(state.days),
-                            standard = standard,
-                            camera = camera,
-                            onStandard = { standard = it },
-                            onCamera = { camera = it },
                             onRecord = { pickVideo.launch("video/*") },
                             onPick = { pickVideo.launch("video/*") },
                             onDone = {

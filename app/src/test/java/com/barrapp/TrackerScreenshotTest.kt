@@ -141,8 +141,7 @@ class TrackerScreenshotTest {
                         phase = RecordPhase.IDLE,
                         stages = emptyList(), activeStage = 0, results = null,
                         lastAnalyzed = LastAnalyzed("Dominada", "8 sept · 8 reps", 71),
-                        standard = "strict", camera = "",
-                        onStandard = {}, onCamera = {}, onRecord = {}, onPick = {}, onDone = {},
+                        onRecord = {}, onPick = {}, onDone = {},
                     )
                 }
             }
@@ -171,8 +170,7 @@ class TrackerScreenshotTest {
                             xp = 134, aboveAverage = true,
                         ),
                         lastAnalyzed = null,
-                        standard = "", camera = "",
-                        onStandard = {}, onCamera = {}, onRecord = {}, onPick = {}, onDone = {},
+                        onRecord = {}, onPick = {}, onDone = {},
                     )
                 }
             }

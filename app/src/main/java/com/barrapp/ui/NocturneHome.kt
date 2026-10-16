@@ -37,23 +37,12 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
     val nstate = remember { NocturneState() }
     val monthOffset = remember { mutableStateOf(0) }
 
-    // What the athlete declares about the next set, asked before the picker
-    // opens. Blank is "not declared" and is always allowed; the values are
-    // the server's own vocabulary (see STANDARDS / CAMERA_SIDES).
-    var declaring by remember { mutableStateOf(false) }
-    var standard by remember { mutableStateOf("") }
-    var camera by remember { mutableStateOf("") }
-
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
     ) { uri ->
-        if (uri == null) {
-            // Backed out of the picker: back to the declaration, not to an
-            // upload page with nothing on it.
-            declaring = true
-        } else {
+        if (uri != null) {
             nstate.goUpload()
-            vm.upload(uri, standard, camera)
+            vm.upload(uri)
         }
     }
 
@@ -65,8 +54,8 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
     // way to it was the "Skip ahead" button. Carry the completion across:
     // once nothing is in flight and a measurement exists, show it.
     val measuring = state.works.any { it.active }
-    androidx.compose.runtime.LaunchedEffect(measuring, state.analysis, declaring) {
-        if (nstate.effective == NScreen.UPLOAD && !declaring && !measuring &&
+    androidx.compose.runtime.LaunchedEffect(measuring, state.analysis) {
+        if (nstate.effective == NScreen.UPLOAD && !measuring &&
             state.analysis != null
         ) {
             nstate.goSession()
@@ -76,7 +65,7 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
     BarrappShell(
         state = nstate,
         subtitle = "Week $weekNumber · ${state.profile.firstName}",
-        onPlus = { declaring = true; nstate.goUpload() },
+        onPlus = { nstate.goUpload() },
         onAccount = vm::openPrivacy,
         week = {
             val tally = weekTally(state.days)
@@ -369,29 +358,17 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
             val active = state.works.firstOrNull { it.active }
             val (stages, activeIndex) = uploadStages(active)
             Column {
-                if (declaring) {
-                    DeclareScreen(
-                        standard = standard,
-                        camera = camera,
-                        onStandard = { standard = it },
-                        onCamera = { camera = it },
-                        onPick = { declaring = false; pickVideo.launch("video/*") },
-                        onBackToWeek = { declaring = false; nstate.goWeek() },
-                    )
-                } else {
-                    UploadScreen(
-                        stages = stages,
-                        activeIndex = activeIndex,
-                        done = active == null && state.analysis != null,
-                        onSkip = {
-                            if (state.analysis != null) nstate.goSession() else nstate.goWeek()
-                        },
-                        onBackToWeek = nstate::goWeek,
-                    )
-                }
-                // The queue stays visible under either page: a failed work's
-                // Retry must not disappear behind the declaration for the
-                // next clip (found on-device - this was the only way back).
+                UploadScreen(
+                    stages = stages,
+                    activeIndex = activeIndex,
+                    done = active == null && state.analysis != null,
+                    onSkip = {
+                        if (state.analysis != null) nstate.goSession() else nstate.goWeek()
+                    },
+                    onBackToWeek = nstate::goWeek,
+                )
+                // The queue stays visible: a failed work's Retry must not
+                // scroll away just because the upload page is showing.
                 if (state.works.isNotEmpty()) {
                     WorksSection(
                         works = state.works,

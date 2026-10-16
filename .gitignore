@@ -75,6 +75,11 @@ data/calisthenics/videos/**
 
 out/**
 !out/.gitkeep
+!out/eval/
+out/eval/*
+!out/eval/baseline/
+out/eval/baseline/*
+!out/eval/baseline/grade.json
 models/
 *.pt
 

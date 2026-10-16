@@ -67,6 +67,20 @@ BARRA_POSE_BACKEND=ultralytics python scripts/pipeline_eval.py \
 Results and the improvements it drove (squat/dip abstention, model retrained on
 the corpus) are in [`docs/PIPELINE-EVAL.md`](docs/PIPELINE-EVAL.md).
 
+## The eval layer
+
+Golden-set grading, prose judging, and the regression gate live in
+`barra/eval/`, driven by `scripts/eval_runner.py`. The golden clips run
+against the reviewed manifest, the prose is reference-checked (and
+rubric-graded when a judge endpoint is configured), and a committed
+baseline turns a metric drop into a nonzero exit for CI. YouTube clips
+come in through `python -m barra.eval.fetch` with attribution. Details
+and the tolerance rules: [`docs/EVAL-LAYER.md`](docs/EVAL-LAYER.md).
+
+The full CI/CD pipeline (test -> package -> deploy -> smoke eval on the
+deployed API -> signed release) is `.github/workflows/cicd.yml`, with the
+eval layer running at every stage.
+
 ## The exercise catalogue, and the first learned model
 
 The app's exercise catalogue (`data/exercises/catalog.json`, loaded by

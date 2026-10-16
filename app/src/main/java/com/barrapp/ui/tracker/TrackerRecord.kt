@@ -64,21 +64,6 @@ data class ResultsData(
 
 data class LastAnalyzed(val movement: String, val meta: String, val score: Int?)
 
-/** One declaration choice — the value is the server's own vocabulary. */
-data class Choice(val label: String, val value: String)
-
-val STANDARDS_ES = listOf(
-    Choice("Sin declarar", ""),
-    Choice("Estricto", "strict"),
-    Choice("Kipping", "kipping"),
-)
-
-val CAMERAS_ES = listOf(
-    Choice("No lo sé", ""),
-    Choice("De lado", "SAGITTAL"),
-    Choice("De frente", "FRONTAL"),
-)
-
 /**
  * Grabar.
  *
@@ -95,10 +80,6 @@ fun TrackerRecord(
     activeStage: Int,
     results: ResultsData?,
     lastAnalyzed: LastAnalyzed?,
-    standard: String,
-    camera: String,
-    onStandard: (String) -> Unit,
-    onCamera: (String) -> Unit,
     onRecord: () -> Unit,
     onPick: () -> Unit,
     onDone: () -> Unit,
@@ -114,11 +95,11 @@ fun TrackerRecord(
         }
         when (phase) {
             RecordPhase.IDLE -> IdlePhase(
-                lastAnalyzed, standard, camera, onStandard, onCamera, onRecord, onPick,
+                lastAnalyzed, onRecord, onPick,
             )
             RecordPhase.ANALYZING -> AnalyzingPhase(stages, activeStage)
             RecordPhase.RESULTS -> results?.let { ResultsPhase(it, onDone) }
-                ?: IdlePhase(lastAnalyzed, standard, camera, onStandard, onCamera, onRecord, onPick)
+                ?: IdlePhase(lastAnalyzed, onRecord, onPick)
         }
     }
 }
@@ -126,10 +107,6 @@ fun TrackerRecord(
 @Composable
 private fun IdlePhase(
     lastAnalyzed: LastAnalyzed?,
-    standard: String,
-    camera: String,
-    onStandard: (String) -> Unit,
-    onCamera: (String) -> Unit,
     onRecord: () -> Unit,
     onPick: () -> Unit,
 ) {
@@ -183,29 +160,6 @@ private fun IdlePhase(
         Spacer(Modifier.height(20.dp))
         TkSecondaryButton("Subir vídeo", onPick)
 
-        Spacer(Modifier.height(20.dp))
-        // The declaration. Blank is always allowed and always first: a check
-        // that depends on a standard nobody declared is marked as such, never
-        // assumed one way.
-        TkCard {
-            Eyebrow("Antes del clip")
-            Spacer(Modifier.height(4.dp))
-            Text(
-                "Lo que declares aquí cambia qué se puede juzgar. Dejarlo en blanco " +
-                    "también vale: las comprobaciones que dependen de ello se marcan, " +
-                    "no se asumen.",
-                style = T.noteTiny,
-            )
-            Spacer(Modifier.height(12.dp))
-            Eyebrow("Estándar", style = T.eyebrowNine)
-            Spacer(Modifier.height(6.dp))
-            ChoiceRow(STANDARDS_ES, standard, onStandard)
-            Spacer(Modifier.height(12.dp))
-            Eyebrow("Cámara", style = T.eyebrowNine)
-            Spacer(Modifier.height(6.dp))
-            ChoiceRow(CAMERAS_ES, camera, onCamera)
-        }
-
         Spacer(Modifier.height(16.dp))
         TkCard {
             Eyebrow("Última sesión analizada")
@@ -227,30 +181,6 @@ private fun IdlePhase(
                         style = T.cardHeadline.copy(color = scoreInk(lastAnalyzed.score)),
                     )
                 }
-            }
-        }
-    }
-}
-
-@Composable
-private fun ChoiceRow(choices: List<Choice>, selected: String, onSelect: (String) -> Unit) {
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        choices.forEach { choice ->
-            val on = choice.value == selected
-            Box(
-                Modifier
-                    .weight(1f)
-                    .clip(ChipShape)
-                    .background(if (on) Tk.primary else Tk.card)
-                    .border(1.dp, if (on) Tk.primary else Tk.border, ChipShape)
-                    .noRipple { onSelect(choice.value) }
-                    .padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(
-                    choice.label,
-                    style = mono(9, 0.05f, if (on) Color.White else Tk.muted),
-                )
             }
         }
     }

@@ -1,0 +1,194 @@
+{
+ "clips": 8,
+ "gradedClips": 8,
+ "ungraded": [],
+ "rollup": {
+  "movement": {
+   "pass": 6,
+   "fail": 1,
+   "total": 7,
+   "rate": 0.8571
+  },
+  "repCount": {
+   "pass": 2,
+   "fail": 0,
+   "total": 2,
+   "rate": 1.0
+  },
+  "forbidden": {
+   "pass": 1,
+   "fail": 0,
+   "total": 1,
+   "rate": 1.0
+  },
+  "phaseScoped": {
+   "pass": 1,
+   "fail": 0,
+   "total": 1,
+   "rate": 1.0
+  },
+  "notReps": {
+   "pass": 1,
+   "fail": 0,
+   "total": 1,
+   "rate": 1.0
+  },
+  "unobservable": {
+   "pass": 1,
+   "fail": 0,
+   "total": 1,
+   "rate": 1.0
+  }
+ },
+ "allPassed": false,
+ "failedChecks": [
+  {
+   "check": "movement",
+   "ok": false,
+   "detected": "front_lever",
+   "reviewed": "unknown"
+  }
+ ],
+ "perClip": [
+  {
+   "clip": "VID-20260827-WA0010",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": true,
+     "detected": "muscle_up",
+     "reviewed": "muscle_up"
+    },
+    {
+     "check": "repCount",
+     "ok": true,
+     "measured": 2,
+     "reviewed": 2
+    },
+    {
+     "check": "phaseScoped",
+     "ok": true,
+     "errorId": "muscle_up.incomplete_support_extension",
+     "phase": "support",
+     "fired": 1,
+     "outsidePhaseOrTooWide": 0
+    }
+   ]
+  },
+  {
+   "clip": "VID-20260827-WA0011",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": true,
+     "detected": "knee_raise",
+     "reviewed": "knee_raise"
+    }
+   ]
+  },
+  {
+   "clip": "VID-20260827-WA0012",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": true,
+     "detected": "muscle_up",
+     "reviewed": "muscle_up"
+    }
+   ]
+  },
+  {
+   "clip": "VID-20260827-WA0014",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": true,
+     "detected": "muscle_up",
+     "reviewed": "muscle_up"
+    },
+    {
+     "check": "notReps",
+     "ok": true,
+     "intervalS": [
+      22.61,
+      25.16
+     ],
+     "keptAsReps": []
+    }
+   ]
+  },
+  {
+   "clip": "VID-20260827-WA0017",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": false,
+     "detected": "front_lever",
+     "reviewed": "unknown"
+    }
+   ]
+  },
+  {
+   "clip": "VID-20260827-WA0018",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": true,
+     "detected": "unknown",
+     "reviewed": "unknown"
+    }
+   ]
+  },
+  {
+   "clip": "VID-20260827-WA0019",
+   "graded": true,
+   "why": "",
+   "checks": []
+  },
+  {
+   "clip": "VID-20260827-WA0020",
+   "graded": true,
+   "why": "",
+   "checks": [
+    {
+     "check": "movement",
+     "ok": true,
+     "detected": "push_up",
+     "reviewed": "push_up"
+    },
+    {
+     "check": "repCount",
+     "ok": true,
+     "measured": 19,
+     "reviewed": 19
+    },
+    {
+     "check": "forbidden",
+     "ok": true,
+     "errorId": "push_up.lift_stall",
+     "firedOn": []
+    },
+    {
+     "check": "unobservable",
+     "ok": true,
+     "errorId": "push_up.hip_sag",
+     "statuses": {
+      "unobservable": 19
+     }
+    }
+   ]
+  }
+ ]
+}
