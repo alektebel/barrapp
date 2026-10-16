@@ -165,8 +165,10 @@ def _fire(ev: Evidence, primitive: str, comparison: str, threshold: float,
 # ---------------------------------------------------------------------------
 def _classifier(track: str):
     def fn(ev: Evidence, variant: str = VARIANT_UNSPECIFIED,
-           fps: float | None = None) -> list[Fault]:
-        return [_fault_of(a, fps) for a in assess(track, ev, variant)
+           fps: float | None = None,
+           ruler_usable: bool = True) -> list[Fault]:
+        return [_fault_of(a, fps)
+                for a in assess(track, ev, variant, ruler_usable=ruler_usable)
                 if a.status == OBSERVED]
     fn.__name__ = track
     fn.__doc__ = f"The faults one rep or hold of {track} was measured to have."
@@ -212,14 +214,15 @@ NOT_MEASURED: dict[str, str] = {
 
 def classify_faults(track: str, ev: Evidence,
                     variant: str = VARIANT_UNSPECIFIED,
-                    fps: float | None = None) -> list[Fault]:
+                    fps: float | None = None,
+                    ruler_usable: bool = True) -> list[Fault]:
     """The faults one rep or hold of `track` was measured to have.
 
     An unknown track produces nothing - not a guess borrowed from a movement
     that happens to share a classifier.
     """
     fn = CLASSIFIERS.get(track)
-    return fn(ev, variant, fps) if fn else []
+    return fn(ev, variant, fps, ruler_usable) if fn else []
 
 
 def classify_failures(track: str, values: dict | Evidence,

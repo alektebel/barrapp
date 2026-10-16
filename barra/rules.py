@@ -41,7 +41,7 @@ from dataclasses import dataclass
 
 from .config import THRESHOLDS as T
 from .evidence import (INSUFFICIENT_EVIDENCE, MEASURED, NOT_APPLICABLE,
-                       PRIMITIVES, SCALED, TRACKING_LOSS, UNMEASURED,
+                       PRIMITIVES, RULER_UNUSABLE, SCALED, TRACKING_LOSS, UNMEASURED,
                        UNSUITABLE_VIEW, UNSUPPORTED_VARIANT, VIEW_BLOCKED,
                        Evidence)
 
@@ -520,21 +520,32 @@ class Assessment:
 
 
 def _reason_kind(detail: str) -> str:
-    for kind in (UNSUITABLE_VIEW, INSUFFICIENT_EVIDENCE, UNSUPPORTED_VARIANT,
+    for kind in (UNSUITABLE_VIEW, RULER_UNUSABLE, INSUFFICIENT_EVIDENCE, UNSUPPORTED_VARIANT,
                  NOT_APPLICABLE, TRACKING_LOSS):
         if detail.startswith(kind):
             return kind
     return TRACKING_LOSS
 
 
+def _needs_ruler(rule: Rule) -> bool:
+    robustness, _plane, unit = PRIMITIVES.get(rule.primitive, (SCALED, "", ""))
+    return robustness == SCALED and (unit.startswith("torso") or unit == "% of reach")
+
+
 def assess(movement: str, ev: Evidence, variant: str = VARIANT_UNSPECIFIED,
-           blocked: str = "") -> list[Assessment]:
+           blocked: str = "", ruler_usable: bool = True) -> list[Assessment]:
     """Every rule of `movement`, judged on `ev`.
 
     `blocked`, when given, is a reason the whole rep cannot be assessed (an
     implausible pose, too little tracking): every rule is then unobservable
     with that reason, and nothing fires. An unusable measurement must not
     produce an authoritative fault label, whether or not a score was withheld.
+
+    `ruler_usable=False` says the torso-length ruler failed on this clip: every
+    SCALED check measured in torso units (torso, torso/s, % of reach) is then
+    unobservable with reason RULER_UNUSABLE rather than "not observed", which
+    would read as a pass. Angles and unitless ratios do not depend on the ruler
+    and are judged as usual.
 
     A rule written for a different declared variant is left out entirely -
     not "not observed", which would read as a pass. A variant-specific
@@ -558,6 +569,13 @@ def assess(movement: str, ev: Evidence, variant: str = VARIANT_UNSPECIFIED,
                 rule, UNOBSERVABLE, None, UNMEASURED,
                 f"{UNSUPPORTED_VARIANT}: variant not declared; this check is "
                 f"defined for {'/'.join(rule.variants)}",
+                m.window, m.coverage, variant))
+            continue
+        if not ruler_usable and _needs_ruler(rule):
+            out.append(Assessment(
+                rule, UNOBSERVABLE, None, UNMEASURED,
+                f"{RULER_UNUSABLE}: the torso-length ruler is not usable on "
+                f"this clip, so a length in torso units cannot be judged",
                 m.window, m.coverage, variant))
             continue
         if m.state == MEASURED and m.value is not None:

@@ -558,6 +558,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         from barra.classify import HUMAN, classify
         from barra.ingest import _clean_signal, probe_video, segment_reps_verbose
         from barra.metrics import (METRIC_SPEC, MIN_REP_QUALITY, arm_reach,
+                                   usable_reference,
                                    rep_metrics)
         from barra.movements import resolve, tracking_signal
         from barra.pose import available_backends, get_backend
@@ -857,6 +858,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     raw_signal, sig_conf = tracking_signal(pose.keypoints, movement)
     signal, _valid = _clean_signal(raw_signal, sig_conf)
     arm = arm_reach(pose.keypoints)
+    ruler_ok = usable_reference(arm)
     reps = []
     usable = 0
     extra_blockers: list[str] = []
@@ -967,10 +969,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         elif measured.quality.get("rep", 0) < MIN_REP_QUALITY:
             blocked = (f"too little of the rep was tracked "
                        f"(quality {measured.quality.get('rep', 0):.2f} < {MIN_REP_QUALITY})")
-        assessments = assess(movement.name, ev, variant_info["name"], blocked=blocked)
+        assessments = assess(movement.name, ev, variant_info["name"], blocked=blocked,
+                        ruler_usable=ruler_ok)
         per_rep_assessments.append(assessments)
         rep_faults = ([] if blocked else
-                      classify_faults(movement.name, ev, variant_info["name"], fps))
+                      classify_faults(movement.name, ev, variant_info["name"], fps,
+                                   ruler_usable=ruler_ok))
         rep_failures = [f.name for f in rep_faults]
         assessment_rows = [a.as_dict(label, fps) for a in assessments]
         # The one decision in the chain that recorded no evidence. Every other

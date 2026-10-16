@@ -59,6 +59,9 @@ UNSUITABLE_VIEW = "unsuitable view"
 UNSUPPORTED_VARIANT = "unsupported variant"
 INSUFFICIENT_EVIDENCE = "insufficient temporal evidence"
 NOT_APPLICABLE = "not applicable to this movement"
+# The torso-length ruler failed on this clip (see metrics.usable_reference), so
+# no length measured in torso units can be trusted - clean or faulty.
+RULER_UNUSABLE = "torso ruler unusable"
 
 
 @dataclass(frozen=True)

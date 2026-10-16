@@ -168,6 +168,8 @@ CATALOG: list[Msg] = [
     # score components (barra/quality.py)
     Msg("score.ruler_unusable", "the torso-length ruler is not usable on this clip (arm reads {a} torso), so range cannot be scored",
         "la medida del torso no sirve en este vídeo (el brazo mide {a} torsos), así que no se puede puntuar el recorrido"),
+    Msg("assess.ruler_unusable", "the torso-length ruler is not usable on this clip, so a length in torso units cannot be judged",
+        "la medida del torso no sirve en este vídeo, así que no se puede juzgar una longitud en torsos"),
     Msg("score.no_arm", "arm reach could not be measured", "no se pudo medir el alcance del brazo"),
     Msg("score.range", "hang {h} of full, lockout {l} of full",
         "colgado al {h} del total, bloqueo arriba al {l} del total"),
