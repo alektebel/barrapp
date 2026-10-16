@@ -99,14 +99,26 @@ def process_job(job: dict, video_path: Path, on_stage=None, pose=None) -> dict:
 _TRACES: dict[str, object] = {}
 
 
-def _resolve_vote(vote):
+# How long fusion waits for the vision vote when the other two detectors
+# disagree. Only then can the vote change the answer, and a wrong movement is
+# a set measured as nothing (WA0020, 2026-10-16: geometry push_up, model
+# muscle_up, vision not back yet -> "muscle-up, 0 reps" instead of 19
+# push-ups). When geometry and the model agree, nothing waits.
+VISION_VOTE_WAIT_S = 45.0
+
+
+def _resolve_vote(vote, wait_s: float = 0.0):
     """The vision vote for fusion: a label, or a callable that produces one
-    (the worker's localization, running alongside pose). A vote that fails is
-    no vote - localization never fails a job."""
+    (the worker's localization, running alongside pose), given up to `wait_s`
+    seconds to arrive. A vote that fails or is late is no vote -
+    localization never fails a job."""
     if not callable(vote):
         return vote
     try:
-        return vote()
+        try:
+            return vote(wait_s)
+        except TypeError:
+            return vote()
     except Exception:  # noqa: BLE001
         return None
 
@@ -751,7 +763,10 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             # and the tiny pose model decide alone (0.556 → 0.817 measured).
             # A callable vote is the worker's localization, started alongside
             # pose; it is waited for here, where it is needed.
-            vision_label = _resolve_vote(vision_label)
+            model_label = ((model_out or {}).get("classification") or {}).get("exercise")
+            disagree = bool(model_label) and model_label != detected.get("exercise")
+            vision_label = _resolve_vote(vision_label,
+                                         VISION_VOTE_WAIT_S if disagree else 0.0)
             fusion = fuse_detection(
                 detected,
                 (model_out or {}).get("classification"),

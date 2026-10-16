@@ -489,9 +489,9 @@ def _run(job_id: str) -> None:
         locator_pool = ThreadPoolExecutor(max_workers=1)
         located_future = locator_pool.submit(_locate)
 
-        def _vision_vote():
+        def _vision_vote(wait_s: float = 0.0):
             try:
-                located = located_future.result(timeout=0)
+                located = located_future.result(timeout=wait_s)
                 label = (located or {}).get("exercise") or None
                 return label if str(label or "").lower() not in (
                     "none", "unknown", "") else None

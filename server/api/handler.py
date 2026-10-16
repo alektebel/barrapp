@@ -875,12 +875,13 @@ def worker(event, _context):
 
         located_future = pool.submit(_locate)
 
-        def _vision_vote():
+        def _vision_vote(wait_s: float = 0.0):
             started_ns = time.perf_counter_ns()
             try:
-                # Localization overlaps pose. A late vote must not turn the
-                # faster pose path into a post-pose network wait.
-                located = located_future.result(timeout=0)
+                # Localization overlaps pose. Fusion waits for a late vote only
+                # when geometry and the model disagree (process.py
+                # VISION_VOTE_WAIT_S): then the vote decides the movement.
+                located = located_future.result(timeout=wait_s)
                 label = (located or {}).get("exercise") or None
                 if label and str(label).lower() not in ("none", "unknown", ""):
                     outcome = "ready"

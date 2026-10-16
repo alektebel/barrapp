@@ -426,6 +426,28 @@ class Worker(unittest.TestCase):
         self.assertTrue(seen["started_before_measure"])
         self.assertEqual(seen["vote"], "push-up")
 
+    def test_a_late_vote_is_waited_for_only_when_asked(self):
+        # Fusion asks with a wait only when geometry and the model disagree
+        # (process.VISION_VOTE_WAIT_S); WA0020 on 2026-10-16 came back as
+        # "muscle-up, 0 reps" because the push-up vote was a few seconds late.
+        def slow_locate(*a, **k):
+            time.sleep(0.3)
+            return {"exercise": "push-up", "usable": True}
+
+        seen = {}
+
+        def measure(job, path, on_stage=None, pose=None, vision_label=None):
+            seen["no_wait"] = process._resolve_vote(vision_label, 0.0)
+            seen["waited"] = process._resolve_vote(vision_label, 2.0)
+            return {**measured(), "visionStatus": "skipped", "traceId": "t"}
+
+        with mock.patch("vision.locate_exercise", side_effect=slow_locate), \
+                mock.patch("process.measure_job", side_effect=measure), \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        self.assertIsNone(seen["no_wait"])
+        self.assertEqual(seen["waited"], "push-up")
+
     def test_locator_and_fusion_wait_durations_are_saved_after_first_result(self):
         def slow_locate(*a, **k):
             time.sleep(0.05)
