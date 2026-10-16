@@ -1,5 +1,6 @@
 package com.barrapp.ui
 
+import kotlinx.coroutines.launch
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -54,11 +55,12 @@ fun ReplayScreen(
     modifier: Modifier = Modifier,
 ) {
     BackHandler(onBack = onBack)
+    val scroll = rememberScrollState()
     Column(
         modifier
             .fillMaxSize()
             .background(Tk.bg)
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scroll)
             // Edge to edge: the last line must clear the system navigation bar.
             .navigationBarsPadding()
             .padding(horizontal = 16.dp, vertical = 12.dp),
@@ -77,7 +79,7 @@ fun ReplayScreen(
             clip == null -> Missing("Este teléfono ya no guarda una copia del clip.", onBack)
             analysis == null || analysis.reps.none { it.endS > it.startS } ->
                 Missing("Esta serie no tiene repeticiones medidas que marcar.", onBack)
-            else -> Body(analysis, clip)
+            else -> Body(analysis, clip, scroll)
         }
     }
 }
@@ -92,7 +94,8 @@ private fun Missing(message: String, onBack: () -> Unit) {
 }
 
 @Composable
-private fun Body(analysis: Analysis, clip: java.io.File) {
+private fun Body(analysis: Analysis, clip: java.io.File, scroll: androidx.compose.foundation.ScrollState) {
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
     val replay = rememberRepReplayState()
     val plan = remember(analysis) { ReplayPlan.from(analysis, analysis.durationS) }
     RepReplay(analysis, clip, state = replay, fullScreen = true)
@@ -117,7 +120,11 @@ private fun Body(analysis: Analysis, clip: java.io.File) {
                 .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
                 .background(Tk.surface)
                 .semantics(mergeDescendants = true) { role = Role.Button }
-                .clickable { replay.showRep(rep.index) }
+                .clickable {
+                    replay.showRep(rep.index)
+                    // El vídeo está arriba: si la lista se ha desplazado, el salto no se vería.
+                    scope.launch { scroll.animateScrollTo(0) }
+                }
                 .padding(horizontal = 14.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),

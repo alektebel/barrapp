@@ -575,7 +575,7 @@ class UploadQueue private constructor(private val app: Application) {
                                     pollSleepMs = pollSleepNs / 1_000_000L,
                                     pollHandleMs = pollHandleNs / 1_000_000L)
                             }
-                            j.result?.let { SessionStore.record(app, j.id, it) }
+                            j.result?.let { SessionStore.record(app, j.id, it, j.createdAt) }
                             val countStatus = j.result?.countStatus ?: "unmeasured"
                             val repCount = j.result?.repCount ?: 0
                             val countDescription = when (countStatus) {

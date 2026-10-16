@@ -89,7 +89,7 @@ object LogicTest {
         check("and is not called proof", c.contains("No es una prueba"), c)
 
         val d = Coach.answer("what did my last session show?", up, profile)
-        check("last session names its date", d.contains("2026-08-17"), d)
+        check("last session names its date", d.contains("17 ago"), d)
 
         val e = Coach.answer("how should I film the next one?", up, profile)
         check("filming advice uses the profile's target", e.contains("${profile.repTarget} repeticiones"), e)
@@ -104,7 +104,7 @@ object LogicTest {
         check("Spanish progress question routes", Coach.answer("¿Estoy mejorando o es ruido?", up, profile).contains("puntos"))
         check("Spanish unscored question routes", Coach.answer("¿Por qué algunas reps no tienen puntuación?", up, profile).contains("físicamente"))
         check("Spanish filming question routes", Coach.answer("¿Cómo debería grabar la siguiente?", up, profile).contains("Cinco cosas"))
-        check("Spanish last-session question routes", Coach.answer("¿Qué mostró realmente mi última sesión?", up, profile).contains("2026-08-17"))
+        check("Spanish last-session question routes", Coach.answer("¿Qué mostró realmente mi última sesión?", up, profile).contains("17 ago"))
 
         // Each suggested question reaches the branch it is about (the English original of
         // the third fell through to the score explainer; the Spanish one is routed on purpose).

@@ -440,6 +440,20 @@ data class MovementDay(
     val score: Int? get() = if (verified > 0) scoreSum / verified else null
 }
 
+/** One clip (job), as the Inicio card and the coach describe it. */
+data class JobSummary(
+    val jobId: String,
+    val exercise: String,
+    val label: String,
+    /** Reps counted. */
+    val reps: Int,
+    /** Reps that were actually scored; 0 means counted but never judged. */
+    val verified: Int,
+    val score: Int?,
+    /** Server creation time, to order clips of one day. May be blank. */
+    val at: String = "",
+)
+
 /** One day in the calendar. Several clips on one day fold into one entry. */
 data class DayEntry(
     val date: String,
@@ -457,6 +471,9 @@ data class DayEntry(
      * a debugger the wrong run.
      */
     val traces: Map<String, String> = emptyMap(),
+    /** The last clip folded into this day, on its own - not mixed with the
+     *  day's other clips. Null for days stored before it was kept. */
+    val last: JobSummary? = null,
 ) {
     val measured: Boolean get() = score != null
 

@@ -106,7 +106,8 @@ fun TrackerCoach(
             Text("COACH", style = T.pageTitle)
             Text(
                 if (data.sessions > 0)
-                    "Basado en tus últimas ${data.sessions} sesiones de ${data.movement}"
+                    if (data.sessions == 1) "Basado en tu última sesión de ${data.movement}"
+                    else "Basado en tus últimas ${data.sessions} sesiones de ${data.movement}"
                 else "Todavía sin sesiones que leer",
                 style = T.bodyS,
                 modifier = Modifier.padding(top = 2.dp),

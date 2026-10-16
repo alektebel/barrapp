@@ -51,6 +51,17 @@ object SessionStore {
                 traces = o.optJSONObject("traces")?.let { t ->
                     t.keys().asSequence().associateWith { k -> t.optString(k) }
                 } ?: emptyMap(),
+                last = o.optJSONObject("last")?.let { l ->
+                    JobSummary(
+                        jobId = l.optString("jobId"),
+                        exercise = l.optString("exercise"),
+                        label = l.optString("label"),
+                        reps = l.optInt("reps"),
+                        verified = l.optInt("verified"),
+                        score = if (l.isNull("score") || !l.has("score")) null else l.optInt("score"),
+                        at = l.optString("at"),
+                    )
+                },
                 byMovement = o.optJSONObject("byMovement")?.let { m ->
                     m.keys().asSequence().mapNotNull { k ->
                         m.optJSONObject(k)?.let { e ->
@@ -75,9 +86,14 @@ object SessionStore {
      * score is the rep-weighted mean of the days's measured reps - not the mean
      * of the clip scores, which would let a one-rep clip outvote a five-rep one.
      */
-    fun record(context: Context, jobId: String, analysis: Analysis) {
+    fun record(context: Context, jobId: String, analysis: Analysis, at: String = "") {
         val date = analysis.sessionDate.ifBlank { today() }
         val existing = days(context).associateBy { it.date }.toMutableMap()
+        // Each job is folded in exactly once. The upload queue records a job
+        // when it finishes, and the late-text follow-up, refresh() and the
+        // history sync all hand the same job back; adding it again doubled
+        // the day's reps and score sum.
+        if (existing.values.any { jobId in it.jobIds }) return
         val prior = existing[date]
 
         // Only reps scored on ALL their components carry evidence towards a
@@ -109,8 +125,24 @@ object SessionStore {
         // happened to be uploaded last.
         val dominant = byMovement.values.maxByOrNull { it.reps }
 
+        val summary = JobSummary(
+            jobId = jobId,
+            exercise = key,
+            label = analysis.detected?.label ?: key,
+            reps = analysis.repCount,
+            verified = verified.size,
+            score = if (verified.isEmpty()) null else verified.sumOf { it.score ?: 0 } / verified.size,
+            at = at,
+        )
+        val before = prior?.last
+        // A clip older than the one already kept (history arrives in any
+        // order) must not displace it.
+        val last = if (before == null || at.isBlank() || before.at.isBlank() || at >= before.at)
+            summary else before
+
         existing[date] = DayEntry(
             date = date,
+            last = last,
             exercise = dominant?.exercise ?: prior?.exercise.orEmpty(),
             exerciseLabel = dominant?.label ?: prior?.exerciseLabel.orEmpty(),
             reps = byMovement.values.sumOf { it.reps },
@@ -153,6 +185,7 @@ object SessionStore {
                     // so mark the day as stale rather than showing a ghost score.
                     // Next refresh() from the server will rebuild aggregates.
                     byMovement = emptyMap(),
+                    last = day.last?.takeIf { it.jobId != jobId },
                     reps = ids.size,
                     score = null,
                     band = "unmeasured",
@@ -174,6 +207,12 @@ object SessionStore {
                     .put("score", d.score ?: JSONObject.NULL)
                     .put("band", d.band)
                     .put("jobIds", JSONArray(d.jobIds))
+                    .put("last", d.last?.let { l ->
+                        JSONObject().put("jobId", l.jobId).put("exercise", l.exercise)
+                            .put("label", l.label).put("reps", l.reps)
+                            .put("verified", l.verified)
+                            .put("score", l.score ?: JSONObject.NULL).put("at", l.at)
+                    } ?: JSONObject.NULL)
                     .put("traces", JSONObject(d.traces as Map<*, *>))
                     .put("byMovement", JSONObject().also { m ->
                         d.byMovement.forEach { (k, v) ->

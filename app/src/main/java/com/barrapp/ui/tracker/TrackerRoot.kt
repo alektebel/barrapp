@@ -153,7 +153,16 @@ fun TrackerRoot(
         return
     }
 
-    TrackerShell(tab, { tab = it }) {
+    TrackerShell(tab, { target ->
+        // The result of a finished clip stays on GRABAR until "Guardar
+        // sesión". The session is already stored when the job finishes, so
+        // tapping GRABAR means "another clip": back to the idle screen.
+        if (target == TrackerTab.RECORD && showResults && !measuring) {
+            showResults = false
+            sentFrom = null
+        }
+        tab = target
+    }) {
         Column(Modifier.fillMaxSize()) {
             // The queue stays visible under every tab: a failed upload's Retry
             // must never be behind a tab the athlete has no reason to open.
@@ -496,19 +505,27 @@ private fun homeData(state: UiState): HomeData {
         mission = Gamification.mission(days, state.profile, focus, focusCue)
             .let { m -> m.copy(movement = movementEs(m.movementKey, m.movement)) },
         lastSession = last?.let { day ->
+            // The last clip, not the day: a day can hold several movements
+            // and unscored sets, and their sum describes none of them.
+            val job = day.last
+            val reps = job?.reps ?: day.reps
+            val score = if (job != null) job.score else day.score
+            val judged = job?.verified ?: day.verifiedReps
+            val movement = movementEs(job?.exercise ?: day.exercise, job?.label ?: day.exerciseLabel)
             LastSessionData(
-                movement = movementEs(day.exercise, day.exerciseLabel),
+                movement = movement,
                 date = shortDate(day.date),
-                reps = day.reps,
-                score = day.score,
-                rows = day.byMovement.values
+                reps = reps,
+                score = score,
+                judged = judged,
+                rows = if (job != null) listOf(SessionRowData(movement, score, reps))
+                else day.byMovement.values
                     .sortedByDescending { it.reps }
                     .map { SessionRowData(movementEs(it.exercise, it.label), it.score, it.reps) }
-                    .ifEmpty {
-                        listOf(SessionRowData(
-                            movementEs(day.exercise, day.exerciseLabel), day.score, day.reps))
-                    },
+                    .ifEmpty { listOf(SessionRowData(movement, score, reps)) },
+                // The ledger is per day: only attribute it to a day of one clip.
                 topFault = state.faults[day.date]
+                    ?.takeIf { job == null || day.jobIds.size <= 1 }
                     ?.maxByOrNull { it.value }
                     ?.let { faultEs(it.key) to it.value },
             )
@@ -571,10 +588,13 @@ private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
 
 private fun lastAnalyzed(days: List<DayEntry>): LastAnalyzed? =
     days.firstOrNull { it.reps > 0 }?.let { day ->
+        val job = day.last
+        val reps = job?.reps ?: day.reps
+        val score = if (job != null) job.score else day.score
         LastAnalyzed(
-            movement = movementEs(day.exercise, day.exerciseLabel),
-            meta = "${shortDate(day.date)} · ${day.reps} reps",
-            score = day.score,
+            movement = movementEs(job?.exercise ?: day.exercise, job?.label ?: day.exerciseLabel),
+            meta = "${shortDate(day.date)} · $reps reps" + if (score == null) " · sin puntuar" else "",
+            score = score,
         )
     }
 
@@ -587,11 +607,6 @@ private fun progressData(state: UiState): ProgressData {
         .takeIf { it.isNotEmpty() }?.average()?.toInt()
     val month = monthPrefix()
     val best = measured.maxByOrNull { it.score ?: 0 }
-    val mostReps = state.days.maxByOrNull { it.verifiedReps }
-    val bestMovement = state.days
-        .flatMap { d -> d.byMovement.values.map { d to it } }
-        .filter { it.second.score != null }
-        .maxByOrNull { it.second.score ?: 0 }
 
     return ProgressData(
         averageScore = recentMean,
@@ -601,20 +616,19 @@ private fun progressData(state: UiState): ProgressData {
         bestScore = best?.score,
         bestScoreDate = best?.date?.let { shortDate(it) }.orEmpty(),
         trend = measured.takeLast(20).map { TrendPoint(shortDate(it.date), it.score ?: 0) },
-        bests = listOfNotNull(
-            best?.let {
-                PersonalBest(movementEs(it.exercise, it.exerciseLabel), "Mejor día",
-                    "${it.score}", "pts", shortDate(it.date))
-            },
-            mostReps?.takeIf { it.verifiedReps > 0 }?.let {
-                PersonalBest(movementEs(it.exercise, it.exerciseLabel), "Más reps en un día",
-                    "${it.verifiedReps}", "reps", shortDate(it.date))
-            },
-            bestMovement?.let { (day, mv) ->
-                PersonalBest(movementEs(mv.exercise, mv.label), "Mejor movimiento",
-                    "${mv.score}", "pts", shortDate(day.date))
-            },
-        ).distinctBy { it.metric },
+        // Per movement, from scored reps only.
+        bests = Progression.records(state.days).take(3).flatMap { r ->
+            listOfNotNull(
+                r.bestScore?.let {
+                    PersonalBest(movementEs(r.movement, r.label), "Mejor día",
+                        "$it", "pts", shortDate(r.bestScoreDate))
+                },
+                r.mostReps.takeIf { it > 0 }?.let {
+                    PersonalBest(movementEs(r.movement, r.label), "Más reps en un día",
+                        "$it", "reps", shortDate(r.mostRepsDate))
+                },
+            )
+        },
         faults = FaultTrend.rows(state.faults).take(5),
         history = state.days.sortedByDescending { it.date }.take(8).map { day ->
             HistoryRow(
@@ -631,10 +645,18 @@ private fun progressData(state: UiState): ProgressData {
 
 private fun coachData(state: UiState): CoachData {
     val rows = FaultTrend.rows(state.faults)
-    val focusMovement = movementEs(
-        state.goals?.focusExercise
-            ?: state.days.firstOrNull { it.reps > 0 }?.exercise.orEmpty()
-    )
+    // The movement named in the header is the one the faults below come from,
+    // not the goal: the ledger is per day, so take the movement that dominates
+    // the days it covers (scored reps first).
+    val faultDays = state.days.filter { state.faults[it.date].orEmpty().isNotEmpty() }
+    val focusKey = faultDays.flatMap { it.byMovement.values }
+        .groupBy { it.exercise }
+        .maxByOrNull { (_, v) -> v.sumOf { it.verified } * 1000 + v.sumOf { it.reps } }
+        ?.key
+        ?: state.goals?.focusExercise
+        ?: state.days.firstOrNull { it.reps > 0 }?.exercise.orEmpty()
+    val focusMovement = movementEs(focusKey)
+    val focusSessions = state.days.count { (it.byMovement[focusKey]?.verified ?: 0) > 0 }
     fun focusOf(row: FaultTrend.Row?) = row?.let {
         CoachFocus(
             fault = faultEs(it.fault),
@@ -648,7 +670,7 @@ private fun coachData(state: UiState): CoachData {
     val drills: List<Drill> = rows.take(3).mapNotNull { drillEs(it.fault) }.distinctBy { it.title }
     return CoachData(
         movement = focusMovement,
-        sessions = state.days.count { it.reps > 0 }.coerceAtMost(4),
+        sessions = focusSessions.coerceAtMost(4),
         focus = focusOf(rows.firstOrNull()),
         secondary = focusOf(rows.getOrNull(1)),
         rules = rules(state),
@@ -707,8 +729,4 @@ private fun monthPrefix(): String {
     return "%04d-%02d".format(c.get(Calendar.YEAR), c.get(Calendar.MONTH) + 1)
 }
 
-private fun shortDate(iso: String): String = runCatching {
-    val inFmt = SimpleDateFormat("yyyy-MM-dd", Locale.UK)
-    val outFmt = SimpleDateFormat("d MMM", Locale.forLanguageTag("es"))
-    outFmt.format(inFmt.parse(iso)!!)
-}.getOrDefault(iso)
+private fun shortDate(iso: String): String = com.barrapp.shortDateEs(iso)

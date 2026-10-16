@@ -43,6 +43,8 @@ data class LastSessionData(
     val date: String,
     val reps: Int,
     val score: Int?,
+    /** Reps that were scored. 0 with reps > 0 is a counted, never judged set. */
+    val judged: Int = reps,
     val rows: List<SessionRowData>,
     /** The fault the day showed most, and how many reps showed it. */
     val topFault: Pair<String, Int>?,
@@ -290,16 +292,23 @@ private fun LastSessionCard(
             Column(Modifier.weight(1f)) {
                 Eyebrow("Última sesión")
                 Text(session.movement.uppercase(), style = T.sectionTitle)
-                Text("${session.date} · ${session.reps} reps", style = T.bodyS)
+                Text(
+                    "${session.date} · ${session.reps} reps" +
+                        if (session.score == null && session.reps > 0) " · sin puntuar" else "",
+                    style = T.bodyS,
+                )
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
                     session.score?.toString() ?: "—",
                     style = T.bigScore.copy(color = scoreInk(session.score)),
                 )
-                Text("CALIDAD MEDIA", style = T.eyebrowTiny)
                 Text(
-                    scoreLabel(session.score),
+                    if (session.score == null) "SIN PUNTUAR" else "CALIDAD MEDIA",
+                    style = T.eyebrowTiny,
+                )
+                Text(
+                    if (session.score == null) "" else scoreLabel(session.score),
                     style = mono(8, 0.05f, scoreInk(session.score)),
                 )
             }

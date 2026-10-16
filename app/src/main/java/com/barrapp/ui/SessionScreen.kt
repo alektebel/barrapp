@@ -108,13 +108,14 @@ fun SessionScreen(
                 .border(1.dp, Nocturne.hairline, RoundedCornerShape(8.dp))
                 .padding(14.dp),
         ) {
-            val n = minOf(cues.size, 2)
+            val shownCues = noChecksPossible(checks)?.let { listOf(it) } ?: cues
+            val n = minOf(shownCues.size, 2)
             androidx.compose.material3.Text(
                 // No prometer «DOS COSAS» sobre a one-item list.
                 if (n > 1) "DOS COSAS PARA LLEVAR A LA SIGUIENTE SERIE"
                 else "QUÉ LLEVAR A LA SIGUIENTE SERIE",
                 style = N.eyebrowAccent)
-            cues.take(2).forEachIndexed { i, cue ->
+            shownCues.take(2).forEachIndexed { i, cue ->
                 Row(Modifier.fillMaxWidth().padding(top = if (i == 0) 12.dp else 10.dp)) {
                     androidx.compose.material3.Text(
                         "0${i + 1}", style = N.cueNumber,
@@ -256,6 +257,13 @@ private fun RepCard(rep: RepCardData, modifier: Modifier) {
 
 /** One check across the set: how many reps flagged it, passed it, or could
  *  not be judged on it. */
+/** Si ninguna comprobación se pudo hacer, «nada que señalar» sería un falso
+ *  todo-correcto: se dice que no se pudo comprobar. Null si alguna se hizo. */
+fun noChecksPossible(checks: List<CheckLine>): String? =
+    if (checks.isNotEmpty() && checks.all { it.flagged + it.clean == 0 })
+        "No se pudo hacer ninguna comprobación en esta serie: no hay nada que señalar ni dar por bueno. Graba de nuevo con el cuerpo entero a la vista."
+    else null
+
 data class CheckLine(val name: String, val flagged: Int, val clean: Int, val blind: Int)
 
 /** What the video model said it saw. Advisory, and labelled so. */

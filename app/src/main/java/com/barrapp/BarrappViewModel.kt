@@ -81,6 +81,9 @@ private const val PENDING_TEXT_FOLLOW_MS = 90_000L
 
 class BarrappViewModel(application: Application) : AndroidViewModel(application) {
     private val api = BarraApi(application)
+    // Clips being copied/sampled (memory only; see setPreparing).
+    private var storedWorks: List<Work> = emptyList()
+    private var preparing: List<Work> = emptyList()
     private val _state = MutableStateFlow(UiState())
     val state: StateFlow<UiState> = _state
 
@@ -135,7 +138,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         // the app is closed. The screen only follows it.
         viewModelScope.launch {
             uploads.works.collect { works ->
-                _state.update { it.copy(works = works,
+                storedWorks = works
+                _state.update { it.copy(works = works + preparing,
                     pendingTrim = works.firstOrNull { w -> w.status == WorkStore.STATUS_PENDING }) }
             }
         }
@@ -550,6 +554,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         val workId = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
         val dest = clipFile(app, workId)
         val preparationStartedNs = SystemClock.elapsedRealtimeNanos()
+        setPreparing(Work(id = workId, createdAt = System.currentTimeMillis(),
+            status = WorkStore.STATUS_WAITING, stage = "Preparando el vídeo…"), workId)
         viewModelScope.launch {
             val kept = runCatching {
                 withContext(Dispatchers.IO) {
@@ -615,6 +621,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             WorkStore.put(app, work)
             EventLog.info(app, "clip added to the queue", workId)
             publishWorks()
+            setPreparing(null, workId)
             // Un clip PENDIENTE espera al atleta: la cola no lo recoge hasta
             // que confirma (o descarta) la ventana de recorte.
             if (kept && work.status != WorkStore.STATUS_PENDING) uploads.kick()
@@ -676,6 +683,14 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     }
 
     private fun publishWorks() = uploads.publish()
+
+    /** Clips being copied/sampled: shown in "En curso" at once, but only in
+     *  memory, so the upload queue never picks up a half-copied clip. */
+
+    private fun setPreparing(w: Work?, id: String) {
+        preparing = preparing.filter { it.id != id } + listOfNotNull(w)
+        _state.update { it.copy(works = storedWorks + preparing) }
+    }
 
     /** A clip finished while this screen was alive: open its session. */
     private fun showFinished(j: Job) {

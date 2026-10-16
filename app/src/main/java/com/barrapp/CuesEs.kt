@@ -36,7 +36,7 @@ data class Drill(
 private val FAULTS_ES = mapOf(
     "poor range of motion" to "Recorrido incompleto",
     "lockout" to "Sin bloqueo arriba",
-    "dead hang" to "Sin dead hang",
+    "dead hang" to "Sin colgado completo",
     "too deep" to "Demasiado profundo",
     "no active hang" to "Sin colgado activo",
     "momentum" to "Balanceo",
@@ -59,7 +59,7 @@ private val FAULTS_ES = mapOf(
 private val CUES_ES = mapOf(
     "momentum" to "Corta el balanceo — tira estricto, sin impulso.",
     "lockout" to "Bloquea del todo arriba en cada repetición.",
-    "dead hang" to "Empieza cada rep desde un dead hang completo.",
+    "dead hang" to "Empieza cada rep colgado del todo, con los brazos estirados.",
     "fast descent" to "Baja más despacio: la bajada es corta comparada con la subida.",
     "stall" to "Atraviesa el punto de estancamiento en un solo arco.",
     "poor transition" to "Pasa la transición en un único movimiento.",
@@ -80,7 +80,7 @@ private val CUES_ES = mapOf(
 )
 
 private val DRILLS_ES = mapOf(
-    "momentum" to Drill("Dead hang estático", "3×30 s",
+    "momentum" to Drill("Colgado estático", "3×30 s",
         "Core anti-balanceo y fuerza de agarre", "3 min"),
     "poor range of motion" to Drill("Dominada con goma", "3×5",
         "Recorrido completo con resistencia reducida", "6 min"),

@@ -1,6 +1,7 @@
 package com.barrapp
 
 import com.barrapp.data.DayEntry
+import com.barrapp.data.MovementDay
 
 /**
  * Am I ready for the next progression?
@@ -34,6 +35,45 @@ import com.barrapp.data.DayEntry
  * the phone and the server referee the same athlete differently.
  */
 object Progression {
+
+    /** A personal record for one movement, from scored reps only. */
+    data class Record(
+        val movement: String,
+        val label: String,
+        /** Best day score for the movement, and the date it happened. */
+        val bestScore: Int?,
+        val bestScoreDate: String,
+        /** Most scored reps in one day, and the date. */
+        val mostReps: Int,
+        val mostRepsDate: String,
+    )
+
+    /**
+     * Records per movement. A muscle-up day never sets a push-up record, and a
+     * rep that was counted but not scored sets nothing. Most trained first.
+     * Days stored before the per-movement breakdown carry no movement and are
+     * skipped rather than guessed at.
+     */
+    fun records(days: List<DayEntry>): List<Record> {
+        val perMovement = days.flatMap { d -> d.byMovement.values.map { d.date to it } }
+            .filter { it.second.verified > 0 }
+            .groupBy { it.second.exercise }
+        return perMovement.map { (key, rows) ->
+            val bestScoreRow = rows.maxWithOrNull(
+                compareBy<Pair<String, MovementDay>> { it.second.score ?: 0 }.thenBy { it.first })
+            val mostRow = rows.maxWithOrNull(
+                compareBy<Pair<String, MovementDay>> { it.second.verified }.thenBy { it.first })
+            Record(
+                movement = key,
+                label = rows.first().second.label,
+                bestScore = bestScoreRow?.second?.score,
+                bestScoreDate = bestScoreRow?.first.orEmpty(),
+                mostReps = mostRow?.second?.verified ?: 0,
+                mostRepsDate = mostRow?.first.orEmpty(),
+            )
+        }.sortedByDescending { r -> perMovement[r.movement]?.sumOf { it.second.verified } ?: 0 }
+    }
+
 
     /**
      * Boundaries converted, not re-tuned, when control left the weighted mean.

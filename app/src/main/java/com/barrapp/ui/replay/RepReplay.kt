@@ -369,7 +369,7 @@ fun RepReplay(
                     "Pausar en cada repetición con un fallo")
             }
         }
-        consistencyLine(analysis)?.let {
+        (if (analysis.unmeasuredSet) null else consistencyLine(analysis))?.let {
             Text(it, style = mono(10, 0.02f, if (analysis.consistencyBand == "irregular") Tk.amber else Tk.muted))
         }
     }
