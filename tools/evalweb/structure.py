@@ -17,6 +17,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import time
 import sys
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -168,7 +169,9 @@ def structure(row: dict, model: str, force: bool) -> dict:
         parsed = json.loads(cache.read_text(encoding="utf-8"))
     else:
         parsed = None
-        for _ in range(3):
+        for attempt in range(5):
+            if attempt:
+                time.sleep(5 * attempt)     # 429: nan limita las peticiones en paralelo
             folder = row.get("movementFolder") or ""
             hint = f"Carpeta del corpus (puede estar mal): {folder}\n\n" if folder in MOVEMENTS else ""
             res = llm.complete(model, [{"role": "user", "content": hint + feedback}],
@@ -197,10 +200,11 @@ def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--model", default="deepseek-v4-flash")
     ap.add_argument("--force", action="store_true", help="ignora la caché")
+    ap.add_argument("--jobs", type=int, default=3)
     args = ap.parse_args()
     rows = [r for r in latest_answers().values() if (r.get("feedback") or "").strip()
             or r.get("unassessable")]
-    with ThreadPoolExecutor(6) as ex:
+    with ThreadPoolExecutor(args.jobs) as ex:
         results = list(ex.map(lambda r: structure(r, args.model, args.force), rows))
     results.sort(key=lambda r: r.get("savedAt") or "")
     DST.write_text("".join(json.dumps(r, ensure_ascii=False) + "\n" for r in results),
