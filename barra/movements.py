@@ -20,6 +20,7 @@ Adding a movement means adding an entry here, not editing the stages.
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 import numpy as np
@@ -126,7 +127,13 @@ MOVEMENTS = {m.name: m for m in (
     SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP,
     FRONT_LEVER, PLANCHE, PISTOL_SQUAT, SPLIT_SQUAT, BULGARIAN_SPLIT_SQUAT,
 )}
-_ALIASES = {a: m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
+def _norm(name: str) -> str:
+    """Spaces, hyphens and underscores are one separator: `front_squat`,
+    `front-squat` and `front squat` are the same name."""
+    return re.sub(r"[\s_-]+", "_", str(name).strip().lower())
+
+
+_ALIASES = {_norm(a): m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
 
 DEFAULT = SQUAT
 
@@ -137,7 +144,7 @@ def resolve(name: str | None) -> Movement:
     numbers that look fine and mean nothing."""
     if not name:
         return DEFAULT
-    key = str(name).strip().lower().replace(" ", "_")
+    key = _norm(name)
     if key in _ALIASES:
         return _ALIASES[key]
     raise SystemExit(
@@ -145,6 +152,61 @@ def resolve(name: str | None) -> Movement:
         "Set it per video in the exercise column of sessions.csv, or add a "
         "profile to barra/movements.py."
     )
+
+
+# Open-vocabulary label -> catalog family. Ordered: the first row whose token
+# is in the label (and none of whose vetoes are) wins, so `decline_push_up`
+# is a push-up before `dip` is ever looked at. Deliberately small and explicit;
+# anything not listed is a different exercise and stays out of the catalog.
+_FAMILY_TABLE: tuple[tuple[tuple[str, ...], tuple[str, ...], str], ...] = (
+    # (tokens, vetoes, family)
+    (("push_up", "pushup", "press_up"), (), "push_up"),
+    (("muscle_up", "muscleup"), (), "muscle_up"),
+    (("pull_up", "pullup", "chin_up", "chinup"), (), "pull_up"),
+    (("dip",), (), "dip"),
+    (("pistol",), (), "pistol_squat"),
+    (("bulgarian",), (), "bulgarian_split_squat"),
+    (("split_squat",), (), "split_squat"),
+    (("lunge",), ("lateral", "side", "curtsy"), "split_squat"),
+    (("squat",), ("split", "pistol", "bulgarian"), "squat"),
+    (("planche",), (), "planche"),
+    (("front_lever",), (), "front_lever"),
+    (("knee_raise", "leg_raise", "toes_to_bar"), (), "knee_raise"),
+)
+# Genuinely other exercises. Checked before the table, so a stray token above
+# can never pull them into a family.
+_FAMILY_EXCLUDED = ("deadlift", "stretch", "step_up", "bench", "handstand",
+                    "back_lever", "flag", "row", "split_stretch")
+
+
+def _has_token(key: str, token: str) -> bool:
+    """`token` as whole underscore-delimited words (plural s allowed), so `row`
+    does not fire inside `narrow_grip_push_up`."""
+    return re.search(rf"(?:^|_){re.escape(token)}s?(?:_|$)", key) is not None
+
+
+def resolve_family(label: str | None) -> Movement | None:
+    """The lenient `resolve`: exact name or alias first, otherwise the catalog
+    family an open-vocabulary label belongs to (`ring_muscle_up` -> muscle_up),
+    or None when it names something the catalog does not cover. Never raises."""
+    if not label:
+        return None
+    try:
+        return resolve(label)
+    except SystemExit:
+        pass
+    # Parenthetical qualifiers ("assisted ..., on bench") describe the setup,
+    # not the exercise, so they must neither match nor veto.
+    key = _norm(re.sub(r"\([^)]*\)?", " ", str(label)))
+    if any(_has_token(key, t) for t in _FAMILY_EXCLUDED):
+        return None
+    # `press` and `raise` are only in the catalog as push-up / knee-leg raise,
+    # which the table names explicitly; any other press or raise falls through.
+    for tokens, vetoes, family in _FAMILY_TABLE:
+        if (any(_has_token(key, t) for t in tokens)
+                and not any(_has_token(key, v) for v in vetoes)):
+            return MOVEMENTS[family]
+    return None
 
 
 # ---------------------------------------------------------------------------

@@ -797,7 +797,17 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     try:
         movement = resolve(chosen)
     except SystemExit:
-        return _unsupported(chosen, detected)
+        # The vision model names exercises in open vocabulary; a label that is
+        # not an exact name can still be a catalog family (`ring_muscle_up`).
+        from barra.movements import resolve_family
+        movement = resolve_family(chosen)
+        if movement is None:
+            return _unsupported(chosen, detected)
+        # Keep the label as it was named; the record says what was measured.
+        detected["namedAs"] = chosen
+        detected["exercise"] = movement.name
+        detected["label"] = HUMAN.get(movement.name, movement.name)
+        tr.step("movement_family", namedAs=chosen, family=movement.name)
 
     # The declared variant, labelled as declared - or unspecified. A variant
     # the movement does not define is not accepted, so a typo cannot switch

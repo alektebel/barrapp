@@ -114,8 +114,14 @@ def _canonical(label: str) -> Optional[str]:
     if not label or label.strip().lower() in _NOT_A_LABEL:
         return None
     try:
-        from .movements import resolve
-        return resolve(label).name
+        from .movements import resolve_family
+        # Lenient on purpose: `ring_muscle_up` is a muscle-up vote, and must
+        # agree with geometry/classifier saying `muscle_up` instead of being a
+        # third name. Out-of-catalog names (deadlift...) still fall through.
+        family = resolve_family(label)
+        if family is not None:
+            return family.name
+        raise SystemExit
     except SystemExit:
         # The taxonomy has no profile for it, so it cannot be canonicalised -
         # but it is still a name, and aliases within it cannot be resolved, so
