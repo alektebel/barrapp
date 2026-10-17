@@ -13,6 +13,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.width
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -58,8 +65,8 @@ import com.barrapp.ui.theme.scoreInk
  * `animate-slide-up` / `animate-badge-pop` keyframes with their cubic-beziers.
  */
 
-/** rounded-2xl */
-val CardShape = RoundedCornerShape(16.dp)
+/** Tiza cards: 14px corners. */
+val CardShape = RoundedCornerShape(14.dp)
 /** rounded-xl */
 val InnerShape = RoundedCornerShape(12.dp)
 /** rounded-lg */
@@ -71,26 +78,34 @@ fun Modifier.noRipple(onClick: () -> Unit): Modifier = this.clickable(
     onClick = onClick,
 )
 
-/** The design's one card. `border` carries the accented variant the mission
- *  and summary cards use (`1.5px solid rgba(124,93,250,0.3)`). */
+/**
+ * Tiza's hard shadow: a solid ink copy of the shape 4dp below it, no blur.
+ * Only the screen's main action wears it.
+ */
+fun Modifier.hardShadow(shape: Shape = CardShape, offset: Dp = 4.dp, color: Color = Tk.ink): Modifier =
+    this.drawBehind {
+        val outline = shape.createOutline(size, layoutDirection, this)
+        translate(top = offset.toPx()) { drawOutline(outline, color) }
+    }
+
+/** The one card: white, 2dp ink border, 14dp corners. `accent` is the
+ *  mission variant: orange ground and the hard shadow, because it is the
+ *  screen's main action. */
 @Composable
 fun TkCard(
     modifier: Modifier = Modifier,
     accent: Boolean = false,
     padding: PaddingValues = PaddingValues(16.dp),
-    background: Color = Tk.surface,
+    background: Color = if (accent) Tk.primary else Tk.surface,
     content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
 ) {
     Column(
         modifier
             .fillMaxWidth()
+            .then(if (accent) Modifier.hardShadow() else Modifier)
             .clip(CardShape)
             .background(background)
-            .border(
-                if (accent) 1.5.dp else 1.dp,
-                if (accent) Tk.primaryA(0.3f) else Tk.border,
-                CardShape,
-            )
+            .border(2.dp, Tk.border, CardShape)
             .padding(padding),
         content = content,
     )
@@ -112,7 +127,7 @@ fun Meter(
     color: Color,
     modifier: Modifier = Modifier,
     height: Dp = 6.dp,
-    track: Color = Tk.border,
+    track: Color = Tk.line,
     animate: Boolean = true,
 ) {
     var ready by remember { mutableStateOf(!animate) }
@@ -169,7 +184,7 @@ fun ScoreRing(
             val inset = w / 2f
             val arc = Size(this.size.width - w, this.size.height - w)
             drawArc(
-                color = Tk.border,
+                color = Tk.line,
                 startAngle = -90f, sweepAngle = 360f, useCenter = false,
                 topLeft = Offset(inset, inset), size = arc,
                 style = Stroke(w, cap = StrokeCap.Round),
@@ -198,64 +213,72 @@ fun ScoreRing(
     }
 }
 
-/** The amber fault tag the rep cards wear. */
+/** A fault tag: mono caps on a soft tint of its colour, ink-bordered. */
 @Composable
 fun FaultChip(text: String, color: Color = Tk.amber, modifier: Modifier = Modifier) {
     Text(
-        text,
-        style = com.barrapp.ui.theme.body(9, color),
+        text.uppercase(),
+        style = com.barrapp.ui.theme.mono(10, 0.04f, Tk.ink, androidx.compose.ui.text.font.FontWeight.SemiBold),
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(color.copy(alpha = 0.12f))
-            .border(1.dp, color.copy(alpha = 0.2f), RoundedCornerShape(6.dp))
+            .background(color.copy(alpha = 0.18f))
+            .border(1.5.dp, Tk.ink, RoundedCornerShape(6.dp))
             .padding(horizontal = 6.dp, vertical = 2.dp),
     )
 }
 
-/** `bg-gradient-to-br from-[#7c5dfa] to-[#a78bfa]`, the design's primary CTA. */
+/** The main action: an ink slab with paper text and an orange dot, 52dp
+ *  tall. `shadow` adds the hard shadow when it is the screen's one action. */
 @Composable
 fun TkPrimaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    shadow: Boolean = true,
 ) {
-    Box(
+    val shape = InnerShape
+    Row(
         modifier
             .fillMaxWidth()
-            .clip(CardShape)
-            .background(
-                if (enabled) Brush.linearGradient(listOf(Tk.primary, Tk.primaryLight))
-                else Brush.linearGradient(listOf(Tk.card, Tk.card))
-            )
-            .then(if (enabled) Modifier.noRipple(onClick) else Modifier)
-            .padding(vertical = 16.dp),
-        contentAlignment = Alignment.Center,
+            .heightIn(min = 52.dp)
+            .then(if (enabled && shadow) Modifier.hardShadow(shape, color = Tk.primary) else Modifier)
+            .clip(shape)
+            .background(if (enabled) Tk.ink else Tk.locked)
+            .then(if (enabled) Modifier.clickable(onClick = onClick) else Modifier)
+            .padding(horizontal = 16.dp, vertical = 14.dp),
+        horizontalArrangement = Arrangement.Center,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
+        if (enabled) {
+            Box(Modifier.size(12.dp).clip(androidx.compose.foundation.shape.CircleShape).background(Tk.primary))
+            Spacer(Modifier.width(10.dp))
+        }
         Text(
             text.uppercase(),
-            style = T.button.copy(color = if (enabled) Color.White else Tk.muted),
+            style = T.button.copy(color = if (enabled) Tk.onInk else Tk.muted),
         )
     }
 }
 
-/** The outlined secondary — `bg-[#161626] border-[#2a2a44] text-[#a78bfa]`. */
+/** The secondary: white, 2dp ink border, mono caps. 48dp tall. */
 @Composable
 fun TkSecondaryButton(
     text: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    tint: Color = Tk.primaryLight,
+    tint: Color = Tk.ink,
     border: Color = Tk.border,
     background: Color = Tk.surface,
 ) {
     Box(
         modifier
             .fillMaxWidth()
-            .clip(CardShape)
+            .heightIn(min = 48.dp)
+            .clip(InnerShape)
             .background(background)
-            .border(1.5.dp, border, CardShape)
-            .noRipple(onClick)
+            .border(2.dp, border, InnerShape)
+            .clickable(onClick = onClick)
             .padding(vertical = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
