@@ -300,16 +300,6 @@
   "claimed_trick": "dip"
  },
  {
-  "detected_trick": "dip",
-  "agrees": true,
-  "description": "A woman in a yellow tank top performs dips on parallel bars in a gym, viewed from behind.",
-  "technique_start": 1.7,
-  "technique_end": 11.7,
-  "reps_estimate": 1,
-  "file": "videos/dip/youtube_ZWMNnuFhX6k.mp4",
-  "claimed_trick": "dip"
- },
- {
   "detected_trick": "front_lever",
   "agrees": true,
   "description": "A compilation showing various athletes performing static front lever holds on bars in different indoor and outdoor settings.",
@@ -877,16 +867,6 @@
   "technique_end": 45.0,
   "reps_estimate": 1,
   "file": "videos/pull_up/commons_Get_Fit-_Proper_Pull-Up_Technique_Marine_Corps_Air_Station_I.mp4",
-  "claimed_trick": "pull_up"
- },
- {
-  "detected_trick": "pull_up",
-  "agrees": true,
-  "description": "A man in a navy t-shirt and shorts performs pull-ups on an outdoor metal bar.",
-  "technique_start": 53.3,
-  "technique_end": 82.4,
-  "reps_estimate": 3,
-  "file": "videos/pull_up/commons_Navy-seal-buds-training-pull-ups.mp4",
   "claimed_trick": "pull_up"
  },
  {

@@ -46,6 +46,7 @@ class Store:
         self.min_bytes = min_bytes
         self.eval_file = Path(eval_file)
         self.cache_file = Path(cache_file)
+        self.dup_file = self.cache_file.parent / "duplicates.json"
         self.scan_dirs = SCAN_DIRS if scan_dirs is None else scan_dirs
         self.lock = threading.RLock()
         self.files: list[tuple[str, str]] = []      # (rel, source)
@@ -131,7 +132,15 @@ class Store:
         self._save_cache()
 
     # ---- elementos ----
+    def hidden(self) -> set[str]:
+        """sha256 de copias recodificadas que dedupe.py encontró y no borró."""
+        try:
+            return set(json.loads(self.dup_file.read_text())["hide"])
+        except (OSError, ValueError, KeyError, TypeError):
+            return set()
+
     def items(self):
+        hidden = self.hidden()
         with self.lock:
             groups: dict[str, dict] = {}
             src_of = dict(self.files)
@@ -145,6 +154,8 @@ class Store:
             hashed = sum(1 for r in self.hashes if r in src_of)
         out = []
         for g in groups.values():
+            if g["sha256"] in hidden:
+                continue
             g["paths"].sort()
             source = min(g["sources"], key=SOURCE_RANK.get)
             folders = sorted({p.split("/")[3] for p in g["paths"]
