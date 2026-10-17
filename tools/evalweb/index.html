@@ -45,11 +45,11 @@ textarea{width:100%;min-height:150px;padding:10px;resize:vertical}
  <label><input type="checkbox" id="un"> no se puede valorar (vídeo malo / no se ve)</label>
 </div>
 <div class="acts">
- <button id="prev">Anterior</button><button id="skip">Saltar</button>
+ <button id="prev">Anterior (P)</button><button id="skip">Saltar (espacio)</button>
  <button id="save" class="primary">Guardar y siguiente (Ctrl+Enter)</button>
 </div>
 <div id="msg"></div>
-<small>Teclas (fuera del cuadro): espacio = play/pausa · , . = fotograma · 1–5 = nota</small>
+<small>Teclas (fuera del cuadro): espacio o N = saltar al siguiente · P = anterior · K = play/pausa · , . = fotograma · 1–5 = nota · Ctrl+Enter = guardar</small>
 </main>
 <script>
 const NAMES={push_up:"Flexión",pull_up:"Dominada",dip:"Fondo",muscle_up:"Muscle-up",squat:"Sentadilla",
@@ -128,12 +128,18 @@ $("stars").querySelectorAll("button").forEach((b,k)=>b.onclick=()=>{setRating(ra
 ["fb","mv","un"].forEach(i=>$(i).addEventListener("input",saveDraft));
 $("mv").addEventListener("change",saveDraft);$("un").addEventListener("change",saveDraft);
 $("fview").onchange=$("fmov").onchange=()=>{const f=items.find(match);if(f)show(f.sha256);else $("msg").textContent="No hay vídeos con este filtro."};
+// En captura: si el foco está en el vídeo o en un botón recién pulsado, el
+// espacio haría lo suyo (pausar, volver a pulsar el botón) antes que esto.
 document.addEventListener("keydown",e=>{
  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();return}
  const t=e.target.tagName;if(t==="TEXTAREA"||t==="SELECT"||t==="INPUT")return;
- if(e.key===" "){e.preventDefault();v.paused?v.play():v.pause()}
+ if(e.ctrlKey||e.metaKey||e.altKey)return;
+ const k=e.key.toLowerCase();
+ if(k===" "||k==="n"){e.preventDefault();e.stopPropagation();e.target.blur&&e.target.blur();nav(1)}
+ else if(k==="p"){e.preventDefault();e.stopPropagation();nav(-1)}
+ else if(k==="k"){e.preventDefault();v.paused?v.play():v.pause()}
  else if(e.key===","){step(-1)}else if(e.key==="."){step(1)}
  else if(/^[1-5]$/.test(e.key)){setRating(+e.key);saveDraft()}
-});
+},true);
 load();
 </script></body></html>
