@@ -87,7 +87,7 @@ class Estimate(unittest.TestCase):
     def test_parallel_runs_each_chunk_and_stitches(self):
         seen = []
 
-        def run(video, chunks, fps):
+        def run(video, chunks, fps, stride=1):
             seen.extend(chunks)
             return [np.full((c.end - c.start, 33, 3), i, dtype=np.float32) for i, c in enumerate(chunks)]
 

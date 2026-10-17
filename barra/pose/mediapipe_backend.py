@@ -71,25 +71,35 @@ class MediapipeBackend:
         n_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         cap.release()
 
+        # Frame budget (barra/pose/budget.py): every k-th frame on long clips,
+        # fps reported as fps / k so downstream times stay in source seconds.
+        from .budget import pose_stride
+        stride = pose_stride(n_frames)
+
         model = ensure_model(self.model_path)
         from .parallel import pose_frames
         # In parallel chunks when the clip is long enough and there are CPUs
         # for it (barra/pose/parallel.py); the same pose_range either way.
         blaze = pose_frames(
             Path(video), n_frames, fps,
-            sequential=lambda: pose_range(model, Path(video), 0, 0, -1, fps))
+            sequential=lambda: pose_range(model, Path(video), 0, 0, -1, fps, stride),
+            stride=stride)
         if not len(blaze):
             raise RuntimeError(f"no frames decoded from {video}")
-        return PoseResult(remap(blaze, COCO_FROM_BLAZE), fps, w, h)
+        return PoseResult(remap(blaze, COCO_FROM_BLAZE), fps / stride, w, h, stride)
 
 
 def pose_range(model: Path, video: Path, warm: int, start: int, end: int,
-               fps: float) -> np.ndarray:
+               fps: float, stride: int = 1) -> np.ndarray:
     """BlazePose landmarks (frames, 33, 3) for frames [start, end) of the clip
     (end = -1: to the end of the file), with tracking warmed up from frame
     `warm`. Frames are reached by decoding from the start, never by seeking:
     OpenCV seeks in H.264 are not frame-accurate. The sequential path is
     pose_range(model, video, 0, 0, -1, fps); a parallel chunk is a slice of it.
+
+    `stride` k > 1 poses only frames whose ABSOLUTE index is divisible by k
+    (row j = source frame j*k); the rest are decoded and dropped. Timestamps
+    stay `idx / fps` of the source, strictly increasing as VIDEO mode needs.
     """
     import mediapipe as mp
     from mediapipe.tasks import python as mp_python
@@ -109,11 +119,12 @@ def pose_range(model: Path, video: Path, warm: int, start: int, end: int,
         min_tracking_confidence=0.5,
         output_segmentation_masks=False,
     )
+    stride = max(1, int(stride))
     frames: list[np.ndarray] = []
     with vision.PoseLandmarker.create_from_options(options) as landmarker:
         idx = 0
         while end < 0 or idx < end:
-            if idx < warm:
+            if idx < warm or idx % stride:
                 # Decode but do not pose: grab() advances without converting.
                 if not cap.grab():
                     break

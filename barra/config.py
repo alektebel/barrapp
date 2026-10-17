@@ -24,6 +24,22 @@ MIN_ACCEPTABLE_DETECTION = 0.60
 MIN_MEAN_CONFIDENCE = 0.60   # frames below this are not used for anatomy
 CONF_FLOOR = 0.10            # weight floor so one dead joint cannot vanish
 
+# --- pose frame budget (barra/pose/budget.py) -----------------------------
+# MediaPipe heavy runs at ~11 frames/s end to end on the worker, whose Lambda
+# timeout is 600 s: a 9,000-frame clip timed out every time (2026-10-17).
+# Above MAX_POSE_FRAMES the pose is estimated on every k-th frame; if that
+# would leave fewer than MIN_POSE_FPS effective samples per second the clip is
+# refused up front instead. Pose-time constants, not thresholds on labels.
+def _env_int(name: str, default: int) -> int:
+    try:
+        return max(1, int(os.environ.get(name, "").strip() or default))
+    except ValueError:
+        return default
+
+
+MAX_POSE_FRAMES = _env_int("BARRA_MAX_POSE_FRAMES", 4000)
+MIN_POSE_FPS = 10.0          # below this, rep timing from pose is not trustworthy
+
 # --- stage 3 ---------------------------------------------------------------
 RESAMPLE_LENGTH = 100        # frames per time-normalised rep
 DBA_ITERATIONS = 12

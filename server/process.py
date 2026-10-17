@@ -156,6 +156,7 @@ def _finish(trace, report: dict, job: dict, requested: str) -> dict:
                    inputs={"job": job.get("id"), "requested": requested})
     if isinstance(report["provenance"], dict):
         report["provenance"]["poseBackendUsed"] = report.get("poseBackend")
+        report["provenance"]["poseStride"] = report.get("poseStride")
     _write_trace(trace, str(job.get("id") or ""))
     return report
 
@@ -634,6 +635,18 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         return _empty(exercise,
                       [f"Could not open the clip: {info.get('reason', 'unknown')}"])
 
+    # Frame budget: a clip too long to pose at a usable rate is refused here,
+    # in seconds, rather than timing the worker out after 600 (barra/pose/budget.py).
+    if pose is None:
+        from barra.pose import budget
+        if budget.too_long(int(info.get("frames") or 0), float(info.get("fps") or 0)):
+            max_s = budget.max_clip_seconds(float(info["fps"]))
+            tr.reject("pose skipped", "the clip is too long to pose at a usable rate", frames=int(info["frames"]),
+                      fps=float(info["fps"]), maxSeconds=max_s,
+                      maxPoseFrames=budget.config.MAX_POSE_FRAMES)
+            return _empty(exercise, [f"video_too_long:{max_s}"],
+                          duration_s=round(float(info.get("duration_s") or 0), 2))
+
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
     pose_error = None
     pose_backend = (pose_backend_override or getattr(pose, "source", "caller")) \
@@ -703,8 +716,10 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     # respected, but the detection still runs so the phone can say when the two
     # disagree - measuring a muscle-up with squat geometry produces numbers that
     # look fine and mean nothing.
+    pose_stride = int(getattr(pose, "stride", 1) or 1)
     tr.step("keypoints", frames=int(len(pose.keypoints)), fps=float(fps),
-            backend=pose_backend)
+            backend=pose_backend, poseStride=pose_stride,
+            sourceFrames=int(info.get("frames") or 0))
     sentinel.watch(tr, "pose", {"keypoints": pose.keypoints},
                    inputs={"backend": pose_backend, "fps": float(fps)}, fps=fps)
     _stage("recognising the movement")
@@ -1182,6 +1197,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # the default model file, which is not the same thing once a backend
         # has fallen over and the next one produced the numbers.
         "poseBackend": pose_backend,
+        # Source frames per keypoint row (1 = every frame). `fps` above is the
+        # effective rate, source fps / poseStride; every time is source seconds.
+        "poseStride": pose_stride,
         "recommendation": rec,
         "n_reps": reported_count,
         "n_candidates": len(found),

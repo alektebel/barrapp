@@ -293,6 +293,10 @@ CATALOG: list[Msg] = [
     # unmeasurable movement (process.py; replaces the raw SystemExit text)
     Msg("movement.unsupported", "movement_unsupported:{name*}",
         "hemos detectado {name*}, que todavía no medimos. Graba dominadas, muscle-ups, fondos, flexiones o sentadillas"),
+    # pose frame budget (barra/pose/budget.py): refused before any pose runs
+    Msg("video.too_long", "video_too_long:{max_s}",
+        "El vídeo es demasiado largo para analizarlo entero. Recórtalo a la serie "
+        "(unos {max_s} segundos como mucho) y vuelve a subirlo."),
     # detectors disagree and no vision read broke the tie (fusion abstention)
     Msg("movement.unconfirmed", "movement_unconfirmed",
         "No hemos podido confirmar qué ejercicio es, así que no lo hemos puntuado. "

@@ -20,9 +20,10 @@ import numpy as np
 @dataclass
 class PoseResult:
     keypoints: np.ndarray   # (T, 17, 3) -> x_px, y_px, confidence
-    fps: float
+    fps: float              # effective: source fps / stride
     width: int
     height: int
+    stride: int = 1         # source frames per keypoint row (budget.py)
 
 
 class PoseBackend(Protocol):

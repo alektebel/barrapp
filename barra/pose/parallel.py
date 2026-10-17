@@ -32,6 +32,8 @@ from typing import Callable
 
 import numpy as np
 
+from .budget import sampled_count
+
 OVERLAP = 45      # frames of warm-up before each chunk (1.5 s at 30 fps)
 MIN_CHUNK = 240   # below this many frames per worker, splitting does not pay
 
@@ -84,15 +86,19 @@ def stitch(chunks: list[Chunk], parts: list[np.ndarray]) -> np.ndarray:
     return np.concatenate(parts, axis=0)
 
 
-def _run_chunks(video: Path, chunks: list[Chunk], fps: float) -> list[np.ndarray]:
-    """Pose each chunk in its own subprocess (`python -m barra.pose.chunk`)."""
+def _run_chunks(video: Path, chunks: list[Chunk], fps: float,
+                stride: int = 1) -> list[np.ndarray]:
+    """Pose each chunk in its own subprocess (`python -m barra.pose.chunk`).
+    `chunks` are in SAMPLED-frame units (see `pose_frames`); the subprocess is
+    given absolute source-frame indices, i.e. every bound times `stride`."""
     with tempfile.TemporaryDirectory(prefix="barra-pose-") as tmp:
         procs = []
         for i, c in enumerate(chunks):
             out = Path(tmp) / f"chunk{i}.npy"
-            end = -1 if i == len(chunks) - 1 else c.end  # last: to end of file
+            end = -1 if i == len(chunks) - 1 else c.end * stride  # last: to end of file
             cmd = [sys.executable, "-m", "barra.pose.chunk", str(video),
-                   str(c.warm), str(c.start), str(end), str(fps), str(out)]
+                   str(c.warm * stride), str(c.start * stride), str(end),
+                   str(fps), str(out), str(stride)]
             procs.append((subprocess.Popen(cmd, stdout=subprocess.DEVNULL,
                                            stderr=subprocess.PIPE), out))
         parts, errors = [], []
@@ -109,14 +115,21 @@ def _run_chunks(video: Path, chunks: list[Chunk], fps: float) -> list[np.ndarray
 
 def pose_frames(video: Path, n_frames: int, fps: float,
                 sequential: Callable[[], np.ndarray],
-                n_workers: int | None = None) -> np.ndarray:
-    """Keypoints (n_frames, 33, 3) for the clip: in parallel when it pays,
-    otherwise - or on any failure - from `sequential()`."""
-    chunks = plan_chunks(n_frames, workers() if n_workers is None else n_workers)
+                n_workers: int | None = None, stride: int = 1) -> np.ndarray:
+    """Keypoints (ceil(n_frames / stride), 33, 3) for the clip: in parallel
+    when it pays, otherwise - or on any failure - from `sequential()`.
+
+    With a pose stride k (barra/pose/budget.py) the clip is planned in SAMPLED
+    frames: chunk bounds are in units of sampled rows, so each chunk is exactly
+    (end - start) rows long and `stitch` is unchanged. Scaled by k they are
+    multiples of k in the source, which is what keeps every chunk on the same
+    frames 0, k, 2k, ... as the sequential pass."""
+    chunks = plan_chunks(sampled_count(n_frames, stride),
+                         workers() if n_workers is None else n_workers)
     if len(chunks) == 1:
         return sequential()
     try:
-        return stitch(chunks, _run_chunks(video, chunks, fps))
+        return stitch(chunks, _run_chunks(video, chunks, fps, stride))
     except Exception as exc:  # noqa: BLE001 - see the module docstring
         print(f"[barra] parallel pose fell back to sequential: {exc}", flush=True)
         return sequential()
