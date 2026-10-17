@@ -1,7 +1,7 @@
 package com.barrapp.ui.theme
 
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
@@ -38,15 +38,15 @@ object Nocturne {
     val background = Tk.bg
     val surface = Tk.surface
     val dim = Tk.card
-    val hairline = Tk.border
+    val hairline = Tk.line
     val accent = Tk.primary
-    val accentDeep = Color(0xFF5B45C9)      // the accent, one step down
+    val accentDeep = Tk.primaryLight
     val accentText = Tk.primaryLight
     val fg = Tk.ink
 
     // measurement encoding — how the rep went; never the accent
     val strong = Tk.teal
-    val solid = Tk.primary
+    val solid = Tk.blue
     val shaky = Tk.amber
     val nothing = Tk.muted
 
@@ -88,7 +88,7 @@ fun nocturne(
     tnum: Boolean = false,
     align: TextAlign = TextAlign.Start,
 ): TextStyle = TextStyle(
-    fontFamily = Inter,
+    fontFamily = BodyFace,   // Tiza: Archivo for running text
     fontWeight = when (weight) {
         500 -> FontWeight.Medium
         600 -> FontWeight.SemiBold
@@ -168,9 +168,9 @@ object N {
 @Composable
 fun BarrappTheme(content: @Composable () -> Unit) {
     MaterialTheme(
-        colorScheme = darkColorScheme(
+        colorScheme = lightColorScheme(
             primary = Nocturne.accent,
-            onPrimary = Nocturne.background,
+            onPrimary = Tk.ink,
             primaryContainer = Nocturne.deep,
             onPrimaryContainer = Nocturne.onDeep,
             secondary = Nocturne.accentDeep,
