@@ -784,7 +784,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         detected["fusion"] = fusion
         final = (fusion or {}).get("exercise") or detection.exercise
         if final == "unknown":
-            return _empty("auto", [detection.reason], detected=detected,
+            # Detectors disagreed with no vision read: say we could not confirm
+            # the exercise (catalog code), not the geometry detector's reason.
+            blocker = ("movement_unconfirmed"
+                       if (fusion or {}).get("status") == "disagreement-no-vision-abstain"
+                       else detection.reason)
+            return _empty("auto", [blocker], detected=detected,
                           duration_s=round(float(info.get("duration_s") or 0), 2))
         chosen = final
         if chosen != detection.exercise:

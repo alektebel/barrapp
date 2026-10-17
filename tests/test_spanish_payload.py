@@ -101,6 +101,13 @@ class Unsupported(unittest.TestCase):
         self.assertNotIn("Known", es["blockers"][0])
         self.assertEqual(es["i18n"]["untranslated"], [])
 
+    def test_an_unconfirmed_exercise_is_a_spanish_sentence(self):
+        out = process._empty("auto", ["movement_unconfirmed"])
+        es = i18n.localize_payload({**out, "headline": "h", "narrative": "n", "nextSession": "s"})
+        self.assertIn("confirmar qué ejercicio", es["blockers"][0])
+        self.assertIn("no lo hemos puntuado", es["blockers"][0])
+        self.assertEqual(es["i18n"]["untranslated"], [])
+
     def test_the_source_no_longer_returns_the_raw_exit_text(self):
         self.assertNotIn("_empty(chosen, [str(exc)]", (ROOT / "server" / "process.py").read_text())
 

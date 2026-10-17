@@ -36,6 +36,10 @@ from typing import Any, Mapping, Optional
 # and its vision input scored 0.907: it overrode a correct model on 45 clips to
 # rescue 12, and abstained on 10 more where the model had the answer.
 #
+# (A later measurement on runs where geometry and the model DISAGREE found the
+# model no better than geometry there - 26% vs 37%, vision 84% - so the default
+# policy now abstains in that case instead of letting either decide; see 2a.)
+#
 # So the rule is now: agreement first, then the most reliable detector that has
 # an answer. Every band of the model's confidence beats geometry's 0.300, so the
 # model is not asked to clear a bar to outrank geometry - only to be better than
@@ -294,6 +298,26 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
                       "geometry/classifier disagreement",
         }
 
+    # --- 2a. geometry and model both speak, disagree, and vision is silent --
+    # Measured against human truth on 38 runs where geometry and the learned
+    # classifier disagreed: vision was right 21/25 (84%), geometry 14/38 (37%),
+    # classifier 10/38 (26%). Without vision, picking either of the two means
+    # picking between a 37% and a 26% detector, and a wrong pick scores the
+    # clip as the wrong exercise (push-ups judged as muscle-ups) and shows the
+    # athlete faults of a movement they did not do. The audit principle is to
+    # abstain rather than claim something unproven. Default policy only; the
+    # opt-in ultralytics-* policies keep their own calibrations above.
+    if (policy == "default" and not _canonical(n_label)
+            and _canonical(g_label) and _canonical(m_label)
+            and m_conf >= MODEL_MIN_CONFIDENCE  # a coin-flip model does not speak
+            and not _same(g_label, m_label)):
+        return answer("unknown", 0.0, "disagreement-no-vision-abstain",
+                      "no vision read, and the geometric detector "
+                      f"({g_label}) and the learned classifier ({m_label}) "
+                      "name different movements; both are unreliable alone "
+                      "on such clips (37% and 26% right), so the exercise "
+                      "is not claimed")
+
     # --- 2. no agreement: the most reliable detector that has an answer ----
     # Geometry keeps its say only where nothing better spoke. It is never
     # silently discarded - `geometry` is on every payload above, so a consumer
@@ -310,8 +334,8 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
             if m_conf < MODEL_MIN_CONFIDENCE:
                 continue  # near a coin flip; let geometry try
             return answer(can, m_conf, "model-decides",
-                          "the learned classifier decided; it is measured well "
-                          "above the geometric detector on this corpus")
+                          "the learned classifier decided; no stronger detector "
+                          "named a different movement")
         return answer(can, g_conf, "geometry-only",
                       "geometry decided the movement; no other detector "
                       "offered a usable label")

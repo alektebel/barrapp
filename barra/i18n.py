@@ -293,6 +293,10 @@ CATALOG: list[Msg] = [
     # unmeasurable movement (process.py; replaces the raw SystemExit text)
     Msg("movement.unsupported", "movement_unsupported:{name*}",
         "hemos detectado {name*}, que todavía no medimos. Graba dominadas, muscle-ups, fondos, flexiones o sentadillas"),
+    # detectors disagree and no vision read broke the tie (fusion abstention)
+    Msg("movement.unconfirmed", "movement_unconfirmed",
+        "No hemos podido confirmar qué ejercicio es, así que no lo hemos puntuado. "
+        "Vuelve a grabarlo de lado, con todo el cuerpo dentro del plano."),
 ]
 
 # -- the English detector used by the sentinel ---------------------------------

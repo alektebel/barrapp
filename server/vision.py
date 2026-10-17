@@ -784,7 +784,20 @@ def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | 
     if parsed is None:
         print(f"[barra] locate: no JSON in the {model} reply "
               f"({len(text or '')} chars)", flush=True)
-        return None
+        # The reasoning model sometimes returns an empty 200 even after the
+        # retries; without a second opinion the vision vote is lost.
+        if model != SECOND_MODEL:
+            text = _chat(base, key, SECOND_MODEL, LOCALIZE_SYSTEM, content,
+                         timeout=LOCALIZE_TIMEOUT, check_model=False)
+            parsed = parse_json_object(text)
+            if parsed is None:
+                print(f"[barra] locate: no JSON in the {SECOND_MODEL} reply "
+                      f"({len(text or '')} chars)", flush=True)
+                return None
+            model = SECOND_MODEL
+            print(f"[barra] locate: answered by fallback {model}", flush=True)
+        else:
+            return None
     out = window_from_verdict(parsed, duration, model)
     print(f"[barra] locate: {out.get('exercise') or '?'} "
           f"{out.get('startS')}-{out.get('endS')}s of {duration:.1f}s "

@@ -47,7 +47,10 @@ def _run(clip: Path):
     tr = Trace(new_id(clip.name), clip.name, source="e2e-test",
                clip=str(clip), exercise_requested="auto")
     pose = load_or_estimate(clip, fresh=False, trace=tr, write_cache=False)
-    payload = analyze_clip(clip, exercise="auto",
+    # Named explicitly: on "auto" this sample's geometry (muscle_up) and
+    # classifier (pull_up) disagree with no vision read, which now abstains by
+    # design; this test is about the measurement seam, not identification.
+    payload = analyze_clip(clip, exercise="muscle_up",
                            session="1970-01-01", trace=tr, pose=pose)
     return tr, payload
 

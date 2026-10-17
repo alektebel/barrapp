@@ -47,14 +47,36 @@ def test_model_and_vision_outvote_geometry():
     assert fused["status"] == "majority"
 
 
-def test_model_outranks_geometry_however_confident_geometry_is():
-    """The case that cost 45 clips: geometry's veto is gone."""
+def test_geometry_model_disagreement_without_vision_abstains():
+    """Measured on 38 disagreeing runs: geometry 37%, classifier 26%, vision
+    84%. With no vision read, neither of the two is allowed to decide."""
     fused = fuse_detection(
         {"exercise": "muscle_up", "confidence": 0.95},
         {"exercise": "pull_up", "confidence": 0.99, "marginToRunnerUp": 0.99},
     )
+    assert fused["exercise"] == "unknown"
+    assert fused["confidence"] == 0.0
+    assert fused["status"] == "disagreement-no-vision-abstain"
+    assert fused["geometry"] == "muscle_up" and fused["model"] == "pull_up"
+
+
+def test_disagreement_with_vision_lets_vision_decide():
+    fused = fuse_detection(
+        {"exercise": "muscle_up", "confidence": 0.95},
+        {"exercise": "pull_up", "confidence": 0.99, "marginToRunnerUp": 0.99},
+        {"exercise": "push_up"},
+    )
+    assert fused["exercise"] == "push_up"
+    assert fused["status"] == "vision-decides"
+
+
+def test_agreement_without_vision_is_unchanged():
+    fused = fuse_detection(
+        {"exercise": "pull-up", "confidence": 0.5},
+        {"exercise": "pull_up", "confidence": 0.7, "marginToRunnerUp": 0.3},
+    )
     assert fused["exercise"] == "pull_up"
-    assert fused["status"] == "model-decides"
+    assert fused["status"] == "geometry-model-agree"
 
 
 def test_vision_outranks_both_when_they_disagree_with_it_and_each_other():
@@ -106,8 +128,8 @@ def test_a_label_outside_the_taxonomy_never_recurses():
         {"exercise": "not_a_movement", "confidence": 0.99,
          "marginToRunnerUp": 0.9},
     )
-    assert fused["exercise"] == "not_a_movement"
-    assert fused["status"] == "model-decides"
+    assert fused["exercise"] == "unknown"
+    assert fused["status"] == "disagreement-no-vision-abstain"
 
 
 def test_a_movement_with_no_profile_still_gets_named():

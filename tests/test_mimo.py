@@ -288,3 +288,48 @@ def test_error_rubric_against_human_labels(tmp_path):
     agreement = 1 - len(misses) / compared
     print(f"\nMiMo error rubric: {compared} judged, agreement {agreement:.2f}")
     assert agreement >= 0.5, "error rubric agreement below chance:\n" + "\n".join(misses)
+
+
+def _locate_setup(tmp_path, monkeypatch, primary, replies):
+    frames = []
+    for i in range(6):
+        p = tmp_path / f"f{i}.jpg"
+        p.write_bytes(b"\xff\xd8jpeg")
+        frames.append((i, p))
+    monkeypatch.setenv("BARRA_LOCALIZE_MODEL", primary)
+    monkeypatch.delenv("BARRA_LOCALIZE", raising=False)
+    monkeypatch.setattr(vision, "_config", lambda: ("http://x/v1", "k", primary))
+    monkeypatch.setattr("barra.ingest.probe_video",
+                        lambda p: {"ok": True, "duration_s": 60.0})
+    monkeypatch.setattr("barra.frames.grab_frames",
+                        lambda v, moments, out, prefix="locate": frames)
+    calls = []
+
+    def fake_chat(base, key, model, *a, **k):
+        calls.append(model)
+        return replies[len(calls) - 1] if len(calls) <= len(replies) else ""
+    monkeypatch.setattr(vision, "_chat", fake_chat)
+    return calls
+
+
+_GOOD = json.dumps({"detected_exercise": "push_up", "technique_start": 12.0,
+                    "technique_end": 31.0, "reps_estimate": 5})
+
+
+def test_locate_falls_back_to_the_second_model_on_an_empty_reply(tmp_path, monkeypatch):
+    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", _GOOD])
+    got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    assert calls == ["mimo-v2.6-flash", vision.SECOND_MODEL]
+    assert got["exercise"] == "push_up" and got["model"] == vision.SECOND_MODEL
+
+
+def test_locate_does_not_retry_when_the_primary_is_the_second_model(tmp_path, monkeypatch):
+    calls = _locate_setup(tmp_path, monkeypatch, vision.SECOND_MODEL, ["", _GOOD])
+    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
+    assert calls == [vision.SECOND_MODEL]
+
+
+def test_locate_returns_none_when_both_models_fail(tmp_path, monkeypatch):
+    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "nope"])
+    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
+    assert len(calls) == 2

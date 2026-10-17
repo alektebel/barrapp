@@ -19,32 +19,30 @@ aparte, porque medir sobre lo ajustado infla el resultado.
 from __future__ import annotations
 
 import json
+import sys
 from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+
+from barra.movements import resolve_family  # noqa: E402
+
 HUMAN = ROOT / "data/eval/human_technique_structured.jsonl"
 PIPE = ROOT / "out/evalweb/pipeline"
 OUT = ROOT / "out/evalweb/report.json"
 
 
 # La etiqueta del pipeline fuera de catálogo es vocabulario abierto del modelo de
-# visión ("ring_muscle_up", "barbell_back_squat"). Se lleva a su familia del
-# catálogo para no contar como error una variante bien nombrada.
-FAMILY = [("muscle_up", "muscle_up"), ("pull_up", "pull_up"), ("chin_up", "pull_up"),
-          ("push_up", "push_up"), ("dip", "dip"), ("pistol", "pistol_squat"),
-          ("bulgarian", "bulgarian_split_squat"), ("split_squat", "split_squat"),
-          ("lunge", "split_squat"), ("squat", "squat"), ("planche", "planche"),
-          ("front_lever", "front_lever"), ("knee_raise", "knee_raise")]
-# Parientes que el entrenador y el modelo nombran distinto sin estar mal.
+# visión ("ring_muscle_up"): se lleva a su familia con la misma tabla que usa el
+# pipeline. Parientes que el entrenador y el modelo nombran distinto sin estar
+# mal cuentan como acierto de familia.
 KIN = {frozenset({"split_squat", "bulgarian_split_squat"})}
 
 
 def family(label: str | None) -> str | None:
-    label = (label or "").lower()
-    if "push_up" in label:  # "decline_push_up" no es un dip
-        return "push_up"
-    return next((fam for key, fam in FAMILY if key in label), None)
+    found = resolve_family(label)
+    return found.name if found else None
 
 
 def is_dev(row: dict) -> bool:

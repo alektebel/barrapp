@@ -60,7 +60,10 @@ def run(api: str, row: dict, budget: int) -> dict:
         return {"clip": str(clip.relative_to(ROOT)), "item": item} if item else {
             "error": f"sin resultado en {budget}s"}
     finally:
-        e2e.request("DELETE", f"{api}/v1/jobs/{job}", device=device)
+        try:
+            e2e.request("DELETE", f"{api}/v1/jobs/{job}", device=device)
+        except Exception:  # noqa: BLE001 - el trabajo caduca solo
+            pass
 
 
 def main() -> int:
@@ -73,11 +76,17 @@ def main() -> int:
     api = e2e.api_base(args.api)
     OUT.mkdir(parents=True, exist_ok=True)
     rows = [json.loads(line) for line in SRC.read_text(encoding="utf-8").splitlines() if line]
-    todo = [r for r in rows if args.force or not (OUT / f"{r['sha256'][:16]}.json").exists()]
+    def done(r):
+        f = OUT / f"{r['sha256'][:16]}.json"
+        return f.exists() and not json.loads(f.read_text(encoding="utf-8")).get("error")
+    todo = [r for r in rows if args.force or not done(r)]
     print(f"{len(todo)} de {len(rows)} clips por pasar ({api})")
 
     def one(row):
-        res = run(api, row, args.budget)
+        try:
+            res = run(api, row, args.budget)
+        except Exception as exc:  # noqa: BLE001 - un corte de red no para la tanda
+            res = {"error": f"{type(exc).__name__}: {exc}"[:300]}
         res["sha256"] = row["sha256"]
         (OUT / f"{row['sha256'][:16]}.json").write_text(
             json.dumps(res, ensure_ascii=False, indent=1), encoding="utf-8")
