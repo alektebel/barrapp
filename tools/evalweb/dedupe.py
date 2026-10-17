@@ -21,6 +21,7 @@ nunca se borra.
 from __future__ import annotations
 
 import argparse
+import importlib.util
 import json
 import os
 import subprocess
@@ -31,9 +32,12 @@ from pathlib import Path
 import numpy as np
 
 ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "tools/evalweb"))
-
-from server import SOURCE_RANK, Store  # noqa: E402
+# El server.py del etiquetador, con nombre propio: "server" es también el
+# paquete del backend, y quien importe los dos no debe recibir el equivocado.
+_spec = importlib.util.spec_from_file_location("evalweb_server", ROOT / "tools/evalweb/server.py")
+_web = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_web)
+SOURCE_RANK, Store = _web.SOURCE_RANK, _web.Store
 
 CACHE = ROOT / "out/evalweb/fingerprints.json"
 THUMBS = ROOT / "out/evalweb/thumbs"
