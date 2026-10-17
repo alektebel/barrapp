@@ -101,3 +101,38 @@ def test_save_appends_and_latest_wins(env):
     c = http.client.HTTPConnection("127.0.0.1", port)
     c.request("POST", "/api/save", json.dumps({"sha256": "f" * 64}))
     assert c.getresponse().status == 400
+
+
+def post(port, path, body):
+    c = http.client.HTTPConnection("127.0.0.1", port)
+    c.request("POST", path, body=json.dumps(body))
+    r = c.getresponse()
+    return r.status, json.loads(r.read() or b"{}")
+
+
+def test_delete_moves_every_copy_to_trash_and_restore_brings_it_back(env):
+    store, port, root = env
+    dup = next(i for i in store.items()[0] if len(i["paths"]) == 2)
+    status, rec = post(port, "/api/delete", {"sha256": dup["sha256"]})
+    assert status == 200 and sorted(rec["paths"]) == sorted(dup["paths"])
+    for rel in dup["paths"]:
+        assert not (root / rel).exists()
+        assert (store.cache_file.parent / "papelera" / rel).is_file()
+    assert [i["sha256"] for i in store.items()[0]] != [] and \
+        dup["sha256"] not in {i["sha256"] for i in store.items()[0]}
+    assert get(port, f"/video/{dup['sha256']}")[0] == 404
+
+    status, _ = post(port, "/api/restore", {"sha256": dup["sha256"]})
+    assert status == 200
+    for rel in dup["paths"]:
+        assert (root / rel).read_bytes() == BODY
+    back = next(i for i in store.items()[0] if i["sha256"] == dup["sha256"])
+    assert back["source"] == "repo" and sorted(back["paths"]) == sorted(dup["paths"])
+    log = (store.cache_file.parent / "borrados.jsonl").read_text().splitlines()
+    assert [json.loads(l)["action"] for l in log] == ["delete", "restore"]
+
+
+def test_delete_unknown_is_refused(env):
+    _, port, _ = env
+    assert post(port, "/api/delete", {"sha256": "0" * 64})[0] == 400
+    assert post(port, "/api/restore", {"sha256": "0" * 64})[0] == 400

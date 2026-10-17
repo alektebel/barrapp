@@ -46,10 +46,11 @@ textarea{width:100%;min-height:150px;padding:10px;resize:vertical}
 </div>
 <div class="acts">
  <button id="prev">Anterior (P)</button><button id="skip">Saltar (espacio)</button>
+ <button id="del" style="margin-left:auto;border-color:#b54">Borrar vídeo (Supr)</button>
  <button id="save" class="primary">Guardar y siguiente (Ctrl+Enter)</button>
 </div>
 <div id="msg"></div>
-<small>Teclas (fuera del cuadro): espacio o N = saltar al siguiente · P = anterior · K = play/pausa · , . = fotograma · 1–5 = nota · Ctrl+Enter = guardar</small>
+<small>Teclas (fuera del cuadro): espacio o N = saltar al siguiente · P = anterior · K = play/pausa · , . = fotograma · 1–5 = nota · Supr = borrar vídeo · Ctrl+Z = deshacer borrado · Ctrl+Enter = guardar</small>
 </main>
 <script>
 const NAMES={push_up:"Flexión",pull_up:"Dominada",dip:"Fondo",muscle_up:"Muscle-up",squat:"Sentadilla",
@@ -119,11 +120,31 @@ async function save(){
  const rec=await r.json();const it=byId(sha);it.done=true;it.answer=rec;lset("d:"+sha,null);
  progress();nav(1);
 }
+let lastDeleted=null;
+async function del(){
+ const it=byId(cur);if(!it)return;
+ if(it.done&&!confirm("Este vídeo ya está valorado. ¿Borrarlo igualmente?"))return;
+ const sha=cur;nav(1);
+ const r=await fetch("/api/delete",{method:"POST",body:JSON.stringify({sha256:sha})});
+ if(!r.ok){$("msg").textContent="No se pudo borrar: "+(await r.text());show(sha);return}
+ const idx=items.indexOf(it);items.splice(idx,1);lastDeleted={item:it,idx};lset("d:"+sha,null);
+ if(cur===sha){const f=items.find(match);if(f)show(f.sha256)}
+ progress();
+ $("msg").innerHTML='Vídeo borrado (está en la papelera). <a href="#" id="undo">Deshacer</a> (Ctrl+Z)';
+ $("undo").onclick=e=>{e.preventDefault();undo()};
+}
+async function undo(){
+ if(!lastDeleted)return;const {item,idx}=lastDeleted;
+ const r=await fetch("/api/restore",{method:"POST",body:JSON.stringify({sha256:item.sha256})});
+ if(!r.ok){$("msg").textContent="No se pudo recuperar: "+(await r.text());return}
+ items.splice(idx,0,item);lastDeleted=null;progress();show(item.sha256);
+ $("msg").textContent="Vídeo recuperado.";
+}
 function rate(x){v.playbackRate=x;document.querySelectorAll("[data-r]").forEach(b=>b.classList.toggle("on",+b.dataset.r===x))}
 document.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>rate(+b.dataset.r));
 function step(d){v.pause();v.currentTime=Math.max(0,v.currentTime+d/30)}
 $("bm").onclick=()=>step(-1);$("bp").onclick=()=>step(1);
-$("save").onclick=save;$("skip").onclick=()=>nav(1);$("prev").onclick=()=>nav(-1);
+$("save").onclick=save;$("del").onclick=del;$("skip").onclick=()=>nav(1);$("prev").onclick=()=>nav(-1);
 $("stars").querySelectorAll("button").forEach((b,k)=>b.onclick=()=>{setRating(rating===k+1?null:k+1);saveDraft()});
 ["fb","mv","un"].forEach(i=>$(i).addEventListener("input",saveDraft));
 $("mv").addEventListener("change",saveDraft);$("un").addEventListener("change",saveDraft);
@@ -133,7 +154,9 @@ $("fview").onchange=$("fmov").onchange=()=>{const f=items.find(match);if(f)show(
 document.addEventListener("keydown",e=>{
  if(e.key==="Enter"&&(e.ctrlKey||e.metaKey)){e.preventDefault();save();return}
  const t=e.target.tagName;if(t==="TEXTAREA"||t==="SELECT"||t==="INPUT")return;
+ if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==="z"){e.preventDefault();undo();return}
  if(e.ctrlKey||e.metaKey||e.altKey)return;
+ if(e.key==="Delete"){e.preventDefault();del();return}
  const k=e.key.toLowerCase();
  if(k===" "||k==="n"){e.preventDefault();e.stopPropagation();e.target.blur&&e.target.blur();nav(1)}
  else if(k==="p"){e.preventDefault();e.stopPropagation();nav(-1)}

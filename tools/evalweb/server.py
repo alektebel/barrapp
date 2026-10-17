@@ -240,6 +240,58 @@ class Store:
         return rec
 
 
+    # ---- borrar ----
+    # "Borrar" mueve el vídeo a out/evalweb/papelera/ (misma ruta relativa) y
+    # lo anota en borrados.jsonl: se puede deshacer, y nada versionado cambia.
+    # Los índices del corpus pueden seguir nombrándolo; sus scripts ya saltan
+    # los ficheros que no están.
+    def _trash_dir(self) -> Path:
+        return self.cache_file.parent / "papelera"
+
+    def delete(self, sha: str) -> dict:
+        with self.lock:
+            paths = sorted(r for r, s in self.hashes.items() if s == sha
+                           and any(r == f for f, _ in self.files))
+            if not paths:
+                raise ValueError("vídeo desconocido")
+            moved = []
+            for rel in paths:
+                src, dst = self.root / rel, self._trash_dir() / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(src, dst)
+                moved.append(rel)
+            self.files = [(r, s) for r, s in self.files if r not in moved]
+            rec = {"sha256": sha, "paths": moved, "action": "delete",
+                   "at": datetime.now().astimezone().isoformat(timespec="seconds")}
+            with open(self.cache_file.parent / "borrados.jsonl", "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return rec
+
+    def restore(self, sha: str) -> dict:
+        with self.lock:
+            paths = [r for r, s in self.hashes.items() if s == sha
+                     and (self._trash_dir() / r).is_file()]
+            if not paths:
+                raise ValueError("no está en la papelera")
+            for rel in paths:
+                dst = self.root / rel
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                os.replace(self._trash_dir() / rel, dst)
+                st = dst.stat()
+                self.cache[rel] = [st.st_size, st.st_mtime_ns, sha]
+            src = {r: s for r, s in self.files}
+            rank = dict(SCAN_DIRS)
+            for rel in paths:
+                if rel not in src:
+                    source = next((v for k, v in rank.items() if rel.startswith(k + "/")), "repo")
+                    self.files.append((rel, source))
+            rec = {"sha256": sha, "paths": sorted(paths), "action": "restore",
+                   "at": datetime.now().astimezone().isoformat(timespec="seconds")}
+            with open(self.cache_file.parent / "borrados.jsonl", "a", encoding="utf-8") as f:
+                f.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        return rec
+
+
 def make_handler(store: Store):
     class H(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -281,12 +333,16 @@ def make_handler(store: Store):
         do_HEAD = do_GET
 
         def do_POST(self):
-            if urlparse(self.path).path != "/api/save":
+            route = urlparse(self.path).path
+            act = {"/api/save": lambda d: store.save(d),
+                   "/api/delete": lambda d: store.delete(str(d.get("sha256", ""))),
+                   "/api/restore": lambda d: store.restore(str(d.get("sha256", "")))}.get(route)
+            if act is None:
                 return self._send(404, b'{"error":"no encontrado"}')
             try:
                 n = int(self.headers.get("Content-Length") or 0)
-                rec = store.save(json.loads(self.rfile.read(n) or b"{}"))
-            except (ValueError, TypeError) as e:
+                rec = act(json.loads(self.rfile.read(n) or b"{}"))
+            except (ValueError, TypeError, OSError) as e:
                 return self._send(400, json.dumps({"error": str(e)}).encode())
             self._send(200, json.dumps(rec, ensure_ascii=False).encode())
 
