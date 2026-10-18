@@ -50,3 +50,21 @@ def test_resolve_stays_strict():
 def test_fusion_vision_family_agrees_with_geometry():
     out = fuse_detection({"exercise": "muscle_up"}, None, nan_label="ring_muscle_up")
     assert out["exercise"] == "muscle_up"
+
+
+def test_a_parenthesis_naming_the_exercise_is_believed():
+    from barra.movements import resolve_family
+    got = resolve_family("rear-foot elevated split squat (Bulgarian split squat) with kettlebells")
+    assert got.name == "bulgarian_split_squat"
+
+
+def test_rear_foot_elevated_is_the_bulgarian():
+    from barra.movements import resolve_family
+    for label in ("rear-foot elevated split squat", "RFESS with dumbbells",
+                  "kettlebell rear foot elevated split squat"):
+        assert resolve_family(label).name == "bulgarian_split_squat", label
+
+
+def test_a_setup_parenthesis_still_does_not_veto():
+    from barra.movements import resolve_family
+    assert resolve_family("push-up (on bench)").name == "push_up"

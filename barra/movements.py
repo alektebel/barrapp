@@ -165,7 +165,10 @@ _FAMILY_TABLE: tuple[tuple[tuple[str, ...], tuple[str, ...], str], ...] = (
     (("pull_up", "pullup", "chin_up", "chinup"), (), "pull_up"),
     (("dip",), (), "dip"),
     (("pistol",), (), "pistol_squat"),
-    (("bulgarian",), (), "bulgarian_split_squat"),
+    # The rear-foot-elevated split squat IS the Bulgarian; vision models name
+    # it either way ("rear-foot elevated split squat (Bulgarian ...)").
+    (("bulgarian", "rear_foot_elevated", "rear_foot_elevated_split_squat", "rfess"),
+     (), "bulgarian_split_squat"),
     (("split_squat",), (), "split_squat"),
     (("lunge",), ("lateral", "side", "curtsy"), "split_squat"),
     (("squat",), ("split", "pistol", "bulgarian"), "squat"),
@@ -195,8 +198,17 @@ def resolve_family(label: str | None) -> Movement | None:
         return resolve(label)
     except SystemExit:
         pass
-    # Parenthetical qualifiers ("assisted ..., on bench") describe the setup,
-    # not the exercise, so they must neither match nor veto.
+    # A parenthesis that is itself a catalog name is the model saying which
+    # exercise it means: "rear-foot elevated split squat (Bulgarian split
+    # squat)" is the Bulgarian, and dropping the parenthesis made it a plain
+    # split squat (2026-10-18, a phone clip).
+    for inner in re.findall(r"\(([^)]*)\)", str(label)):
+        try:
+            return resolve(inner.strip())
+        except SystemExit:
+            pass
+    # Other parenthetical qualifiers ("assisted ..., on bench") describe the
+    # setup, not the exercise, so they must neither match nor veto.
     key = _norm(re.sub(r"\([^)]*\)?", " ", str(label)))
     if any(_has_token(key, t) for t in _FAMILY_EXCLUDED):
         return None
