@@ -315,8 +315,8 @@ def _rest_level(raw: np.ndarray, valid: np.ndarray, a: int, b: int,
     return min(ends, key=abs)
 
 
-# A turnaround this close (seconds) to a span edge, with the signal still
-# above the rest gate there, belongs to a rep the trimming cut in half.
+# A turnaround this close (seconds) to the span edge its rep runs into
+# belongs to a rep the trimming cut in half: no half-rep is this short.
 SPAN_EDGE_MARGIN_S = 0.5
 
 
@@ -531,9 +531,12 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
         # got a tempo of 28:1 and no score. The trimmed stretch is not
         # trustworthy signal to extend into (that is the walk the span was
         # drawn to exclude), so the rep is rejected with its reason instead.
+        # Not gated on the signal still being high there: in that clip it fell
+        # below the gate within 3 frames of the edge, as the athlete stepped
+        # off - a 0.1 s lift no half-rep of these movements can have. Reaching
+        # the edge within the margin of the turnaround is the cut itself.
         cut = next((side for side, edge, end in (("start", lo, a), ("end", hi, b))
-                    if end == edge and sig[end] > gate
-                    and abs(pk - end) <= SPAN_EDGE_MARGIN_S * fps), None)
+                    if end == edge and abs(pk - end) <= SPAN_EDGE_MARGIN_S * fps), None)
         if cut is not None:
             tr.reject(f"candidate at {at}s", "the rep runs past the edge of the active span",
                       edge=cut, edge_value=float(sig[a if cut == "start" else b]),
