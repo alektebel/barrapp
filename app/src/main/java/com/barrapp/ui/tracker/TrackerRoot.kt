@@ -158,7 +158,11 @@ fun TrackerRoot(
             onClose = { faultAt = null },
             // "Ver la rep": the correction for that rep, beside the best one.
             onPlayRep = { slide ->
-                val i = repCorrections(analysis).indexOfFirst { it.rep == slide.rep }
+                // The same fault first: two faults in one rep must not open
+                // each other's correction.
+                val all = repCorrections(analysis)
+                val i = all.indexOfFirst { it.title.equals(slide.title, ignoreCase = true) }
+                    .takeIf { it >= 0 } ?: all.indexOfFirst { it.rep == slide.rep }
                 faultAt = null
                 correctionAt = i.takeIf { it >= 0 } ?: 0
             },
