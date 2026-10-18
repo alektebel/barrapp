@@ -8,12 +8,15 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -37,9 +40,11 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.barrapp.data.DayEntry
 import com.barrapp.data.SkillGraph
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
+import com.barrapp.ui.theme.body
 import com.barrapp.ui.theme.mono
 
 /** One skill on the path, ready to draw. */
@@ -93,12 +98,92 @@ fun skillPathData(graph: SkillGraph, target: String, verified: Set<String>,
     return SkillPathData(target, graph[target]!!.name, rows, edges, next?.let { ui[it.id] }, standard, targets)
 }
 
+/** One step of the vertical path - design 2d's CAMINO DE SKILLS. */
+data class PathStep(
+    val id: String,
+    val name: String,
+    /** The human line under the name ("Completado", "Ahora: 5 reps …"). */
+    val note: String = "",
+    /** The SkillGraph state of this step. */
+    val state: String = SkillGraph.LOCKED,
+    /** The step to work on now: the path's one orange dot. */
+    val next: Boolean = false,
+    /**
+     * What is still missing to meet this step, in words, without the
+     * "Te falta: " prefix - the path adds it here, once in the whole app
+     * (the design notes' B2). Null when nothing honest can be said.
+     */
+    val missing: String? = null,
+)
+
+/**
+ * The graph's path as design 2d reads it: shallowest first, one human line
+ * each, the next step marked. The standard of the next skill is already the
+ * note; `missingFor` (see [missingForNext]) adds the "Te falta" line when the
+ * caller can compute the real gap from the athlete's days.
+ */
+fun pathSteps(data: SkillPathData, missingFor: String? = null): List<PathStep> =
+    data.rows.flatten().map { n ->
+        val standard = if (n.next) data.nextStandard else null
+        PathStep(
+            id = n.id,
+            name = n.name,
+            note = when {
+                n.state == SkillGraph.VERIFIED -> "Completado"
+                n.state == SkillGraph.CLAIMED -> "Hecho"
+                n.next -> when {
+                    standard == null -> "Ahora"
+                    standard.startsWith("barra todavía no mide") ->
+                        "Ahora: barra todavía no la mide; trabájala en tus series"
+                    else -> "Ahora: ${standard.substringBefore(". barra lo verifica")}"
+                }
+                else -> "Bloqueado hasta completar el anterior"
+            },
+            state = n.state,
+            next = n.next,
+            missing = if (n.next) missingFor else null,
+        )
+    }
+
+/**
+ * The gap to the next skill, from the athlete's measured days, in words: what
+ * its standard still asks that the days do not show yet. Null when the step is
+ * verified, has no measurable standard, or nothing is missing - the path stays
+ * quiet instead of inventing a gap.
+ */
+fun missingForNext(graph: SkillGraph, next: SkillNodeUi?, days: List<DayEntry>): String? {
+    val node = next?.let { graph[it.id] } ?: return null
+    val std = node.standard?.takeIf { node.measurable } ?: return null
+    if (next.state == SkillGraph.VERIFIED) return null
+    val onDays = days.mapNotNull { it.byMovement[node.id] }
+    val mostReps = onDays.maxOfOrNull { it.reps } ?: 0
+    val bestScore = onDays.mapNotNull { it.score }.maxOrNull()
+    val qualifying = onDays.count { it.reps >= std.reps && (it.score ?: -1) >= std.quality }
+    val gaps = mutableListOf<String>()
+    if (onDays.isEmpty()) {
+        gaps += "todavía no hay repeticiones medidas de esta habilidad"
+    } else {
+        if (mostReps < std.reps) {
+            val short = std.reps - mostReps
+            gaps += "${if (short == 1) "1 repetición más" else "$short repeticiones más"} en una sesión (vas por $mostReps)"
+        }
+        if ((bestScore ?: -1) < std.quality) {
+            gaps += "calidad ${std.quality} o más (mejor hasta ahora: ${bestScore ?: "sin puntuar"})"
+        }
+    }
+    if (qualifying < std.days && onDays.isNotEmpty()) {
+        val short = std.days - qualifying
+        gaps += if (short == 1) "1 día más que cumpla" else "$short días más que cumplan"
+    }
+    if (gaps.isEmpty()) return null
+    return gaps.joinToString(", y ")
+}
+
 /**
  * Order the nodes of each row to cut edge crossings: the barycenter heuristic
  * (each node goes under the mean position of its prerequisites in the rows
  * above), one pass down then one up, keeping the original order on ties.
- */
-internal fun orderRows(rows: List<List<String>>, edges: List<Pair<String, String>>): List<List<String>> {
+ */internal fun orderRows(rows: List<List<String>>, edges: List<Pair<String, String>>): List<List<String>> {
     val parents = edges.groupBy({ it.second }, { it.first })
     val children = edges.groupBy({ it.first }, { it.second })
     val out = rows.map { it.toMutableList() }.toMutableList()
@@ -262,5 +347,67 @@ private fun SkillChip(node: SkillNodeUi, modifier: Modifier = Modifier) {
                 lineHeight = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp),
             ),
         )
+    }
+}
+
+private fun stepDot(s: PathStep): Color = when {
+    s.state == SkillGraph.VERIFIED || s.state == SkillGraph.CLAIMED -> Tk.ink
+    s.next -> Tk.primary
+    else -> Tk.bg
+}
+
+/**
+ * Design 2d's CAMINO DE SKILLS: the path as a vertical line of steps, each
+ * with its mark - done (ink dot, check), next (the one orange dot) or locked
+ * (paper dot, muted name). The next step carries the app's single
+ * "Te falta: …" line; nothing else says it.
+ */
+@Composable
+fun SkillPathSteps(steps: List<PathStep>, modifier: Modifier = Modifier) {
+    Column(modifier.fillMaxWidth()) {
+        steps.forEachIndexed { i, s ->
+            Row(
+                Modifier.fillMaxWidth().height(IntrinsicSize.Min),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Column(
+                    Modifier.width(24.dp).fillMaxHeight(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Box(
+                        Modifier.size(20.dp)
+                            .clip(CircleShape)
+                            .background(stepDot(s))
+                            .border(2.dp, Tk.border, CircleShape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (s.state == SkillGraph.VERIFIED || s.state == SkillGraph.CLAIMED) {
+                            Text("✓", style = mono(11, 0f, Tk.onInk, FontWeight.SemiBold))
+                        }
+                    }
+                    if (i < steps.size - 1) {
+                        Box(
+                            Modifier.width(2.dp).weight(1f)
+                                .background(if (s.state == SkillGraph.LOCKED) Tk.line else Tk.ink),
+                        )
+                    }
+                }
+                Column(Modifier.weight(1f).padding(bottom = 12.dp)) {
+                    Text(
+                        s.name,
+                        style = T.rowTitle.copy(
+                            color = if (s.state == SkillGraph.LOCKED) Tk.muted else Tk.ink,
+                        ),
+                    )
+                    if (s.note.isNotBlank()) {
+                        Text(s.note, style = body(13), modifier = Modifier.padding(top = 2.dp))
+                    }
+                    if (s.next && !s.missing.isNullOrBlank()) {
+                        Text("Te falta: ${s.missing}", style = T.itemTitleSmall,
+                            modifier = Modifier.padding(top = 3.dp))
+                    }
+                }
+            }
+        }
     }
 }
