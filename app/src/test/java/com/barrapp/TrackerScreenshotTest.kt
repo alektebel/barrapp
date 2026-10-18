@@ -11,6 +11,7 @@ import com.barrapp.data.Profile
 import com.barrapp.ui.theme.BarrappTheme
 import com.barrapp.ui.tracker.HomeData
 import com.barrapp.ui.tracker.LastSessionData
+import com.barrapp.ui.tracker.NextGoalData
 import com.barrapp.ui.tracker.SessionRowData
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.tracker.CoachData
@@ -94,9 +95,16 @@ class TrackerScreenshotTest {
                     movement = "Dominada", date = "8 sept", reps = it.reps, score = it.score,
                     rows = listOf(SessionRowData("Dominada", it.score, it.reps)),
                     topFault = "Balanceo" to 4,
+                    // Per-rep scores, so the home's rep strip draws the real thing.
+                    repScores = List(it.reps.coerceIn(1, 12)) { i ->
+                        listOf(88, 74, 52, null, 61, 66)[i % 6]
+                    },
+                    sets = 3,
                 )
             },
             badges = Gamification.badges(days, "pull_up"),
+            nextGoal = if (measured) NextGoalData("8 dominadas por encima de 70", 5, 8) else null,
+            weekTarget = 4,
         )
     }
 

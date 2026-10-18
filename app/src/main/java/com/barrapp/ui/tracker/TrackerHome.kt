@@ -5,34 +5,50 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.barrapp.Gamification
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.body
+import com.barrapp.ui.theme.display
 import com.barrapp.ui.theme.mono
 import com.barrapp.ui.theme.scoreInk
-import com.barrapp.ui.theme.scoreLabel
+import java.text.DecimalFormat
+import java.text.DecimalFormatSymbols
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 /** One movement's share of the last training day — the design's "SER n" row,
  *  carrying what this app can actually attribute: a movement, not a set. */
@@ -48,7 +64,25 @@ data class LastSessionData(
     val rows: List<SessionRowData>,
     /** The fault the day showed most, and how many reps showed it. */
     val topFault: Pair<String, Int>?,
+    /**
+     * The last clip's per-rep score, in rep order; null where the pose model
+     * could not read a rep. Empty until it is wired from the analysis: the
+     * rep strip then falls back to the session's aggregate bar.
+     */
+    val repScores: List<Int?> = emptyList(),
+    /** Clips (series) the session folds, for the «N REPS · M SERIES» line. */
+    val sets: Int = 1,
 )
+
+/** The ladder's current rung, for the «SIGUIENTE LOGRO» row. */
+data class NextGoalData(
+    val label: String,
+    val done: Int,
+    val target: Int,
+) {
+    val fraction: Float
+        get() = if (target <= 0) 0f else (done.toFloat() / target).coerceIn(0f, 1f)
+}
 
 data class HomeData(
     val name: String,
@@ -57,15 +91,21 @@ data class HomeData(
     val mission: Gamification.Mission,
     val lastSession: LastSessionData?,
     val badges: List<Gamification.Badge>,
+    /** The next rung of the ladder; null hides the row until it is wired. */
+    val nextGoal: NextGoalData? = null,
+    /** Weekly session target for «N/T SESIONES SEM.»; 0 shows only the count. */
+    val weekTarget: Int = 0,
 )
 
 /**
- * Inicio.
+ * Inicio, design 2a.
  *
- * The mockup's home, card for card. What differs is only ever the source: the
- * streak, the XP bar, the week strip and the badges read measured training, so
- * a phone that has filmed nothing shows zeroes and an empty last-session card
- * rather than someone else's 18-day streak.
+ * One main action — the orange mission card, with the ink GRABAR SERIE slab.
+ * Everything else reports: a single strip carries streak, level/XP and the
+ * week's sessions, the last session shows itself as a clip with one bar per
+ * rep, and the next ladder rung dangles from a dashed row. Every number is
+ * measured: a phone that has filmed nothing shows zeroes and an empty clip
+ * card rather than someone else's streak.
  */
 @Composable
 fun TrackerHome(
@@ -86,116 +126,118 @@ fun TrackerHome(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Greeting(data)
-        XpCard(data.standing)
+        StatStrip(data, onOpenCalendar)
         MissionCard(data.mission, onRecord)
-        WeekCard(data.week, onOpenCalendar)
-        LastSessionCard(data.lastSession, onOpenSession, onOpenCoach, onRecord)
-        BadgesCard(data.badges, onOpenLadder)
+        LastSessionSection(data.lastSession, onOpenSession, onRecord)
+        NextGoalRow(data.nextGoal, onOpenLadder)
     }
 }
 
 @Composable
 private fun Greeting(data: HomeData) {
-    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-        Column(Modifier.weight(1f)) {
-            Text("Buenas,", style = T.eyebrowWide)
-            Text(data.name.uppercase(), style = T.name)
-            Row(
-                Modifier.padding(top = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                Text("Lv.${data.standing.level}", style = mono(10, 0.05f, Tk.primary))
-                Text("·", style = mono(10, 0f, Tk.border))
-                Text(data.standing.title, style = mono(10))
-            }
+    Row(
+        Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.Bottom,
+    ) {
+        Column {
+            Text(todayLabel(), style = mono(12, 0.02f))
+            Spacer(Modifier.height(4.dp))
+            Text(
+                "HOLA, ${displayName(data.name).uppercase()}",
+                style = display(30),
+            )
         }
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Box(
-                Modifier
-                    .size(56.dp)
-                    .clip(CardShape)
-                    .background(Tk.amberA(0.1f))
-                    .border(1.5.dp, Tk.amberA(0.25f), CardShape),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("🔥", style = body(24, Tk.amber))
-            }
-            Text("${data.standing.streak}", style = T.streak)
-            Text("RACHA", style = T.eyebrowTiny)
+        Box(
+            Modifier
+                .size(44.dp)
+                .clip(InnerShape)
+                .background(Tk.surface)
+                .border(2.dp, Tk.border, InnerShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(initial(data.name), style = display(16))
+        }
+    }
+}
+
+/** Streak, level/XP and the week's sessions: one strip, 2px separators. The
+ *  week cell opens the calendar — it is where the old week card's VER MES
+ *  went. */
+@Composable
+private fun StatStrip(data: HomeData, onOpenCalendar: () -> Unit) {
+    val done = data.week.count { it.done }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .height(IntrinsicSize.Min)
+            .clip(CardShape)
+            .background(Tk.surface)
+            .border(2.dp, Tk.border, CardShape),
+    ) {
+        StatCell(data.standing.streak.toString(), "Días seguidos", Modifier.weight(1f))
+        StripDivider()
+        StatCell(
+            "NV ${data.standing.level}",
+            "${xpEs(data.standing.totalXp)} XP",
+            Modifier.weight(1f),
+        )
+        StripDivider()
+        Column(
+            Modifier
+                .weight(1f)
+                .noRipple(onOpenCalendar)
+                .padding(horizontal = 10.dp, vertical = 10.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+            Text(
+                if (data.weekTarget > 0) "$done/${data.weekTarget}" else "$done",
+                style = display(22),
+            )
+            Text("SESIONES SEM.", style = mono(11, 0.02f, line = 1.25f))
         }
     }
 }
 
 @Composable
-private fun XpCard(standing: Gamification.Standing) {
-    TkCard {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Eyebrow("XP al siguiente nivel")
-            Text(
-                "${standing.xp} / ${standing.maxXp}",
-                style = mono(10, 0.05f, Tk.primaryLight),
-            )
-        }
-        Spacer(Modifier.height(8.dp))
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(6.dp)
-                .clip(RoundedCornerShape(3.dp))
-                .background(Tk.border),
-        ) {
-            Box(
-                Modifier
-                    .fillMaxWidth(standing.fraction)
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(3.dp))
-                    .background(Brush.horizontalGradient(listOf(Tk.primary, Tk.primaryLight))),
-            )
-        }
-        Spacer(Modifier.height(6.dp))
-        Text(
-            if (standing.empty)
-                "Aún sin XP. Cada rep medida suma; filma una serie para empezar."
-            else "${standing.toNext} XP para el nivel ${standing.level + 1} — ${standing.nextTitle}",
-            style = T.noteNine,
-        )
+private fun RowScope.StatCell(value: String, label: String, modifier: Modifier) {
+    Column(
+        modifier.padding(horizontal = 10.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(value, style = display(22))
+        Text(label.uppercase(), style = mono(11, 0.02f, line = 1.25f))
     }
+}
+
+@Composable
+private fun RowScope.StripDivider() {
+    Box(Modifier.width(2.dp).fillMaxHeight().background(Tk.border))
 }
 
 @Composable
 private fun MissionCard(mission: Gamification.Mission, onRecord: () -> Unit) {
-    TkCard(accent = true, modifier = Modifier.noRipple(onRecord)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.width(4.dp).height(16.dp)
-                .clip(RoundedCornerShape(2.dp)).background(Tk.primary))
-            Spacer(Modifier.width(8.dp))
-            Eyebrow("Misión de hoy", style = T.eyebrowMission)
-        }
+    TkCard(accent = true) {
+        Eyebrow("Misión de hoy", style = T.eyebrowMission)
         Spacer(Modifier.height(12.dp))
         Text(
             "${mission.targetReps} reps · ${mission.movement}".uppercase(),
             style = T.missionTitle,
         )
-        Spacer(Modifier.height(2.dp))
-        Text("Foco: ${mission.focus}", style = T.bodyS)
-        Spacer(Modifier.height(16.dp))
+        Spacer(Modifier.height(8.dp))
+        Text(mission.focus, style = body(14, Tk.ink, 1.4f))
+        Spacer(Modifier.height(12.dp))
         // One segment per rep the standard asks for, filled by what was
-        // measured today. Never more segments than the standard, never more
-        // filled than were actually measured.
+        // measured today. Ink fills on the orange ground — orange there would
+        // vanish, and the orange is already spent on the action itself.
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             repeat(mission.targetReps.coerceIn(1, 12)) { i ->
-                val filled = i < mission.doneReps
                 Box(
                     Modifier
                         .weight(1f)
                         .height(6.dp)
                         .clip(RoundedCornerShape(3.dp))
-                        .background(if (filled) Tk.primary else Tk.border),
+                        .background(if (i < mission.doneReps) Tk.ink else Tk.orangeSoft),
                 )
             }
         }
@@ -205,219 +247,223 @@ private fun MissionCard(mission: Gamification.Mission, onRecord: () -> Unit) {
                 "Misión cumplida · ${mission.doneReps} reps medidas hoy"
             else "${mission.doneReps} de ${mission.targetReps} reps medidas hoy · " +
                 "+${mission.xpReward} XP al terminar",
-            style = T.eyebrowNine,
+            style = mono(9, 0.05f, Tk.ink),
+        )
+        Spacer(Modifier.height(12.dp))
+        // The card already wears the hard shadow; the slab inside it does not
+        // double it.
+        TkPrimaryButton("Grabar serie", onRecord, shadow = false)
+    }
+}
+
+@Composable
+private fun LastSessionSection(
+    session: LastSessionData?,
+    onOpenSession: () -> Unit,
+    onRecord: () -> Unit,
+) {
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Eyebrow(
+                if (session == null) "Última sesión" else "Última sesión · ${session.date}",
+                style = mono(12, 0.02f),
+            )
+            if (session != null) {
+                Text(
+                    "VER",
+                    style = mono(12, 0.05f, Tk.ink),
+                    textDecoration = TextDecoration.Underline,
+                )
+            }
+        }
+        if (session == null) {
+            // Nothing measured yet. An empty state says less and lies none;
+            // tapping it starts where the data comes from.
+            TkCard(padding = PaddingValues(8.dp), modifier = Modifier.noRipple(onRecord)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ClipThumb(hasClip = false)
+                    Column(
+                        Modifier.weight(1f).heightIn(min = 88.dp).padding(vertical = 2.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Text("Sin sesiones todavía", style = T.rowTitle)
+                        Text(
+                            "Filma una serie y aquí aparecerá su clip, con la nota de cada rep.",
+                            style = T.bodyS,
+                        )
+                    }
+                }
+            }
+        } else {
+            // The clip is the entry: the whole card opens the session.
+            TkCard(padding = PaddingValues(8.dp), modifier = Modifier.noRipple(onOpenSession)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    ClipThumb(hasClip = true)
+                    Column(
+                        Modifier.weight(1f).heightIn(min = 88.dp).padding(vertical = 2.dp),
+                        verticalArrangement = Arrangement.SpaceBetween,
+                    ) {
+                        Row {
+                            Text(
+                                session.movement.uppercase(),
+                                style = T.rowTitle,
+                                modifier = Modifier.weight(1f).alignByBaseline(),
+                            )
+                            Text(
+                                session.score?.toString() ?: "—",
+                                style = display(22, color = scoreInk(session.score)),
+                                modifier = Modifier.alignByBaseline(),
+                            )
+                        }
+                        Text(sessionMeta(session), style = mono(11, 0.02f))
+                        RepStrip(session)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** The clip's frame: dark ground and the bar, until a real thumbnail reaches
+ *  the screen. Decorative either way — the card's own texts describe it. */
+@Composable
+private fun ClipThumb(hasClip: Boolean) {
+    Box(
+        Modifier
+            .size(88.dp)
+            .clip(InnerShape)
+            .background(Tk.dark)
+            .then(
+                if (hasClip)
+                    Modifier.clearAndSetSemantics { contentDescription = "Vídeo de la última sesión" }
+                else
+                    Modifier.clearAndSetSemantics { }
+            ),
+        contentAlignment = Alignment.TopCenter,
+    ) {
+        Box(
+            Modifier
+                .padding(top = 14.dp)
+                .width(64.dp)
+                .height(3.dp)
+                .background(Tk.darkLine),
         )
     }
 }
 
+private fun sessionMeta(session: LastSessionData): String {
+    val parts = mutableListOf("${session.reps} reps")
+    if (session.sets > 1) parts += "${session.sets} series"
+    if (session.score == null && session.reps > 0) parts += "sin puntuar"
+    return parts.joinToString(" · ").uppercase()
+}
+
+/**
+ * One bar per rep, height by its score, in its band's ink. A rep the pose
+ * model could not read is a grey stub — never zero, never red. Without
+ * per-rep data yet, it falls back to the session's aggregate bar and draws
+ * nothing it did not measure.
+ */
 @Composable
-private fun WeekCard(week: List<Gamification.WeekDay>, onOpenCalendar: () -> Unit) {
-    TkCard(modifier = Modifier.noRipple(onOpenCalendar)) {
+private fun RepStrip(session: LastSessionData) {
+    val perRep: List<Int?> = when {
+        session.repScores.isNotEmpty() -> session.repScores
+        session.rows.size > 1 -> session.rows.map { it.score }
+        else -> emptyList()
+    }
+    if (perRep.isEmpty()) {
+        Meter(
+            fraction = (session.score ?: 0) / 100f,
+            color = scoreInk(session.score),
+            height = 6.dp,
+        )
+    } else {
         Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
+            Modifier.fillMaxWidth().height(22.dp),
+            horizontalArrangement = Arrangement.spacedBy(3.dp),
+            verticalAlignment = Alignment.Bottom,
         ) {
-            Eyebrow("Esta semana")
-            Text("VER MES", style = mono(9, 0.05f, Tk.primary))
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            week.forEach { day ->
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Text(day.label, style = T.eyebrowNine)
-                    Box(
-                        Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(
-                                when {
-                                    day.done -> Tk.primary
-                                    day.today -> Color.Transparent
-                                    else -> Tk.card
-                                }
-                            )
-                            .then(
-                                if (day.today && !day.done)
-                                    Modifier.border(1.5.dp, Tk.primaryA(0.5f), CircleShape)
-                                else Modifier
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        when {
-                            day.done -> androidx.compose.foundation.Canvas(Modifier.size(12.dp)) {
-                                drawCheck(Color.White)
-                            }
-                            day.today -> Box(Modifier.size(6.dp).background(Tk.primary, CircleShape))
-                        }
-                    }
-                    Text(
-                        day.score?.toString().orEmpty(),
-                        style = mono(8, 0.05f, scoreInk(day.score)),
-                    )
-                }
+            perRep.forEach { score ->
+                Box(
+                    Modifier
+                        .weight(1f)
+                        .height((((score ?: 0) / 100f) * 22).dp.coerceIn(3.dp, 22.dp))
+                        .background(scoreInk(score)),
+                )
             }
         }
     }
 }
 
 @Composable
-private fun LastSessionCard(
-    session: LastSessionData?,
-    onOpenSession: () -> Unit,
-    onOpenCoach: () -> Unit,
-    onRecord: () -> Unit,
-) {
-    if (session == null) {
-        // Nothing measured yet. The mockup's literal here was a full record —
-        // an exercise, a rep count and a score — which a new user reads as
-        // their own training. An empty state says less and lies none.
-        TkCard(modifier = Modifier.noRipple(onRecord)) {
-            Eyebrow("Última sesión")
-            Spacer(Modifier.height(4.dp))
-            Text("SIN SESIONES", style = T.sectionTitle)
-            Spacer(Modifier.height(4.dp))
+private fun NextGoalRow(goal: NextGoalData?, onOpenLadder: () -> Unit) {
+    if (goal == null || goal.target <= 0) return
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Eyebrow("Siguiente logro", style = mono(12, 0.02f))
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .dashedBorder(CardShape)
+                .noRipple(onOpenLadder)
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
             Text(
-                "Filma una serie y barra la medirá. Tu última sesión aparecerá aquí.",
-                style = T.bodyS,
+                "${goal.target}",
+                style = display(20),
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(44.dp),
             )
-        }
-        return
-    }
-    TkCard(modifier = Modifier.noRipple(onOpenSession)) {
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-            Column(Modifier.weight(1f)) {
-                Eyebrow("Última sesión")
-                Text(session.movement.uppercase(), style = T.sectionTitle)
-                Text(
-                    "${session.date} · ${session.reps} " + (if (session.reps == 1) "rep" else "reps") +
-                        if (session.score == null && session.reps > 0) " · sin puntuar" else "",
-                    style = T.bodyS,
-                )
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    session.score?.toString() ?: "—",
-                    style = T.bigScore.copy(color = scoreInk(session.score)),
-                )
-                Text(
-                    if (session.score == null) "SIN PUNTUAR" else "CALIDAD MEDIA",
-                    style = T.eyebrowTiny,
-                )
-                Text(
-                    if (session.score == null) "" else scoreLabel(session.score),
-                    style = mono(8, 0.05f, scoreInk(session.score)),
-                )
-            }
-        }
-        Spacer(Modifier.height(12.dp))
-        session.rows.forEach { row ->
-            Row(
-                Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
+            Column(
+                Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(
-                    row.label.uppercase(),
-                    style = T.eyebrowNine,
-                    modifier = Modifier.width(58.dp),
-                    maxLines = 1,
-                )
-                Meter(
-                    fraction = (row.score ?: 0) / 100f,
-                    color = scoreInk(row.score),
-                    height = 4.dp,
-                    modifier = Modifier.weight(1f),
-                )
-                Text(
-                    row.score?.toString() ?: "—",
-                    style = mono(9, 0.05f, scoreInk(row.score)),
-                    modifier = Modifier.width(20.dp),
-                    textAlign = TextAlign.End,
-                )
-                Text(
-                    "${row.reps} reps",
-                    style = T.eyebrowTiny,
-                    modifier = Modifier.width(44.dp),
-                    textAlign = TextAlign.End,
-                )
+                Text(goal.label, style = T.itemTitle)
+                Meter(fraction = goal.fraction, color = Tk.ink, height = 6.dp)
             }
-        }
-        session.topFault?.let { (fault, count) ->
-            Row(
-                Modifier
-                    .fillMaxWidth()
-                    .clip(InnerShape)
-                    .background(Tk.amberA(0.08f))
-                    .border(1.dp, Tk.amberA(0.2f), InnerShape)
-                    .noRipple(onOpenCoach)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                androidx.compose.foundation.Canvas(Modifier.size(14.dp)) { drawWarning(Tk.amber) }
-                Text(
-                    "$fault · $count reps afectadas",
-                    style = body(12, Tk.amber),
-                    modifier = Modifier.weight(1f),
-                )
-                Text("VER COACH →", style = T.eyebrowNine)
-            }
+            Text("${goal.done}/${goal.target}", style = mono(12, 0.05f, Tk.ink))
         }
     }
 }
 
-@Composable
-private fun BadgesCard(badges: List<Gamification.Badge>, onOpenLadder: () -> Unit) {
-    TkCard {
-        Row(
-            Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Eyebrow("Logros")
-            Text(
-                "VER ESCALERA",
-                style = mono(9, 0.05f, Tk.primary),
-                modifier = Modifier.noRipple(onOpenLadder),
-            )
-        }
-        Spacer(Modifier.height(12.dp))
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            badges.forEach { badge ->
-                Column(
-                    Modifier.weight(1f),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(6.dp),
-                ) {
-                    Box(
-                        Modifier
-                            .size(48.dp)
-                            // Emoji are colour glyphs, so an alpha on the text
-                            // colour leaves a locked badge looking earned. The
-                            // whole tile fades instead.
-                            .alpha(if (badge.unlocked) 1f else 0.35f)
-                            .clip(CardShape)
-                            .background(if (badge.unlocked) Tk.primaryA(0.12f) else Tk.locked)
-                            .border(
-                                1.dp,
-                                if (badge.unlocked) Tk.primaryA(0.3f) else Tk.border,
-                                CardShape,
-                            ),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text(badge.icon, style = body(22, Tk.ink))
-                    }
-                    Text(
-                        badge.label,
-                        style = mono(7, 0f, if (badge.unlocked) Tk.muted else Tk.faint, line = 1.2f),
-                        textAlign = TextAlign.Center,
-                    )
-                }
-            }
-        }
-    }
+/** The design's 2px dashed border — Modifier.border cannot dash, so the
+ *  outline draws itself behind the content. */
+private fun Modifier.dashedBorder(
+    shape: Shape,
+    color: Color = Tk.border,
+    width: Dp = 2.dp,
+): Modifier = drawBehind {
+    drawOutline(
+        shape.createOutline(size, layoutDirection, this),
+        color = color,
+        style = Stroke(
+            width = width.toPx(),
+            pathEffect = PathEffect.dashPathEffect(floatArrayOf(4.dp.toPx(), 3.dp.toPx())),
+        ),
+    )
 }
+
+/** «MARTES 17 OCT» — the phone's today, in Spanish, mono caps. */
+private fun todayLabel(): String =
+    SimpleDateFormat("EEEE d MMM", Locale("es", "ES"))
+        .format(Calendar.getInstance().time)
+        .uppercase(Locale("es"))
+
+/** 1240 → «1.240», the design's Spanish grouping. */
+private fun xpEs(xp: Int): String {
+    val symbols = DecimalFormatSymbols(Locale("es")).apply {
+        groupingSeparator = '.'
+        decimalSeparator = ','
+    }
+    return DecimalFormat("#,##0", symbols).format(xp.toLong())
+}
+
+private fun displayName(name: String): String = name.trim().ifBlank { "atleta" }
+
+private fun initial(name: String): String =
+    name.trim().firstOrNull()?.uppercase() ?: "·"
