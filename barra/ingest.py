@@ -320,6 +320,16 @@ def _rest_level(raw: np.ndarray, valid: np.ndarray, a: int, b: int,
 SPAN_EDGE_MARGIN_S = 0.5
 
 
+class Reps(list):
+    """The accepted reps, plus `cut`: the turnaround frames of reps that ran
+    into a span edge. Those are counted - the athlete did them - but their
+    measurement is missing a part, so they are never scored."""
+
+    def __init__(self, *a):
+        super().__init__(*a)
+        self.cut: set[int] = set()
+
+
 def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                          max_invented_frac: float = 0.4,
                          max_half_rep_s: float | None = None,
@@ -485,7 +495,7 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
     # rep - both wrong in the same direction on every rep, which is exactly the
     # kind of bias that survives averaging.
     max_half = int(max_half_rep_s * fps)
-    reps: list[tuple[int, int, int]] = []
+    reps = Reps()
     for pk in peaks:
         at = round(float(pk) / fps, 2)
         # A rep cannot run out of the span that contains its turnaround: past
@@ -523,28 +533,17 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             return i
 
         a, b = walk(pk, -1), walk(pk, +1)
-        # A rep that reaches the span edge still above the gate has not
-        # finished: the real rep runs on into the stretch trimmed away as
-        # "off the apparatus". Accepting it keeps only the part inside the
-        # span - a Bulgarian split squat (261018-113422-30bb00, rep 4) turned
-        # 0.1 s before the span ended, was accepted with a 3-frame lift, and
-        # got a tempo of 28:1 and no score. The trimmed stretch is not
-        # trustworthy signal to extend into (that is the walk the span was
-        # drawn to exclude), so the rep is rejected with its reason instead.
-        # Not gated on the signal still being high there: in that clip it fell
-        # below the gate within 3 frames of the edge, as the athlete stepped
-        # off - a 0.1 s lift no half-rep of these movements can have. Reaching
-        # the edge within the margin of the turnaround is the cut itself.
+        # A rep that runs into a span edge right after its turnaround has not
+        # finished inside the span: the rest of it is in the stretch trimmed
+        # away as "off the apparatus". A Bulgarian split squat
+        # (261018-113422-30bb00, rep 4) turned 0.1 s before the span ended and
+        # was measured with a 3-frame lift: tempo 28:1, a score from half a
+        # rep. It is still a rep the athlete did, so it is counted; it is
+        # marked cut and never scored (process.py). Not gated on the signal
+        # still being high at the edge: in that clip it fell below the gate
+        # within 3 frames as the athlete stepped off.
         cut = next((side for side, edge, end in (("start", lo, a), ("end", hi, b))
                     if end == edge and abs(pk - end) <= SPAN_EDGE_MARGIN_S * fps), None)
-        if cut is not None:
-            tr.reject(f"candidate at {at}s", "the rep runs past the edge of the active span",
-                      edge=cut, edge_value=float(sig[a if cut == "start" else b]),
-                      gate=float(gate))
-            reasons.append(
-                f"candidate at {pk / fps:.1f}s runs past the {cut} of the active "
-                "span - the rest of the rep was cut off, so it is not scored")
-            continue
         # Length, observation, anchor and rest posture: the checks shared with
         # the relaxed pass, so the two cannot disagree about what a rep is.
         why = candidate_checks(kp, physical, valid, a, pk, b, movement, fps,
@@ -571,6 +570,10 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                         dropped_at_s=round(reps[-1][1] / fps, 2))
                 reps.pop()
         reps.append((int(a), int(pk), int(b)))
+        if cut is not None:
+            reps.cut.add(int(pk))
+            tr.note("rep runs past the edge of the active span: counted, not scored",
+                    edge=cut, frames=[int(a), int(pk), int(b)])
         tr.decision(f"rep {len(reps)}", "accepted",
                     window_s=[round(a / fps, 2), round(b / fps, 2)],
                     turnaround_s=at, frames=[int(a), int(pk), int(b)])

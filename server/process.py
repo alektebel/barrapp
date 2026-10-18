@@ -106,6 +106,10 @@ _TRACES: dict[str, object] = {}
 # push-ups). When geometry and the model agree, nothing waits.
 VISION_VOTE_WAIT_S = 45.0
 
+# The note a rep cut by a span edge carries (counted, not scored).
+CUT_REP_NOTE = ("the rep runs past the end of the measured stretch, so its end "
+                "was cut off and it is counted but not scored")
+
 
 def _resolve_vote(vote, wait_s: float = 0.0):
     """The vision vote for fusion: a label, or a callable that produces one
@@ -1003,6 +1007,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             min_rep_quality=MIN_REP_QUALITY,
             trace=tr, label=label,
         )
+        cut_rep = turn in getattr(found, "cut", ())
+        if cut_rep:
+            # Counted, never scored: its window ends at a span edge, so every
+            # number from it describes part of a rep (barra.ingest.Reps).
+            q = type(q)(None, q.components, q.penalties, q.context,
+                        note=CUT_REP_NOTE)
         if q.score is not None:
             scores.append(q.score)
         # Classify the failure types this rep was measured to have, so the
@@ -1017,7 +1027,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # authoritative label on a measurement the same code had just called
         # unusable.
         blocked = ""
-        if not measured.plausible:
+        if cut_rep:
+            blocked = CUT_REP_NOTE
+        elif not measured.plausible:
             blocked = "the pose estimate is not physically possible: " + \
                       "; ".join(measured.problems)
         elif measured.quality.get("rep", 0) < MIN_REP_QUALITY:

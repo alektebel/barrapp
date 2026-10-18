@@ -141,35 +141,38 @@ class TestPrefixInvariance(unittest.TestCase):
 
 
 class TestRepCutByTheSpanEdge(unittest.TestCase):
-    """A turnaround just inside the end of an active span is half a rep."""
+    """A turnaround just inside the end of an active span is half a rep: it
+    counts (the athlete did it) but is marked cut, so nothing scores it.
+    Real case: a Bulgarian split squat filmed on a phone, rep 4 turned 0.1 s
+    before the span ended and was measured with a 3-frame lift."""
 
-    def setUp(self):
-        self.movement = resolve("pull_up")
-        self.kp = bar_set(n_reps=4, fpr=60, clearance=0.5)
-
-    def segment(self, active_until):
+    def segment(self, kp, movement, active_until):
         from unittest import mock
-        active = np.zeros(len(self.kp), dtype=bool)
+        active = np.zeros(len(kp), dtype=bool)
         active[:active_until] = True
         with mock.patch("barra.ingest.active_mask", return_value=active):
-            return segment_reps_verbose(self.kp, FPS, self.movement)
+            return segment_reps_verbose(kp, FPS, resolve(movement))
 
-    def test_normal_reps_are_unchanged(self):
-        reps, reasons = segment_reps_verbose(self.kp, FPS, self.movement)
+    def test_a_floor_rep_cut_by_the_span_end_is_counted_and_marked(self):
+        sys.path.insert(0, str(Path(__file__).resolve().parent))
+        from test_classify_quality import squat_clip
+        kp = squat_clip(n_reps=4)
+        whole, _ = segment_reps_verbose(kp, FPS, resolve("squat"))
+        self.assertEqual((len(whole), whole.cut), (4, set()))
+        last_turn = whole[-1][1]
+        reps, reasons = self.segment(kp, "squat", last_turn + 3)
         self.assertEqual(len(reps), 4, reasons)
-        # Span ending at the real end of the set: the last rep is whole.
-        reps, reasons = self.segment(len(self.kp))
-        self.assertEqual(len(reps), 4, reasons)
+        self.assertEqual(reps.cut, {last_turn})
+        self.assertEqual(reps[:3], whole[:3])
 
-    def test_a_rep_whose_turnaround_sits_at_the_span_end_is_rejected(self):
-        # The 4th rep peaks at frame 210; the span ends 5 frames later, with
-        # the signal still near the top.
-        reps, reasons = self.segment(215)
-        self.assertEqual(len(reps), 3, reasons)
-        self.assertTrue(any("runs past the end of the active span" in r
-                            for r in reasons), reasons)
+    def test_a_cut_hanging_rep_is_never_scored_as_whole(self):
+        # On a hanging movement the half-rep also fails the rest-posture check
+        # and is dropped with that reason; either way no 3-frame lift survives
+        # as an ordinary, scoreable rep.
+        kp = bar_set(n_reps=4, fpr=60, clearance=0.5)
+        reps, reasons = self.segment(kp, "pull_up", 215)
         for a, pk, b in reps:
-            self.assertGreater(b - pk, 10)
+            self.assertTrue(b - pk > 10 or pk in reps.cut, (a, pk, b))
 
 
 class TestPerSpanAmplitude(unittest.TestCase):
