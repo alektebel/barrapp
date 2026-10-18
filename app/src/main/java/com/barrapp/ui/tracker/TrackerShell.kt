@@ -1,7 +1,7 @@
 package com.barrapp.ui.tracker
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,16 +9,18 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
@@ -26,8 +28,10 @@ import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.rotate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.mono
 
@@ -41,7 +45,7 @@ enum class TrackerTab(val label: String) {
 
 /**
  * The frame every tab renders inside: the page on top, the design's bottom bar
- * underneath.
+ * underneath, and the notes' "?" at the trailing edge of that bar.
  *
  * The mockup drew its own status bar (a fixed "9:41", a battery) because it
  * lived in a browser. On a phone the real one is right there, so it is gone —
@@ -52,118 +56,90 @@ fun TrackerShell(
     tab: TrackerTab,
     onTab: (TrackerTab) -> Unit,
     modifier: Modifier = Modifier,
+    onHelp: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     Column(modifier.fillMaxSize().background(Tk.bg)) {
         Box(Modifier.weight(1f).fillMaxWidth()) { content() }
-        TrackerNav(tab, onTab)
+        TrackerNav(tab, onTab, onHelp)
     }
 }
 
+/**
+ * The design's bottom bar (the `tabs()` template of the spec): four equal
+ * columns over a 2dp ink border, each tab a 22x4 bar sitting on top of a mono
+ * label — orange when active, transparent otherwise — and no icons. The "?"
+ * the notes give the shell opens the help on how to film.
+ */
 @Composable
-private fun TrackerNav(tab: TrackerTab, onTab: (TrackerTab) -> Unit) {
+private fun TrackerNav(tab: TrackerTab, onTab: (TrackerTab) -> Unit, onHelp: () -> Unit) {
     Column {
-        Box(Modifier.fillMaxWidth().height(1.dp).background(Tk.border))
+        Box(Modifier.fillMaxWidth().height(2.dp).background(Tk.border))
         Row(
             Modifier
                 .fillMaxWidth()
                 .background(Tk.bg)
-                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.SpaceAround,
-            verticalAlignment = Alignment.Bottom,
+                .padding(start = 6.dp, end = 8.dp, top = 8.dp, bottom = 14.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
-            TrackerTab.entries.forEach { t ->
-                NavSlot(t, tab == t) { onTab(t) }
+            Row(Modifier.weight(1f)) {
+                TrackerTab.entries.forEach { t ->
+                    NavSlot(t, tab == t, Modifier.weight(1f)) { onTab(t) }
+                }
             }
+            HelpSlot(onHelp)
         }
     }
 }
 
 @Composable
-private fun NavSlot(tab: TrackerTab, active: Boolean, onClick: () -> Unit) {
-    val ink = if (active) Tk.primaryLight else Tk.muted
-    val fill = if (active) Tk.primaryA(0.15f) else Color.Transparent
+private fun NavSlot(
+    tab: TrackerTab,
+    active: Boolean,
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit,
+) {
     Column(
-        Modifier.noRipple(onClick).padding(horizontal = 16.dp, vertical = 4.dp),
+        modifier
+            .heightIn(min = 48.dp)
+            .noRipple(onClick),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
     ) {
-        Canvas(Modifier.size(22.dp)) {
-            when (tab) {
-                TrackerTab.HOME -> drawHome(ink, fill)
-                TrackerTab.RECORD -> drawRecord(ink, fill)
-                TrackerTab.PROGRESS -> drawProgress(ink)
-                TrackerTab.COACH -> drawCoach(ink, fill)
-            }
-        }
-        Text(tab.label.uppercase(), style = mono(9, 0.05f, ink))
         Box(
             Modifier
-                .size(4.dp)
-                .background(if (active) Tk.primary else Color.Transparent, CircleShape)
+                .width(22.dp)
+                .height(4.dp)
+                .background(if (active) Tk.primary else Color.Transparent),
+        )
+        Text(
+            tab.label.uppercase(),
+            style = mono(
+                11, 0.05f,
+                if (active) Tk.ink else Tk.muted,
+                if (active) FontWeight.SemiBold else FontWeight.Normal,
+            ),
         )
     }
 }
 
-// ---- the nav icons, from the design's own 22x22 path data ------------------
-
-private fun DrawScope.unit() = size.width / 22f
-
-private fun DrawScope.drawHome(ink: Color, fill: Color) {
-    val s = unit()
-    val roof = Path().apply {
-        moveTo(3f * s, 9.5f * s)
-        lineTo(11f * s, 3f * s)
-        lineTo(19f * s, 9.5f * s)
-        lineTo(19f * s, 20f * s)
-        lineTo(3f * s, 20f * s)
-        close()
+/** Help is a control like any other — white, 2dp ink border — but never the
+ *  screen's action, so no orange and no hard shadow. */
+@Composable
+private fun HelpSlot(onHelp: () -> Unit) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(CircleShape)
+            .background(Tk.surface)
+            .border(2.dp, Tk.border, CircleShape)
+            .noRipple(onHelp)
+            .semantics { contentDescription = "Ayuda: cómo filmar" },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("?", style = mono(18, 0f, Tk.ink, FontWeight.SemiBold))
     }
-    if (fill != Color.Transparent) drawPath(roof, fill)
-    drawPath(roof, ink, style = Stroke(1.7f * s, join = StrokeJoin.Round))
-    drawPath(Path().apply {
-        moveTo(8f * s, 20f * s)
-        lineTo(8f * s, 12f * s)
-        lineTo(14f * s, 12f * s)
-        lineTo(14f * s, 20f * s)
-    }, ink, style = Stroke(1.7f * s, join = StrokeJoin.Round))
-}
-
-private fun DrawScope.drawRecord(ink: Color, fill: Color) {
-    val s = unit()
-    val centre = Offset(11f * s, 11f * s)
-    if (fill != Color.Transparent) drawCircle(fill, 8.5f * s, centre)
-    drawCircle(ink, 8.5f * s, centre, style = Stroke(1.7f * s))
-    drawCircle(ink, 4f * s, centre)
-}
-
-private fun DrawScope.drawProgress(ink: Color) {
-    val s = unit()
-    drawPath(Path().apply {
-        moveTo(2f * s, 16f * s)
-        lineTo(7f * s, 10f * s)
-        lineTo(11f * s, 13f * s)
-        lineTo(16f * s, 6f * s)
-        lineTo(20f * s, 9f * s)
-    }, ink, style = Stroke(1.7f * s, cap = StrokeCap.Round, join = StrokeJoin.Round))
-    drawCircle(ink, 1.5f * s, Offset(20f * s, 9f * s))
-}
-
-private fun DrawScope.drawCoach(ink: Color, fill: Color) {
-    val s = unit()
-    val head = Offset(11f * s, 7.5f * s)
-    if (fill != Color.Transparent) drawCircle(fill, 3.5f * s, head)
-    drawCircle(ink, 3.5f * s, head, style = Stroke(1.7f * s))
-    // M3.5 19c0-4.14 3.36-7.5 7.5-7.5s7.5 3.36 7.5 7.5 — the shoulders: the
-    // top half of a circle of radius 7.5 centred at (11, 19), so the bounding
-    // box starts at y = 11.5. Centring it on the head instead drew an eyebrow.
-    drawArc(
-        color = ink,
-        startAngle = 180f, sweepAngle = 180f, useCenter = false,
-        topLeft = Offset(3.5f * s, 11.5f * s),
-        size = Size(15f * s, 15f * s),
-        style = Stroke(1.7f * s, cap = StrokeCap.Round),
-    )
 }
 
 /** The `w-8 h-8 rounded-lg` logo mark from the onboarding header: the bar and
