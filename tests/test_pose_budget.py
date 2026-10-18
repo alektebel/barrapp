@@ -213,3 +213,17 @@ class RepTimesUnchanged(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_the_ruler_is_read_over_the_set_not_the_walk_up():
+    """A Bulgarian split squat clip read an arm of 1.99 torsos over the whole
+    video (walking up and picking the kettlebells up close to the camera) and
+    every rep went unscored; trimmed to the set it scored. The set window is
+    first rep start to last rep end, plus a second either side."""
+    from barra.metrics import set_slice
+    found = [(300, 330, 360), (400, 430, 460), (500, 530, 560)]
+    sl = set_slice(found, 1200, 30.0)
+    assert (sl.start, sl.stop) == (270, 591)
+    assert set_slice([], 1200, 30.0) == slice(0, 1200)
+    # never an empty or tiny window
+    assert set_slice([(5, 6, 7)], 8, 30.0) == slice(0, 8)

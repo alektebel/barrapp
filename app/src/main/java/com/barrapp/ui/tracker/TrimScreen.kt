@@ -64,9 +64,11 @@ fun TrimScreen(
         Text("Recorta la serie", style = T.pageTitle)
         Spacer(Modifier.height(8.dp))
         Text(
-            "Barra encontró movimiento entre %.1f s y %.1f s. Ajusta los " +
-                "tiros si empezaste antes o terminaste después; solo lo " +
-                "recortado se sube."
+            // One string, then format: `.format` on the last literal of a
+            // `+` chain applied to that piece alone and shipped "%.1f s".
+            ("Barra encontró movimiento entre %.1f s y %.1f s. Mueve los " +
+                "tiradores si empezaste antes o terminaste después; solo lo " +
+                "recortado se sube.")
                 .format(work.trimStartS, work.trimEndS),
             style = T.bodyS,
             modifier = Modifier.padding(horizontal = 8.dp),
@@ -111,7 +113,7 @@ fun TrimScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text("%.1f s".format(start), style = mono(12, color = Tk.ink))
-                Text("%.1f s de %.0f".format(end - start, duration),
+                Text("%.1f s de %.0f s".format(end - start, duration),
                     style = mono(12))
                 Text("%.1f s".format(end), style = mono(12, color = Tk.ink))
             }

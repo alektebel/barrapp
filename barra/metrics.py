@@ -88,6 +88,21 @@ def arm_reach(kp: np.ndarray, min_conf: float = 0.6) -> float:
     return float(np.mean(reach) / robust_torso(kp))
 
 
+def set_slice(found, n_frames: int, fps: float, margin_s: float = 1.0) -> slice:
+    """The frames of the set itself: first rep start to last rep end, plus a
+    margin. The ruler is read here, not over the whole clip: walking up to the
+    camera and picking the kettlebells up before the set read an arm of 1.99
+    torsos on a Bulgarian split squat (anatomy says 0.65-0.95), the ruler was
+    refused, and six well-tracked reps went unscored. The same clip trimmed to
+    the set scored all six."""
+    if not found:
+        return slice(0, n_frames)
+    pad = int(round(margin_s * max(float(fps), 1.0)))
+    lo = max(0, min(int(s) for s, _, _ in found) - pad)
+    hi = min(n_frames, max(int(e) for _, _, e in found) + pad + 1)
+    return slice(lo, hi) if hi - lo >= 10 else slice(0, n_frames)
+
+
 def implausibilities(values: dict[str, float], movement: Movement,
                      arm: float) -> list[str]:
     """Physical checks against the subject's own anatomy.
@@ -196,7 +211,7 @@ def _series(kp: np.ndarray, movement: Movement) -> dict[str, np.ndarray]:
 
 def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
                 movement: Movement, anatomy: dict | None = None,
-                trace=None, label: str = "") -> RepMetrics:
+                trace=None, label: str = "", arm: float | None = None) -> RepMetrics:
     from .phases import HAS_TRANSITION, rep_phases, transition_band
 
     s = _series(kp, movement)
@@ -279,7 +294,9 @@ def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
         np.mean([quality["mean_conf"], quality["turn_conf"],
                  quality["body_conf"], quality["observed_frac"]])
     )
-    arm = arm_reach(kp)
+    # The set's ruler when the caller read it over the set (see set_slice);
+    # the whole clip otherwise, as before.
+    arm = arm_reach(kp) if arm is None else arm
     quality["arm_reach"] = arm
     problems = implausibilities(values, movement, arm)
 

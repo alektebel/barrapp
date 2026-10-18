@@ -908,8 +908,11 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     session = session or date.today().isoformat()
     raw_signal, sig_conf = tracking_signal(pose.keypoints, movement)
     signal, _valid = _clean_signal(raw_signal, sig_conf)
-    arm = arm_reach(pose.keypoints)
+    from barra.metrics import set_slice
+    arm = arm_reach(pose.keypoints[set_slice(found, len(pose.keypoints), fps)])
     ruler_ok = usable_reference(arm)
+    tr.step("ruler", arm_reach=round(float(arm), 3) if np.isfinite(arm) else None,
+            usable=bool(ruler_ok), over="set")
     reps = []
     usable = 0
     extra_blockers: list[str] = []
@@ -974,7 +977,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         rep_durations.append((end - start) / fps)
         amp_by_rep.append(rep_amp)
         measured = rep_metrics(pose.keypoints, start, turn, end, fps, movement,
-                               trace=tr, label=label)
+                               trace=tr, label=label, arm=arm)
         # The phases as measured - metrics narrows the muscle-up's transition
         # to the frames in the bar plane; the raw table has the whole lift.
         phases = measured.phases or rep_phases(movement, start, turn, end, fps)

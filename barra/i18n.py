@@ -190,6 +190,8 @@ CATALOG: list[Msg] = [
         "sin puntuar: se siguió muy poco de la repetición"),
     Msg("score.not_components", "not scored: no component could be measured",
         "sin puntuar: no se pudo medir ningún componente"),
+    Msg("score.no_components_note", "None of the components could be measured.",
+        "No se pudo medir ninguno de los componentes de la nota."),
     Msg("score.not_range", "not scored: range could not be measured", "sin puntuar: no se pudo medir el recorrido"),
     Msg("score.swing_aside", "body travel relative to the bar - needs a consistent camera side, so it is not part of the score",
         "desplazamiento del cuerpo respecto a la barra: necesita grabar siempre desde el mismo lado, así que no cuenta en la puntuación"),
