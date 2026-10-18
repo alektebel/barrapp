@@ -12,10 +12,9 @@ import com.barrapp.ui.theme.BarrappTheme
 import com.barrapp.ui.tracker.HomeData
 import com.barrapp.ui.tracker.LastSessionData
 import com.barrapp.ui.tracker.SessionRowData
-import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.tracker.CoachData
-import com.barrapp.ui.tracker.CoachFocus
-import com.barrapp.ui.tracker.CoachRule
+import com.barrapp.ui.tracker.CoachMessage
+import com.barrapp.ui.tracker.CoachProof
 import com.barrapp.ui.tracker.HistoryRow
 import com.barrapp.ui.tracker.LastAnalyzed
 import com.barrapp.ui.tracker.PersonalBest
@@ -275,6 +274,8 @@ class TrackerScreenshotTest {
         snap("tracker-progress")
     }
 
+    /** Design 2e: the conversation with a PRUEBA row under the answer that
+     *  carries evidence. Ends on an answer, so no retry card shows. */
     @Test
     fun coach() {
         rule.setContent {
@@ -282,39 +283,83 @@ class TrackerScreenshotTest {
                 TrackerShell(TrackerTab.COACH, {}, Modifier.fillMaxSize()) {
                     TrackerCoach(
                         data = CoachData(
-                            movement = "Dominada", sessions = 4,
-                            focus = CoachFocus(
-                                "Balanceo",
-                                "Corta el balanceo — tira estricto, sin impulso.",
-                                drillEs("momentum"), 19, 27, true,
+                            movement = "Dominada", sessions = 14,
+                            focus = null, secondary = null, rules = emptyList(),
+                            drills = emptyList(), totalMinutes = 0,
+                            conversation = listOf(
+                                CoachMessage(true, "¿Estoy mejorando en dominadas?"),
+                                CoachMessage(
+                                    false,
+                                    "Sí. Tu calidad media pasó de 58 a 69 en 8 semanas. " +
+                                        "Lo que más mejoró es el rango: ya bajas hasta extender los brazos.",
+                                    proof = CoachProof(
+                                        "Rep 2 de ago vs rep 2 de hoy",
+                                        sessionDate = "2026-08-12", repIndex = 2,
+                                    ),
+                                ),
+                                CoachMessage(true, "¿Cuándo intento un muscle-up?"),
+                                CoachMessage(
+                                    false,
+                                    "Cuando encadenes 3 sesiones sólidas seguidas. " +
+                                        "Hoy tienes una: la del 8 sept.",
+                                ),
                             ),
-                            secondary = CoachFocus(
-                                "Sin bloqueo arriba",
-                                "Bloquea del todo arriba en cada repetición.",
-                                drillEs("lockout"), 12, 14, true,
+                            suggestions = listOf(
+                                "¿Por qué bajó la rep 4?",
+                                "Plan para esta semana",
+                                "Compárame con agosto",
                             ),
-                            rules = listOf(
-                                CoachRule("swing", "Balanceo", "Toda la repetición", "Corregir",
-                                    Tk.amber,
-                                    "Se detectó en 4 de 6 reps juzgadas en la última serie.",
-                                    "Corta el balanceo — tira estricto, sin impulso."),
-                                CoachRule("lockout", "Sin bloqueo arriba", "Bloqueo superior",
-                                    "Progresando", Tk.teal,
-                                    "Se detectó en 2 de 6 reps juzgadas en la última serie.",
-                                    "Bloquea del todo arriba en cada repetición."),
-                                CoachRule("hang", "Sin dead hang", "Posición baja", "Correcto",
-                                    Tk.primaryLight,
-                                    "Comprobado en 6 reps y limpio en todas ellas.", ""),
-                            ),
-                            drills = listOfNotNull(drillEs("momentum"), drillEs("lockout")),
-                            totalMinutes = 7,
                         ),
-                        onAskCoach = {}, onRecord = {},
+                        onAskCoach = {}, onRecord = {}, onOpenProof = {},
                     )
                 }
             }
         }
         snap("tracker-coach")
+    }
+
+    /** Rule B2: while the coach works, the REVISANDO bubble answers. */
+    @Test
+    fun coachThinking() {
+        rule.setContent {
+            BarrappTheme {
+                TrackerShell(TrackerTab.COACH, {}, Modifier.fillMaxSize()) {
+                    TrackerCoach(
+                        data = CoachData(
+                            movement = "Dominada", sessions = 14,
+                            focus = null, secondary = null, rules = emptyList(),
+                            drills = emptyList(), totalMinutes = 0,
+                            conversation = listOf(
+                                CoachMessage(true, "¿Por qué bajó la rep 4?"),
+                            ),
+                            thinking = true,
+                        ),
+                        onAskCoach = {}, onRecord = {}, onOpenProof = {},
+                    )
+                }
+            }
+        }
+        snap("tracker-coach-thinking")
+    }
+
+    /** Nothing filmed yet: what the coach is for, and the way out. */
+    @Test
+    fun coachEmpty() {
+        rule.setContent {
+            BarrappTheme {
+                TrackerShell(TrackerTab.COACH, {}, Modifier.fillMaxSize()) {
+                    TrackerCoach(
+                        data = CoachData(
+                            movement = "", sessions = 0,
+                            focus = null, secondary = null, rules = emptyList(),
+                            drills = emptyList(), totalMinutes = 0,
+                        ),
+                        onAskCoach = {}, onRecord = {}, onOpenProof = {},
+                    )
+                }
+            }
+        }
+        snap("tracker-coach-empty")
     }
 
     @Test
