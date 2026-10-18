@@ -90,4 +90,19 @@ object ResultComparison {
             if (folded) mine.sumOf { it.score ?: 0 } else 0
         return (a.sessionScore ?: 0) >= sum.toDouble() / verified
     }
+
+    /** This set's score minus the athlete's mean for the movement, excluding
+     *  this set; null when there is no history to compare against. */
+    fun vsAverage(a: Analysis, days: List<DayEntry>, jobId: String?): Int? {
+        val score = a.sessionScore ?: return null
+        val mine = a.reps.filter { it.score != null && it.complete }
+        val key = a.exercise.ifBlank { "unknown" }
+        val folded = jobId != null && days.any { jobId in it.jobIds }
+        val verified = days.sumOf { it.byMovement[key]?.verified ?: 0 } -
+            if (folded) mine.size else 0
+        if (verified <= 0) return null
+        val sum = days.sumOf { it.byMovement[key]?.scoreSum ?: 0 } -
+            if (folded) mine.sumOf { it.score ?: 0 } else 0
+        return Math.round(score - sum.toDouble() / verified).toInt()
+    }
 }

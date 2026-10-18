@@ -250,10 +250,10 @@ fun SkillPathScreen(data: SkillPathData, onTarget: (String) -> Unit, onClose: ()
             data.targets.forEach { (id, name) ->
                 val on = id == data.targetId
                 Text(
-                    name, style = mono(10, 0.03f, if (on) Tk.bg else Tk.primaryLight),
+                    name, style = mono(10, 0.03f, if (on) Tk.onInk else Tk.ink),
                     modifier = Modifier.clip(RoundedCornerShape(50))
-                        .background(if (on) Tk.primary else Tk.surface)
-                        .border(1.dp, if (on) Tk.primary else Tk.border, RoundedCornerShape(50))
+                        .background(if (on) Tk.ink else Tk.surface)
+                        .border(1.5.dp, Tk.border, RoundedCornerShape(50))
                         .noRipple { onTarget(id) }
                         .padding(horizontal = 12.dp, vertical = 7.dp),
                 )
@@ -262,13 +262,13 @@ fun SkillPathScreen(data: SkillPathData, onTarget: (String) -> Unit, onClose: ()
 
         // Next step
         data.next?.let { n ->
-            TkCard(accent = true, modifier = Modifier.padding(top = 16.dp)) {
+            TkCard(modifier = Modifier.padding(top = 16.dp)) {
                 Eyebrow("Siguiente paso")
                 Text(n.name, style = T.cardHeadline, modifier = Modifier.padding(top = 6.dp))
                 data.nextStandard?.let { Text(it, style = T.bodyS, modifier = Modifier.padding(top = 4.dp)) }
             }
         } ?: if (data.rows.lastOrNull()?.lastOrNull()?.state == SkillGraph.VERIFIED) {
-            TkCard(accent = true, modifier = Modifier.padding(top = 16.dp)) {
+            TkCard(modifier = Modifier.padding(top = 16.dp)) {
                 Text("Ya tienes ${data.targetName} verificada.", style = T.bodyInk)
             }
         } else Unit

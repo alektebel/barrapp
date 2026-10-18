@@ -443,4 +443,49 @@ class TrackerScreenshotTest {
         }
         snap("tracker-onboarding")
     }
+
+    /** Design 3b without a clip: the dark box with rep and time, the
+     *  measured value and goal, and the cue. */
+    @Test
+    fun faultViewer() {
+        // Stories animate forever: drive the clock by hand or it never idles.
+        rule.mainClock.autoAdvance = false
+        rule.setContent {
+            BarrappTheme {
+                com.barrapp.ui.tracker.FaultViewer(
+                    faults = listOf(
+                        com.barrapp.ui.tracker.FaultSlide(4, 14.0, "BALANCEO AL SUBIR", "BALANCEO",
+                            "19°", "OBJETIVO MENOS DE 8°",
+                            "Las piernas se adelantan para coger impulso.",
+                            "Glúteos y abdomen apretados, piernas juntas.",
+                            com.barrapp.ui.tracker.BodyRegion.MIDDLE),
+                        com.barrapp.ui.tracker.FaultSlide(6, 21.0, "BARBILLA BAJO LA BARRA", "RECORRIDO",
+                            "4 cm", "BARBILLA SOBRE LA BARRA", "No cuenta como rep completa.",
+                            "Si no llegas, para.", com.barrapp.ui.tracker.BodyRegion.UPPER),
+                    ),
+                    startIndex = 0, clip = null, onClose = {}, exercise = "pull_up",
+                )
+            }
+        }
+        rule.mainClock.advanceTimeBy(2000)
+        snap("tracker-fault-viewer")
+    }
+
+    @Test
+    fun repCorrection() {
+        rule.setContent {
+            BarrappTheme {
+                com.barrapp.ui.tracker.RepCorrection(
+                    data = com.barrapp.ui.tracker.RepCorrectionData(
+                        rep = 4, bestRep = 1, atS = 14.0, bestAtS = 3.0, title = "Balanceo",
+                        value = "19°", bestValue = "5°", goal = "OBJETIVO MENOS DE 8°",
+                        why = "En la rep 1 el cuerpo oscilaba 5°. En la 4 llegó a 19°.",
+                        cue = "Glúteos y abdomen apretados. Para en la rep 4.", index = 1, total = 2,
+                    ),
+                    clip = null, onBack = {}, onNext = {},
+                )
+            }
+        }
+        snap("tracker-rep-correction")
+    }
 }

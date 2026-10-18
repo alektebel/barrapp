@@ -208,7 +208,7 @@ fun TrackerProgress(
 @Composable
 private fun Camino(path: List<PathStep>, onOpenSkills: () -> Unit) {
     if (path.isEmpty()) {
-        TkCard(accent = true, modifier = Modifier.noRipple(onOpenSkills)) {
+        TkCard(modifier = Modifier.noRipple(onOpenSkills)) {
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,

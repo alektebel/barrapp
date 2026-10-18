@@ -60,7 +60,7 @@ import java.util.Calendar
 import java.util.Locale
 
 /** A page opened on top of a tab, not one of the four tabs itself. */
-private enum class Sheet { NONE, SESSION, CALENDAR, LADDER, CHAT, SKILLS }
+private enum class Sheet { NONE, SESSION, CALENDAR, LADDER, CHAT, SKILLS, HELP }
 
 /**
  * The redesigned app, wired to the real view model.
@@ -92,6 +92,10 @@ fun TrackerRoot(
     // The full-screen replay opens over whatever was showing and closes back
     // to it - the results, or the session sheet - rather than to Home.
     var replayOpen by remember { mutableStateOf(false) }
+    // The fault viewer (Tiza 3b) opened from the results, at this fault.
+    var faultAt by remember { mutableStateOf<Int?>(null) }
+    // The rep correction (Tiza 2c), opened from the viewer's "ver la rep".
+    var correctionAt by remember { mutableStateOf<Int?>(null) }
 
     val pickVideo = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
@@ -125,6 +129,44 @@ fun TrackerRoot(
         }
     }
 
+    androidx.activity.compose.BackHandler(enabled = faultAt != null) { faultAt = null }
+    androidx.activity.compose.BackHandler(enabled = correctionAt != null) { correctionAt = null }
+    val analysis = state.analysis
+    if (correctionAt != null && analysis != null) {
+        val corrections = remember(analysis.traceId) { repCorrections(analysis) }
+        val i = correctionAt!!
+        val data = corrections.getOrNull(i)
+        if (data != null) {
+            RepCorrection(
+                data = data,
+                clip = remember(analysis.traceId, state.current?.id) { vm.replayClip() },
+                onBack = { correctionAt = null },
+                onNext = if (i + 1 < corrections.size) ({ correctionAt = i + 1 }) else null,
+            )
+            return
+        }
+        correctionAt = null
+    }
+    if (faultAt != null && analysis != null) {
+        val slides = remember(analysis.traceId) {
+            slidesInFixOrder(faultSlides(analysis), fixItems(analysis))
+        }
+        FaultViewer(
+            faults = slides,
+            startIndex = faultAt!!.coerceIn(0, (slides.size - 1).coerceAtLeast(0)),
+            clip = remember(analysis.traceId, state.current?.id) { vm.replayClip() },
+            onClose = { faultAt = null },
+            // "Ver la rep": the correction for that rep, beside the best one.
+            onPlayRep = { slide ->
+                val i = repCorrections(analysis).indexOfFirst { it.rep == slide.rep }
+                faultAt = null
+                correctionAt = i.takeIf { it >= 0 } ?: 0
+            },
+            exercise = analysis.exercise,
+        )
+        return
+    }
+
     if (replayOpen) {
         com.barrapp.ui.ReplayScreen(
             analysis = state.analysis,
@@ -153,7 +195,7 @@ fun TrackerRoot(
         return
     }
 
-    TrackerShell(tab, { target ->
+    TrackerShell(tab, onHelp = { sheet = Sheet.HELP }, onTab = { target ->
         // The result of a finished clip stays on GRABAR until "Guardar
         // sesión". The session is already stored when the job finishes, so
         // tapping GRABAR means "another clip": back to the idle screen.
@@ -178,7 +220,7 @@ fun TrackerRoot(
             Box(Modifier.weight(1f)) {
                 when (tab) {
                     TrackerTab.HOME -> TrackerHome(
-                        data = homeData(state),
+                        data = homeData(state, state.jobs),
                         onOpenSession = {
                             state.days.firstOrNull { it.reps > 0 }?.let { vm.selectDate(it.date) }
                             sheet = Sheet.SESSION
@@ -199,7 +241,9 @@ fun TrackerRoot(
                             },
                             stages = stages,
                             activeStage = active,
-                            results = state.analysis?.let { resultsData(it, state.days, state.current?.id) },
+                            results = state.analysis?.let {
+                                resultsData(it, state.days, state.current?.id, state.current?.createdAt)
+                            },
                             lastAnalyzed = lastAnalyzed(state.days),
                             standard = standard,
                             camera = camera,
@@ -229,11 +273,17 @@ fun TrackerRoot(
                                 vm.replayClip()
                             },
                             onExpandReplay = { replayOpen = true },
+                            onOpenFault = { faultAt = it },
+                            onShare = state.analysis?.let { a -> { shareSet(context, a) } },
+                            onBack = {
+                                showResults = false
+                                sentFrom = null
+                            },
                         )
                     }
 
                     TrackerTab.PROGRESS -> TrackerProgress(
-                        data = progressData(state),
+                        data = progressData(state, state.jobs).copy(path = skillPath(state)),
                         onOpenDay = { date -> vm.selectDate(date); sheet = Sheet.SESSION },
                         onOpenLadder = { sheet = Sheet.LADDER },
                         onOpenSkills = { sheet = Sheet.SKILLS },
@@ -241,8 +291,17 @@ fun TrackerRoot(
                     )
 
                     TrackerTab.COACH -> TrackerCoach(
-                        data = coachData(state),
+                        data = coachData(state).copy(
+                            conversation = state.chat.map { CoachMessage(it.fromUser, it.text) },
+                            thinking = state.coachThinking,
+                            suggestions = vm.suggestions().take(3),
+                        ),
                         onAskCoach = { sheet = Sheet.CHAT },
+                        onSend = vm::ask,
+                        onOpenProof = { proof ->
+                            vm.selectDate(proof.sessionDate)
+                            sheet = Sheet.SESSION
+                        },
                         onRecord = { tab = TrackerTab.RECORD },
                     )
                 }
@@ -287,6 +346,7 @@ private fun SheetHost(
                     Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenSession)
                     Sheet.LADDER -> LadderSheet(state, onClose)
                     Sheet.SKILLS -> SkillsSheet(state, onClose)
+                    Sheet.HELP -> HelpSheet(onClose)
                     else -> Unit
                 }
             }
@@ -489,7 +549,7 @@ private fun LadderSheet(state: UiState, onClose: () -> Unit) {
 
 // ---- the derivations the tabs read ----------------------------------------
 
-private fun homeData(state: UiState): HomeData {
+private fun homeData(state: UiState, jobs: List<com.barrapp.data.Job>): HomeData {
     val days = state.days
     val standing = Gamification.standing(days)
     val focus = state.goals?.focusExercise
@@ -528,9 +588,32 @@ private fun homeData(state: UiState): HomeData {
                     ?.takeIf { job == null || day.jobIds.size <= 1 }
                     ?.maxByOrNull { it.value }
                     ?.let { faultEs(it.key) to it.value },
+                // The last clip's own reps, when its measurement is on the
+                // phone; otherwise the card falls back to the set's score.
+                repScores = job?.let { j ->
+                    (jobs.firstOrNull { it.id == j.jobId }?.result
+                        ?: state.analysis?.takeIf { state.current?.id == j.jobId })
+                        ?.reps?.map { it.score }
+                }.orEmpty(),
+                sets = day.jobIds.size.coerceAtLeast(1),
             )
         },
         badges = Gamification.badges(days, focus),
+        nextGoal = Progression.verdicts(days, focus).firstNotNullOfOrNull { v ->
+            val step = v.step ?: return@firstNotNullOfOrNull null
+            if (v.qualifyingDays.size >= step.days) null
+            else NextGoalData(
+                label = movementEs(v.movement, v.label) + " · " + v.standard,
+                done = v.qualifyingDays.size,
+                target = step.days,
+            )
+        },
+        weekTarget = when (state.profile.activity) {
+            com.barrapp.data.ActivityLevel.New, com.barrapp.data.ActivityLevel.Occasional -> 2
+            com.barrapp.data.ActivityLevel.Regular -> 4
+            com.barrapp.data.ActivityLevel.Daily -> 5
+            com.barrapp.data.ActivityLevel.Unset -> 0
+        },
     )
 }
 
@@ -552,7 +635,12 @@ private fun stagesFor(state: UiState): Pair<List<String>, Int> {
     return stages to idx
 }
 
-private fun resultsData(a: Analysis, days: List<DayEntry>, jobId: String? = null): ResultsData {
+private fun resultsData(
+    a: Analysis,
+    days: List<DayEntry>,
+    jobId: String? = null,
+    createdAt: String? = null,
+): ResultsData {
     val verifiedXp = a.reps.count { it.score != null && it.complete }
     return ResultsData(
         headline = a.headline,
@@ -581,6 +669,10 @@ private fun resultsData(a: Analysis, days: List<DayEntry>, jobId: String? = null
         xp = if (verifiedXp == 0) 0 else verifiedXp * ((a.sessionScore ?: 0) / 5) + 50,
         unjudged = unjudgedNote(a),
         aboveAverage = ResultComparison.aboveAverage(a, days, jobId),
+        vsAverage = ResultComparison.vsAverage(a, days, jobId),
+        seriesLabel = days.firstOrNull { jobId != null && jobId in it.jobIds }
+            ?.let { "Serie ${it.jobIds.indexOf(jobId) + 1}" }.orEmpty(),
+        whenLabel = createdAt?.let { whenEs(it) }.orEmpty(),
     )
 }
 
@@ -596,7 +688,7 @@ private fun lastAnalyzed(days: List<DayEntry>): LastAnalyzed? =
         )
     }
 
-private fun progressData(state: UiState): ProgressData {
+private fun progressData(state: UiState, jobs: List<com.barrapp.data.Job>): ProgressData {
     val measured = state.days.filter { it.score != null }.sortedBy { it.date }
     val half = measured.size / 2
     val recentMean = measured.drop(half).mapNotNull { it.score }
@@ -628,6 +720,7 @@ private fun progressData(state: UiState): ProgressData {
             )
         },
         faults = FaultTrend.rows(state.faults).take(5),
+        movements = movementSeries(state, jobs),
         history = state.days.sortedByDescending { it.date }.take(8).map { day ->
             HistoryRow(
                 date = day.date,
@@ -664,7 +757,7 @@ private fun coachData(state: UiState): CoachData {
     // movement was actually scored.
     val scoredDates = state.days.filter { (it.byMovement[key]?.verified ?: 0) > 0 }.map { it.date }.toSet()
     val rows = FaultTrend.rows(state.faults.filterKeys { it in scoredDates })
-    val sessions = scoredDates.size.coerceAtMost(4)
+    val sessions = scoredDates.size
     fun focusOf(row: FaultTrend.Row?) = row?.let {
         CoachFocus(
             fault = faultEs(it.fault),
@@ -730,6 +823,116 @@ private fun rules(a: Analysis, faults: Map<String, Map<String, Int>>): List<Coac
 }
 
 // ---- small shared helpers -------------------------------------------------
+
+/** The viewer's slides in the order the results list the fixes, so the
+ *  thumbnail i and "REVISAR FALLOS" open the fault they name. Slides with no
+ *  matching fix keep their own order after those. */
+internal fun slidesInFixOrder(slides: List<FaultSlide>, fixes: List<FixItem>): List<FaultSlide> {
+    val ordered = fixes.mapNotNull { fix ->
+        slides.firstOrNull { it.title.equals(fix.title, ignoreCase = true) }
+            ?: fix.repIndex?.let { r -> slides.firstOrNull { it.rep == r + 1 } }
+    }.distinct()
+    return ordered + slides.filter { it !in ordered }
+}
+
+/** One chart per trained movement (Tiza 2d), from the days the phone holds. */
+private fun movementSeries(state: UiState, jobs: List<com.barrapp.data.Job>): List<MovementSeries> {
+    val keys = state.days.flatMap { it.byMovement.keys }.distinct()
+    return keys.mapNotNull { key ->
+        val days = state.days.filter { (it.byMovement[key]?.reps ?: 0) > 0 }.sortedBy { it.date }
+        if (days.isEmpty()) return@mapNotNull null
+        val sessions = days.map { d ->
+            val m = d.byMovement.getValue(key)
+            SessionPoint(
+                date = d.date, dateLabel = shortDate(d.date), score = m.score, reps = m.verified,
+                note = state.faults[d.date]?.maxByOrNull { it.value }?.key?.let { faultEs(it) }.orEmpty(),
+            )
+        }
+        val scores = sessions.mapNotNull { it.score }
+        val half = scores.size / 2
+        val label = days.last().byMovement.getValue(key).label
+        MovementSeries(
+            id = key,
+            label = movementEs(key, label),
+            sessions = sessions,
+            average = scores.takeIf { it.isNotEmpty() }?.average()?.toInt(),
+            delta = if (scores.size >= 2)
+                scores.drop(half).average().toInt() - scores.take(half.coerceAtLeast(1)).average().toInt()
+            else null,
+            maxCleanReps = days.maxOf { it.byMovement.getValue(key).verified }.takeIf { it > 0 },
+            bestRep = jobs.filter { it.exercise == key || it.result?.exercise == key }
+                .flatMap { it.result?.reps.orEmpty() }
+                .mapNotNull { it.score }.maxOrNull(),
+        )
+    }
+}
+
+/** The skill path as the vertical steps the progress page draws. */
+@Composable
+private fun skillPath(state: UiState): List<PathStep> {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val graph = remember { com.barrapp.data.SkillGraph.load(context) }
+    val goal = state.goals?.focusExercise?.takeIf { graph[it] != null }
+    return remember(state.days, goal) {
+        val verified = graph.verifiedFrom(state.days)
+        skillPathData(graph, goal ?: "muscle_up", verified, goal)
+            ?.let { pathSteps(it, missingForNext(graph, it.next, state.days)) }
+            .orEmpty()
+    }
+}
+
+/** "Hoy 18:42", "Ayer 18:42" or "8 sept 18:42" from an ISO timestamp. */
+internal fun whenEs(iso: String, today: java.time.LocalDate = java.time.LocalDate.now()): String {
+    val t = runCatching {
+        java.time.OffsetDateTime.parse(iso).atZoneSameInstant(java.time.ZoneId.systemDefault())
+            .toLocalDateTime()
+    }.recoverCatching { java.time.LocalDateTime.parse(iso.take(19)) }.getOrNull() ?: return ""
+    val hm = "%02d:%02d".format(t.hour, t.minute)
+    return when (t.toLocalDate()) {
+        today -> "Hoy $hm"
+        today.minusDays(1) -> "Ayer $hm"
+        else -> "${shortDate(t.toLocalDate().toString())} $hm"
+    }
+}
+
+/** Share the set as plain text: movement, reps, score and what to fix. */
+private fun shareSet(context: android.content.Context, a: Analysis) {
+    val score = a.sessionScore?.let { "nota $it (${com.barrapp.ui.theme.scoreLabel(it).lowercase()})" } ?: "sin nota"
+    val fixes = fixItems(a).take(3).joinToString("\n") { "· " + it.title }
+    val text = "${movementEs(a.exercise, a.detected?.label.orEmpty())} · ${a.repCount} reps · $score" +
+        (if (fixes.isNotBlank()) "\nLo que mejorar:\n$fixes" else "") + "\n— medido con BarrApp"
+    val send = android.content.Intent(android.content.Intent.ACTION_SEND)
+        .setType("text/plain")
+        .putExtra(android.content.Intent.EXTRA_TEXT, text)
+    context.startActivity(android.content.Intent.createChooser(send, "Compartir serie"))
+}
+
+/** "?" in the tab bar: how to film a set the app can measure. Each line is a
+ *  reason the pipeline refuses or cannot score a clip. */
+@Composable
+private fun HelpSheet(onClose: () -> Unit) {
+    androidx.compose.material3.Text("CÓMO FILMAR", style = com.barrapp.ui.theme.T.pageTitle)
+    androidx.compose.material3.Text(
+        "Así la app puede contar y medir cada repetición.",
+        style = com.barrapp.ui.theme.T.lead,
+        modifier = Modifier.padding(top = 6.dp, bottom = 12.dp),
+    )
+    listOf(
+        "De lado" to "Pon el teléfono a la altura de la cadera, perpendicular a ti. De frente no se ve la profundidad ni el bloqueo.",
+        "Todo el cuerpo y la barra" to "Desde las manos hasta los pies, y el aparato, dentro del plano durante toda la serie.",
+        "Teléfono quieto" to "Apóyalo o usa un trípode. Si se mueve, la medida se pierde.",
+        "Una sola persona" to "Si entra alguien más en el plano, la app puede seguir a la persona equivocada.",
+        "Sólo la serie" to "Empieza a grabar justo antes y para al acabar. Un vídeo de varios minutos se rechaza.",
+        "Buena luz" to "A contraluz o de noche el cuerpo no se distingue del fondo.",
+    ).forEach { (title, body) ->
+        TkCard(modifier = Modifier.padding(bottom = 10.dp)) {
+            androidx.compose.material3.Text(title.uppercase(), style = com.barrapp.ui.theme.T.rowTitle)
+            androidx.compose.material3.Text(body, style = com.barrapp.ui.theme.T.bodyInk,
+                modifier = Modifier.padding(top = 4.dp))
+        }
+    }
+    TkSecondaryButton("Volver", onClose, modifier = Modifier.padding(top = 10.dp))
+}
 
 private fun monthPrefix(): String {
     val c = Calendar.getInstance()

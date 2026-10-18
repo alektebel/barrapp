@@ -83,7 +83,7 @@ fun SessionScreen(
             Spacer(Modifier.width(16.dp))
             Box(Modifier.size(80.dp), contentAlignment = Alignment.Center) {
                 Canvas(Modifier.size(80.dp)) {
-                    drawArc(Color(0xFF292B31), -90f, 360f, false,
+                    drawArc(com.barrapp.ui.theme.Tk.line, -90f, 360f, false,
                         style = Stroke(7f, cap = StrokeCap.Round))
                     if (score != null) {
                         drawArc(bandColor, -90f, 360f * score / 100f, false,
