@@ -45,8 +45,10 @@ from dataclasses import dataclass, field
 # recalibration to make scores look better - a muscle-up that read 78 (solid)
 # now reads 56, and is still solid. The boundaries remain conventions and are
 # still unvalidated: see docs/QUALITY.md.
-SOLID = 47
-STRONG = 73
+#
+# 2026-10-18: the scale was recalibrated (a clean rep now reads ~95-100) and
+# the bands with it; they live in barra/quality.py, the one place they are set.
+from .quality import SOLID, STRONG  # noqa: E402
 
 
 @dataclass(frozen=True)

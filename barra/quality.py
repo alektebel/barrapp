@@ -75,7 +75,25 @@ STALL_RATE = THRESHOLDS.stall_rate
 # recalibration to make scores look better - a muscle-up that read 78 (solid)
 # now reads 56, and is still solid. The boundaries remain conventions and are
 # still unvalidated: see docs/QUALITY.md.
-STRONG, SOLID, SHAKY = 73, 47, 20
+# Cut for the 2026-10-18 scale, where a clean rep reads ~95-100 and each
+# measured fault costs FAULT_PENALTY: clean is strong, one fault solid, two
+# shaky. The old 73/47/20 fitted a scale that topped out near 55.
+STRONG, SOLID, SHAKY = 85, 70, 50
+
+# Full marks, measured against the rep users rate perfect rather than against
+# an ideal no body reaches (2026-10-18, 46 sets rated 1-5 by a coach):
+#  - range counts the part of the range that exists for the movement: how far
+#    a hanging movement hangs, how far a pushing/squatting one locks out. The
+#    old mean of both was capped at 0.5 because the other half is structurally
+#    zero (no hang on a push-up), so a perfect set scored ~51.
+#  - 90% of the full range is full range; smoothness 0.645 is a natural rep's
+#    (a half-sine ascent: mean speed / p90 speed).
+RANGE_FULL = 0.90
+SMOOTH_IDEAL = 0.645
+# Points each measured fault takes off its rep. Swept 0-30 against the coach's
+# ratings: separation (Spearman 0.05 -> 0.21) stops improving at 20, and clean
+# sets stay at ~90 while sets rated 1-2 fall to ~78.
+FAULT_PENALTY = 20
 
 
 @dataclass
@@ -109,7 +127,7 @@ def _clip01(x: float) -> float:
     return float(np.clip(x, 0.0, 1.0)) if np.isfinite(x) else 0.0
 
 
-def range_component(values: dict, arm: float) -> tuple[float, str]:
+def range_component(values: dict, arm: float, direction: str | None = None) -> tuple[float, str]:
     """Did the rep use the range the athlete's own arms make available?
 
     Scored against arm reach measured in the same clip, so the reference is the
@@ -127,9 +145,14 @@ def range_component(values: dict, arm: float) -> tuple[float, str]:
         )
     hang = _clip01(values.get("start_depth", float("nan")) / arm)
     lockout = _clip01(values.get("peak_height", float("nan")) / arm)
-    return 0.5 * (hang + lockout), (
-        f"hang {hang:.0%} of full, lockout {lockout:.0%} of full"
-    )
+    why = f"hang {hang:.0%} of full, lockout {lockout:.0%} of full"
+    if direction == "ascending":
+        part = hang
+    elif direction == "descending":
+        part = lockout
+    else:
+        return 0.5 * (hang + lockout), why
+    return _clip01(part / RANGE_FULL), why
 
 
 def control_penalty(values: dict) -> tuple[float, str]:
@@ -210,7 +233,7 @@ def smoothness_component(signal: np.ndarray, start: int, turn: int) -> tuple[flo
     fast = float(np.percentile(step, 90))
     if fast <= 1e-9:
         return 0.0, "the ascent never moved at a usable rate"
-    evenness = _clip01(mean_rate / fast)
+    evenness = _clip01(mean_rate / fast / SMOOTH_IDEAL)
 
     # Reported rather than scored: a plain stalled-frame count is what a person
     # reads, even though scoring on it is what quantised the component.
@@ -225,7 +248,7 @@ def smoothness_component(signal: np.ndarray, start: int, turn: int) -> tuple[flo
 def score_rep(values: dict, arm: float, signal: np.ndarray | None = None,
               start: int = 0, turn: int = 0, plausible: bool = True,
               rep_quality: float = 1.0, min_rep_quality: float = 0.55,
-              trace=None, label: str = "") -> Quality:
+              trace=None, label: str = "", direction: str | None = None) -> Quality:
     """Combine the components into the number the app shows.
 
     Returns `score=None` rather than a low score when the rep could not be
@@ -247,7 +270,7 @@ def score_rep(values: dict, arm: float, signal: np.ndarray | None = None,
                                   "enough to score.")
 
     comps: dict[str, dict] = {}
-    r, r_why = range_component(values, arm)
+    r, r_why = range_component(values, arm, direction)
     s, s_why = (smoothness_component(signal, start, turn)
                 if signal is not None else (float("nan"), "no trace available"))
     penalty, p_why = control_penalty(values)

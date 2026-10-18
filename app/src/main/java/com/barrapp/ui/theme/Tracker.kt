@@ -21,7 +21,7 @@ import com.barrapp.R
  *  - Every card and control has a 2px ink border.
  *  - A hard shadow (0 4px 0 ink) only on the screen's one main action.
  *  - Orange only for what asks for action. A score is never orange.
- *  - Score bands keep barra's own cuts (73/47/20); the design's palette wears
+ *  - Score bands keep barra's own cuts (85/70/50); the design's palette wears
  *    them: strong green, solid blue, shaky amber, broken red.
  *
  * The token names are the previous design's, so every screen re-skins without

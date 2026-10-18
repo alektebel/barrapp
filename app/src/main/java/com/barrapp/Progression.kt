@@ -92,9 +92,11 @@ object Progression {
      * now reads 56, and is still solid. The boundaries remain conventions and are
      * still unvalidated: see docs/QUALITY.md.
      */
-    const val SOLID = 47
-    const val STRONG = 73
-    const val SHAKY = 20
+    // The server's bands (barra/quality.py), on the 2026-10-18 scale where a
+    // clean rep reads ~95-100 and each measured fault costs 20 points.
+    const val SOLID = 70
+    const val STRONG = 85
+    const val SHAKY = 50
 
     data class Step(
         val towards: String,

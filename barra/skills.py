@@ -30,8 +30,7 @@ from functools import lru_cache
 
 # Quality bands, shared with the scorer. See barra/quality.py for why these
 # numbers are what they are.
-SOLID = 47
-STRONG = 73
+from .quality import SOLID, STRONG  # noqa: E402
 
 PUSH, PULL, CORE, LEGS, BALANCE, BAR = (
     "push", "pull", "core", "legs", "balance", "bar")

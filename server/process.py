@@ -1044,7 +1044,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             plausible=measured.plausible,
             rep_quality=measured.quality.get("rep", 0.0),
             min_rep_quality=MIN_REP_QUALITY,
-            trace=tr, label=label,
+            trace=tr, label=label, direction=movement.direction,
         )
         cut_rep = turn in getattr(found, "cut", ())
         if cut_rep:
@@ -1052,8 +1052,6 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             # number from it describes part of a rep (barra.ingest.Reps).
             q = type(q)(None, q.components, q.penalties, q.context,
                         note=CUT_REP_NOTE)
-        if q.score is not None:
-            scores.append(q.score)
         # Classify the failure types this rep was measured to have, so the
         # phone can say WHAT was wrong rather than only how far from "perfect".
         ev = rep_evidence(measured.values, arm, signal, start, turn, end, fps,
@@ -1081,6 +1079,16 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                       classify_faults(movement.name, ev, variant_info["name"], fps,
                                    ruler_usable=ruler_ok))
         rep_failures = [f.name for f in rep_faults]
+        # Each measured fault costs its rep FAULT_PENALTY points: a clean rep
+        # reads ~95-100, and the number now moves with what was found wrong.
+        if q.score is not None and rep_faults:
+            from barra.quality import FAULT_PENALTY
+            q = type(q)(max(0, q.score - FAULT_PENALTY * len(rep_faults)),
+                        q.components, q.penalties,
+                        {**q.context, "faultPenalty": FAULT_PENALTY * len(rep_faults)},
+                        note=q.note)
+        if q.score is not None:
+            scores.append(q.score)
         assessment_rows = [a.as_dict(label, fps) for a in assessments]
         # The one decision in the chain that recorded no evidence. Every other
         # stage prints the number it measured next to the threshold it had to

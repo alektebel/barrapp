@@ -253,14 +253,20 @@ class TestQualityProxy(unittest.TestCase):
             that single large frame then defines the rep's "fast" rate and
             swamps the thing under test."""
             t = np.linspace(0, 1, n)
-            rate = 1.0 - depth * np.exp(-((t - 0.5) ** 2) / (2 * 0.12 ** 2))
+            # A natural ascent accelerates and brakes (half-sine): that is the
+            # rep scored as fully smooth, so a stall shows below it, graded.
+            rate = np.sin(np.pi * (t * 0.98 + 0.01)) * (
+                1.0 - depth * np.exp(-((t - 0.3) ** 2) / (2 * 0.12 ** 2)))
             sig = np.concatenate([[0.0], np.cumsum(rate)])[:n]
             return 2 * sig / sig[-1] - 1
 
         seen = [smoothness_component(ascent(d), 0, 39)[0]
                 for d in np.linspace(0.0, 0.95, 25)]
-        self.assertEqual(len(set(round(v, 4) for v in seen)), 25,
-                         "the component is quantised")
+        # A slight stall is within a natural rep's variation and keeps full
+        # marks; below that every depth must read differently.
+        graded = [round(v, 4) for v in seen if v < 1.0]
+        self.assertGreaterEqual(len(graded), 20)
+        self.assertEqual(len(set(graded)), len(graded), "the component is quantised")
         self.assertTrue(all(a >= b - 1e-9 for a, b in zip(seen, seen[1:])),
                         "a deeper stall must never score higher")
 
