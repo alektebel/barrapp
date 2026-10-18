@@ -132,7 +132,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
             Screen.Onboarding -> com.barrapp.ui.tracker.TrackerOnboarding(
                 initialName = state.profile.name,
                 onComplete = { r ->
-                    vm.saveIntake(r.name, r.activity, r.goal, r.focusExercise)
+                    vm.saveIntake(r.name, r.activity, r.goal)
                 },
             )
 

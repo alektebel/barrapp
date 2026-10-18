@@ -405,7 +405,9 @@ private fun SkillsSheet(state: UiState, onClose: () -> Unit) {
     val goal = state.goals?.focusExercise?.takeIf { graph[it] != null }
     var target by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(goal ?: "muscle_up") }
     val verified = remember(state.days) { graph.verifiedFrom(state.days) }
-    val data = remember(target, verified) { skillPathData(graph, target, verified, goal) }
+    val data = remember(target, verified, state.days) {
+        skillPathData(graph, target, verified, goal, state.days)
+    }
     if (data != null) SkillPathScreen(data, onTarget = { target = it }, onClose = onClose)
 }
 

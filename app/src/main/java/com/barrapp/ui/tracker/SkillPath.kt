@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -38,12 +39,37 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.barrapp.data.SkillGraph
+import com.barrapp.data.DayEntry
+
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.mono
 
-/** One skill on the path, ready to draw. */
-data class SkillNodeUi(val id: String, val name: String, val state: String, val next: Boolean)
+data class SkillNodeUi(
+    val id: String,
+    val name: String,
+    val state: String,
+    val next: Boolean,
+    /** The skill's own estimated progression, when barra can measure it. */
+    val progress: SkillProgressUi? = null,
+)
+
+/**
+ * The progression towards one measurable skill: its standard, and where the
+ * athlete stands against it from measured sessions only. `qualifyingDays`
+ * counts only sessions with enough reps at the quality bar; `bestReps` and
+ * `bestScore` are the best session so far, whatever the quality.
+ */
+data class SkillProgressUi(
+    val reps: Int,
+    val quality: Int,
+    val days: Int,
+    val qualifyingDays: Int,
+    val bestReps: Int,
+    val bestScore: Int?,
+) {
+    val done: Boolean get() = qualifyingDays >= days
+}
 
 data class SkillPathData(
     val targetId: String,
@@ -66,18 +92,21 @@ private val CLASSIC_TARGETS = listOf(
 
 /**
  * The path to `target`: every prerequisite, by tier, with its state (barra's
- * own: VERIFIED only from measured sessions) and the next skill to work on
+ * own: VERIFIED only from measured sessions), the next skill to work on, and
+ * each measurable skill's estimated progression against its standard
  * (docs/UX-PLAN.md B2-B3).
  */
 fun skillPathData(graph: SkillGraph, target: String, verified: Set<String>,
-                  goal: String? = null): SkillPathData? {
+                  goal: String? = null,
+                  all: List<DayEntry> = emptyList()): SkillPathData? {
     val path = graph.path(target)
     if (path.isEmpty()) return null
     val st = graph.state(verified, emptySet())
     val next = graph.nextOnPath(target, verified, emptySet())
     val onPath = path.map { it.id }.toSet()
-    val ui = path.associate {
-        it.id to SkillNodeUi(it.id, it.name, st[it.id] ?: SkillGraph.LOCKED, it.id == next?.id)
+    val ui = path.associate { s ->
+        s.id to SkillNodeUi(s.id, s.name, st[s.id] ?: SkillGraph.LOCKED,
+            s.id == next?.id, skillProgress(s, all))
     }
     val edges = path.flatMap { s -> s.requires.filter { it in onPath }.map { it to s.id } }
     val rows = orderRows(path.groupBy { it.tier }.toSortedMap().values.map { t -> t.map { it.id } }, edges)
@@ -91,6 +120,33 @@ fun skillPathData(graph: SkillGraph, target: String, verified: Set<String>,
     val targets = (listOfNotNull(goal) + CLASSIC_TARGETS).distinct()
         .mapNotNull { id -> graph[id]?.let { id to it.name } }
     return SkillPathData(target, graph[target]!!.name, rows, edges, next?.let { ui[it.id] }, standard, targets)
+}
+
+/**
+ * One measurable skill's progression, from the athlete's measured days only.
+ * A day qualifies when its verified reps meet the standard's volume at its
+ * quality bar - the same rule SkillGraph.verifiedFrom referees with.
+ */
+internal fun skillProgress(skill: SkillGraph.SkillNode,
+                           all: List<DayEntry>): SkillProgressUi? {
+    val std = skill.standard ?: return null
+    if (!skill.measurable) return null
+    val days = all.mapNotNull { d -> d.byMovement[skill.id]?.let { it to (d.date to it) } }
+        .map { it.first }.filter { it.verified > 0 }
+    val best = days.maxByOrNull { it.verified * 1000 + (it.score ?: 0) }
+    return SkillProgressUi(
+        reps = std.reps, quality = std.quality, days = std.days,
+        qualifyingDays = days.count { it.verified >= std.reps && (it.score ?: 0) >= std.quality },
+        bestReps = best?.verified ?: 0,
+        bestScore = best?.score,
+    )
+}
+
+private fun stateColor(state: String): Color = when (state) {
+    SkillGraph.VERIFIED -> Tk.teal
+    SkillGraph.CLAIMED -> Tk.tealA(0.45f)
+    SkillGraph.AVAILABLE -> Tk.primary
+    else -> Tk.faint
 }
 
 /**
@@ -136,12 +192,6 @@ internal fun crossings(rows: List<List<String>>, edges: List<Pair<String, String
     return n
 }
 
-private fun stateColor(state: String): Color = when (state) {
-    SkillGraph.VERIFIED -> Tk.teal
-    SkillGraph.CLAIMED -> Tk.tealA(0.45f)
-    SkillGraph.AVAILABLE -> Tk.primary
-    else -> Tk.faint
-}
 
 private fun stateLabel(state: String): String = when (state) {
     SkillGraph.VERIFIED -> "Verificada"
@@ -262,5 +312,37 @@ private fun SkillChip(node: SkillNodeUi, modifier: Modifier = Modifier) {
                 lineHeight = androidx.compose.ui.unit.TextUnit(13f, androidx.compose.ui.unit.TextUnitType.Sp),
             ),
         )
+        // The skill's own estimated progression, from measured sessions only.
+        // Skills barra cannot measure show nothing: no invented bar.
+        node.progress?.let { p ->
+            Spacer(Modifier.height(4.dp))
+            if (p.done) {
+                Text("✓", style = mono(9, 0f, Tk.teal))
+            } else if (p.bestReps > 0) {
+                Text(
+                    "${p.bestReps}/${p.reps} reps · ${p.qualifyingDays}/${p.days} días",
+                    style = mono(8, 0.02f, if (node.state == SkillGraph.LOCKED) Tk.muted else Tk.primaryLight),
+                )
+            } else {
+                Text(
+                    "${p.reps} reps · ${p.days} días",
+                    style = mono(8, 0.02f, if (node.state == SkillGraph.LOCKED) Tk.muted else Tk.faint),
+                )
+            }
+            ProgressDots(p)
+        }
+    }
+}
+
+/** One dot per standard day: filled when the measured sessions earned it. */
+@Composable
+private fun ProgressDots(p: SkillProgressUi) {
+    Row(horizontalArrangement = Arrangement.spacedBy(3.dp), modifier = Modifier.padding(top = 3.dp)) {
+        repeat(p.days) { i ->
+            Box(
+                Modifier.width(7.dp).height(4.dp).clip(RoundedCornerShape(2.dp))
+                    .background(if (i < p.qualifyingDays) Tk.teal else Tk.border),
+            )
+        }
     }
 }
