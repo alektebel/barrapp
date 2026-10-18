@@ -3,6 +3,7 @@ package com.barrapp.ui.tracker
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -25,6 +26,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
@@ -32,13 +36,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.barrapp.repFaults
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.body
+import com.barrapp.ui.theme.display
 import kotlinx.coroutines.launch
 import com.barrapp.ui.theme.mono
 import com.barrapp.ui.theme.scoreInk
@@ -77,6 +91,16 @@ data class ResultsData(
     val unjudged: String? = null,
     /** null when there is no earlier training to compare against. */
     val aboveAverage: Boolean?,
+    /** This score minus the athlete's mean for the movement (+4 = four
+     *  points over it). Null when there is no mean yet: the results lead
+     *  then omits the comparison line instead of inventing one. */
+    val vsAverage: Int? = null,
+    /** Which set of the day this is ("Serie 2"). Blank when the caller
+     *  cannot know; the header then shows only the movement. */
+    val seriesLabel: String = "",
+    /** When the set was recorded, in human words ("Hoy 18:42"). Blank when
+     *  unknown; the header then shows only the rep count. */
+    val whenLabel: String = "",
 )
 
 data class LastAnalyzed(val movement: String, val meta: String, val score: Int?)
@@ -132,6 +156,11 @@ fun TrackerRecord(
     replayAnalysis: com.barrapp.data.Analysis? = null,
     replayClip: java.io.File? = null,
     onExpandReplay: (() -> Unit)? = null,
+    /** Opens the fault viewer on fault [i] (the order of [ResultsData.fixes]).
+     *  The viewer itself is FaultViewer.kt; this screen only points at it. */
+    onOpenFault: ((Int) -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     LaunchedEffect(phase, results != null, resultJobId, resultTraceId, currentResultTraceId) {
@@ -146,20 +175,69 @@ fun TrackerRecord(
         }
     }
     Column(modifier.fillMaxSize()) {
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
-            Text("BarrApp", style = T.eyebrowWide)
-            Text(
-                if (phase == RecordPhase.RESULTS) "ANÁLISIS" else "GRABAR SET",
-                style = T.pageTitle,
-            )
+        if (phase == RecordPhase.RESULTS && results != null) {
+            // The set names the page (2b): movement · set, and when · how many.
+            ResultsHeader(results, onBack)
+        } else {
+            Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp)) {
+                Text("BarrApp", style = T.eyebrowWide)
+                Text(
+                    if (phase == RecordPhase.RESULTS) "ANÁLISIS" else "GRABAR SET",
+                    style = T.pageTitle,
+                )
+            }
         }
         when (phase) {
             RecordPhase.IDLE -> IdlePhase(lastAnalyzed, onRecord, onPick)
             RecordPhase.ANALYZING -> AnalyzingPhase(stages, activeStage)
             RecordPhase.RESULTS -> results?.let {
-                ResultsPhase(it, onDone, replayAnalysis, replayClip, onExpandReplay)
+                ResultsPhase(
+                    it, onDone, replayAnalysis, replayClip, onExpandReplay, onOpenFault, onShare,
+                )
             }
                 ?: IdlePhase(lastAnalyzed, onRecord, onPick)
+        }
+    }
+}
+
+/** «DOMINADA · SERIE 1» — the movement, and where this set sits. */
+internal fun resultsHeaderTitle(results: ResultsData): String =
+    listOfNotNull(
+        results.movement,
+        results.seriesLabel.takeIf { it.isNotBlank() },
+    ).joinToString(" · ")
+
+/** «HOY 18:42 · 6 REPS» — when it was, and how many reps it counted. */
+internal fun resultsHeaderMeta(results: ResultsData): String =
+    (listOfNotNull(results.whenLabel.takeIf { it.isNotBlank() }) + "${results.reps} reps")
+        .joinToString(" · ")
+
+@Composable
+private fun ResultsHeader(results: ResultsData, onBack: (() -> Unit)?) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        if (onBack != null) {
+            Box(
+                Modifier
+                    .size(44.dp)
+                    .clip(InnerShape)
+                    .background(Tk.surface)
+                    .border(2.dp, Tk.border, InnerShape)
+                    .clickable(onClick = onBack)
+                    .semantics { contentDescription = "Volver" },
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("←", style = display(18, color = Tk.ink))
+            }
+        }
+        Column {
+            Text(resultsHeaderTitle(results).uppercase(), style = display(20, FontWeight.Black, 1f))
+            Text(resultsHeaderMeta(results).uppercase(), style = mono(11, 0.05f, Tk.muted))
         }
     }
 }
@@ -184,16 +262,23 @@ private fun IdlePhase(
             Box(
                 Modifier
                     .size(112.dp)
+                    // The screen's one main action, so it wears the hard shadow.
+                    .hardShadow(CircleShape)
                     .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Tk.primary, Tk.primaryLight)))
-                    .noRipple(onRecord),
+                    .background(Tk.primary)
+                    .border(2.dp, Tk.border, CircleShape)
+                    .noRipple(onRecord)
+                    .semantics {
+                        role = Role.Button
+                        contentDescription = "Grabar un set"
+                    },
                 contentAlignment = Alignment.Center,
             ) {
                 Box(
-                    Modifier.size(40.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.2f)),
+                    Modifier.size(40.dp).clip(CircleShape).background(Tk.onInk.copy(alpha = 0.25f)),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Box(Modifier.size(20.dp).clip(CircleShape).background(Color.White))
+                    Box(Modifier.size(20.dp).clip(CircleShape).background(Tk.onInk))
                 }
             }
         }
@@ -263,8 +348,8 @@ private fun AnalyzingPhase(stages: List<String>, activeStage: Int) {
                 Modifier
                     .size(96.dp)
                     .clip(CircleShape)
-                    .background(Tk.primaryA(0.1f))
-                    .border(2.dp, Tk.primaryA(0.3f), CircleShape),
+                    .background(Tk.surface)
+                    .border(2.dp, Tk.border, CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Canvas(Modifier.size(40.dp)) { drawCamera() }
@@ -330,6 +415,121 @@ internal fun WhatHappened(results: ResultsData) {
     }
 }
 
+/** One bar of the set's timeline: a rep drawn to its score. */
+internal data class RepBar(
+    /** 0-based, the index the replay and the fault viewer speak in. */
+    val index: Int,
+    /** null = sin medir: grey, "—", never a zero. */
+    val score: Int?,
+    val faulted: Boolean,
+    /** Where the clip lands when the bar is tapped; null when unknown. */
+    val startS: Double?,
+)
+
+/** The timeline's data, from the measurement when there is one, else from
+ *  the pre-drawn cards an older result already carries. */
+internal fun repBars(
+    analysis: com.barrapp.data.Analysis?,
+    cards: List<RepCardItem>,
+): List<RepBar> = when {
+    analysis != null && analysis.reps.isNotEmpty() -> analysis.reps.mapIndexed { i, rep ->
+        RepBar(i, rep.score, repFaults(rep).isNotEmpty(), rep.startS)
+    }
+    else -> cards.mapIndexed { i, card ->
+        RepBar(i, card.score, card.faults.isNotEmpty(), null)
+    }
+}
+
+/** «0:14» — minutes:seconds, the clip's clock. */
+internal fun clockMmSs(seconds: Double): String {
+    val t = seconds.coerceAtLeast(0.0).toInt()
+    return "%d:%02d".format(t / 60, t % 60)
+}
+
+/** «LÍNEA DE TIEMPO · 0:24», or just «LÍNEA DE TIEMPO» when the length is unknown. */
+internal fun timelineLabel(analysis: com.barrapp.data.Analysis?): String {
+    val d = analysis?.durationS ?: 0.0
+    return if (d > 0.0) "Línea de tiempo · ${clockMmSs(d)}" else "Línea de tiempo"
+}
+
+/** «VER VÍDEO COMPLETO · 0:24». */
+internal fun fullClipLabel(analysis: com.barrapp.data.Analysis?): String {
+    val d = analysis?.durationS ?: 0.0
+    return if (d > 0.0) "Ver vídeo completo · ${clockMmSs(d)}" else "Ver vídeo completo"
+}
+
+/** «En las reps 4, 5 y 6.» — where the measured faults fall; null when none. */
+internal fun faultRepsSentence(repsWithFaults: List<Int>): String? {
+    if (repsWithFaults.isEmpty()) return null
+    val nums = repsWithFaults.sorted()
+    return if (nums.size == 1) "En la rep ${nums.first()}."
+    else "En las reps " + nums.dropLast(1).joinToString(", ") + " y ${nums.last()}."
+}
+
+/** «Las 3 primeras están limpias.» — said only when the measurement says it:
+ *  the leading run of scored, fault-free reps before the first fault. */
+internal fun leadingCleanSentence(bars: List<RepBar>): String? {
+    val clean = bars.takeWhile { it.score != null && !it.faulted }.size
+    val rest = bars.drop(clean)
+    if (clean == 0 || rest.isEmpty() || rest.none { it.faulted }) return null
+    return if (clean == 1) "La primera está limpia." else "Las $clean primeras están limpias."
+}
+
+/**
+ * «+4 respecto a tu media de dominada» — the comparison with the athlete's
+ * own mean. Omits the line when there is no mean: the first measurement has
+ * nothing to compare against, and inventing a baseline is the one thing this
+ * screen must not do. Falls back to the qualitative comparison while the
+ * numeric one is not wired.
+ */
+internal fun versusAverageLine(delta: Int?, aboveAverage: Boolean?, movement: String): String? {
+    val base = movement.trim().lowercase().ifBlank { "este movimiento" }
+    return when {
+        delta == null && aboveAverage == null -> null
+        delta != null && delta > 0 -> "+$delta respecto a tu media de $base"
+        delta != null && delta < 0 -> "$delta respecto a tu media de $base"
+        delta != null -> "En tu media de $base"
+        aboveAverage == true -> "Por encima de tu media de $base"
+        else -> "Algo por debajo de tu media de $base"
+    }
+}
+
+/** One tap into the fault viewer: a fault and the rep that shows it. */
+internal data class FaultThumb(
+    val title: String,
+    /** 1-based; null when no single rep stands for it. */
+    val repNumber: Int?,
+    /** The rep's moment in the clip, «0:14»; null when unknown. */
+    val timeLabel: String?,
+    /** The index the viewer is opened on. */
+    val openIndex: Int,
+)
+
+/**
+ * The thumbnails under «FALLOS DETECTADOS»: one per ranked fix (the faults
+ * the screen already ranks), each with the rep that demonstrates it. When no
+ * fixes came, the fault list itself stands in — without a rep to point at.
+ */
+internal fun faultThumbs(
+    results: ResultsData,
+    analysis: com.barrapp.data.Analysis?,
+): List<FaultThumb> {
+    val items: List<Pair<String, Int?>> = when {
+        results.fixes.isNotEmpty() -> results.fixes.map { it.title to it.repIndex }
+        else -> results.faults.take(3).map { it.first to null }
+    }
+    return items.take(3).mapIndexed { i, (title, repIndex) ->
+        FaultThumb(
+            title = title,
+            repNumber = repIndex?.plus(1),
+            timeLabel = repIndex?.let { idx ->
+                analysis?.reps?.getOrNull(idx)?.startS?.let(::clockMmSs)
+            },
+            openIndex = i,
+        )
+    }
+}
+
 @Composable
 private fun ResultsPhase(
     results: ResultsData,
@@ -337,6 +537,8 @@ private fun ResultsPhase(
     analysis: com.barrapp.data.Analysis? = null,
     clip: java.io.File? = null,
     onExpandReplay: (() -> Unit)? = null,
+    onOpenFault: ((Int) -> Unit)? = null,
+    onShare: (() -> Unit)? = null,
 ) {
     val scroll = rememberScrollState()
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -345,6 +547,18 @@ private fun ResultsPhase(
     // video is the result, the cards below explain it.
     val playable = analysis != null && clip != null && results.reps > 0 &&
         analysis.reps.any { it.endS > it.startS }
+    var selectedRep by rememberSaveable { mutableIntStateOf(-1) }
+    val showRep: (Int) -> Unit = { index ->
+        selectedRep = index
+        if (playable) {
+            // The state lands on the rep's turnaround and holds there; the
+            // scroll brings the clip back into view.
+            replay.showRep(index)
+            scope.launch { scroll.animateScrollTo(0) }
+        }
+    }
+    val bars = repBars(analysis, results.repCards)
+
     Column(
         Modifier
             .fillMaxSize()
@@ -361,30 +575,29 @@ private fun ResultsPhase(
                 onExpand = onExpandReplay,
             )
         }
-        SlideUp {
-            TkCard(accent = true) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    ScoreRing(results.score, size = 72.dp, stroke = 6.dp)
-                    Spacer(Modifier.width(16.dp))
-                    Column {
-                        Eyebrow("Movimiento", style = mono(10, 0.05f, Tk.primary))
-                        Text(results.movement.uppercase(), style = T.cardHeadline)
-                        Text(
-                            "${results.setsLabel} · ${results.reps} reps en total",
-                            style = T.bodyS,
-                        )
-                        Text(
-                            scoreLabel(results.score) + when {
-                                // An unscored set is not a measurement.
-                                results.score == null -> ""
-                                results.aboveAverage == true -> " — por encima de tu media"
-                                results.aboveAverage == false -> " — algo por debajo de tu media"
-                                else -> " — tu primera medición"
-                            },
-                            style = mono(10, 0.05f, scoreInk(results.score)),
-                            modifier = Modifier.padding(top = 4.dp),
-                        )
-                    }
+
+        if (results.reps > 0 && bars.isNotEmpty()) {
+            SlideUp {
+                Column {
+                    Text(timelineLabel(analysis), style = mono(11, 0.05f, Tk.muted))
+                    Spacer(Modifier.height(8.dp))
+                    RepTimeline(bars, selectedRep, playable, showRep)
+                    bars.getOrNull(selectedRep)?.let { RepSelectionLine(it) }
+                }
+            }
+        }
+
+        if (results.reps > 0) {
+            SlideUp(delayMillis = 40) { ScoreBlock(results) }
+        }
+
+        // 3a: the faults lead — how many, where they fall, and the way into
+        // each one. A set measured clean says so instead, and asks nothing.
+        if (results.reps > 0 && results.unjudged == null) {
+            SlideUp(delayMillis = 80) { FaultsBlock(results, bars, analysis, onOpenFault) }
+            if (results.faults.isNotEmpty() && playable && onExpandReplay != null) {
+                SlideUp(delayMillis = 100) {
+                    TkSecondaryButton(fullClipLabel(analysis), onExpandReplay)
                 }
             }
         }
@@ -392,23 +605,19 @@ private fun ResultsPhase(
         // Short by default (docs/UX-PLAN.md): what to fix, in order. A set
         // with nothing counted says why instead. Everything else is one tap away.
         if (results.reps > 0) {
-            SlideUp(delayMillis = 60) {
+            SlideUp(delayMillis = 120) {
                 FixesCard(
                     results.fixes,
+                    onShowRep = if (playable) showRep else null,
                     unjudged = results.unjudged,
-                    onShowRep = if (playable) { index ->
-                        replay.showRep(index)
-                        scope.launch { scroll.animateScrollTo(0) }
-                    } else null,
+                    selectedRep = selectedRep.takeIf { it >= 0 },
                 )
             }
         } else if (results.headline.isNotBlank() || results.blockers.isNotEmpty()) {
             SlideUp(delayMillis = 60) { WhatHappened(results) }
         }
 
-        var detail by androidx.compose.runtime.saveable.rememberSaveable {
-            androidx.compose.runtime.mutableStateOf(false)
-        }
+        var detail by rememberSaveable { mutableStateOf(false) }
         if (results.reps > 0) {
             TkSecondaryButton(if (detail) "Ocultar detalle" else "Ver detalle", { detail = !detail })
         }
@@ -417,35 +626,289 @@ private fun ResultsPhase(
             WhatHappened(results)
         }
 
-        if (detail && results.faults.isNotEmpty()) {
-            SlideUp(delayMillis = 100) {
-                TkCard {
-                    Eyebrow("Errores detectados")
-                    Spacer(Modifier.height(12.dp))
-                    results.faults.forEach { (fault, count) ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(bottom = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(Modifier.size(6.dp).clip(CircleShape).background(Tk.amber))
-                            Text(fault, style = T.bodyInk, modifier = Modifier.weight(1f))
-                            Text("$count reps", style = mono(9, 0.05f, Tk.amber))
-                        }
-                    }
-                }
-            }
-        }
-
         if (detail) {
             results.repCards.forEachIndexed { i, rep ->
                 SlideUp(delayMillis = 200 + i * 60) { RepCard(rep) }
             }
         }
 
-        TkPrimaryButton(
-            if (results.xp > 0) "Guardar sesión (+${results.xp} XP)" else "Volver al inicio",
-            onDone,
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            if (onShare != null) {
+                TkSecondaryButton("Compartir", onShare, Modifier.weight(1f))
+            }
+            TkPrimaryButton(
+                if (results.reps > 0) "Siguiente serie" else "Volver al inicio",
+                onDone,
+                Modifier.weight(if (onShare != null) 2f else 1f),
+            )
+        }
+    }
+}
+
+/**
+ * The set's timeline (2b, 3a): one bar per rep, its height the rep's score,
+ * its colour the band's, the selected rep inked. Faulted reps carry the
+ * orange dot of 3a, so where the faults fall is readable at a glance.
+ * Unmeasured reps are grey stubs with «—»: counted, never judged.
+ */
+@Composable
+private fun RepTimeline(
+    bars: List<RepBar>,
+    selectedRep: Int,
+    playable: Boolean,
+    onSelect: (Int) -> Unit,
+) {
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        bars.forEachIndexed { i, bar ->
+            val selected = i == selectedRep
+            val shape = RoundedCornerShape(10.dp)
+            Column(
+                Modifier
+                    .weight(1f)
+                    .then(if (playable) Modifier.clickable { onSelect(i) } else Modifier)
+                    .semantics {
+                        contentDescription = "Rep ${i + 1}, " + when {
+                            bar.score == null -> "sin medir"
+                            bar.faulted -> "puntuación ${bar.score}, con fallo"
+                            else -> "puntuación ${bar.score}, limpia"
+                        }
+                        if (playable) role = Role.Button
+                    }
+                    .padding(vertical = 2.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                // The 3a dot lives above the bar, in its own lane, so bars
+                // keep bottom-aligned whether they carry one or not.
+                Box(Modifier.height(14.dp), contentAlignment = Alignment.BottomCenter) {
+                    if (bar.faulted) {
+                        Box(
+                            Modifier
+                                .size(12.dp)
+                                .clip(CircleShape)
+                                .background(Tk.primary)
+                                .border(2.dp, Tk.border, CircleShape),
+                        )
+                    }
+                }
+                Spacer(Modifier.height(2.dp))
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .height(barHeight(bar.score))
+                        .clip(shape)
+                        .background(if (bar.score == null) Tk.locked else scoreInk(bar.score))
+                        .then(if (selected) Modifier.border(2.dp, Tk.border, shape) else Modifier),
+                )
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    bar.score?.toString() ?: "—",
+                    style = mono(
+                        11, 0f,
+                        if (selected) Tk.ink else Tk.muted,
+                        if (selected) FontWeight.SemiBold else FontWeight.Normal,
+                    ),
+                )
+            }
+        }
+    }
+}
+
+/** A rep's bar: its score to scale, a stub when nothing was measured. */
+private fun barHeight(score: Int?): Dp =
+    if (score == null) 6.dp
+    else (score.coerceIn(0, 100) * 0.44f).dp.coerceAtLeast(6.dp)
+
+/** «REP 4 · 0:14   59 · INESTABLE» — what a tap on the timeline picked. */
+@Composable
+private fun RepSelectionLine(bar: RepBar) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(top = 8.dp)
+            .semantics { liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Text(
+            "REP ${bar.index + 1}" + (bar.startS?.let { " · ${clockMmSs(it)}" } ?: ""),
+            style = mono(12, 0f, Tk.ink, FontWeight.SemiBold),
+        )
+        Text(
+            if (bar.score == null) "Sin medir"
+            else "${bar.score} · ${scoreLabel(bar.score).uppercase()}",
+            style = mono(12, 0f, scoreInk(bar.score), FontWeight.SemiBold),
+        )
+    }
+}
+
+/** The note (2b): the score, its band's word, and the comparison with the
+ *  athlete's own mean — or nothing, when there is no mean to compare to. */
+@Composable
+private fun ScoreBlock(results: ResultsData) {
+    Row(
+        Modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Text(
+            results.score?.toString() ?: "—",
+            style = display(
+                52, FontWeight.Black, 0.9f,
+                color = if (results.score == null) Tk.muted else Tk.ink,
+            ),
+        )
+        Column {
+            Text(
+                scoreLabel(results.score).uppercase(),
+                style = display(17, FontWeight.Black, 1f, color = scoreInk(results.score)),
+            )
+            versusAverageLine(results.vsAverage, results.aboveAverage, results.movement)?.let {
+                Text(
+                    it,
+                    style = body(13, Tk.darkLine),
+                    modifier = Modifier.padding(top = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+/**
+ * The faults, first (3a): an orange card because looking at them is the
+ * action this screen asks for — the number, where they fall, a thumbnail
+ * per fault, and the way into the viewer. Without faults: a quiet white
+ * card saying the series is clean, and no button.
+ */
+@Composable
+private fun FaultsBlock(
+    results: ResultsData,
+    bars: List<RepBar>,
+    analysis: com.barrapp.data.Analysis?,
+    onOpenFault: ((Int) -> Unit)?,
+) {
+    if (results.faults.isEmpty()) {
+        TkCard {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Box(Modifier.size(8.dp).clip(CircleShape).background(Tk.teal))
+                Text("Serie limpia", style = T.rowTitle)
+            }
+            Text(
+                "Ningún fallo medido en esta serie.",
+                style = T.bodyInk,
+                modifier = Modifier.padding(top = 6.dp),
+            )
+        }
+        return
+    }
+    TkCard(accent = true) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Text("${results.faults.size}", style = display(46, FontWeight.Black, 0.9f, color = Tk.ink))
+            Text("FALLOS DETECTADOS", style = display(20, FontWeight.Black, 1.05f, color = Tk.ink))
+        }
+        val sentence = listOfNotNull(
+            faultRepsSentence(bars.filter { it.faulted }.map { it.index + 1 }),
+            leadingCleanSentence(bars),
+        ).joinToString(" ")
+        if (sentence.isNotBlank()) {
+            Text(
+                sentence,
+                style = body(14, Tk.ink, 1.4f),
+                modifier = Modifier.padding(top = 8.dp),
+            )
+        }
+        Spacer(Modifier.height(12.dp))
+        Row(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            faultThumbs(results, analysis).forEach { thumb ->
+                Box(Modifier.weight(1f)) {
+                    FaultThumbCard(thumb, onOpenFault?.let { open -> { open(thumb.openIndex) } })
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        // No hard shadow of its own: the card carries it already.
+        TkPrimaryButton("Revisar fallos", { onOpenFault?.invoke(0) }, shadow = false)
+    }
+}
+
+/** The 3a thumbnail: the rep's moment on the clip's dark, its number, and
+ *  the fault's name. Opens the fault viewer on this fault. */
+@Composable
+private fun FaultThumbCard(thumb: FaultThumb, onOpen: (() -> Unit)?) {
+    val shape = RoundedCornerShape(10.dp)
+    Column(
+        Modifier
+            .then(if (onOpen != null) Modifier.clickable(onClick = onOpen) else Modifier)
+            .semantics(mergeDescendants = true) {
+                if (onOpen != null) role = Role.Button
+                contentDescription = buildString {
+                    append("Ver en el vídeo")
+                    thumb.repNumber?.let { append(", rep $it") }
+                    append(": ${thumb.title}")
+                }
+            }
+            .padding(vertical = 2.dp),
+    ) {
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .height(92.dp)
+                .clip(shape)
+                .background(Tk.dark)
+                .border(2.dp, Tk.border, shape),
+        ) {
+            thumb.timeLabel?.let {
+                Text(
+                    it,
+                    style = mono(10, 0f, Tk.ink, FontWeight.SemiBold),
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .padding(6.dp)
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(Tk.bg)
+                        .padding(horizontal = 5.dp, vertical = 2.dp),
+                )
+            }
+            Canvas(Modifier.size(20.dp).align(Alignment.Center)) {
+                val w = size.width
+                val h = size.height
+                drawPath(
+                    Path().apply {
+                        moveTo(w * 0.22f, h * 0.08f)
+                        lineTo(w * 0.85f, h * 0.5f)
+                        lineTo(w * 0.22f, h * 0.92f)
+                        close()
+                    },
+                    Tk.primary,
+                )
+            }
+        }
+        if (thumb.repNumber != null) {
+            Text(
+                "REP ${thumb.repNumber}",
+                style = mono(11, 0f, Tk.ink, FontWeight.SemiBold),
+                modifier = Modifier.padding(top = 5.dp),
+            )
+        }
+        Text(
+            thumb.title,
+            style = mono(11, 0f, Tk.ink, FontWeight.SemiBold, 1.2f),
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

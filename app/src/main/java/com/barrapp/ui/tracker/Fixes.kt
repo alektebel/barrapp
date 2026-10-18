@@ -1,33 +1,33 @@
 package com.barrapp.ui.tracker
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.heightIn
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.role
-import androidx.compose.ui.semantics.semantics
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
 import com.barrapp.cueEs
 import com.barrapp.data.Analysis
 import com.barrapp.faultCounts
 import com.barrapp.faultEs
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
+import com.barrapp.ui.theme.display
 import com.barrapp.ui.theme.mono
 
 /** One of the three things to improve, ready to show. [repIndex] is the rep
@@ -77,52 +77,88 @@ fun unjudgedNote(a: Analysis): String? {
     return if (why != null) "$head ${why.trim().trimEnd('.')}. $tail" else "$head $tail"
 }
 
+/**
+ * "Lo que mejorar", in the design's own shape (2b): a mono label and one
+ * bordered row per fix — the rep that shows it as the tag, the cue as the
+ * sub-line, and the whole row leading to that rep in the video. No orange
+ * card and no hard shadow: this section asks for attention, not for action.
+ *
+ * `selectedRep` (the rep shown in the clip right now) tints its row, the
+ * design's way of answering "which one am I looking at?".
+ */
 @Composable
 internal fun FixesCard(
     fixes: List<FixItem>,
     onShowRep: ((Int) -> Unit)? = null,
     unjudged: String? = null,
+    selectedRep: Int? = null,
 ) {
-    TkCard(accent = true) {
-        Eyebrow("Lo que mejorar")
-        if (unjudged != null) {
+    if (unjudged != null) {
+        TkCard {
+            Eyebrow("Serie sin juzgar")
             Text(unjudged, style = T.bodyInk, modifier = Modifier.padding(top = 10.dp))
-            return@TkCard
         }
-        if (fixes.isEmpty()) {
+        return
+    }
+    if (fixes.isEmpty()) {
+        TkCard {
+            Eyebrow("Lo que mejorar")
             Text("Nada importante que corregir en esta serie.", style = T.bodyInk,
                 modifier = Modifier.padding(top = 10.dp))
-            return@TkCard
         }
+        return
+    }
+    Column {
+        Eyebrow(
+            if (onShowRep != null) "Lo que mejorar · toca para verlo" else "Lo que mejorar",
+            style = mono(12, 0.05f, Tk.muted),
+        )
+        Spacer(Modifier.height(8.dp))
         fixes.forEachIndexed { i, fix ->
+            val rep = fix.repIndex
+            val tappable = onShowRep != null && rep != null
+            val selected = rep != null && rep == selectedRep
+            val shape = CardShape
             Row(
-                Modifier.padding(top = if (i == 0) 12.dp else 16.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = if (i == 0) 0.dp else 8.dp)
+                    .clip(shape)
+                    .background(if (selected) Tk.orangeSoft else Tk.surface)
+                    .border(2.dp, Tk.border, shape)
+                    .then(
+                        if (onShowRep != null && rep != null)
+                            Modifier.clickable { onShowRep(rep) }
+                        else Modifier
+                    )
+                    .semantics {
+                        if (onShowRep != null && rep != null) {
+                            role = Role.Button
+                            contentDescription = "Ver en el vídeo la rep ${rep + 1}: ${fix.title}"
+                        }
+                    }
+                    .padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                Box(
-                    Modifier.size(26.dp).clip(CircleShape)
-                        .background(if (i == 0) Tk.primary else Tk.primary.copy(alpha = 0.35f)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text("${i + 1}", style = mono(12, 0f, Tk.bg).copy(fontWeight = FontWeight.Bold))
-                }
-                Column(Modifier.padding(top = 2.dp)) {
-                    Text(fix.title, style = T.bodyInk.copy(fontWeight = FontWeight.SemiBold))
-                    fix.cue?.let { Text(it, style = T.bodyS, modifier = Modifier.padding(top = 2.dp)) }
-                    Spacer(Modifier.height(2.dp))
-                    Text(fix.where, style = mono(9, 0.05f, Tk.amber))
-                    if (onShowRep != null && fix.repIndex != null) {
-                        val rep = fix.repIndex
-                        Text(
-                            "Ver en la rep ${rep + 1} →",
-                            style = mono(11, 0.05f, Tk.primaryLight),
-                            modifier = Modifier
-                                .heightIn(min = 48.dp)
-                                .semantics { role = Role.Button }
-                                .clickable { onShowRep(rep) }
-                                .padding(vertical = 14.dp),
-                        )
+                // The tag is the evidence: the rep where this shows worst.
+                Text(
+                    rep?.let { "REP ${it + 1}" } ?: "${i + 1}",
+                    style = mono(12, 0f, Tk.ink, FontWeight.SemiBold),
+                )
+                Column(Modifier.weight(1f)) {
+                    Text(fix.title, style = T.itemTitle)
+                    fix.cue?.let {
+                        Text(it, style = T.bodyS, modifier = Modifier.padding(top = 2.dp))
                     }
+                    Text(
+                        fix.where,
+                        style = mono(9, 0.05f, Tk.muted),
+                        modifier = Modifier.padding(top = 3.dp),
+                    )
+                }
+                if (onShowRep != null && rep != null) {
+                    Text("→", style = display(18, color = Tk.ink))
                 }
             }
         }
