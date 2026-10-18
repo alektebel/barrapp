@@ -99,19 +99,21 @@ fun TrimScreen(
                 },
                 valueRange = 0f..duration.toFloat(),
                 colors = SliderDefaults.colors(
-                    thumbColor = Tk.primary,
-                    activeTrackColor = Tk.primary,
-                    inactiveTrackColor = Tk.border,
+                    // Ajustar no es la acción de la pantalla (el botón lo es):
+                    // tinta sobre la pista suave, naranja para nada.
+                    thumbColor = Tk.ink,
+                    activeTrackColor = Tk.ink,
+                    inactiveTrackColor = Tk.line,
                 ),
             )
             Row(
                 Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                Text("%.1f s".format(start), style = mono(12))
+                Text("%.1f s".format(start), style = mono(12, color = Tk.ink))
                 Text("%.1f s de %.0f".format(end - start, duration),
-                    style = mono(12, color = Tk.primaryLight))
-                Text("%.1f s".format(end), style = mono(12))
+                    style = mono(12))
+                Text("%.1f s".format(end), style = mono(12, color = Tk.ink))
             }
             Spacer(Modifier.height(4.dp))
             Text(
@@ -159,7 +161,7 @@ private fun FramePeek(clipPath: String, atS: Double, label: String, modifier: Mo
             Modifier
                 .fillMaxWidth()
                 .height(140.dp)
-                .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                .clip(InnerShape)
                 .background(Tk.card),
             contentAlignment = Alignment.Center,
         ) {

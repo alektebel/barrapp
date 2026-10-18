@@ -39,7 +39,6 @@ import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.body
 import com.barrapp.ui.theme.display
-import com.barrapp.ui.theme.mono
 
 /** What the onboarding collects, in the app's own vocabulary. */
 data class OnboardingResult(
@@ -155,8 +154,8 @@ fun TrackerOnboarding(
                 Modifier
                     .size(32.dp)
                     .clip(ChipShape)
-                    .background(Tk.primaryA(0.2f))
-                    .border(1.dp, Tk.primaryA(0.4f), ChipShape),
+                    .background(Tk.surface)
+                    .border(2.dp, Tk.border, ChipShape),
                 contentAlignment = Alignment.Center,
             ) {
                 Canvas(Modifier.size(16.dp)) { drawLogoMark() }
@@ -228,6 +227,8 @@ private fun Heading(text: String) {
     Spacer(Modifier.height(8.dp))
 }
 
+/** The step dots in ink: orange is for what asks for action, and progress is
+ *  a statement. Where you are is the wide dot; what is left stays a soft hint. */
 @Composable
 private fun ProgressDots(step: Int, total: Int) {
     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -237,7 +238,7 @@ private fun ProgressDots(step: Int, total: Int) {
                     .width(if (i == step) 20.dp else 6.dp)
                     .height(6.dp)
                     .clip(RoundedCornerShape(3.dp))
-                    .background(if (i <= step) Tk.primary else Tk.border),
+                    .background(if (i <= step) Tk.ink else Tk.line),
             )
         }
     }
@@ -250,14 +251,14 @@ private fun NameField(value: String, onValue: (String) -> Unit) {
             .fillMaxWidth()
             .clip(CardShape)
             .background(Tk.surface)
-            .border(1.5.dp, if (value.isBlank()) Tk.border else Tk.primary, CardShape)
+            .border(2.dp, Tk.border, CardShape)
             .padding(horizontal = 16.dp, vertical = 14.dp),
     ) {
         BasicTextField(
             value = value,
             onValueChange = { onValue(it.take(24)) },
             textStyle = display(24, androidx.compose.ui.text.font.FontWeight.Bold, 1.1f, 0.02f),
-            cursorBrush = SolidColor(Tk.primary),
+            cursorBrush = SolidColor(Tk.ink),
             singleLine = true,
             keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
                 imeAction = ImeAction.Done,
@@ -277,6 +278,9 @@ private fun NameField(value: String, onValue: (String) -> Unit) {
     }
 }
 
+/** A choice the Tiza way: white card, 2dp ink border; the chosen one wears
+ *  the soft orange ground. The radio answers in ink with a paper check —
+ *  selecting is a statement, not an action the app is asking for. */
 @Composable
 private fun ChoiceCard(label: String, sub: String, selected: Boolean, onClick: () -> Unit) {
     Row(
@@ -284,8 +288,8 @@ private fun ChoiceCard(label: String, sub: String, selected: Boolean, onClick: (
             .fillMaxWidth()
             .padding(bottom = 12.dp)
             .clip(CardShape)
-            .background(if (selected) Tk.primaryA(0.18f) else Tk.surface)
-            .border(1.5.dp, if (selected) Tk.primary else Tk.border, CardShape)
+            .background(if (selected) Tk.orangeSoft else Tk.surface)
+            .border(2.dp, Tk.border, CardShape)
             .noRipple(onClick)
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -300,12 +304,12 @@ private fun ChoiceCard(label: String, sub: String, selected: Boolean, onClick: (
             Modifier
                 .size(20.dp)
                 .clip(CircleShape)
-                .background(if (selected) Tk.primary else Color.Transparent)
-                .border(2.dp, if (selected) Tk.primary else Tk.border, CircleShape),
+                .background(if (selected) Tk.ink else Color.Transparent)
+                .border(2.dp, Tk.ink, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             if (selected) {
-                Canvas(Modifier.size(10.dp)) { drawCheck(Color.White) }
+                Canvas(Modifier.size(12.dp)) { drawCheck(Tk.onInk) }
             }
         }
     }
@@ -332,15 +336,15 @@ private fun Briefing(
         Box(
             Modifier
                 .size(80.dp)
-                .clip(RoundedCornerShape(24.dp))
-                .background(Tk.primaryA(0.15f))
-                .border(1.5.dp, Tk.primaryA(0.4f), RoundedCornerShape(24.dp)),
+                .clip(CardShape)
+                .background(Tk.surface)
+                .border(2.dp, Tk.border, CardShape),
             contentAlignment = Alignment.Center,
         ) {
             Text("🎯", style = body(34, Tk.ink))
         }
         Spacer(Modifier.height(24.dp))
-        Text("MISIÓN ASIGNADA", style = mono(10, 0.2f, Tk.primary))
+        Text("MISIÓN ASIGNADA", style = T.eyebrowAccent)
         Spacer(Modifier.height(12.dp))
         Text(
             "BIENVENIDO,\n${name.uppercase()}",
@@ -350,12 +354,12 @@ private fun Briefing(
         Spacer(Modifier.height(8.dp))
         Text(
             "Ejercicio principal: $exercise",
-            style = body(14, Tk.primaryLight),
+            style = body(14, Tk.ink),
             textAlign = TextAlign.Center,
         )
         Text(
             "Objetivo: $goal",
-            style = body(14, Tk.primaryLight),
+            style = body(14, Tk.ink),
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(32.dp))
