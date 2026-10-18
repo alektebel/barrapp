@@ -130,6 +130,9 @@ fun movementEs(exercise: String, label: String = ""): String {
 }
 
 private val MOVEMENTS_ES = mapOf(
+    // A clip whose exercise was not confirmed: never "Auto" in a heading.
+    "auto" to "Ejercicio",
+    "unknown" to "Ejercicio",
     "pull_up" to "Dominada",
     "chin_up" to "Dominada supina",
     "push_up" to "Flexión",

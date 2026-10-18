@@ -299,7 +299,7 @@ private fun IdlePhase(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             Box(Modifier.weight(1f).height(1.dp).background(Tk.border))
-            Text("O", style = mono(10))
+            Text("o", style = mono(11))
             Box(Modifier.weight(1f).height(1.dp).background(Tk.border))
         }
         Spacer(Modifier.height(20.dp))

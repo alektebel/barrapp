@@ -333,3 +333,19 @@ def test_locate_returns_none_when_both_models_fail(tmp_path, monkeypatch):
     calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "nope"])
     assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
     assert len(calls) == 2
+
+
+def test_locate_fits_inside_the_fusion_wait(tmp_path, monkeypatch):
+    """Both tries together must finish before fusion stops waiting for the
+    vote (pose plus VISION_VOTE_WAIT_S), or a slow primary starves the
+    fallback and the job abstains on a clip vision would have named."""
+    _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", _GOOD])
+    budgets = []
+
+    def fake_chat(base, key, model, *a, timeout=None, attempts=None, **k):
+        budgets.append(timeout * attempts)
+        return "" if len(budgets) == 1 else _GOOD
+    monkeypatch.setattr(vision, "_chat", fake_chat)
+    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    import process
+    assert sum(budgets) < process.VISION_VOTE_WAIT_S + 30, budgets

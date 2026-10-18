@@ -58,7 +58,7 @@ private val EXERCISES = listOf(
     Option("push_up", "Flexión", "El empuje que abre la escalera"),
     Option("dip", "Fondo", "Empuje vertical, recorrido largo"),
     Option("muscle_up", "Muscle-up", "Tirón y fondo en un solo movimiento"),
-    Option("squat", "Sentadilla", "Tren inferior, patrón de bisagra"),
+    Option("squat", "Sentadilla", "Tren inferior, las dos piernas a la vez"),
     Option("bulgarian_split_squat", "Sentadilla búlgara",
         "Tren inferior, una pierna retrasada"),
     Option("split_squat", "Split squat", "Tren inferior, zancada estática"),

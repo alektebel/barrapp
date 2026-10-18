@@ -61,7 +61,13 @@ SOURCE_VISION = "vision-advisory"
 # tests/test_vision_errors.py pins this against template.yaml.
 VISION_MODEL_DEFAULT = "mimo-v2.6-flash"
 LOCALIZE_MODEL_DEFAULT = VISION_MODEL_DEFAULT
-LOCALIZE_TIMEOUT = 120
+# Localization feeds fusion, which waits for it only until pose ends plus
+# process.VISION_VOTE_WAIT_S (~80 s on a 20 s clip). One bounded try per
+# model keeps both inside that: 120 s x 3 attempts on a slow primary used the
+# whole budget, the fallback never ran, and 5-15% of jobs lost the vision vote
+# (a clean push-up set came back "no hemos podido confirmar qué ejercicio es").
+LOCALIZE_TIMEOUT = 30
+LOCALIZE_ATTEMPTS = 1
 MIN_WINDOW_S = 4.0
 MAX_WINDOW_FRAC = 0.95
 
@@ -779,7 +785,7 @@ def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | 
     if len(content) < 2:
         return None
     text = _chat(base, key, model, LOCALIZE_SYSTEM, content,
-                 timeout=LOCALIZE_TIMEOUT, check_model=False)
+                 timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS, check_model=False)
     parsed = parse_json_object(text)
     if parsed is None:
         print(f"[barra] locate: no JSON in the {model} reply "
@@ -788,7 +794,8 @@ def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | 
         # retries; without a second opinion the vision vote is lost.
         if model != SECOND_MODEL:
             text = _chat(base, key, SECOND_MODEL, LOCALIZE_SYSTEM, content,
-                         timeout=LOCALIZE_TIMEOUT, check_model=False)
+                         timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS,
+                         check_model=False)
             parsed = parse_json_object(text)
             if parsed is None:
                 print(f"[barra] locate: no JSON in the {SECOND_MODEL} reply "

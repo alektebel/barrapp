@@ -220,7 +220,12 @@ def describe(payload: dict) -> tuple[str, str]:
     # ---- nothing countable -------------------------------------------------
     if n == 0:
         detected = payload.get("detected") or {}
-        if not detected.get("exercise") or detected.get("exercise") == "unknown":
+        if detected.get("geometryVote") and detected.get("exercise") == "unknown":
+            # The detectors named different movements: it may well be one
+            # barra measures, it just was not confirmed.
+            headline = "Ejercicio sin confirmar"
+            opening = first or "No hemos podido confirmar qué ejercicio es."
+        elif not detected.get("exercise") or detected.get("exercise") == "unknown":
             headline = "Ningún ejercicio que barra pueda medir"
             opening = "Barra no pudo saber qué se ve en este vídeo." + (f" {first}" if first else "")
         else:

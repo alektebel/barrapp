@@ -626,6 +626,10 @@ private fun stagesFor(state: UiState): Pair<List<String>, Int> {
     )
     val active = state.works.firstOrNull { it.active }
     val idx = when (active?.status) {
+        // Still on the phone (being prepared or waiting to go) is the first
+        // stage too: showing "recortando la serie" above "esperando para
+        // enviarse" contradicted the queue card on the same screen.
+        WorkStore.STATUS_PENDING, WorkStore.STATUS_WAITING,
         WorkStore.STATUS_SENDING, WorkStore.STATUS_CONNECTING -> 0
         WorkStore.STATUS_QUEUED -> 1
         WorkStore.STATUS_MEASURING ->

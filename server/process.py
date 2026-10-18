@@ -804,6 +804,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             blocker = ("movement_unconfirmed"
                        if (fusion or {}).get("status") == "disagreement-no-vision-abstain"
                        else detection.reason)
+            # Nothing was confirmed, so nothing is named: the geometry vote
+            # stays on record as a vote, not as "reconocido como flexión"
+            # above "no hemos podido confirmar qué ejercicio es".
+            detected["geometryVote"] = detected.get("exercise")
+            detected["exercise"] = "unknown"
+            detected["label"] = ""
             return _empty("auto", [blocker], detected=detected,
                           duration_s=round(float(info.get("duration_s") or 0), 2))
         chosen = final
