@@ -337,7 +337,8 @@ Resources:
             TableName: !Ref UploadsTable
         - S3ReadPolicy:
             BucketName: !Ref VideoBucket
-        # The worker overwrites the stored clip with the located exercise.
+        # The worker keeps the clip as uploaded (<job>.original.mp4, a copy:
+        # read + put) and overwrites <job>.mp4 with the located exercise.
         - Statement:
             - Effect: Allow
               Action: s3:PutObject

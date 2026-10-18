@@ -494,6 +494,8 @@ def _route(event):
         if not _owned(item, owner):
             return _resp(404, {"error": "unknown job"})
         s3.delete_object(Bucket=BUCKET, Key=f"{owner}/{job_id}.mp4")
+        # Deleting a session deletes every copy of its clip.
+        s3.delete_object(Bucket=BUCKET, Key=ORIGINAL_KEY.format(owner=owner, job=job_id))
         table.delete_item(Key={"id": job_id})
         return _resp(200, {"ok": True, "id": job_id})
 
@@ -692,9 +694,20 @@ def _route(event):
     return _resp(404, {"error": "not found"})
 
 
+# The clip as uploaded, kept beside the trimmed copy for debugging.
+ORIGINAL_KEY = "{owner}/{job}.original.mp4"
+
+
 def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
                         end_s: float, duration_s: float | None = None) -> bool:
-    """Cut the located window out of the clip and overwrite the stored object.
+    """Cut the located window out of the clip and overwrite the stored object,
+    after keeping the clip as uploaded at `ORIGINAL_KEY`.
+
+    The original is kept for debugging, under the same 30-day lifecycle: a
+    Bulgarian split squat whose ruler failed only because of the seconds
+    before the set scored fine once trimmed, so the trimmed copy alone could
+    not reproduce the bug (2026-10-18) - the clip had to be pulled off the
+    phone.
 
     Best-effort by design: if there is no cutter, the cut fails, or the upload
     fails, the original stays in S3 and the job still succeeds. A localization
@@ -713,6 +726,14 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
         return False
     out = Path("/tmp") / f"{job_id}-exercise.mp4"
     if trim_clip(src, start, end, out) is None:
+        return False
+    key = f"{owner}/{job_id}.mp4"
+    try:
+        # Server-side copy: no re-upload. If it fails, nothing is overwritten.
+        s3.copy_object(Bucket=BUCKET, Key=ORIGINAL_KEY.format(owner=owner, job=job_id),
+                       CopySource={"Bucket": BUCKET, "Key": key},
+                       ContentType="video/mp4", MetadataDirective="REPLACE")
+    except Exception:  # noqa: BLE001 - never trade the original for the cut
         return False
     try:
         s3.upload_file(str(out), BUCKET, f"{owner}/{job_id}.mp4",
