@@ -44,7 +44,7 @@ Globals:
         JOBS_TABLE: !Ref JobsTable
         VIDEO_BUCKET: !Ref VideoBucket
         # The written report (server/report.py), through nan.builders.
-        BARRA_REPORT_MODEL: deepseek-v4-flash
+        BARRA_REPORT_MODEL: glm5.3-flash
         BARRA_REPORT_BACKUP_MODEL: qwen3.8-flash
         NAN_SECRET_ID: barrapp/nan-api-key
         NAN_BASE_URL: !Ref NanBaseUrl

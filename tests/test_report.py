@@ -245,3 +245,27 @@ class FallsBack(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class QuotingMeasuredMetrics(unittest.TestCase):
+    """A measured swing metric may be quoted with its number; it may not be
+    claimed as a fault without one (2026-10-18: every model's prose was thrown
+    away for "poco balanceo (0,19 torsos)")."""
+
+    def facts(self):
+        reps = payload()["reps"]
+        reps[0]["metrics"].append({"key": "swing", "name": "Body swing relative to the bar",
+                                   "value": "0.19 torso", "class": "PLANAR"})
+        return report.digest(payload(reps=reps))
+
+    def test_quoting_the_metric_with_its_number_passes(self):
+        text = "La primera tuvo poco balanceo (0,19 torsos) y buena subida."
+        self.assertEqual(report.unsupported_faults(text, self.facts()), [])
+
+    def test_naming_it_without_a_number_is_still_a_claim(self):
+        self.assertIn("Balanceo",
+                      report.unsupported_faults("Notamos balanceo en la subida.", self.facts()))
+
+    def test_an_unmeasured_fault_still_fails_next_to_a_quoted_metric(self):
+        text = "Poco balanceo (0,19 torsos). Las rodillas se van hacia dentro."
+        self.assertIn("Rodillas hacia dentro", report.unsupported_faults(text, self.facts()))

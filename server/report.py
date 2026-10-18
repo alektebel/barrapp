@@ -39,7 +39,9 @@ try:
 except ImportError:  # tests / local dev with `server/` on the path
     from api import llm
 
-REPORT_MODEL = os.environ.get("BARRA_REPORT_MODEL", "deepseek-v4-flash")
+# deepseek-v4-flash ran out of nan allowance until 2026-11-01 (402 on every
+# job); glm5.3-flash wrote 6/6 accepted reports at ~40 s, qwen 6/6 at ~97 s.
+REPORT_MODEL = os.environ.get("BARRA_REPORT_MODEL", "glm5.3-flash")
 BACKUP_MODEL = os.environ.get("BARRA_REPORT_BACKUP_MODEL", "qwen3.8-flash")
 PROSE_KEYS = ("headline", "narrative", "nextSession")
 
@@ -203,9 +205,23 @@ def unsupported_faults(text: str, facts: dict) -> list[str]:
     """Spanish names of the faults `text` talks about that the digest does not
     list as fired. A digest with no faults admits none."""
     allowed = {f.get("name") for f in facts.get("faults") or []}
-    plain = _plain(text)
-    return [label for label, pattern in _CLAIMS.items()
-            if label not in allowed and pattern.search(plain)]
+    # Quoting a MEASURED metric with its number is not claiming a fault: "poco
+    # balanceo (0,19 torsos)" reads "Balanceo respecto a la barra" off the reps,
+    # and invented_numbers checks the 0,19. Rejecting it threw away the prose of
+    # every set with that metric, from every model (2026-10-18). A mention with
+    # no number in its sentence is still a claim and still fails.
+    metric_names = _plain(" ".join(
+        name for r in facts.get("reps") or [] for name in (r.get("metrics") or {})))
+    measured = {label for label, pattern in _CLAIMS.items() if pattern.search(metric_names)}
+    sentences = re.split(r"(?<=[.;!?])\s+", _plain(text))
+    out = []
+    for label, pattern in _CLAIMS.items():
+        if label in allowed:
+            continue
+        hits = [x for x in sentences if pattern.search(x)]
+        if hits and not (label in measured and all(_NUMBER.search(x) for x in hits)):
+            out.append(label)
+    return out
 
 
 def _parse(text: str | None) -> dict | None:
