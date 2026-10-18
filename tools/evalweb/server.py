@@ -163,7 +163,16 @@ class Store:
                               and p.count("/") >= 4})
             out.append({"sha256": g["sha256"], "paths": g["paths"], "source": source,
                         "movementFolder": folders[0] if folders else ""})
-        return self._order(out), total_files, hashed
+        return self._prioritise(self._order(out)), total_files, hashed
+
+    def _prioritise(self, items):
+        """Los vídeos de out/evalweb/priority.json, en ese orden, delante."""
+        try:
+            first = json.loads((self.cache_file.parent / "priority.json").read_text())
+        except (OSError, ValueError):
+            return items
+        rank = {sha: i for i, sha in enumerate(first)}
+        return sorted(items, key=lambda i: rank.get(i["sha256"], len(rank)))
 
     @staticmethod
     def _order(items):
