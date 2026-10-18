@@ -140,6 +140,38 @@ class TestPrefixInvariance(unittest.TestCase):
                                   fps=FPS).exercise, "unknown")
 
 
+class TestRepCutByTheSpanEdge(unittest.TestCase):
+    """A turnaround just inside the end of an active span is half a rep."""
+
+    def setUp(self):
+        self.movement = resolve("pull_up")
+        self.kp = bar_set(n_reps=4, fpr=60, clearance=0.5)
+
+    def segment(self, active_until):
+        from unittest import mock
+        active = np.zeros(len(self.kp), dtype=bool)
+        active[:active_until] = True
+        with mock.patch("barra.ingest.active_mask", return_value=active):
+            return segment_reps_verbose(self.kp, FPS, self.movement)
+
+    def test_normal_reps_are_unchanged(self):
+        reps, reasons = segment_reps_verbose(self.kp, FPS, self.movement)
+        self.assertEqual(len(reps), 4, reasons)
+        # Span ending at the real end of the set: the last rep is whole.
+        reps, reasons = self.segment(len(self.kp))
+        self.assertEqual(len(reps), 4, reasons)
+
+    def test_a_rep_whose_turnaround_sits_at_the_span_end_is_rejected(self):
+        # The 4th rep peaks at frame 210; the span ends 5 frames later, with
+        # the signal still near the top.
+        reps, reasons = self.segment(215)
+        self.assertEqual(len(reps), 3, reasons)
+        self.assertTrue(any("runs past the end of the active span" in r
+                            for r in reasons), reasons)
+        for a, pk, b in reps:
+            self.assertGreater(b - pk, 10)
+
+
 class TestPerSpanAmplitude(unittest.TestCase):
     """C5 - one span's amplitude must not set the bar for another."""
 

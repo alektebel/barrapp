@@ -108,6 +108,10 @@ CATALOG: list[Msg] = [
     # segmentation (barra/ingest.py)
     Msg("segment.no_turnaround", "no turnaround stood out from the noise",
         "ningún cambio de dirección destacó sobre el ruido"),
+    Msg("segment.span_cut_end", "candidate at {t}s runs past the end of the active span - the rest of the rep was cut off, so it is not scored",
+        "el intento en {t} s sigue después del tramo que se pudo medir: le falta el final, así que no se puntúa"),
+    Msg("segment.span_cut_start", "candidate at {t}s runs past the start of the active span - the rest of the rep was cut off, so it is not scored",
+        "el intento en {t} s empieza antes del tramo que se pudo medir: le falta el principio, así que no se puntúa"),
     Msg("segment.too_brief", "candidate at {t}s was too brief to be a rep",
         "el intento en {t} s fue demasiado corto para ser una repetición"),
     Msg("segment.interpolated", "candidate at {t}s is mostly interpolated - only {p} of its frames were tracked",

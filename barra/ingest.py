@@ -315,6 +315,11 @@ def _rest_level(raw: np.ndarray, valid: np.ndarray, a: int, b: int,
     return min(ends, key=abs)
 
 
+# A turnaround this close (seconds) to a span edge, with the signal still
+# above the rest gate there, belongs to a rep the trimming cut in half.
+SPAN_EDGE_MARGIN_S = 0.5
+
+
 def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
                          max_invented_frac: float = 0.4,
                          max_half_rep_s: float | None = None,
@@ -518,6 +523,25 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             return i
 
         a, b = walk(pk, -1), walk(pk, +1)
+        # A rep that reaches the span edge still above the gate has not
+        # finished: the real rep runs on into the stretch trimmed away as
+        # "off the apparatus". Accepting it keeps only the part inside the
+        # span - a Bulgarian split squat (261018-113422-30bb00, rep 4) turned
+        # 0.1 s before the span ended, was accepted with a 3-frame lift, and
+        # got a tempo of 28:1 and no score. The trimmed stretch is not
+        # trustworthy signal to extend into (that is the walk the span was
+        # drawn to exclude), so the rep is rejected with its reason instead.
+        cut = next((side for side, edge, end in (("start", lo, a), ("end", hi, b))
+                    if end == edge and sig[end] > gate
+                    and abs(pk - end) <= SPAN_EDGE_MARGIN_S * fps), None)
+        if cut is not None:
+            tr.reject(f"candidate at {at}s", "the rep runs past the edge of the active span",
+                      edge=cut, edge_value=float(sig[a if cut == "start" else b]),
+                      gate=float(gate))
+            reasons.append(
+                f"candidate at {pk / fps:.1f}s runs past the {cut} of the active "
+                "span - the rest of the rep was cut off, so it is not scored")
+            continue
         # Length, observation, anchor and rest posture: the checks shared with
         # the relaxed pass, so the two cannot disagree about what a rep is.
         why = candidate_checks(kp, physical, valid, a, pk, b, movement, fps,
