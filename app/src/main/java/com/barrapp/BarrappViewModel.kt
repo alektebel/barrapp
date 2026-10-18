@@ -247,16 +247,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     /**
      * The redesigned intake, saved in one go.
      *
-     * The four answers land in the two places that already own them — the name
-     * and the training frequency on the profile, the goal and the focus
-     * movement in the goals store — so nothing else in the app has to learn a
-     * new shape to read them.
+     * The three answers land in the two places that already own them — the
+     * name and the training frequency on the profile, the goal in the goals
+     * store. The focus movement is not asked here: it arrives from the
+     * objectives intake chat, and any existing value is left alone so the
+     * chat's answer survives an onboarding re-run.
      */
-    fun saveIntake(name: String, activity: ActivityLevel, goal: String, focusExercise: String) {
+    fun saveIntake(name: String, activity: ActivityLevel, goal: String) {
         val app = getApplication<Application>()
         val profile = _state.value.profile.copy(name = name, activity = activity)
         ProfileStore.save(app, profile)
-        val goals = Goals(goal = goal, focusExercise = focusExercise)
+        val goals = Goals(goal = goal, focusExercise = GoalsStore.load(app).focusExercise)
         GoalsStore.save(app, goals)
         WeeklyReviewWorker.schedule(app)
         _state.update { it.copy(profile = profile, goals = goals, screen = Screen.Home) }

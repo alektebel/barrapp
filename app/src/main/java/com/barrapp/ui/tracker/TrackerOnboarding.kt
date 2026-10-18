@@ -41,30 +41,16 @@ import com.barrapp.ui.theme.body
 import com.barrapp.ui.theme.display
 import com.barrapp.ui.theme.mono
 
-/** What the onboarding collects, in the app's own vocabulary. */
+/** What the onboarding collects, in the app's own vocabulary. The focus
+ *  movement is deliberately absent: it comes from the objectives intake chat,
+ *  where it can be reasoned about, not from a first-run multiple choice. */
 data class OnboardingResult(
     val name: String,
-    /** A ladder movement key: pull_up, push_up, dip, muscle_up, squat, knee_raise. */
-    val focusExercise: String,
     val goal: String,
     val activity: ActivityLevel,
 )
 
 private data class Option(val value: String, val label: String, val sub: String = "")
-
-/** Only movements barra can actually measure are offered. Offering an L-sit
- *  here would promise a verdict the pipeline cannot give. */
-private val EXERCISES = listOf(
-    Option("pull_up", "Dominada", "El movimiento de tirón de referencia"),
-    Option("push_up", "Flexión", "El empuje que abre la escalera"),
-    Option("dip", "Fondo", "Empuje vertical, recorrido largo"),
-    Option("muscle_up", "Muscle-up", "Tirón y fondo en un solo movimiento"),
-    Option("squat", "Sentadilla", "Tren inferior, patrón de bisagra"),
-    Option("bulgarian_split_squat", "Sentadilla búlgara",
-        "Tren inferior, una pierna retrasada"),
-    Option("split_squat", "Split squat", "Tren inferior, zancada estática"),
-    Option("knee_raise", "Elevación de rodillas", "Core colgado de la barra"),
-)
 
 private val GOALS = listOf(
     Option("Perfeccionar la técnica", "Perfeccionar técnica",
@@ -97,11 +83,15 @@ private val LEVELS = ActivityLevel.entries.filter { it != ActivityLevel.Unset }.
 }
 
 /**
- * The four-step intake, then the briefing.
+ * The three-step intake, then the briefing.
  *
- * Faithful to the mockup step for step: the dots, the choice cards with their
- * scale-up on selection, the display-face headings, and the briefing card that
- * says what the app will and will not do.
+ * Faithful to the mockup: the dots, the choice cards with their scale-up on
+ * selection, the display-face headings, and the briefing card that says what
+ * the app will and will not do. The mockup's "main movement" step is not one
+ * of them: a multiple-choice at first run cannot know which movement someone
+ * trains, and every screen that used the answer already falls back to the
+ * trained history when it is blank. The objectives intake chat asks it where
+ * it can be reasoned about.
  */
 @Composable
 fun TrackerOnboarding(
@@ -111,22 +101,19 @@ fun TrackerOnboarding(
 ) {
     var step by remember { mutableIntStateOf(0) }
     var name by remember { mutableStateOf(initialName) }
-    var exercise by remember { mutableStateOf("") }
     var goal by remember { mutableStateOf("") }
     var level by remember { mutableStateOf("") }
     var briefing by remember { mutableStateOf(false) }
 
     val canNext = when (step) {
         0 -> name.isNotBlank()
-        1 -> exercise.isNotBlank()
-        2 -> goal.isNotBlank()
+        1 -> goal.isNotBlank()
         else -> level.isNotBlank()
     }
 
     fun finish() = onComplete(
         OnboardingResult(
             name = name.trim(),
-            focusExercise = exercise,
             goal = goal,
             activity = ActivityLevel.entries.firstOrNull { it.name == level } ?: ActivityLevel.Unset,
         )
@@ -135,7 +122,6 @@ fun TrackerOnboarding(
     if (briefing) {
         Briefing(
             name = name.trim(),
-            exercise = EXERCISES.first { it.value == exercise }.label,
             goal = GOALS.first { it.value == goal }.label,
             onStart = ::finish,
             modifier = modifier,
@@ -165,11 +151,11 @@ fun TrackerOnboarding(
             Text("BARRAPP", style = display(20, androidx.compose.ui.text.font.FontWeight.Black, 1f, 0.05f))
         }
         Spacer(Modifier.height(40.dp))
-        ProgressDots(step, 4)
+        ProgressDots(step, 3)
         Spacer(Modifier.height(32.dp))
 
         Column(Modifier.weight(1f).verticalScroll(rememberScrollState())) {
-            Text("PASO ${step + 1} DE 4", style = T.eyebrowAccent)
+            Text("PASO ${step + 1} DE 3", style = T.eyebrowAccent)
             Spacer(Modifier.height(12.dp))
             when (step) {
                 0 -> {
@@ -182,14 +168,6 @@ fun TrackerOnboarding(
                     NameField(name) { name = it }
                 }
                 1 -> {
-                    Heading("TU MOVIMIENTO\nPRINCIPAL")
-                    Text("El coach ajustará el análisis a este ejercicio.", style = T.lead)
-                    Spacer(Modifier.height(24.dp))
-                    EXERCISES.forEach { o ->
-                        ChoiceCard(o.label, o.sub, exercise == o.value) { exercise = o.value }
-                    }
-                }
-                2 -> {
                     Heading("¿QUÉ QUIERES\nCONSEGUIR?")
                     Text("Define tu objetivo ahora. Puedes cambiarlo más adelante.", style = T.lead)
                     Spacer(Modifier.height(24.dp))
@@ -214,8 +192,8 @@ fun TrackerOnboarding(
 
         Column(Modifier.padding(bottom = 32.dp)) {
             TkPrimaryButton(
-                if (step < 3) "Siguiente" else "Ver mi misión",
-                onClick = { if (step < 3) step++ else briefing = true },
+                if (step < 2) "Siguiente" else "Ver mi misión",
+                onClick = { if (step < 2) step++ else briefing = true },
                 enabled = canNext,
             )
         }
@@ -314,7 +292,6 @@ private fun ChoiceCard(label: String, sub: String, selected: Boolean, onClick: (
 @Composable
 private fun Briefing(
     name: String,
-    exercise: String,
     goal: String,
     onStart: () -> Unit,
     modifier: Modifier = Modifier,
@@ -345,12 +322,6 @@ private fun Briefing(
         Text(
             "BIENVENIDO,\n${name.uppercase()}",
             style = T.headline,
-            textAlign = TextAlign.Center,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            "Ejercicio principal: $exercise",
-            style = body(14, Tk.primaryLight),
             textAlign = TextAlign.Center,
         )
         Text(
