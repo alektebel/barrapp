@@ -1,34 +1,52 @@
 package com.barrapp.ui.tracker
 
-import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.barrapp.Drill
 import com.barrapp.ui.theme.T
@@ -36,7 +54,10 @@ import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.body
 import com.barrapp.ui.theme.mono
 
-/** One technique rule, as the app measured it over the recent window. */
+/** One technique rule, as the app measured it over the recent window.
+ *
+ *  No longer rendered on this screen: the COACH tab is now the conversation
+ *  of design 2e. The class stays because the data layer still builds it. */
 data class CoachRule(
     val id: String,
     val title: String,
@@ -48,7 +69,9 @@ data class CoachRule(
     val cue: String,
 )
 
-/** A fault the coach is working on, with the evidence behind it. */
+/** A fault the coach is working on, with the evidence behind it.
+ *
+ *  No longer rendered on this screen: see [CoachRule]. */
 data class CoachFocus(
     val fault: String,
     val cue: String,
@@ -58,6 +81,27 @@ data class CoachFocus(
      *  compare against. */
     val improvementPct: Int?,
     val improving: Boolean,
+)
+
+/**
+ * The proof behind a coach claim: a rep of a concrete session the athlete can
+ * open. The video is the evidence — every answer points at one.
+ */
+data class CoachProof(
+    /** Human label, e.g. "Rep 2 de ago vs rep 2 de hoy". */
+    val label: String,
+    /** ISO date of the session the proof opens; blank when unknown. */
+    val sessionDate: String = "",
+    /** 1-based rep inside that session; 0 opens the session itself. */
+    val repIndex: Int = 0,
+)
+
+/** One exchange in the coach conversation, oldest first. */
+data class CoachMessage(
+    val fromUser: Boolean,
+    val text: String,
+    /** The clip/rep that backs this answer, when it has one. */
+    val proof: CoachProof? = null,
 )
 
 data class CoachData(
@@ -70,24 +114,37 @@ data class CoachData(
     val totalMinutes: Int,
     /** Plain statement about the last session when it could not be scored. */
     val notice: String? = null,
-    /** "De tu última sesión puntuada: Movimiento · fecha" when the last session was not scored. */
+    /** "Movimiento · fecha" of the scored session the rules and focus come from.
+     *  No longer rendered: the 2e header names the number of sessions. */
     val basisLabel: String? = null,
     /** "Movimiento · fecha" of the scored session the rules and focus come from. */
     val rulesLabel: String = "",
+    /** The conversation so far, oldest first. */
+    val conversation: List<CoachMessage> = emptyList(),
+    /** True while the coach is working on the last question. */
+    val thinking: Boolean = false,
+    /** Questions offered as chips, taken from the last session. */
+    val suggestions: List<String> = emptyList(),
 )
 
 /**
- * Coach.
+ * Coach — design 2e: the tab IS the conversation.
  *
- * The mockup fronts each fault with an Unsplash photograph. This app ships no
- * photo assets and does not fetch remote images — an image request would carry
- * the fact that this athlete is working on this fault to a third party — so
- * the hero panels are the design's gradient with its type on top. That is the
- * one place this screen renders less than the mockup.
+ * Header "COACH · RESPONDE CON TUS DATOS · N SESIONES", the exchange as ink
+ * bubbles (the athlete) and white bordered cards (the coach), a PRUEBA row
+ * under every answer that carries one, suggested questions as chips above the
+ * field, and the field with its orange send arrow.
  *
- * Everything else is measured: the focus is the fault the ledger counted most
- * over the last four weeks, the rules are the checks the pipeline actually
- * ran, and a rule that could not be judged says so instead of passing.
+ * The design's rule B2 is structural here: a question is never left without a
+ * visible answer. While the coach works the REVISANDO bubble stands in; if an
+ * answer never arrives (crash, dropped store) a human error card with
+ * "Reintentar" takes its place, so the last question is always answered by
+ * something.
+ *
+ * What this port renders less than the mockup: its answers carry bold spans
+ * ("de 58 a 69") which plain-string answers from the coach cannot mark, and
+ * the PRUEBA rows only appear once the answer pipeline attaches the
+ * session/rep evidence it points at.
  */
 @Composable
 fun TrackerCoach(
@@ -95,321 +152,352 @@ fun TrackerCoach(
     onAskCoach: () -> Unit,
     onRecord: () -> Unit,
     modifier: Modifier = Modifier,
+    /** Sends a question. Default bridges to the chat sheet the previous
+     *  design used; wire it to the coach ask entry point instead. */
+    onSend: (String) -> Unit = { onAskCoach() },
+    /** Opens the session/rep a PRUEBA row points at. */
+    onOpenProof: (CoachProof) -> Unit = {},
 ) {
-    var openRule by remember { mutableStateOf(data.rules.firstOrNull()?.id) }
-    var secondOpen by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf("") }
+    val scroll = rememberScrollState()
 
-    Column(
-        modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
-            .padding(top = 8.dp, bottom = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp),
-    ) {
-        Column {
-            Text("BarrApp", style = T.eyebrowWide)
+    // The latest turn is always on view: follow the conversation down as it
+    // grows and when the REVISANDO bubble appears at its end.
+    LaunchedEffect(data.conversation.size, data.thinking) {
+        scroll.animateScrollTo(scroll.maxValue)
+    }
+
+    Column(modifier.fillMaxSize().imePadding()) {
+        Column(
+            Modifier.fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 10.dp),
+        ) {
             Text("COACH", style = T.pageTitle)
             Text(
-                if (data.basisLabel != null) data.basisLabel
-                else if (data.sessions > 0)
-                    if (data.sessions == 1) "Basado en tu última sesión de ${data.movement}"
-                    else "Basado en tus últimas ${data.sessions} sesiones de ${data.movement}"
-                else "Todavía sin sesiones que leer",
-                style = T.bodyS,
+                sessionsSubtitle(data.sessions),
+                style = mono(11, 0.05f, Tk.muted),
                 modifier = Modifier.padding(top = 2.dp),
             )
         }
+        Box(Modifier.fillMaxWidth().height(2.dp).background(Tk.border))
 
-        data.notice?.let { notice ->
-            TkCard {
-                Text("SIN PUNTUAR", style = T.sectionTitle)
-                Spacer(Modifier.height(6.dp))
-                Text(notice, style = T.bodyS)
+        Column(
+            Modifier
+                .weight(1f)
+                .fillMaxWidth()
+                .verticalScroll(scroll)
+                .padding(start = 16.dp, end = 16.dp, top = 14.dp, bottom = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            data.notice?.let { notice -> NoticeCard(notice) }
+            if (data.conversation.isEmpty()) {
+                IntroCard(hasSessions = data.sessions > 0, onRecord = onRecord)
+            }
+            data.conversation.forEach { turn ->
+                if (turn.fromUser) UserBubble(turn.text) else CoachAnswer(turn, onOpenProof)
+            }
+            if (data.thinking) {
+                ThinkingBubble(data.sessions)
+            } else {
+                // No thinking and no answer: the question fell through. Say so
+                // and offer the way back instead of leaving it hanging.
+                data.conversation.lastOrNull()
+                    ?.takeIf { it.fromUser }
+                    ?.let { last -> RetryCard(onRetry = { onSend(last.text) }) }
             }
         }
 
-        if (data.focus == null) {
-            TkCard {
-                Text("NADA QUE CORREGIR TODAVÍA", style = T.sectionTitle)
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    if (data.notice != null)
-                        "Aún no hay ninguna sesión puntuada de la que sacar errores. " +
-                            "Filma otra serie de cuerpo entero y trabajará sobre lo que salga."
-                    else
-                        "El coach solo habla de errores que se han medido. Filma una serie " +
-                            "y trabajará sobre lo que salga de ella.",
-                    style = T.bodyS,
+        val chips = suggestionChips(data)
+        if (chips.isNotEmpty()) {
+            @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+            FlowRow(
+                Modifier.fillMaxWidth()
+                    .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                chips.forEach { question ->
+                    SuggestionChip(question) { onSend(question) }
+                }
+            }
+        }
+
+        Row(
+            Modifier.fillMaxWidth()
+                .padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            AskField(draft = draft, onDraft = { draft = it }, modifier = Modifier.weight(1f))
+            SendButton(enabled = draft.isNotBlank()) {
+                onSend(draft.trim())
+                draft = ""
+            }
+        }
+    }
+}
+
+// ---- the conversation ------------------------------------------------------
+
+@Composable
+private fun UserBubble(text: String) {
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+        // Capped, not fixed: a short question stays a short bubble and a long
+        // one wraps inside the design's 78%.
+        Box(
+            Modifier
+                .widthIn(max = 280.dp)
+                .clip(CardShape)
+                .background(Tk.ink)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+        ) {
+            Text(text, style = body(15, Tk.onInk, 1.4f))
+        }
+    }
+}
+
+@Composable
+private fun CoachAnswer(turn: CoachMessage, onOpenProof: (CoachProof) -> Unit) {
+    Column(
+        Modifier.widthIn(max = 320.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        TkCard(padding = PaddingValues(12.dp)) {
+            Text(turn.text, style = body(15, Tk.ink, 1.45f))
+        }
+        turn.proof?.takeIf { it.label.isNotBlank() }?.let { proof ->
+            ProofRow(proof, onOpenProof)
+        }
+    }
+}
+
+/** "PRUEBA · Rep 2 de ago vs rep 2 de hoy": the answer's evidence, one tap
+ *  from the clip it came from. */
+@Composable
+private fun ProofRow(proof: CoachProof, onOpen: (CoachProof) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(CardShape)
+            .background(Tk.surface)
+            .border(2.dp, Tk.border, CardShape)
+            .noRipple { onOpen(proof) }
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    ) {
+        Box(
+            Modifier
+                .size(56.dp)
+                .clip(InnerShape)
+                .background(Tk.dark),
+            contentAlignment = Alignment.Center,
+        ) {
+            // The design's play mark (M3 1.5v11l9-5.5z) on the video ground.
+            Canvas(
+                Modifier
+                    .size(16.dp)
+                    .semantics { contentDescription = "Reproducir la prueba en vídeo" },
+            ) {
+                val s = size.width / 14f
+                drawPath(
+                    Path().apply {
+                        moveTo(3f * s, 1.5f * s)
+                        lineTo(3f * s, 12.5f * s)
+                        lineTo(12f * s, 7f * s)
+                        close()
+                    },
+                    Tk.onInk,
                 )
-                Spacer(Modifier.height(16.dp))
-                TkPrimaryButton("Grabar un set", onRecord)
             }
-        } else {
-            SlideUp { FocusCard(data.focus) }
         }
+        Column(Modifier.weight(1f)) {
+            Text("PRUEBA", style = mono(11, 0.05f, Tk.muted))
+            Text(proof.label, style = body(14, Tk.ink, 1.3f, FontWeight.SemiBold))
+        }
+    }
+}
 
-        if (data.rules.isNotEmpty()) {
-            SlideUp(delayMillis = 100) {
-                TkCard(padding = PaddingValues(0.dp)) {
-                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 8.dp)) {
-                        Eyebrow("Reglas de técnica · ${data.rulesLabel.ifBlank { data.movement }}")
-                        Text(
-                            "El sistema evalúa estos criterios en cada repetición",
-                            style = T.noteNine,
-                            modifier = Modifier.padding(top = 2.dp),
-                        )
-                    }
-                    data.rules.forEach { rule ->
-                        Box(Modifier.fillMaxWidth().height(1.dp).background(Tk.border))
-                        RuleRow(
-                            rule = rule,
-                            open = openRule == rule.id,
-                            onToggle = { openRule = if (openRule == rule.id) null else rule.id },
-                        )
-                    }
+/** The design's rule B2: the coach is never silent — this stands in for the
+ *  answer while it is being worked out. */
+@Composable
+private fun ThinkingBubble(sessions: Int) {
+    Row(
+        Modifier
+            .widthIn(max = 320.dp)
+            .clip(CardShape)
+            .background(Tk.surface)
+            .border(2.dp, Tk.border, CardShape)
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        repeat(3) { i -> ThinkingDot(delayMillis = i * 150) }
+        Spacer(Modifier.size(6.dp))
+        Text(revisandoLabel(sessions), style = mono(12, 0.05f, Tk.muted))
+    }
+}
+
+/** The design's `dotPulse`: 1s in-out, each dot a step behind the last. */
+@Composable
+private fun ThinkingDot(delayMillis: Int) {
+    val transition = rememberInfiniteTransition(label = "thinking")
+    val alpha by transition.animateFloat(
+        initialValue = 1f,
+        targetValue = 0.2f,
+        animationSpec = infiniteRepeatable(
+            tween(500, delayMillis = delayMillis, easing = LinearEasing),
+            RepeatMode.Reverse,
+        ),
+        label = "dot",
+    )
+    Box(Modifier.size(8.dp).alpha(alpha).background(Tk.ink, CircleShape))
+}
+
+/** The answer never came: human words and one way out, never a hanging
+ *  question (the design's "nunca una pregunta sin respuesta visible"). */
+@Composable
+private fun RetryCard(onRetry: () -> Unit) {
+    TkCard {
+        Eyebrow("Sin respuesta")
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Ahora mismo no he podido leer tus sesiones para contestar. " +
+                "Revisa tu conexión y vuelve a intentarlo.",
+            style = body(15, Tk.ink, 1.45f),
+        )
+        Spacer(Modifier.height(12.dp))
+        TkSecondaryButton("Reintentar", onRetry)
+    }
+}
+
+/** The empty conversation. No invented numbers: what the coach is for, and,
+ *  with nothing filmed yet, the way to give it something to read. */
+@Composable
+private fun IntroCard(hasSessions: Boolean, onRecord: () -> Unit) {
+    TkCard {
+        Eyebrow("Tu coach")
+        Spacer(Modifier.height(6.dp))
+        Text(
+            "Pregúntame lo que quieras sobre tus series. Contesto con lo que se ha " +
+                "medido en tus vídeos: repeticiones, puntuaciones y fallos. Nada de opiniones.",
+            style = body(15, Tk.ink, 1.45f),
+        )
+        if (!hasSessions) {
+            Spacer(Modifier.height(16.dp))
+            TkPrimaryButton("Grabar una serie", onRecord)
+        }
+    }
+}
+
+/** A session that could not be scored, said in the coach's own voice. */
+@Composable
+private fun NoticeCard(notice: String) {
+    TkCard {
+        Eyebrow("Sin puntuar")
+        Spacer(Modifier.height(6.dp))
+        Text(notice, style = body(15, Tk.ink, 1.45f))
+    }
+}
+
+// ---- the chips and the field -----------------------------------------------
+
+/** The chips above the field: the ones the last session suggests when the
+ *  data brings them, otherwise generic ones named after what the screen does
+ *  know (the movement of the last scored session). None with zero sessions. */
+private fun suggestionChips(data: CoachData): List<String> {
+    if (data.suggestions.isNotEmpty()) return data.suggestions
+    if (data.sessions <= 0) return emptyList()
+    return buildList {
+        if (data.movement.isNotBlank()) add("¿Estoy mejorando en ${data.movement}?")
+        add("¿Qué mostró realmente mi última sesión?")
+        add("¿Por qué algunas repeticiones no tienen puntuación?")
+    }
+}
+
+/** A visual 36dp pill the design draws, with the 48dp tap target around it. */
+@Composable
+private fun SuggestionChip(question: String, onAsk: () -> Unit) {
+    Box(
+        Modifier
+            .heightIn(min = 48.dp)
+            .noRipple(onAsk),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier
+                .heightIn(min = 36.dp)
+                .clip(CircleShape)
+                .background(Tk.bg)
+                .border(2.dp, Tk.border, CircleShape)
+                .padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(question, style = body(13, Tk.ink, 1.25f, FontWeight.SemiBold))
+        }
+    }
+}
+
+@Composable
+private fun AskField(draft: String, onDraft: (String) -> Unit, modifier: Modifier = Modifier) {
+    val focusRequester = remember { FocusRequester() }
+    // The whole bordered area is the tap target, as in the chat sheet.
+    Box(
+        modifier
+            .heightIn(min = 48.dp)
+            .clip(InnerShape)
+            .background(Tk.surface)
+            .border(2.dp, Tk.border, InnerShape)
+            .focusRequester(focusRequester)
+            .noRipple { focusRequester.requestFocus() }
+            .padding(horizontal = 12.dp, vertical = 13.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        BasicTextField(
+            value = draft,
+            onValueChange = onDraft,
+            textStyle = body(15, Tk.ink, 1.3f),
+            cursorBrush = SolidColor(Tk.primary),
+            modifier = Modifier.fillMaxWidth(),
+            decorationBox = { inner ->
+                if (draft.isEmpty()) {
+                    Text("Pregunta sobre tus series…", style = body(15, Tk.muted, 1.3f))
                 }
-            }
-        }
-
-        if (data.drills.isNotEmpty()) {
-            SlideUp(delayMillis = 200) {
-                TkCard {
-                    Row(
-                        Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Eyebrow("Ejercicios correctivos de hoy")
-                        Text("~${data.totalMinutes} min", style = T.eyebrowNine)
-                    }
-                    Spacer(Modifier.height(12.dp))
-                    data.drills.forEachIndexed { i, drill ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(vertical = 10.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Box(
-                                Modifier
-                                    .size(28.dp)
-                                    .clip(ChipShape)
-                                    .background(Tk.primaryA(0.15f)),
-                                contentAlignment = Alignment.Center,
-                            ) {
-                                Text(
-                                    "${i + 1}",
-                                    style = com.barrapp.ui.theme.display(
-                                        14, androidx.compose.ui.text.font.FontWeight.Black,
-                                        1f, 0f, Tk.primaryLight,
-                                    ),
-                                )
-                            }
-                            Column(Modifier.weight(1f)) {
-                                Row(
-                                    Modifier.fillMaxWidth(),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
-                                ) {
-                                    Text(drill.title, style = T.itemTitle)
-                                    Text(drill.sets, style = mono(9, 0.05f, Tk.primary))
-                                }
-                                Text(drill.focus, style = T.noteTiny,
-                                    modifier = Modifier.padding(top = 2.dp))
-                                Text(drill.duration, style = mono(9, 0.05f, Tk.faint),
-                                    modifier = Modifier.padding(top = 2.dp))
-                            }
-                        }
-                        if (i < data.drills.size - 1) {
-                            Box(Modifier.fillMaxWidth().height(1.dp).background(Tk.border))
-                        }
-                    }
-                }
-            }
-        }
-
-        data.secondary?.let { second ->
-            SlideUp(delayMillis = 300) {
-                TkCard(padding = PaddingValues(0.dp)) {
-                    Box(
-                        Modifier
-                            .fillMaxWidth()
-                            .height(112.dp)
-                            .background(heroBrush(if (second.improving) Tk.teal else Tk.amber))
-                            .noRipple { secondOpen = !secondOpen }
-                            .padding(16.dp),
-                    ) {
-                        Column(
-                            Modifier.fillMaxSize(),
-                            verticalArrangement = Arrangement.SpaceBetween,
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            ) {
-                                Box(
-                                    Modifier.size(width = 6.dp, height = 16.dp)
-                                        .clip(RoundedCornerShape(3.dp))
-                                        .background(if (second.improving) Tk.teal else Tk.amber)
-                                )
-                                Text(
-                                    if (second.improving) "MEJORANDO" else "EN SEGUIMIENTO",
-                                    style = mono(9, 0.12f, if (second.improving) Tk.teal else Tk.amber),
-                                )
-                            }
-                            Spacer(Modifier.height(24.dp))
-                            Text(second.fault.uppercase(), style = T.missionTitle)
-                        }
-                    }
-                    AnimatedVisibility(secondOpen) {
-                        Column(Modifier.padding(16.dp)) {
-                            Text(second.cue, style = T.bodyS)
-                            Spacer(Modifier.height(12.dp))
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                second.improvementPct?.let { pct ->
-                                    Tag(
-                                        if (pct >= 0) "↓ $pct% en 4 semanas"
-                                        else "↑ ${-pct}% en 4 semanas",
-                                        if (pct >= 0) Tk.teal else Tk.amber,
-                                    )
-                                }
-                                Tag("${second.repsAffected} reps este mes", Tk.muted)
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        TkSecondaryButton(
-            "Preguntar al coach",
-            onAskCoach,
-            tint = Tk.primaryLight,
-            border = Tk.primaryA(0.25f),
-            background = Tk.primaryA(0.12f),
+                inner()
+            },
+            singleLine = true,
         )
     }
 }
 
+/** The design's orange send arrow, 48dp, ink border, 12dp corners. */
 @Composable
-private fun FocusCard(focus: CoachFocus) {
-    TkCard(padding = PaddingValues(0.dp), accent = true) {
-        Box(
-            Modifier
-                .fillMaxWidth()
-                .height(144.dp)
-                .background(heroBrush(Tk.amber))
-                .padding(16.dp),
-            contentAlignment = Alignment.BottomStart,
-        ) {
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Box(
-                        Modifier.size(width = 6.dp, height = 16.dp)
-                            .clip(RoundedCornerShape(3.dp)).background(Tk.amber)
-                    )
-                    Text("FOCO DE HOY", style = mono(9, 0.15f, Tk.amber))
-                }
-                Spacer(Modifier.height(4.dp))
-                Text(focus.fault.uppercase(), style = T.cardHeadline)
-                Text(
-                    buildString {
-                        append("${focus.repsAffected} " + if (focus.repsAffected == 1) "rep afectada" else "reps afectadas")
-                        focus.improvementPct?.let {
-                            append(if (it >= 0) " · ↓ $it% en 4 semanas" else " · ↑ ${-it}% en 4 semanas")
-                        }
-                    },
-                    style = body(12, Tk.inkA(0.7f)),
-                    modifier = Modifier.padding(top = 2.dp),
-                )
-            }
-        }
-        Column(Modifier.background(Tk.surface).padding(16.dp)) {
-            Text(focus.cue, style = T.bodyS)
-            focus.drill?.let { drill ->
-                Spacer(Modifier.height(12.dp))
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(InnerShape)
-                        .background(Tk.primaryA(0.1f))
-                        .border(1.dp, Tk.primaryA(0.2f), InnerShape)
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp),
-                ) {
-                    Text("🏋️", style = body(18, Tk.ink))
-                    Column {
-                        Text("Ejercicio correctivo", style = T.itemTitleSmall)
-                        Text("${drill.title} · ${drill.sets}", style = body(10, Tk.primaryLight))
-                    }
-                }
-            }
-        }
+private fun SendButton(enabled: Boolean, onSend: () -> Unit) {
+    Box(
+        Modifier
+            .size(48.dp)
+            .clip(InnerShape)
+            .background(if (enabled) Tk.primary else Tk.locked)
+            .border(2.dp, Tk.border, InnerShape)
+            .semantics(mergeDescendants = true) { contentDescription = "Enviar pregunta" }
+            .noRipple { if (enabled) onSend() },
+        contentAlignment = Alignment.Center,
+    ) {
+        Text("↑", style = mono(18, 0f, if (enabled) Tk.ink else Tk.muted, FontWeight.SemiBold))
     }
 }
 
-@Composable
-private fun RuleRow(rule: CoachRule, open: Boolean, onToggle: () -> Unit) {
-    Column {
-        Row(
-            Modifier.fillMaxWidth().noRipple(onToggle).padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(8.dp).clip(CircleShape).background(rule.verdictInk))
-            Spacer(Modifier.size(12.dp))
-            Column(Modifier.weight(1f)) {
-                Text(rule.title, style = T.itemTitle)
-                Text(rule.phase, style = T.eyebrowNine)
-            }
-            Text(rule.verdict, style = mono(9, 0.05f, rule.verdictInk))
-            Spacer(Modifier.size(10.dp))
-            androidx.compose.foundation.Canvas(Modifier.size(14.dp)) {
-                drawChevron(Tk.muted, flipped = open)
-            }
-        }
-        AnimatedVisibility(open) {
-            Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                Text(rule.description, style = T.bodyS)
-                if (rule.cue.isNotBlank()) {
-                    Spacer(Modifier.height(8.dp))
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .clip(InnerShape)
-                            .background(Tk.primaryA(0.08f))
-                            .border(1.dp, Tk.primaryA(0.15f), InnerShape)
-                            .padding(horizontal = 12.dp, vertical = 10.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    ) {
-                        Text("💡", style = body(14, Tk.primaryLight))
-                        Text(rule.cue, style = body(12, Tk.primaryLight))
-                    }
-                }
-            }
-        }
-    }
+// ---- labels ----------------------------------------------------------------
+
+/** The design's header line, with the real number of sessions. */
+private fun sessionsSubtitle(sessions: Int): String = when {
+    sessions > 1 -> "RESPONDE CON TUS DATOS · $sessions SESIONES"
+    sessions == 1 -> "RESPONDE CON TUS DATOS · 1 SESIÓN"
+    else -> "RESPONDE CON TUS DATOS"
 }
 
-@Composable
-private fun Tag(text: String, ink: Color) {
-    Text(
-        text,
-        style = body(10, ink),
-        modifier = Modifier
-            .clip(ChipShape)
-            .background(ink.copy(alpha = 0.1f))
-            .border(1.dp, ink.copy(alpha = 0.2f), ChipShape)
-            .padding(horizontal = 8.dp, vertical = 4.dp),
-    )
+private fun revisandoLabel(sessions: Int): String = when {
+    sessions > 1 -> "REVISANDO $sessions SESIONES"
+    sessions == 1 -> "REVISANDO 1 SESIÓN"
+    else -> "REVISANDO TUS SESIONES"
 }
-
-/** The gradient that stands in for the mockup's darkened photograph. */
-private fun heroBrush(tint: Color) = Brush.linearGradient(
-    listOf(
-        Tk.card,
-        tint.copy(alpha = 0.10f),
-        Tk.surface,
-    )
-)
