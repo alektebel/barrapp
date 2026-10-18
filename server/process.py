@@ -106,9 +106,42 @@ _TRACES: dict[str, object] = {}
 # push-ups). When geometry and the model agree, nothing waits.
 VISION_VOTE_WAIT_S = 45.0
 
+# How far outside the vision model's exercise window a rep may sit and still
+# belong to the set (seconds).
+VISION_WINDOW_MARGIN_S = 1.5
+
 # The note a rep cut by a span edge carries (counted, not scored).
 CUT_REP_NOTE = ("the rep runs past the end of the measured stretch, so its end "
                 "was cut off and it is counted but not scored")
+
+
+def _inside_vision_window(found, window, fps: float, tr):
+    """The reps that belong to the set the vision model located.
+
+    Picking the kettlebells up before a Bulgarian split squat is a squat-shaped
+    dip; the segmenter counted it as rep 1 (4.4-6.0 s) while the vision model
+    put the exercise at 9.7-35.7 s. A rep lying wholly outside that window,
+    plus a margin, is setup, not set. No window - vision late, failed or not
+    usable - leaves the count exactly as the segmenter found it, and the
+    window never removes every rep: a wrong window must not erase a set."""
+    try:
+        win = window() if callable(window) else window
+    except Exception:  # noqa: BLE001 - localization never fails a job
+        win = None
+    if not win or not found:
+        return found
+    lo = float(win[0]) - VISION_WINDOW_MARGIN_S
+    hi = float(win[1]) + VISION_WINDOW_MARGIN_S
+    keep = [r for r in found if r[2] / fps >= lo and r[0] / fps <= hi]
+    if len(keep) == len(found) or not keep:
+        return found
+    dropped = [r for r in found if r not in keep]
+    tr.step("reps outside the located exercise", window_s=[round(lo, 2), round(hi, 2)],
+            dropped_s=[[round(a / fps, 2), round(b / fps, 2)] for a, _, b in dropped])
+    out = type(found)(keep)
+    if hasattr(found, "cut"):
+        out.cut = {t for t in found.cut if any(t == r[1] for r in keep)}
+    return out
 
 
 def _resolve_vote(vote, wait_s: float = 0.0):
@@ -166,7 +199,8 @@ def _finish(trace, report: dict, job: dict, requested: str) -> dict:
 
 
 def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
-                vision_label=None, pose_backend_override: str | None = None) -> dict:
+                vision_label=None, pose_backend_override: str | None = None,
+                vision_window=None) -> dict:
     """The measurement and its report - everything the phone needs except the
     advisory vision note, which `add_vision` adds afterwards.
 
@@ -201,7 +235,8 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
                            variant=job.get("variant"),
                            pose=pose,
                            vision_label=vision_label,
-                           pose_backend_override=pose_backend_override)
+                           pose_backend_override=pose_backend_override,
+                           vision_window=vision_window)
     # The model prose is OFF the critical path (docs/SPEED-PLAN.md B): the
     # result reaches the phone with the deterministic Spanish text and
     # `proseStatus: "pending"`, and `finish_prose` upgrades it afterwards,
@@ -537,7 +572,8 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                  declared_bin: str | None = None,
                  variant: str | None = None,
                  vision_label: str | None = None,
-                 pose_backend_override: str | None = None) -> dict:
+                 pose_backend_override: str | None = None,
+                 vision_window=None) -> dict:
     """Measure one clip. `on_stage`, when given, is called with a short human
     phrase at each step that can take real time, so a waiting phone can say
     where the work is. `visual_count`, when given, is the last resort for a
@@ -553,7 +589,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     it is never inferred from a posture, and rules written for a different
     standard are left out rather than fired. `vision_label` is an independent
     multimodal name for the movement (typically from locate_exercise); when
-    auto-detecting it is the third vote in fuse_detection."""
+    auto-detecting it is the third vote in fuse_detection. `vision_window` is
+    where that model saw the exercise, (startS, endS) or a callable returning
+    it or None: reps wholly outside it are not part of the set."""
     def _stage(name: str) -> None:
         if on_stage is None:
             return
@@ -854,6 +892,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
 
     _stage("finding the reps")
     found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
+    found = _inside_vision_window(found, vision_window, fps, tr)
     sentinel.watch(tr, "segments", {"found": found, "blockers": reasons},
                    subject=found, n_frames=int(len(pose.keypoints)),
                    inputs={"movement": movement.name, "fps": float(fps)})

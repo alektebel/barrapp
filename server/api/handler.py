@@ -897,7 +897,18 @@ def worker(event, _context):
                         (time.perf_counter_ns() - started_ns) / 1_000_000)
                     localization_timing["fusionOutcome"] = outcome
 
-        result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote)
+        def _vision_window():
+            # Only a window already in hand: fusion has had its wait by the
+            # time reps are counted, and counting never waits on vision.
+            if not located_future.done():
+                return None
+            located = located_future.result() or {}
+            if not located.get("usable") or located.get("startS") is None:
+                return None
+            return float(located["startS"]), float(located["endS"])
+
+        result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote,
+                             vision_window=_vision_window)
 
         # The measurement reaches the phone now. Cutting and re-uploading the
         # stored clip (~44 s on 2026-10-11), the model prose (~10-15 s,

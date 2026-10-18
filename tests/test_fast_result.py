@@ -410,7 +410,7 @@ class Worker(unittest.TestCase):
 
         seen = {}
 
-        def measure(job, path, on_stage=None, pose=None, vision_label=None):
+        def measure(job, path, on_stage=None, pose=None, vision_label=None, vision_window=None):
             # Locate is already running when measuring starts...
             seen["started_before_measure"] = started.wait(1.0)
             # ...and finishes while the measured pose is in flight.
@@ -436,7 +436,7 @@ class Worker(unittest.TestCase):
 
         seen = {}
 
-        def measure(job, path, on_stage=None, pose=None, vision_label=None):
+        def measure(job, path, on_stage=None, pose=None, vision_label=None, vision_window=None):
             seen["no_wait"] = process._resolve_vote(vision_label, 0.0)
             seen["waited"] = process._resolve_vote(vision_label, 2.0)
             return {**measured(), "visionStatus": "skipped", "traceId": "t"}
@@ -454,7 +454,7 @@ class Worker(unittest.TestCase):
             return {"exercise": "push_up", "usable": True,
                     "startS": 1.0, "endS": 8.0}
 
-        def measure(_job, _path, on_stage=None, pose=None, vision_label=None):
+        def measure(_job, _path, on_stage=None, pose=None, vision_label=None, vision_window=None):
             # Model the pose stage taking longer than localization. The vote
             # is ready by fusion, so the result path must not wait here.
             time.sleep(0.08)
