@@ -1082,11 +1082,10 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # Each measured fault costs its rep FAULT_PENALTY points: a clean rep
         # reads ~95-100, and the number now moves with what was found wrong.
         if q.score is not None and rep_faults:
-            from barra.quality import FAULT_PENALTY
-            q = type(q)(max(0, q.score - FAULT_PENALTY * len(rep_faults)),
-                        q.components, q.penalties,
-                        {**q.context, "faultPenalty": FAULT_PENALTY * len(rep_faults)},
-                        note=q.note)
+            from barra.quality import FAULT_PENALTY, FAULT_PENALTY_MAX
+            cost = min(FAULT_PENALTY_MAX, FAULT_PENALTY * len(rep_faults))
+            q = type(q)(max(0, q.score - cost), q.components, q.penalties,
+                        {**q.context, "faultPenalty": cost}, note=q.note)
         if q.score is not None:
             scores.append(q.score)
         assessment_rows = [a.as_dict(label, fps) for a in assessments]

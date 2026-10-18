@@ -94,6 +94,10 @@ SMOOTH_IDEAL = 0.645
 # ratings: separation (Spearman 0.05 -> 0.21) stops improving at 20, and clean
 # sets stay at ~90 while sets rated 1-2 fall to ~78.
 FAULT_PENALTY = 20
+# ...and at most this many in total: three faults took a completed muscle-up
+# to 4/100, which says "nothing happened"; capped, it reads broken, not void.
+# Same separation against the ratings (0.20 vs 0.21).
+FAULT_PENALTY_MAX = 50
 
 
 @dataclass
