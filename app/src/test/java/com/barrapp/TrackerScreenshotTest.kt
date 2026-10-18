@@ -19,11 +19,14 @@ import com.barrapp.ui.tracker.CoachFocus
 import com.barrapp.ui.tracker.CoachRule
 import com.barrapp.ui.tracker.HistoryRow
 import com.barrapp.ui.tracker.LastAnalyzed
+import com.barrapp.ui.tracker.MovementSeries
+import com.barrapp.ui.tracker.PathStep
 import com.barrapp.ui.tracker.PersonalBest
 import com.barrapp.ui.tracker.ProgressData
 import com.barrapp.ui.tracker.RecordPhase
 import com.barrapp.ui.tracker.RepCardItem
 import com.barrapp.ui.tracker.ResultsData
+import com.barrapp.ui.tracker.SessionPoint
 import com.barrapp.ui.tracker.TrackerCoach
 import com.barrapp.ui.tracker.TrackerHome
 import com.barrapp.ui.tracker.TrackerProgress
@@ -274,6 +277,42 @@ class TrackerScreenshotTest {
                                 HistoryRow("2026-09-07", "7 sept", "Dominada", 6, 2, 64),
                                 HistoryRow("2026-09-06", "6 sept", "Flexión", 12, 1, null),
                             ),
+                            movements = listOf(
+                                MovementSeries(
+                                    id = "pull_up", label = "Dominada",
+                                    sessions = listOf(
+                                        SessionPoint("2026-08-09", "9 ago", 52, 6),
+                                        SessionPoint("2026-08-16", "16 ago", 55, 7),
+                                        SessionPoint("2026-08-23", "23 ago", 54, 7),
+                                        SessionPoint("2026-08-30", "30 ago", 59, 8),
+                                        SessionPoint("2026-09-06", "6 sept", 61, 9),
+                                        SessionPoint("2026-09-13", "13 sept", 60, 8),
+                                        SessionPoint("2026-09-20", "20 sept", 66, 9),
+                                        SessionPoint("2026-09-27", "27 sept", 69, 9),
+                                    ),
+                                    average = 60, delta = 11, maxCleanReps = 9, bestRep = 86,
+                                ),
+                                MovementSeries(
+                                    id = "push_up", label = "Flexión",
+                                    sessions = listOf(
+                                        SessionPoint("2026-09-06", "6 sept", 44, 12),
+                                        SessionPoint("2026-09-14", "14 sept", 49, 13),
+                                    ),
+                                    average = 46, delta = 5, maxCleanReps = 13, bestRep = 57,
+                                ),
+                            ),
+                            path = listOf(
+                                PathStep("australian_pull_up", "Dominada australiana",
+                                    "Completado en agosto", com.barrapp.data.SkillGraph.VERIFIED),
+                                PathStep("pull_up", "Dominada estricta",
+                                    "Completado · 9 reps limpias", com.barrapp.data.SkillGraph.VERIFIED),
+                                PathStep("slow_pull_up", "Dominada lenta",
+                                    "Ahora: 5 reps de 3 s bajando · vas por 3",
+                                    com.barrapp.data.SkillGraph.AVAILABLE, next = true,
+                                    missing = "2 repeticiones más en una sesión, y 2 días más que cumplan"),
+                                PathStep("muscle_up", "Muscle-up",
+                                    "Bloqueado hasta completar el anterior"),
+                            ),
                         ),
                         onOpenDay = {}, onOpenLadder = {}, onRecord = {},
                     )
@@ -281,6 +320,33 @@ class TrackerScreenshotTest {
             }
         }
         snap("tracker-progress")
+    }
+
+    /** What the page shows before the root connects movements: the history
+     *  folded into series, so the athlete never sees a demo chart. */
+    @Test
+    fun progressBridge() {
+        rule.setContent {
+            BarrappTheme {
+                TrackerShell(TrackerTab.PROGRESS, {}, Modifier.fillMaxSize()) {
+                    TrackerProgress(
+                        data = ProgressData(
+                            averageScore = 71, averageDelta = 9, repsThisMonth = 84,
+                            bestScore = 81, bestScoreDate = "31 ago", trend = emptyList(),
+                            bests = emptyList(), faults = emptyList(),
+                            history = listOf(
+                                HistoryRow("2026-09-08", "8 sept", "Dominada", 8, 1, 71),
+                                HistoryRow("2026-09-06", "6 sept", "Dominada", 7, 1, 66),
+                                HistoryRow("2026-09-04", "4 sept", "Dominada", 6, 1, 61),
+                                HistoryRow("2026-09-02", "2 sept", "Flexión", 12, 1, null),
+                            ),
+                        ),
+                        onOpenDay = {}, onOpenLadder = {}, onRecord = {},
+                    )
+                }
+            }
+        }
+        snap("tracker-progress-bridge")
     }
 
     @Test
