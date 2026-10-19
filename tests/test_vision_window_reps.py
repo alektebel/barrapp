@@ -44,3 +44,18 @@ def test_a_rep_overlapping_the_margin_stays():
     # Rep 1 ends at 5.97 s; a window starting at 7.0 s (margin 1.5) reaches it.
     out = process._inside_vision_window(reps(), (7.0, 35.0), FPS, NullTrace())
     assert list(out) == FOUND
+
+
+def test_a_wrong_window_does_not_eat_into_the_set():
+    """2026-10-19: on a clip already trimmed to the set, vision put the
+    exercise at 16.3-25.6 s of 28 and three real reps sat before it."""
+    found = [(104, 166, 203), (229, 275, 307), (307, 392, 426),
+             (457, 503, 534), (569, 631, 662), (710, 757, 800)]
+    out = process._inside_vision_window(Reps(found), (16.31, 25.64), FPS, NullTrace())
+    assert list(out) == found
+
+
+def test_one_setup_movement_on_each_side_goes():
+    found = [(30, 60, 90)] + FOUND[1:3] + [(1150, 1180, 1210)]
+    out = process._inside_vision_window(Reps(found), (9.73, 35.67), FPS, NullTrace())
+    assert list(out) == FOUND[1:3]

@@ -132,10 +132,21 @@ def _inside_vision_window(found, window, fps: float, tr):
         return found
     lo = float(win[0]) - VISION_WINDOW_MARGIN_S
     hi = float(win[1]) + VISION_WINDOW_MARGIN_S
-    keep = [r for r in found if r[2] / fps >= lo and r[0] / fps <= hi]
-    if len(keep) == len(found) or not keep:
+    before = [r for r in found if r[2] / fps < lo]
+    after = [r for r in found if r[0] / fps > hi]
+    # Only one setup movement per side: picking the weights up, putting them
+    # down. Several reps outside on one side are the set, and the window is
+    # what is wrong - vision put a trimmed clip's set at 16-26 s of 28 and the
+    # first version of this filter took three real reps off it (2026-10-19).
+    dropped = (before if len(before) == 1 else []) + (after if len(after) == 1 else [])
+    keep = [r for r in found if r not in dropped]
+    if not dropped or not keep:
+        if before or after:
+            tr.step("reps outside the located exercise kept",
+                    window_s=[round(lo, 2), round(hi, 2)],
+                    before=len(before), after=len(after),
+                    why="more than one rep outside on a side: the window is wrong, not the reps")
         return found
-    dropped = [r for r in found if r not in keep]
     tr.step("reps outside the located exercise", window_s=[round(lo, 2), round(hi, 2)],
             dropped_s=[[round(a / fps, 2), round(b / fps, 2)] for a, _, b in dropped])
     out = type(found)(keep)
