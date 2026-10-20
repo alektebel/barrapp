@@ -39,9 +39,10 @@ try:
 except ImportError:  # tests / local dev with `server/` on the path
     from api import llm
 
-# deepseek-v4-flash ran out of nan allowance until 2026-11-01 (402 on every
-# job); glm5.3-flash wrote 6/6 accepted reports at ~40 s, qwen 6/6 at ~97 s.
-REPORT_MODEL = os.environ.get("BARRA_REPORT_MODEL", "glm5.3-flash")
+# deepseek-v4-flash and then glm5.3-flash ran out of nan allowance until
+# 2026-11-01 (402 on every job). qwen3.6 wrote 3/3 accepted reports at ~60 s,
+# qwen3.8-flash 6/6 at ~97 s (2026-10-21).
+REPORT_MODEL = os.environ.get("BARRA_REPORT_MODEL", "qwen3.6")
 BACKUP_MODEL = os.environ.get("BARRA_REPORT_BACKUP_MODEL", "qwen3.8-flash")
 PROSE_KEYS = ("headline", "narrative", "nextSession")
 
