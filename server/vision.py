@@ -68,6 +68,8 @@ LOCALIZE_MODEL_DEFAULT = VISION_MODEL_DEFAULT
 # (a clean push-up set came back "no hemos podido confirmar qué ejercicio es").
 LOCALIZE_TIMEOUT = 30
 LOCALIZE_ATTEMPTS = 1
+# Pause before trying the primary again when both models answered empty.
+LOCALIZE_RETRY_PAUSE_S = 5
 MIN_WINDOW_S = 4.0
 MAX_WINDOW_FRAC = 0.95
 
@@ -784,27 +786,31 @@ def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | 
     content += _images([p for _, p in frames])
     if len(content) < 2:
         return None
-    text = _chat(base, key, model, LOCALIZE_SYSTEM, content,
-                 timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS, check_model=False)
-    parsed = parse_json_object(text)
-    if parsed is None:
-        print(f"[barra] locate: no JSON in the {model} reply "
+    # Primary, the second model, then the primary again after a pause. On
+    # 2026-10-21 mimo and qwen both answered empty at the same moment on a
+    # clip of dips; with no vision vote, geometry alone called it a split
+    # squat (low bars, feet near the floor) and the wrong segmentation lost
+    # reps. Seconds later the same call worked. Pose on a long clip leaves
+    # room for the third try; on a short one it arrives late and is simply
+    # not counted, as before.
+    tries = [model] + ([SECOND_MODEL, model] if model != SECOND_MODEL else [])
+    parsed = None
+    for n, who in enumerate(tries):
+        if n == 2:
+            time.sleep(LOCALIZE_RETRY_PAUSE_S)
+        text = _chat(base, key, who, LOCALIZE_SYSTEM, content,
+                     timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS,
+                     check_model=False)
+        parsed = parse_json_object(text)
+        if parsed is not None:
+            if n:
+                print(f"[barra] locate: answered by {who} on try {n + 1}", flush=True)
+            model = who
+            break
+        print(f"[barra] locate: no JSON in the {who} reply "
               f"({len(text or '')} chars)", flush=True)
-        # The reasoning model sometimes returns an empty 200 even after the
-        # retries; without a second opinion the vision vote is lost.
-        if model != SECOND_MODEL:
-            text = _chat(base, key, SECOND_MODEL, LOCALIZE_SYSTEM, content,
-                         timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS,
-                         check_model=False)
-            parsed = parse_json_object(text)
-            if parsed is None:
-                print(f"[barra] locate: no JSON in the {SECOND_MODEL} reply "
-                      f"({len(text or '')} chars)", flush=True)
-                return None
-            model = SECOND_MODEL
-            print(f"[barra] locate: answered by fallback {model}", flush=True)
-        else:
-            return None
+    if parsed is None:
+        return None
     out = window_from_verdict(parsed, duration, model)
     print(f"[barra] locate: {out.get('exercise') or '?'} "
           f"{out.get('startS')}-{out.get('endS')}s of {duration:.1f}s "

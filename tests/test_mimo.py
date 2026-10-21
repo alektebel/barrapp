@@ -329,10 +329,21 @@ def test_locate_does_not_retry_when_the_primary_is_the_second_model(tmp_path, mo
     assert calls == [vision.SECOND_MODEL]
 
 
-def test_locate_returns_none_when_both_models_fail(tmp_path, monkeypatch):
-    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "nope"])
+def test_locate_returns_none_when_every_try_fails(tmp_path, monkeypatch):
+    monkeypatch.setattr(vision, "LOCALIZE_RETRY_PAUSE_S", 0)
+    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "nope", ""])
     assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
-    assert len(calls) == 2
+    assert calls == ["mimo-v2.6-flash", vision.SECOND_MODEL, "mimo-v2.6-flash"]
+
+
+def test_a_third_try_saves_the_vote_when_both_models_were_empty(tmp_path, monkeypatch):
+    """2026-10-21: mimo and qwen both answered empty on a clip of dips; with
+    no vision vote geometry called it a split squat. Seconds later it worked."""
+    monkeypatch.setattr(vision, "LOCALIZE_RETRY_PAUSE_S", 0)
+    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "", _GOOD])
+    got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    assert got["exercise"] == "push_up" and got["model"] == "mimo-v2.6-flash"
+    assert len(calls) == 3
 
 
 def test_locate_fits_inside_the_fusion_wait(tmp_path, monkeypatch):
