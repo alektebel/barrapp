@@ -61,7 +61,7 @@ private val EXERCISES = listOf(
     Option("squat", "Sentadilla", "Tren inferior, las dos piernas a la vez"),
     Option("bulgarian_split_squat", "Sentadilla búlgara",
         "Tren inferior, una pierna retrasada"),
-    Option("split_squat", "Split squat", "Tren inferior, zancada estática"),
+    Option("split_squat", "Zancada", "Tren inferior, una pierna adelantada y quieta"),
     Option("knee_raise", "Elevación de rodillas", "Core colgado de la barra"),
 )
 

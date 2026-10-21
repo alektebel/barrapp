@@ -66,10 +66,12 @@ LOCALIZE_MODEL_DEFAULT = VISION_MODEL_DEFAULT
 # model keeps both inside that: 120 s x 3 attempts on a slow primary used the
 # whole budget, the fallback never ran, and 5-15% of jobs lost the vision vote
 # (a clean push-up set came back "no hemos podido confirmar qué ejercicio es").
-LOCALIZE_TIMEOUT = 30
+LOCALIZE_TIMEOUT = 40
 LOCALIZE_ATTEMPTS = 1
-# Pause before trying the primary again when both models answered empty.
-LOCALIZE_RETRY_PAUSE_S = 5
+# Raced beside the primary (BARRA_LOCALIZE_MODEL). Tested 2026-10-21 on a
+# frame of parallel-bar dips: mimo and qwen3.8-flash right in ~6 s, qwen3.6
+# right in ~16 s; gemma4 called it a planche, so it is not here.
+LOCALIZE_RACE = ("qwen3.8-flash", "qwen3.6")
 MIN_WINDOW_S = 4.0
 MAX_WINDOW_FRAC = 0.95
 
@@ -737,6 +739,37 @@ def window_from_verdict(parsed: dict, duration: float,
     return out
 
 
+def _race_localize(base: str, key: str, primary: str, content: list[dict]):
+    """(parsed verdict, model) from the first model to answer with JSON, or
+    (None, primary). The others are left to finish on their own threads."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    models = list(dict.fromkeys([primary, *LOCALIZE_RACE]))
+
+    def ask(who: str):
+        text = _chat(base, key, who, LOCALIZE_SYSTEM, content,
+                     timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS,
+                     check_model=False)
+        return who, text, parse_json_object(text)
+
+    pool = ThreadPoolExecutor(max_workers=len(models))
+    try:
+        for fut in as_completed([pool.submit(ask, m) for m in models]):
+            try:
+                who, text, parsed = fut.result()
+            except Exception as exc:  # noqa: BLE001 - one model failing is not the race
+                print(f"[barra] locate: a model raised {type(exc).__name__}", flush=True)
+                continue
+            if parsed is not None:
+                if who != primary:
+                    print(f"[barra] locate: answered first by {who}", flush=True)
+                return parsed, who
+            print(f"[barra] locate: no JSON in the {who} reply "
+                  f"({len(text or '')} chars)", flush=True)
+        return None, primary
+    finally:
+        pool.shutdown(wait=False, cancel_futures=True)
+
+
 def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | None:
     """Where the exercise is: MiMo's window over sampled stills, or None.
 
@@ -786,29 +819,13 @@ def locate_exercise(video_path, out_dir, movement: str | None = None) -> dict | 
     content += _images([p for _, p in frames])
     if len(content) < 2:
         return None
-    # Primary, the second model, then the primary again after a pause. On
-    # 2026-10-21 mimo and qwen both answered empty at the same moment on a
-    # clip of dips; with no vision vote, geometry alone called it a split
-    # squat (low bars, feet near the floor) and the wrong segmentation lost
-    # reps. Seconds later the same call worked. Pose on a long clip leaves
-    # room for the third try; on a short one it arrives late and is simply
-    # not counted, as before.
-    tries = [model] + ([SECOND_MODEL, model] if model != SECOND_MODEL else [])
-    parsed = None
-    for n, who in enumerate(tries):
-        if n == 2:
-            time.sleep(LOCALIZE_RETRY_PAUSE_S)
-        text = _chat(base, key, who, LOCALIZE_SYSTEM, content,
-                     timeout=LOCALIZE_TIMEOUT, attempts=LOCALIZE_ATTEMPTS,
-                     check_model=False)
-        parsed = parse_json_object(text)
-        if parsed is not None:
-            if n:
-                print(f"[barra] locate: answered by {who} on try {n + 1}", flush=True)
-            model = who
-            break
-        print(f"[barra] locate: no JSON in the {who} reply "
-              f"({len(text or '')} chars)", flush=True)
+    # All the localization models at once; the first valid answer wins. One
+    # after another they took up to 30 s each, and on 2026-10-21 mimo and
+    # qwen3.8-flash both timed out in turn on a clip of dips: no vision vote,
+    # geometry alone called it a split squat (low bars, feet near the floor)
+    # and the split-squat segmentation lost reps. Raced, a slow model costs
+    # nothing as long as one answers; the wait is one timeout, not their sum.
+    parsed, model = _race_localize(base, key, model, content)
     if parsed is None:
         return None
     out = window_from_verdict(parsed, duration, model)

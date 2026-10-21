@@ -51,7 +51,7 @@ NOUN = {
     "front_lever": ("front lever", "front levers", False),
     "planche": ("plancha", "planchas", True),
     "pistol_squat": ("sentadilla pistol", "sentadillas pistol", True),
-    "split_squat": ("sentadilla split", "sentadillas split", True),
+    "split_squat": ("zancada", "zancadas", True),
     "bulgarian_split_squat": ("sentadilla búlgara", "sentadillas búlgaras", True),
 }
 _REP = ("repetición", "repeticiones", True)

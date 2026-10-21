@@ -47,7 +47,7 @@ MOVEMENTS = {
     "Muscle-up": "Muscle-up", "Pull-up": "Dominada", "Dip": "Fondo", "Push-up": "Flexión",
     "Squat": "Sentadilla", "Hanging knee raise": "Elevación de rodillas colgado",
     "Front lever": "Front lever", "Planche": "Plancha", "Pistol squat": "Sentadilla pistol",
-    "Split squat": "Sentadilla split", "Bulgarian split squat": "Sentadilla búlgara",
+    "Split squat": "Zancada", "Bulgarian split squat": "Sentadilla búlgara",
     "Not recognised": "No reconocido",
     # Names the classifier can say but the pipeline cannot measure.
     "deadlift": "Peso muerto", "bench_press": "Press de banca", "barbell_squat": "Sentadilla con barra",
@@ -336,7 +336,12 @@ _SPANISH = {"el", "la", "los", "las", "de", "del", "que", "en", "y", "se", "un",
             "por", "con", "para", "es", "sin", "al", "lo", "su", "más", "muy", "ya",
             # Determiners and negations that headlines lean on: "19 flexiones:
             # ninguna verificada" has no accent and none of the words above.
-            "ninguna", "ninguno", "ningún", "no", "ni", "cada", "todas", "todos"}
+            "ninguna", "ninguno", "ningún", "no", "ni", "cada", "todas", "todos",
+            # The summary's short headlines, "14 fondos verificados, irregular",
+            # carry neither an accent nor a function word: their own words
+            # say they are Spanish.
+            "verificada", "verificadas", "verificado", "verificados"} | {
+            w for band in BANDS.values() for w in band.split()}
 
 
 def looks_spanish(text: str) -> bool:

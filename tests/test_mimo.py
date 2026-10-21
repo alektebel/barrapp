@@ -92,7 +92,8 @@ def test_locate_exercise_with_a_stubbed_model(tmp_path, monkeypatch):
     got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
     assert got["usable"] and got["exercise"] == "pull_up"
     assert (got["startS"], got["endS"]) == (12.0, 31.0)
-    assert got["repsEstimate"] == 5 and got["model"] == "mimo-v2.5"
+    # Raced: whichever model answers first is recorded as the one that did.
+    assert got["repsEstimate"] == 5 and got["model"] in {"mimo-v2.5", *vision.LOCALIZE_RACE}
 
 
 def test_locate_exercise_is_off_without_a_key_or_a_flag(tmp_path, monkeypatch):
@@ -316,47 +317,57 @@ _GOOD = json.dumps({"detected_exercise": "push_up", "technique_start": 12.0,
                     "technique_end": 31.0, "reps_estimate": 5})
 
 
-def test_locate_falls_back_to_the_second_model_on_an_empty_reply(tmp_path, monkeypatch):
-    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", _GOOD])
-    got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
-    assert calls == ["mimo-v2.6-flash", vision.SECOND_MODEL]
-    assert got["exercise"] == "push_up" and got["model"] == vision.SECOND_MODEL
+def _race_setup(tmp_path, monkeypatch, primary, replies, delays=None):
+    """Replies per model (the race calls them in parallel, in no fixed order)."""
+    import threading
+    import time as _t
+    _locate_setup(tmp_path, monkeypatch, primary, [])
+    calls, lock = [], threading.Lock()
 
-
-def test_locate_does_not_retry_when_the_primary_is_the_second_model(tmp_path, monkeypatch):
-    calls = _locate_setup(tmp_path, monkeypatch, vision.SECOND_MODEL, ["", _GOOD])
-    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
-    assert calls == [vision.SECOND_MODEL]
-
-
-def test_locate_returns_none_when_every_try_fails(tmp_path, monkeypatch):
-    monkeypatch.setattr(vision, "LOCALIZE_RETRY_PAUSE_S", 0)
-    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "nope", ""])
-    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
-    assert calls == ["mimo-v2.6-flash", vision.SECOND_MODEL, "mimo-v2.6-flash"]
-
-
-def test_a_third_try_saves_the_vote_when_both_models_were_empty(tmp_path, monkeypatch):
-    """2026-10-21: mimo and qwen both answered empty on a clip of dips; with
-    no vision vote geometry called it a split squat. Seconds later it worked."""
-    monkeypatch.setattr(vision, "LOCALIZE_RETRY_PAUSE_S", 0)
-    calls = _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", "", _GOOD])
-    got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
-    assert got["exercise"] == "push_up" and got["model"] == "mimo-v2.6-flash"
-    assert len(calls) == 3
-
-
-def test_locate_fits_inside_the_fusion_wait(tmp_path, monkeypatch):
-    """Both tries together must finish before fusion stops waiting for the
-    vote (pose plus VISION_VOTE_WAIT_S), or a slow primary starves the
-    fallback and the job abstains on a clip vision would have named."""
-    _locate_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", ["", _GOOD])
-    budgets = []
-
-    def fake_chat(base, key, model, *a, timeout=None, attempts=None, **k):
-        budgets.append(timeout * attempts)
-        return "" if len(budgets) == 1 else _GOOD
+    def fake_chat(base, key, model, *a, **k):
+        with lock:
+            calls.append(model)
+        _t.sleep((delays or {}).get(model, 0))
+        return replies.get(model, "")
     monkeypatch.setattr(vision, "_chat", fake_chat)
-    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    return calls
+
+
+def test_the_race_takes_the_first_valid_answer(tmp_path, monkeypatch):
+    calls = _race_setup(tmp_path, monkeypatch, "mimo-v2.6-flash",
+                        {"qwen3.8-flash": _GOOD})
+    got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    assert got["exercise"] == "push_up" and got["model"] == "qwen3.8-flash"
+    assert set(calls) <= {"mimo-v2.6-flash", *vision.LOCALIZE_RACE}
+
+
+def test_a_slow_model_does_not_hold_the_race(tmp_path, monkeypatch):
+    """2026-10-21: mimo and qwen timed out one after the other on a clip of
+    dips; raced, the wait is the fastest valid answer, not the sum."""
+    import time as _t
+    _race_setup(tmp_path, monkeypatch, "mimo-v2.6-flash",
+                {"mimo-v2.6-flash": _GOOD, "qwen3.6": _GOOD},
+                delays={"mimo-v2.6-flash": 3.0, "qwen3.8-flash": 3.0})
+    t0 = _t.monotonic()
+    got = vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    assert got["model"] == "qwen3.6"
+    assert _t.monotonic() - t0 < 2.0
+
+
+def test_the_race_has_no_vote_when_every_model_fails(tmp_path, monkeypatch):
+    calls = _race_setup(tmp_path, monkeypatch, "mimo-v2.6-flash", {})
+    assert vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto") is None
+    assert sorted(calls) == sorted(["mimo-v2.6-flash", *vision.LOCALIZE_RACE])
+
+
+def test_a_primary_already_in_the_race_is_asked_once(tmp_path, monkeypatch):
+    calls = _race_setup(tmp_path, monkeypatch, "qwen3.8-flash", {})
+    vision.locate_exercise(tmp_path / "clip.mp4", tmp_path / "out", "auto")
+    assert sorted(calls) == sorted(set(vision.LOCALIZE_RACE))
+
+
+def test_locate_fits_inside_the_fusion_wait():
+    """The race waits one timeout, whatever the number of models: it must end
+    before fusion stops waiting for the vote (pose + VISION_VOTE_WAIT_S)."""
     import process
-    assert sum(budgets) < process.VISION_VOTE_WAIT_S + 30, budgets
+    assert vision.LOCALIZE_TIMEOUT * vision.LOCALIZE_ATTEMPTS <= process.VISION_VOTE_WAIT_S
