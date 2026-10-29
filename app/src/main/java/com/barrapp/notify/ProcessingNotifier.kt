@@ -32,6 +32,14 @@ object ProcessingNotifier {
     const val ONGOING_ID = 4202
     private const val RESULT_ID = 4203
 
+    /** Results are their own channel: the progress channel is silent on
+     *  purpose (it updates every few seconds), but "tu análisis está listo"
+     *  has to be noticed - sound, heads-up and an icon badge. */
+    const val RESULT_CHANNEL = "resultados"
+    private const val RESULT_CHANNEL_NAME = "Análisis listos"
+    private const val RESULT_GROUP = "resultados"
+    private const val SUMMARY_ID = 4204
+
     // Mirrors BarrappViewModel.STAGE_* in order, so the notification's progress
     // bar can show where in the pipeline the job is.
     val STAGES = listOf(
@@ -57,6 +65,19 @@ object ProcessingNotifier {
         )
     }
 
+    private fun ensureResultChannel(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
+        val manager = context.getSystemService(NotificationManager::class.java) ?: return
+        if (manager.getNotificationChannel(RESULT_CHANNEL) != null) return
+        manager.createNotificationChannel(
+            NotificationChannel(RESULT_CHANNEL, RESULT_CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_DEFAULT).apply {
+                description = "Aviso de que un vídeo ya está medido."
+                setShowBadge(true)
+            }
+        )
+    }
+
     /** The ongoing notification: what upload/UploadWorker runs under. */
     fun ongoing(context: Context, stage: String, index: Int): android.app.Notification =
         builder(context, TITLE)
@@ -74,18 +95,39 @@ object ProcessingNotifier {
         post(context, ONGOING_ID, ongoing(context, stage, index))
     }
 
-    /** Replace the ongoing notification with a "finished" one that opens the result. */
-    fun done(context: Context, title: String, body: String) {
+    /** Replace the ongoing notification with a "finished" one. One per clip
+     *  ([jobId] picks its id): three clips finishing leave three notifications,
+     *  not the last one over the others. */
+    fun done(context: Context, title: String, body: String, jobId: String = "") {
         cancel(context)
         if (!canPost(context)) return
-        val notification = builder(context, title)
+        ensureResultChannel(context)
+        val notification = NotificationCompat.Builder(context, RESULT_CHANNEL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle(title)
             .setContentText(body)
             .setStyle(NotificationCompat.BigTextStyle().bigText(body))
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setCategory(NotificationCompat.CATEGORY_STATUS)
+            .setGroup(RESULT_GROUP)
             .setAutoCancel(true)
             .setContentIntent(openApp(context))
             .build()
-        post(context, RESULT_ID, notification)
+        post(context, resultId(jobId), notification)
+        // The group needs a summary or the system shows the children loose.
+        post(context, SUMMARY_ID, NotificationCompat.Builder(context, RESULT_CHANNEL)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Análisis listos")
+            .setGroup(RESULT_GROUP)
+            .setGroupSummary(true)
+            .setAutoCancel(true)
+            .setContentIntent(openApp(context))
+            .build())
     }
+
+    /** A stable id per clip, away from the fixed ones above. */
+    internal fun resultId(jobId: String): Int =
+        if (jobId.isBlank()) RESULT_ID else 10_000 + (jobId.hashCode() and 0xFFFF)
 
     /** Replace the ongoing notification with a "failed" one. */
     fun fail(context: Context, message: String) {

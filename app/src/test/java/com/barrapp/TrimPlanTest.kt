@@ -39,11 +39,11 @@ object TrimPlanTest {
         val s = suggest()
         check("a clip with a set suggests a window", s != null)
         if (s == null) return
-        // Serie 15–21 s: la ventana con 1 s de aire a cada lado.
-        check("window starts about a second before the set",
-            Math.abs(s.startS - 14.0) < 0.6, "startS=${s.startS}")
-        check("window ends about a second after the set",
-            Math.abs(s.endS - 22.0) < 0.6, "endS=${s.endS}")
+        // Serie 14,5–21 s: la ventana con 2,5 s de aire a cada lado.
+        check("window starts well before the set",
+            Math.abs(s.startS - 12.0) < 0.6, "startS=${s.startS}")
+        check("window ends well after the set",
+            Math.abs(s.endS - 23.5) < 0.6, "endS=${s.endS}")
         check("window is clamped inside the clip",
             s.startS >= 0.0 && s.endS <= 35.0)
         check("duration recorded", Math.abs(s.durationS - 35.0) < 1e-9)
@@ -79,7 +79,7 @@ object TrimPlanTest {
         }
         val s = suggest(withGap)
         check("a pause inside the set does not split the window",
-            s != null && Math.abs(s.endS - 22.0) < 0.6, "endS=${s?.endS}")
+            s != null && Math.abs(s.endS - 23.5) < 0.6, "endS=${s?.endS}")
     }
 
     private fun noSignalRules() {
@@ -89,24 +89,38 @@ object TrimPlanTest {
         check("a clip with no motion suggests nothing", suggest(flat) == null)
     }
 
-    private fun loudestRunRules() {
-        // Dos tramos por encima del umbral: gana el más largo, no el primero.
-        val twoRuns = (1..69).map { i ->
+    private fun keepsEverySubstantialRunRules() {
+        // Conservador: un tramo corto de ruido (1 s) no cuenta, pero dos
+        // series con un descanso largo en medio se conservan las dos.
+        val blip = (1..69).map { i ->
             val t = i * 0.5
             MotionSample(t, when {
-                t in 5.0..8.0 -> 40.0     // ruido corto al entrar
+                t in 5.0..5.5 -> 40.0     // roce de 1 s al entrar: no es serie
                 t in 14.5..21.0 -> 40.0   // la serie
                 else -> 1.0
             })
         }
-        val s = suggest(twoRuns)
-        check("the longest loud run wins",
-            s != null && Math.abs(s.startS - 14.0) < 0.6, "startS=${s?.startS}")
+        val s = suggest(blip)
+        check("a one-second blip is not a set",
+            s != null && Math.abs(s.startS - 12.0) < 0.6, "startS=${s?.startS}")
+
+        val twoSets = (1..69).map { i ->
+            val t = i * 0.5
+            MotionSample(t, when {
+                t in 8.0..13.0 -> 40.0    // primera serie
+                t in 24.0..29.0 -> 40.0   // segunda, tras 11 s de descanso
+                else -> 1.0
+            })
+        }
+        val s2 = suggest(twoSets)
+        check("both sets stay inside the window",
+            s2 != null && s2.startS <= 5.6 && s2.endS >= 31.4,
+            "window=${s2?.startS}..${s2?.endS}")
     }
 
     private fun shouldTrimRules() {
-        // La serie (14–22 s) contra 35 s: recorta.
-        check("a 8 s window over a 35 s clip is worth trimming",
+        // La serie con aire (12–23,5 s) contra 35 s: recorta.
+        check("an 11 s window over a 35 s clip is worth trimming",
             TrimPlan.shouldTrim(suggest(), 35.0))
         // Un clip que ya es casi todo serie: no.
         val allSet = (1..69).map { MotionSample(it * 0.5, 40.0) }
@@ -124,7 +138,7 @@ object TrimPlanTest {
         quietEdgeRules()
         gapToleranceRules()
         noSignalRules()
-        loudestRunRules()
+        keepsEverySubstantialRunRules()
         shouldTrimRules()
         println(if (failures == 0) "OK  $checks checks passed"
                 else "FAILED  $failures of $checks checks")

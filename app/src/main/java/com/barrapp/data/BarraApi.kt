@@ -512,6 +512,9 @@ class BarraApi(context: Context) {
                     )
                 },
                 blockers = (0 until blockers.length()).map { blockers.getString(it) },
+                notes = json.optJSONArray("notes").let { n ->
+                    if (n == null) emptyList() else (0 until n.length()).map { n.getString(it) }
+                },
                 nextSession = json.optString("nextSession"),
                 exercise = json.optString("exercise"),
                 detected = json.optJSONObject("detected")?.let { d ->

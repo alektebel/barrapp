@@ -20,7 +20,6 @@ import com.barrapp.data.WorkStore
 import com.barrapp.Progression
 import androidx.compose.ui.unit.dp
 import com.barrapp.ui.theme.Nocturne
-import com.barrapp.ui.tracker.TrimScreen
 import com.barrapp.ui.theme.N
 import com.barrapp.ui.parts.bandColor
 import com.barrapp.improvementLines
@@ -72,17 +71,6 @@ fun NocturneHome(vm: BarrappViewModel = viewModel()) {
         ) {
             nstate.goSession()
         }
-    }
-
-    // Un clip esperando la ventana: la decisión va antes que cualquier pantalla.
-    state.pendingTrim?.let { pending ->
-        TrimScreen(
-            work = pending,
-            onWindow = { s, e -> vm.setTrimWindow(pending.id, s, e) },
-            onConfirm = { vm.confirmTrim(pending.id) },
-            onDiscard = { vm.discardTrim(pending.id) },
-        )
-        return
     }
 
     BarrappShell(

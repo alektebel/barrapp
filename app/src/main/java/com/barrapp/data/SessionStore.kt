@@ -25,6 +25,7 @@ object SessionStore {
     private const val CHAT = "chat"
     private const val LAST_REVIEW = "last_review_at"
     private const val FAULTS = "faults"
+    private const val UNSEEN = "unseen"
 
     private fun prefs(context: Context) =
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -51,17 +52,10 @@ object SessionStore {
                 traces = o.optJSONObject("traces")?.let { t ->
                     t.keys().asSequence().associateWith { k -> t.optString(k) }
                 } ?: emptyMap(),
-                last = o.optJSONObject("last")?.let { l ->
-                    JobSummary(
-                        jobId = l.optString("jobId"),
-                        exercise = l.optString("exercise"),
-                        label = l.optString("label"),
-                        reps = l.optInt("reps"),
-                        verified = l.optInt("verified"),
-                        score = if (l.isNull("score") || !l.has("score")) null else l.optInt("score"),
-                        at = l.optString("at"),
-                    )
-                },
+                last = o.optJSONObject("last")?.let(::summaryFrom),
+                sessions = o.optJSONArray("sessions")?.let { a ->
+                    (0 until a.length()).mapNotNull { i -> a.optJSONObject(i)?.let(::summaryFrom) }
+                } ?: emptyList(),
                 byMovement = o.optJSONObject("byMovement")?.let { m ->
                     m.keys().asSequence().mapNotNull { k ->
                         m.optJSONObject(k)?.let { e ->
@@ -78,6 +72,26 @@ object SessionStore {
             )
         }.sortedByDescending { it.date }
     }
+
+    private fun summaryFrom(l: JSONObject) = JobSummary(
+        jobId = l.optString("jobId"),
+        exercise = l.optString("exercise"),
+        label = l.optString("label"),
+        reps = l.optInt("reps"),
+        verified = l.optInt("verified"),
+        score = if (l.isNull("score") || !l.has("score")) null else l.optInt("score"),
+        at = l.optString("at"),
+        sessionScore = if (l.isNull("sessionScore") || !l.has("sessionScore")) null else l.optInt("sessionScore"),
+        scoreSum = l.optInt("scoreSum"),
+    )
+
+    private fun summaryJson(l: JobSummary) = JSONObject()
+        .put("jobId", l.jobId).put("exercise", l.exercise)
+        .put("label", l.label).put("reps", l.reps)
+        .put("verified", l.verified)
+        .put("score", l.score ?: JSONObject.NULL).put("at", l.at)
+        .put("sessionScore", l.sessionScore ?: JSONObject.NULL)
+        .put("scoreSum", l.scoreSum)
 
     /**
      * Fold one finished job into its day.
@@ -133,6 +147,8 @@ object SessionStore {
             verified = verified.size,
             score = if (verified.isEmpty()) null else verified.sumOf { it.score ?: 0 } / verified.size,
             at = at,
+            sessionScore = analysis.sessionScore,
+            scoreSum = verified.sumOf { it.score ?: 0 },
         )
         val before = prior?.last
         // A clip older than the one already kept (history arrives in any
@@ -149,6 +165,7 @@ object SessionStore {
             score = score,
             band = bandFor(score),
             jobIds = ((prior?.jobIds ?: emptyList()) + jobId).distinct(),
+            sessions = ((prior?.sessions ?: emptyList()).filterNot { it.jobId == jobId } + summary),
             byMovement = byMovement,
             // Kept so a day recorded weeks ago can still be replayed against
             // the exact run that produced its score, rather than a re-run that
@@ -169,23 +186,31 @@ object SessionStore {
      *  on the server - a refresh rebuilds this from whoever is signed in now. */
     fun forgetAll(context: Context) {
         write(context, emptyList())
-        prefs(context).edit { remove(FAULTS) }
+        prefs(context).edit { remove(FAULTS); remove(UNSEEN) }
     }
 
     fun forget(context: Context, jobId: String) {
+        markSeen(context, jobId)
         val kept = days(context).mapNotNull { day ->
             if (jobId !in day.jobIds) day
             else {
                 val ids = day.jobIds - jobId
+                val sessions = day.sessions.filterNot { it.jobId == jobId }
                 if (ids.isEmpty()) null
+                // Every clip left has its own record: the day is rebuilt from
+                // them, exactly, instead of being left without a score.
+                else if (sessions.isNotEmpty() && sessions.map { it.jobId }.toSet() == ids.toSet())
+                    rebuilt(day, ids, sessions)
                 else day.copy(
                     jobIds = ids,
                     traces = day.traces - jobId,
-                    // We don't have per-job verified/scoreSum to subtract accurately,
-                    // so mark the day as stale rather than showing a ghost score.
-                    // Next refresh() from the server will rebuild aggregates.
+                    // A day stored before the per-clip list was kept has no
+                    // per-clip sums to subtract, so mark it stale rather than
+                    // showing a ghost score. The next refresh() from the
+                    // server rebuilds the aggregates.
                     byMovement = emptyMap(),
                     last = day.last?.takeIf { it.jobId != jobId },
+                    sessions = sessions,
                     reps = ids.size,
                     score = null,
                     band = "unmeasured",
@@ -193,6 +218,36 @@ object SessionStore {
             }
         }
         write(context, kept)
+    }
+
+    /** A day recomputed from its clips: reps add up, and the score is the
+     *  mean over every fully scored rep of the day, so a one-rep clip cannot
+     *  outvote a five-rep one. A clip with no scored reps weighs nothing. */
+    private fun rebuilt(day: DayEntry, ids: List<String>, sessions: List<JobSummary>): DayEntry {
+        val byMovement = sessions.groupBy { it.exercise }.mapValues { (key, js) ->
+            MovementDay(
+                exercise = key,
+                label = js.last().label,
+                reps = js.sumOf { it.reps },
+                verified = js.sumOf { it.verified },
+                scoreSum = js.sumOf { it.scoreSum },
+            )
+        }
+        val verified = byMovement.values.sumOf { it.verified }
+        val score = if (verified > 0) byMovement.values.sumOf { it.scoreSum } / verified else null
+        val dominant = byMovement.values.maxByOrNull { it.reps }
+        return day.copy(
+            exercise = dominant?.exercise.orEmpty(),
+            exerciseLabel = dominant?.label.orEmpty(),
+            reps = byMovement.values.sumOf { it.reps },
+            score = score,
+            band = bandFor(score),
+            jobIds = ids,
+            traces = day.traces.filterKeys { it in ids },
+            byMovement = byMovement,
+            last = sessions.maxWithOrNull(compareBy({ it.at.isBlank().not() }, { it.at })),
+            sessions = sessions,
+        )
     }
 
     private fun write(context: Context, entries: List<DayEntry>) {
@@ -207,12 +262,8 @@ object SessionStore {
                     .put("score", d.score ?: JSONObject.NULL)
                     .put("band", d.band)
                     .put("jobIds", JSONArray(d.jobIds))
-                    .put("last", d.last?.let { l ->
-                        JSONObject().put("jobId", l.jobId).put("exercise", l.exercise)
-                            .put("label", l.label).put("reps", l.reps)
-                            .put("verified", l.verified)
-                            .put("score", l.score ?: JSONObject.NULL).put("at", l.at)
-                    } ?: JSONObject.NULL)
+                    .put("last", d.last?.let(::summaryJson) ?: JSONObject.NULL)
+                    .put("sessions", JSONArray().also { a -> d.sessions.forEach { a.put(summaryJson(it)) } })
                     .put("traces", JSONObject(d.traces as Map<*, *>))
                     .put("byMovement", JSONObject().also { m ->
                         d.byMovement.forEach { (k, v) ->
@@ -234,6 +285,26 @@ object SessionStore {
         score >= Progression.SOLID -> "solid"
         score >= Progression.SHAKY -> "shaky"
         else -> "broken down"
+    }
+
+    // ---- results not looked at yet ------------------------------------------
+    //
+    // A clip that finishes while the athlete is somewhere else is a result
+    // they have not seen. It stays "nuevo" - banner on Inicio, tag in its day -
+    // until they open it. Only clips that finished on THIS phone are added: a
+    // history sync that brings back last month's sessions is not news.
+
+    fun unseen(context: Context): Set<String> =
+        prefs(context).getStringSet(UNSEEN, emptySet()).orEmpty().toSet()
+
+    fun addUnseen(context: Context, jobId: String) {
+        if (jobId.isBlank()) return
+        prefs(context).edit { putStringSet(UNSEEN, unseen(context) + jobId) }
+    }
+
+    fun markSeen(context: Context, jobId: String) {
+        val now = unseen(context)
+        if (jobId in now) prefs(context).edit { putStringSet(UNSEEN, now - jobId) }
     }
 
     // ---- fault ledger ------------------------------------------------------

@@ -95,6 +95,8 @@ data class HomeData(
     val nextGoal: NextGoalData? = null,
     /** Weekly session target for «N/T SESIONES SEM.»; 0 shows only the count. */
     val weekTarget: Int = 0,
+    /** Clips that finished and have not been opened yet. */
+    val newResults: Int = 0,
 )
 
 /**
@@ -116,6 +118,7 @@ fun TrackerHome(
     onOpenLadder: () -> Unit,
     onRecord: () -> Unit,
     modifier: Modifier = Modifier,
+    onOpenNew: () -> Unit = {},
 ) {
     Column(
         modifier
@@ -126,6 +129,7 @@ fun TrackerHome(
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Greeting(data)
+        if (data.newResults > 0) NewResultsBanner(data.newResults, onOpenNew)
         StatStrip(data, onOpenCalendar)
         MissionCard(data.mission, onRecord)
         LastSessionSection(data.lastSession, onOpenSession, onRecord)
@@ -467,3 +471,17 @@ private fun displayName(name: String): String = name.trim().ifBlank { "atleta" }
 
 private fun initial(name: String): String =
     name.trim().firstOrNull()?.uppercase() ?: "·"
+
+/** "Terminado", a la vista: el aviso no se va hasta que abres el resultado. */
+@Composable
+private fun NewResultsBanner(count: Int, onOpen: () -> Unit) {
+    TkCard(Modifier.noRipple(onOpen), accent = true) {
+        Eyebrow(if (count == 1) "Listo" else "Listos", style = T.eyebrowMission)
+        Text(
+            if (count == 1) "1 análisis nuevo" else "$count análisis nuevos",
+            style = T.missionTitle,
+            modifier = Modifier.padding(top = 4.dp),
+        )
+        Text("Toca para verlos", style = T.bodyInk, modifier = Modifier.padding(top = 2.dp))
+    }
+}

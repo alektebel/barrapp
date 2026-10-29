@@ -26,17 +26,22 @@ data class TrimSuggestion(
 object TrimPlan {
     /** Aire antes y después de la serie, para no cortar la primera ni la
      *  última repetición por los bordes. */
-    const val LEAD_IN_S = 1.0
-    const val LEAD_OUT_S = 1.0
+    const val LEAD_IN_S = 2.5
+    const val LEAD_OUT_S = 2.5
 
     /** Fracción del pico de movimiento a partir de la cual una muestra
-     *  cuenta como "serie". Las caminatas quedan muy por debajo. */
-    const val PEAK_FRACTION = 0.3
+     *  cuenta como "serie". Baja a propósito: perder una repetición cuesta
+     *  más que subir unos segundos de más. */
+    const val PEAK_FRACTION = 0.2
+
+    /** Un tramo de movimiento más corto que esto (muestras) es un roce, no
+     *  una serie. Con muestras cada 0,5 s son 2 s. */
+    const val MIN_RUN_SAMPLES = 4
 
     /** Cuántas muestras por debajo del umbral se toleran DENTRO de la serie
      *  (una pausa entre repeticiones, un frame oscuro) antes de dar la serie
-     *  por terminada. Con muestras cada 0,5 s son hasta 1 s de silencio. */
-    const val MAX_GAP_SAMPLES = 2
+     *  por terminada. Con muestras cada 0,5 s son hasta 3 s de silencio. */
+    const val MAX_GAP_SAMPLES = 6
 
     /**
      * La ventana contigua de movimiento por encima del umbral, expandida con
@@ -63,11 +68,14 @@ object TrimPlan {
                 runs.add(listOf(cur))
             }
         }
-        // La serie de trabajo es la más larga: la caminata de entrada puede
-        // tener un portalámparas ruidoso, pero no más movimiento que la serie.
-        val run = runs.maxBy { it.size }
-        val windowStart = samples[run.first()].tS
-        val windowEnd = samples[run.last()].tS
+        // Conservador: se conservan TODOS los tramos con entidad, del primero
+        // al último, no solo el más largo. Dos series con un descanso largo
+        // en medio, o una serie corta tras una larga, siguen dentro. Si
+        // ningún tramo llega al mínimo, se queda el más largo.
+        val real = runs.filter { it.size >= MIN_RUN_SAMPLES }
+            .ifEmpty { listOf(runs.maxBy { it.size }) }
+        val windowStart = samples[real.first().first()].tS
+        val windowEnd = samples[real.last().last()].tS
 
         val startS = (windowStart - LEAD_IN_S).coerceIn(0.0, durationS)
         val endS = (windowEnd + LEAD_OUT_S).coerceIn(startS, durationS)

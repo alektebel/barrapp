@@ -43,6 +43,11 @@ data class Work(
      *  with the job, blank when not declared; the server never infers them. */
     val variant: String = "",
     val view: String = "",
+    /** The movement the athlete SAID this clip is, in the server's catalog
+     *  names (pull_up, dip, ...); blank = "detect it". [exercise] above is the
+     *  other thing: what the server found. Kept apart so a declaration can
+     *  never be mistaken for a measurement. */
+    val declaredExercise: String = "",
     /** La ventana que el teléfono propuso recortar, y si lo hizo. `trimStart`
      *  queda en 0 para un clip ya recortado: el servidor mide el fichero que
      *  recibe, y su propio `trim` en la respuesta habla del fichero recibido. */
@@ -77,8 +82,8 @@ data class Work(
 data class PartMark(val partNumber: Int, val etag: String?)
 
 object WorkStore {
-    const val STATUS_PENDING = "pending"        // on the phone; the athlete
-                                                // is choosing the trim window
+    const val STATUS_PENDING = "pending"        // legacy: waited for a manual
+                                                // trim; migrated to WAITING
     const val STATUS_WAITING = "waiting"        // known locally, not yet sent
     const val STATUS_SENDING = "sending"        // upload in flight
     const val STATUS_QUEUED = "queued"          // the server holds the clip
@@ -143,6 +148,7 @@ object WorkStore {
                 clipDurationS = o.optDouble("clipDurationS", 0.0),
                 variant = o.optString("variant"),
                 view = o.optString("view"),
+                declaredExercise = o.optString("declaredExercise"),
                 uploadedParts = (o.optJSONArray("uploadedParts") ?: JSONArray())
                     .let { arr ->
                         (0 until arr.length()).mapNotNull { j ->
@@ -185,6 +191,7 @@ object WorkStore {
                 .put("uploadId", w.uploadId).put("partSize", w.partSize)
                 .put("uploadMode", w.uploadMode).put("uploadComplete", w.uploadComplete)
                 .put("variant", w.variant).put("view", w.view)
+                .put("declaredExercise", w.declaredExercise)
                 .put("trimmed", w.trimmed)
                 .put("timingAttemptId", w.timingAttemptId)
                 .put("trimStartS", w.trimStartS).put("trimEndS", w.trimEndS)

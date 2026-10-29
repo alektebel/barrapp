@@ -82,4 +82,71 @@ class SessionRecordTest {
         assertFalse(ans, ans.contains("medidas"))
         assertFalse(ans, ans.contains("2026-10-16"))
     }
+
+    @Test fun aDayKeepsEverySessionWithItsOwnScore() {
+        SessionStore.record(ctx, "a", analysis("muscle_up", 80, 80), "2026-10-16T10:00:00")
+        SessionStore.record(ctx, "b", analysis("muscle_up", 40), "2026-10-16T11:00:00")
+        val day = SessionStore.days(ctx).single()
+        assertEquals(listOf("a", "b"), day.sessions.map { it.jobId })
+        assertEquals(listOf(80, 40), day.sessions.map { it.score })
+        // weighted by scored reps: (80+80+40)/3, not the mean of the clips (60)
+        assertEquals(66, day.score)
+    }
+
+    @Test fun anUnmeasuredSessionDoesNotLowerTheDay() {
+        SessionStore.record(ctx, "a", analysis("muscle_up", 80, 70), "2026-10-16T10:00:00")
+        SessionStore.record(ctx, "b", analysis("push_up", null, null), "2026-10-16T11:00:00")
+        val day = SessionStore.days(ctx).single()
+        assertEquals(75, day.score)
+        assertEquals(2, day.sessions.size)
+        assertEquals(null, day.sessions.last().score)
+    }
+
+    @Test fun deletingASessionRebuildsTheDay() {
+        SessionStore.record(ctx, "a", analysis("muscle_up", 80, 80), "2026-10-16T10:00:00")
+        SessionStore.record(ctx, "b", analysis("muscle_up", 40), "2026-10-16T11:00:00")
+        SessionStore.forget(ctx, "b")
+        val day = SessionStore.days(ctx).single()
+        assertEquals(listOf("a"), day.jobIds)
+        assertEquals(80, day.score)
+        assertEquals(2, day.reps)
+        assertEquals("a", day.last!!.jobId)
+        SessionStore.forget(ctx, "a")
+        assertTrue(SessionStore.days(ctx).isEmpty())
+    }
+
+    @Test fun aFinishedClipStaysNewUntilItIsOpened() {
+        assertTrue(SessionStore.unseen(ctx).isEmpty())
+        SessionStore.addUnseen(ctx, "a")
+        SessionStore.addUnseen(ctx, "b")
+        assertEquals(setOf("a", "b"), SessionStore.unseen(ctx))
+        SessionStore.markSeen(ctx, "a")
+        assertEquals(setOf("b"), SessionStore.unseen(ctx))
+        // deleting a clip is not news either
+        SessionStore.record(ctx, "b", analysis("muscle_up", 80), "2026-10-16T10:00:00")
+        SessionStore.forget(ctx, "b")
+        assertTrue(SessionStore.unseen(ctx).isEmpty())
+        // signing out forgets what the previous account had not seen
+        SessionStore.addUnseen(ctx, "c")
+        SessionStore.forgetAll(ctx)
+        assertTrue(SessionStore.unseen(ctx).isEmpty())
+    }
+
+    @Test fun theDayListsNewestSessionFirstAndShowsLocalTime() {
+        SessionStore.record(ctx, "a", analysis("muscle_up", 80), "2026-10-16T10:00:00Z")
+        SessionStore.record(ctx, "b", analysis("push_up", 60), "2026-10-16T11:30:00Z")
+        val day = SessionStore.days(ctx).single()
+        assertEquals(listOf("b", "a"), com.barrapp.ui.tracker.daySessions(day).map { it.jobId })
+        // a day stored before the list existed still shows its last clip
+        val legacy = day.copy(sessions = emptyList())
+        assertEquals(listOf("b"), com.barrapp.ui.tracker.daySessions(legacy).map { it.jobId })
+        val utc = java.util.TimeZone.getDefault()
+        java.util.TimeZone.setDefault(java.util.TimeZone.getTimeZone("Europe/Madrid"))
+        try {
+            assertEquals("12:00", com.barrapp.ui.tracker.localTime("2026-10-16T10:00:00Z"))
+            assertEquals(null, com.barrapp.ui.tracker.localTime(""))
+        } finally {
+            java.util.TimeZone.setDefault(utc)
+        }
+    }
 }

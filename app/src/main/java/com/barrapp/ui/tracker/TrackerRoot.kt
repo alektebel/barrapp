@@ -1,6 +1,7 @@
 package com.barrapp.ui.tracker
 
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -60,7 +61,7 @@ import java.util.Calendar
 import java.util.Locale
 
 /** A page opened on top of a tab, not one of the four tabs itself. */
-private enum class Sheet { NONE, SESSION, CALENDAR, LADDER, CHAT, SKILLS, HELP }
+private enum class Sheet { NONE, SESSION, DAY, CALENDAR, LADDER, CHAT, SKILLS, HELP }
 
 /**
  * The redesigned app, wired to the real view model.
@@ -70,6 +71,10 @@ private enum class Sheet { NONE, SESSION, CALENDAR, LADDER, CHAT, SKILLS, HELP }
  * open on top of the tab that links to them and close back to it, so nothing
  * that was reachable before became unreachable.
  */
+/** Cuántos vídeos caben en una selección. El sistema exige un tope; 10 sobra
+ *  para una sesión y la cola los procesa de uno en uno. */
+private const val MAX_CLIPS_PER_PICK = 10
+
 @Composable
 fun TrackerRoot(
     vm: BarrappViewModel = viewModel(),
@@ -83,6 +88,8 @@ fun TrackerRoot(
     val declared = remember { com.barrapp.data.ProfileStore.declaration(context) }
     var standard by remember { mutableStateOf(declared.first) }
     var camera by remember { mutableStateOf(declared.second) }
+    // Per clip, deliberately not saved like standard and camera: see IdlePhase.
+    var exercise by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
     // The trace the record tab was looking at when the clip was sent. The
     // results phase waits for a DIFFERENT one, so a failed upload falls back
     // to the idle screen instead of re-presenting the previous session under
@@ -97,15 +104,22 @@ fun TrackerRoot(
     // The rep correction (Tiza 2c), opened from the viewer's "ver la rep".
     var correctionAt by remember { mutableStateOf<Int?>(null) }
 
+    // El selector del sistema, con varios vídeos: una sesión suele ser más
+    // de un clip y todos entran a la vez en la cola. No pide permisos (el
+    // usuario le da al sistema solo lo que elige) y ofrece la cámara.
     val pickVideo = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri ->
-        if (uri != null) {
+        ActivityResultContracts.PickMultipleVisualMedia(MAX_CLIPS_PER_PICK)
+    ) { uris ->
+        if (uris.isNotEmpty()) {
             sentFrom = state.analysis?.traceId.orEmpty()
             showResults = false
             tab = TrackerTab.RECORD
-            vm.upload(uri, standard, camera)
+            vm.uploadMany(uris, standard, camera, exercise)
+            exercise = ""
         }
+    }
+    val launchPicker = {
+        pickVideo.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.VideoOnly))
     }
     // The mockup's record button and its "subir vídeo" both land here.
     // `CaptureVideo` needs an output uri this app does not manage yet, so the
@@ -183,19 +197,12 @@ fun TrackerRoot(
     if (sheet != Sheet.NONE) {
         SheetHost(vm, state, sheet, repsOpen, { repsOpen = !repsOpen },
             onOpenSession = { sheet = Sheet.SESSION },
+            onOpenDay = { sheet = Sheet.DAY },
+            onOpenJob = { jobId ->
+                vm.selectDate(state.selectedDate.orEmpty(), jobId)
+                sheet = Sheet.SESSION
+            },
             onReplay = { replayOpen = true }) { sheet = Sheet.NONE }
-        return
-    }
-
-    // Un clip esperando la ventana: la decisión va primero, siempre visible
-    // por encima de cualquier pestaña.
-    state.pendingTrim?.let { pending ->
-        TrimScreen(
-            work = pending,
-            onWindow = { s, e -> vm.setTrimWindow(pending.id, s, e) },
-            onConfirm = { vm.confirmTrim(pending.id) },
-            onDiscard = { vm.discardTrim(pending.id) },
-        )
         return
     }
 
@@ -233,6 +240,10 @@ fun TrackerRoot(
                         onOpenCalendar = { sheet = Sheet.CALENDAR },
                         onOpenLadder = { sheet = Sheet.LADDER },
                         onRecord = { tab = TrackerTab.RECORD },
+                        onOpenNew = {
+                            state.days.firstOrNull { d -> d.jobIds.any { it in state.unseen } }
+                                ?.let { vm.selectDay(it.date); sheet = Sheet.DAY }
+                        },
                     )
 
                     TrackerTab.RECORD -> {
@@ -251,6 +262,8 @@ fun TrackerRoot(
                             lastAnalyzed = lastAnalyzed(state.days),
                             standard = standard,
                             camera = camera,
+                            exercise = exercise,
+                            onExercise = { exercise = it },
                             onStandard = {
                                 standard = it
                                 com.barrapp.data.ProfileStore.saveDeclaration(context, standard, camera)
@@ -259,8 +272,8 @@ fun TrackerRoot(
                                 camera = it
                                 com.barrapp.data.ProfileStore.saveDeclaration(context, standard, camera)
                             },
-                            onRecord = { pickVideo.launch("video/*") },
-                            onPick = { pickVideo.launch("video/*") },
+                            onRecord = { launchPicker() },
+                            onPick = { launchPicker() },
                             onDone = {
                                 showResults = false
                                 sentFrom = null
@@ -324,6 +337,8 @@ private fun SheetHost(
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
     onOpenSession: () -> Unit,
+    onOpenDay: () -> Unit,
+    onOpenJob: (String) -> Unit,
     onReplay: () -> Unit,
     onClose: () -> Unit,
 ) {
@@ -347,7 +362,10 @@ private fun SheetHost(
             ) {
                 when (sheet) {
                     Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onReplay, onClose)
-                    Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenSession)
+                    Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenDay)
+                    Sheet.DAY -> state.days.firstOrNull { it.date == state.selectedDate }?.let {
+                        DaySheet(it, state.unseen, onOpenSession = onOpenJob, onClose = onClose)
+                    }
                     Sheet.LADDER -> LadderSheet(state, onClose)
                     Sheet.SKILLS -> SkillsSheet(state, onClose)
                     Sheet.HELP -> HelpSheet(onClose)
@@ -457,7 +475,7 @@ private fun SessionSheet(
 }
 
 @Composable
-private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: () -> Unit) {
+private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenDay: () -> Unit) {
     var offset by remember { mutableStateOf(0) }
     val cal = Calendar.getInstance().apply { add(Calendar.MONTH, offset) }
     val month = cal.getDisplayName(Calendar.MONTH, Calendar.LONG, Locale.forLanguageTag("es")) ?: ""
@@ -490,14 +508,14 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: (
         days = cells,
         summaryMeasured = "${inMonth.count { it.verifiedReps > 0 }} días medidos",
         summaryReps = "${inMonth.sumOf { it.verifiedReps }} reps medidas en $month",
-        rows = inMonth.sortedByDescending { it.date }.take(3).map { day ->
+        rows = inMonth.sortedByDescending { it.date }.map { day ->
             CalRow(
                 title = movementEs(day.exercise, day.exerciseLabel),
                 subtitle = "${day.reps} reps · ${shortDate(day.date)}",
                 score = day.score?.toString() ?: "—",
                 color = bandColor(day.band),
                 scoreColor = if (day.score != null) bandColor(day.band) else Nocturne.fgA(0.4f),
-                clickable = day.reps > 0,
+                clickable = true,
                 day = day.date.takeLast(2).toIntOrNull() ?: 1,
             )
         },
@@ -506,7 +524,7 @@ private fun CalendarSheet(vm: BarrappViewModel, state: UiState, onOpenSession: (
         onOpenDay = { n ->
             val key = "%04d-%02d-%02d".format(
                 cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, n)
-            byDate[key]?.takeIf { it.reps > 0 }?.let { vm.selectDate(it.date); onOpenSession() }
+            byDate[key]?.let { vm.selectDay(it.date); onOpenDay() }
         },
     )
 }
@@ -612,6 +630,7 @@ private fun homeData(state: UiState, jobs: List<com.barrapp.data.Job>): HomeData
                 target = step.days,
             )
         },
+        newResults = state.unseen.size,
         weekTarget = when (state.profile.activity) {
             com.barrapp.data.ActivityLevel.New, com.barrapp.data.ActivityLevel.Occasional -> 2
             com.barrapp.data.ActivityLevel.Regular -> 4
@@ -653,7 +672,7 @@ private fun resultsData(
     return ResultsData(
         headline = a.headline,
         narrative = a.narrative,
-        blockers = a.blockers,
+        blockers = a.blockers + a.notes,
         nextSession = a.nextSession,
         fixes = fixItems(a),
         movement = movementEs(a.exercise, a.detected?.label.orEmpty()),

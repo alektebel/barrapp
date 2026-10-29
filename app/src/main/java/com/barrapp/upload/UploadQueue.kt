@@ -458,7 +458,7 @@ class UploadQueue private constructor(private val app: Application) {
             // work with nothing in flight asks for a fresh job.
             val created = if (!resuming) timedRound2Phase(timingAttemptId, "jobCreate") {
                 withRetry("crear el trabajo", work.id) {
-                    withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
+                    withContext(Dispatchers.IO) { api.createJob(work.declaredExercise.ifBlank { "auto" }, work.variant, work.view) }
                 }
             } else null
             val jobId = if (resuming) work.jobId else requireNotNull(created).job.id
@@ -612,6 +612,7 @@ class UploadQueue private constructor(private val app: Application) {
                                     "Estándar superado: ${verdict.step.towardsLabel} desbloqueado",
                                     "Has cumplido el estándar de ${verdict.label} en " +
                                         "${verdict.step.days} días distintos. Mira el Plan.",
+                                    jobId = j.id,
                                 )
                             } else {
                                 ProcessingNotifier.done(
@@ -626,9 +627,11 @@ class UploadQueue private constructor(private val app: Application) {
                                     "Tu análisis de " + com.barrapp.movementEs(
                                         j.result?.exercise.orEmpty(), j.result?.detected?.label.orEmpty(),
                                     ).lowercase() + " está listo.",
+                                    jobId = j.id,
                                 )
                             }
                             WorkStore.forget(app, work.id)
+                            SessionStore.addUnseen(app, j.id)
                             publish()
                             // The screen, if one is open, takes it from here.
                             _finished.tryEmit(j)

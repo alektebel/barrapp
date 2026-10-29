@@ -93,6 +93,10 @@ data class Analysis(
     /** True when the vision model saw a different movement than the
      *  geometry labelled - flagged for review, never applied. */
     val visionDisagreesOnMovement: Boolean = false,
+    /** Things worth knowing about a clip that WAS measured (the server's own
+     *  Spanish): it was filmed upside down and turned, there was little light.
+     *  A clip that could not be measured says the same through [blockers]. */
+    val notes: List<String> = emptyList(),
 ) {
     /** Reps that got a score. A rep without one was counted, never judged. */
     val scoredReps: Int get() = reps.count { it.score != null }
@@ -452,6 +456,14 @@ data class JobSummary(
     val score: Int?,
     /** Server creation time, to order clips of one day. May be blank. */
     val at: String = "",
+    /** The score the result screen showed for this clip (the server's own
+     *  sessionScore). [score] is the mean over fully scored reps only, which
+     *  can differ by a point or two; the day list shows this one so a row
+     *  matches the screen it opens. Null for clips stored before it was kept. */
+    val sessionScore: Int? = null,
+    /** Sum of the fully scored reps' scores, so a day can be rebuilt exactly
+     *  when one of its clips is deleted. Zero when [verified] is. */
+    val scoreSum: Int = 0,
 )
 
 /** One day in the calendar. Several clips on one day fold into one entry. */
@@ -474,6 +486,9 @@ data class DayEntry(
     /** The last clip folded into this day, on its own - not mixed with the
      *  day's other clips. Null for days stored before it was kept. */
     val last: JobSummary? = null,
+    /** Every clip of this day, each with its own score. Empty for days stored
+     *  before the list was kept: those fall back to [last] and [jobIds]. */
+    val sessions: List<JobSummary> = emptyList(),
 ) {
     val measured: Boolean get() = score != null
 

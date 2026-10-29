@@ -128,7 +128,6 @@ private fun WorkRow(
             }
             Pill(
                 when (work.status) {
-                    WorkStore.STATUS_PENDING -> "recortar"
                     WorkStore.STATUS_FAILED -> "fallo"
                     WorkStore.STATUS_SENDING -> "enviando"
                     WorkStore.STATUS_CONNECTING -> "en pausa"

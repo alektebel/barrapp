@@ -144,6 +144,9 @@ fun TrackerRecord(
     camera: String,
     onStandard: (String) -> Unit,
     onCamera: (String) -> Unit,
+    /** The movement the athlete says the next clip is; blank = detect it. */
+    exercise: String = "",
+    onExercise: (String) -> Unit = {},
     onRecord: () -> Unit,
     onPick: () -> Unit,
     onDone: () -> Unit,
@@ -188,14 +191,14 @@ fun TrackerRecord(
             }
         }
         when (phase) {
-            RecordPhase.IDLE -> IdlePhase(lastAnalyzed, onRecord, onPick)
+            RecordPhase.IDLE -> IdlePhase(lastAnalyzed, onRecord, onPick, exercise, onExercise)
             RecordPhase.ANALYZING -> AnalyzingPhase(stages, activeStage)
             RecordPhase.RESULTS -> results?.let {
                 ResultsPhase(
                     it, onDone, replayAnalysis, replayClip, onExpandReplay, onOpenFault, onShare,
                 )
             }
-                ?: IdlePhase(lastAnalyzed, onRecord, onPick)
+                ?: IdlePhase(lastAnalyzed, onRecord, onPick, exercise, onExercise)
         }
     }
 }
@@ -247,6 +250,8 @@ private fun IdlePhase(
     lastAnalyzed: LastAnalyzed?,
     onRecord: () -> Unit,
     onPick: () -> Unit,
+    exercise: String,
+    onExercise: (String) -> Unit,
 ) {
     Column(
         Modifier
@@ -305,10 +310,15 @@ private fun IdlePhase(
         Spacer(Modifier.height(20.dp))
         TkSecondaryButton("Subir vídeo", onPick)
 
-        // Nothing to declare before a set: the server reads the camera angle
-        // and the movement from the clip, and checks that depend on a
-        // standard nobody declared are marked as such, never assumed.
+        // The server reads the camera angle and the movement from the clip,
+        // so nothing HAS to be declared. The movement can be, though: a clip
+        // shot in the dark or upside down is the case where detection guesses
+        // wrong, and one tap is cheaper than a wrong score. It is per clip and
+        // never remembered - a stale "dominada" on tomorrow's dips would be
+        // the same mistake made quietly.
         Spacer(Modifier.height(28.dp))
+        ExercisePicker(exercise, onExercise)
+        Spacer(Modifier.height(16.dp))
         TkCard {
             Eyebrow("Última sesión analizada")
             Spacer(Modifier.height(8.dp))
@@ -328,6 +338,46 @@ private fun IdlePhase(
                         lastAnalyzed.score?.toString() ?: "—",
                         style = T.cardHeadline.copy(color = scoreInk(lastAnalyzed.score)),
                     )
+                }
+            }
+        }
+    }
+}
+
+/** One choice of the "¿Qué ejercicio es?" picker; the value is the server's
+ *  catalog name, blank for "detect it". */
+internal val EXERCISE_CHOICES: List<Choice> =
+    listOf(Choice("Detectar solo", "")) +
+        com.barrapp.data.DECLARABLE_EXERCISE_LIST.map { Choice(com.barrapp.movementEs(it), it) }
+
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun ExercisePicker(selected: String, onSelect: (String) -> Unit) {
+    TkCard {
+        Eyebrow("¿Qué ejercicio es?")
+        Spacer(Modifier.height(4.dp))
+        Text(
+            if (selected.isBlank()) "Barra lo reconoce en el vídeo. Díselo si de noche o con poca luz se equivoca."
+            else "Se medirá como ${EXERCISE_CHOICES.label(selected).lowercase()}, sin reconocerlo antes.",
+            style = T.bodyS,
+        )
+        Spacer(Modifier.height(10.dp))
+        FlowRow(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            EXERCISE_CHOICES.forEach { choice ->
+                val on = choice.value == selected
+                Box(
+                    Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(if (on) Tk.primary else Tk.surface)
+                        .border(2.dp, Tk.border, RoundedCornerShape(50))
+                        .clickable(role = Role.RadioButton) { onSelect(choice.value) }
+                        .semantics { contentDescription = "Ejercicio: ${choice.label}" }
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                ) {
+                    Text(choice.label, style = body(12, if (on) Tk.onInk else Tk.ink))
                 }
             }
         }

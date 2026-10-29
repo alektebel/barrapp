@@ -47,14 +47,13 @@ data class UiState(
     val faults: Map<String, Map<String, Int>> = emptyMap(),
     val jobs: List<Job> = emptyList(),
     val selectedDate: String? = null,
+    /** Clips that finished on this phone and have not been opened yet. */
+    val unseen: Set<String> = emptySet(),
     val current: Job? = null,
     val analysis: Analysis? = null,
     /** Every clip on its way to being a session: the works in progress, the
      *  ones waiting, and the ones that went wrong with their reason. */
     val works: List<Work> = emptyList(),
-    /** El clip que espera a que el atleta confirme (o mueva) la ventana de
-     *  recorte antes de subirse. Uno como mucho: la cola es de uno. */
-    val pendingTrim: Work? = null,
     val workLogId: String? = null,
     val error: String? = null,
     val chat: List<ChatTurn> = emptyList(),
@@ -129,6 +128,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 days = SessionStore.days(app),
                 faults = SessionStore.faults(app),
                 chat = SessionStore.chat(app),
+                unseen = SessionStore.unseen(app),
                 works = WorkStore.all(app),
                 weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,
                 signedInAs = AuthStore.email(app),
@@ -139,11 +139,17 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             uploads.works.collect { works ->
                 storedWorks = works
-                _state.update { it.copy(works = works + preparing,
-                    pendingTrim = works.firstOrNull { w -> w.status == WorkStore.STATUS_PENDING }) }
+                _state.update { it.copy(works = works + preparing) }
             }
         }
         viewModelScope.launch { uploads.finished.collect { j -> showFinished(j) } }
+        // Una versión anterior dejaba el clip esperando a que el atleta
+        // confirmara el recorte. Ya no hay nadie que lo confirme: los que
+        // quedaron así siguen a la cola con la ventana que tenían.
+        WorkStore.all(app).filter { it.status == WorkStore.STATUS_PENDING }.forEach {
+            WorkStore.put(app, it.copy(status = WorkStore.STATUS_WAITING,
+                trimmed = it.trimEndS > it.trimStartS))
+        }
         // Opening the app is one more chance for a clip left mid-way to go on.
         if (WorkStore.all(app).any { it.active }) uploads.kick()
         // The resume-on-connection watcher: a work paused mid-upload does not
@@ -443,13 +449,26 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
-    fun selectDate(date: String) {
+    private fun markSeen(jobId: String) {
+        val app = getApplication<Application>()
+        SessionStore.markSeen(app, jobId)
+        _state.update { it.copy(unseen = SessionStore.unseen(app)) }
+    }
+
+    /** Open a day's list of sessions, without loading any of them yet. */
+    fun selectDay(date: String) {
+        _state.update { it.copy(selectedDate = date) }
+    }
+
+    /** Open one session of a day: [chosen] when given, else the day's last. */
+    fun selectDate(date: String, chosen: String? = null) {
         val day = _state.value.days.firstOrNull { it.date == date }
         _state.update { it.copy(selectedDate = date, pane = Pane.Session) }
-        val jobId = day?.jobIds?.lastOrNull() ?: run {
+        val jobId = chosen ?: day?.jobIds?.lastOrNull() ?: run {
             _state.update { it.copy(analysis = null, current = null) }
             return
         }
+        markSeen(jobId)
         val known = _state.value.jobs.firstOrNull { it.id == jobId }
         // A cached result whose vision note or model prose was still on its
         // way is fetched again, so both appear once the server has added them.
@@ -548,15 +567,34 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     /** A clip picked anywhere lands here. The clip is copied onto the phone
      *  FIRST, because a camera's content uri can expire before the upload
      *  finishes, and a work that cannot be retried is not in a queue at all. */
-    fun upload(uri: Uri?, variant: String = "", view: String = "") {
-        val video = uri ?: return
+    fun upload(uri: Uri?, variant: String = "", view: String = "", exercise: String = "") =
+        uploadMany(listOfNotNull(uri), variant, view, exercise)
+
+    /** Varios clips de una sesión, de una vez. Todos aparecen en "En curso"
+     *  al instante y en el orden en que se eligieron; se copian y se
+     *  muestrean de uno en uno, y la cola los sube y mide también de uno en
+     *  uno. Lo que se declara (estándar, cámara) vale para todos. */
+    fun uploadMany(uris: List<Uri>, variant: String = "", view: String = "", exercise: String = "") {
+        if (uris.isEmpty()) return
         val app = getApplication<Application>()
-        val workId = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+        val batch = uris.map { uri ->
+            val workId = java.util.UUID.randomUUID().toString().replace("-", "").take(12)
+            setPreparing(Work(id = workId, createdAt = System.currentTimeMillis(),
+                status = WorkStore.STATUS_WAITING, stage = "Preparando el vídeo…"), workId)
+            uri to workId
+        }
+        viewModelScope.launch {
+            batch.forEach { (uri, workId) -> prepareClip(app, uri, workId, variant, view, exercise) }
+        }
+    }
+
+    private suspend fun prepareClip(
+        app: Application, video: Uri, workId: String, variant: String, view: String,
+        exercise: String,
+    ) {
         val dest = clipFile(app, workId)
         val preparationStartedNs = SystemClock.elapsedRealtimeNanos()
-        setPreparing(Work(id = workId, createdAt = System.currentTimeMillis(),
-            status = WorkStore.STATUS_WAITING, stage = "Preparando el vídeo…"), workId)
-        viewModelScope.launch {
+        run {
             val kept = runCatching {
                 withContext(Dispatchers.IO) {
                     dest.parentFile?.mkdirs()
@@ -587,7 +625,6 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 createdAt = System.currentTimeMillis(),
                 status = when {
                     !kept -> WorkStore.STATUS_FAILED
-                    win != null && doTrim -> WorkStore.STATUS_PENDING
                     else -> WorkStore.STATUS_WAITING
                 },
                 clipPath = dest.absolutePath,
@@ -597,14 +634,22 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 // upper (SAGITTAL, FRONTAL, OBLIQUE). Anything else comes back
                 // as unspecified / UNKNOWN with the word kept beside it.
                 variant = variant.trim().lowercase(),
+                // Only a catalog movement travels; anything else is "detect".
+                declaredExercise = exercise.trim().lowercase()
+                    .takeIf { it in com.barrapp.data.DECLARABLE_EXERCISES }.orEmpty(),
                 view = view.trim().uppercase(),
                 trimStartS = if (win != null && doTrim) win.startS else 0.0,
                 trimEndS = if (win != null && doTrim) win.endS else 0.0,
-                trimmed = false,   // only true once the athlete confirms
+                // El recorte es automático: la ventana sugerida manda y
+                // trimForUpload la corta justo antes de subir. Si falla, se
+                // sube el clip entero.
+                trimmed = win != null && doTrim,
                 timingAttemptId = workId,
                 clipDurationS = suggestion?.first?.durationS ?: 0.0,
                 log = buildList {
                     val declared = listOfNotNull(
+                        exercise.trim().lowercase().takeIf { it in com.barrapp.data.DECLARABLE_EXERCISES }
+                            ?.let { "ejercicio «${com.barrapp.movementEs(it)}» declarado" },
                         variant.takeIf { it.isNotBlank() }?.let { "estándar «$it» declarado" },
                         view.takeIf { it.isNotBlank() }?.let { "cámara $it" },
                     )
@@ -612,7 +657,8 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                         (listOf("clip añadido a la cola") + declared).joinToString(" · ")))
                     if (win != null) {
                         add(WorkStore.Entry(System.currentTimeMillis(), WorkStore.Level.INFO,
-                            "serie sugerida: %.1f s–%.1f s".format(win.startS, win.endS)))
+                            (if (doTrim) "se recortará a %.1f s–%.1f s"
+                             else "serie detectada %.1f s–%.1f s; se sube entero").format(win.startS, win.endS)))
                     }
                     if (!kept) add(WorkStore.Entry(System.currentTimeMillis(),
                         WorkStore.Level.ERROR, "no se pudo leer ni guardar el clip"))
@@ -622,63 +668,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             EventLog.info(app, "clip added to the queue", workId)
             publishWorks()
             setPreparing(null, workId)
-            // Un clip PENDIENTE espera al atleta: la cola no lo recoge hasta
-            // que confirma (o descarta) la ventana de recorte.
-            if (kept && work.status != WorkStore.STATUS_PENDING) uploads.kick()
-        }
-    }
-
-    /** El atleta movió los tiradores del deslizador. Grueso vale: 0,1 s. */
-    fun setTrimWindow(workId: String, startS: Double, endS: Double) {
-        val app = getApplication<Application>()
-        val work = WorkStore.get(app, workId) ?: return
-        WorkStore.put(app, work.copy(
-            trimStartS = startS.coerceIn(0.0, work.clipDurationS),
-            trimEndS = endS.coerceIn(startS, work.clipDurationS),
-        ))
-        publishWorks()
-    }
-
-    /** Confirmación: la ventana que hay en el work manda. A subir. */
-    fun confirmTrim(workId: String) {
-        val app = getApplication<Application>()
-        val work = WorkStore.get(app, workId) ?: return
-        val keepTrim = work.trimEndS > work.trimStartS
-        val confirmedNs = SystemClock.elapsedRealtimeNanos()
-        WorkStore.put(app, work.copy(
-            status = WorkStore.STATUS_WAITING,
-            trimmed = keepTrim,
-            trimStartS = if (keepTrim) work.trimStartS else 0.0,
-            trimEndS = if (keepTrim) work.trimEndS else 0.0,
-            log = work.log + WorkStore.Entry(System.currentTimeMillis(),
-                WorkStore.Level.INFO, if (keepTrim)
-                    "recorte confirmado: %.1f s–%.1f s".format(
-                        work.trimStartS, work.trimEndS)
-                else "se sube el clip entero"),
-        ))
-        publishWorks()
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { Round2TimingStore.trimConfirmed(app, work.timingAttemptId.ifBlank { work.id }, confirmedNs) }
-            uploads.kick()
-        }
-    }
-
-    /** Cancelar el recorte y subir el clip entero, sin pasarlo por el
-     *  transcodificador: mismo camino de siempre. */
-    fun discardTrim(workId: String) {
-        val app = getApplication<Application>()
-        val work = WorkStore.get(app, workId) ?: return
-        val confirmedNs = SystemClock.elapsedRealtimeNanos()
-        WorkStore.put(app, work.copy(
-            status = WorkStore.STATUS_WAITING,
-            trimmed = false, trimStartS = 0.0, trimEndS = 0.0,
-            log = work.log + WorkStore.Entry(System.currentTimeMillis(),
-                WorkStore.Level.INFO, "se sube el clip entero"),
-        ))
-        publishWorks()
-        viewModelScope.launch {
-            withContext(Dispatchers.IO) { Round2TimingStore.trimConfirmed(app, work.timingAttemptId.ifBlank { work.id }, confirmedNs) }
-            uploads.kick()
+            if (kept) uploads.kick()
         }
     }
 
@@ -695,6 +685,9 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
     /** A clip finished while this screen was alive: open its session. */
     private fun showFinished(j: Job) {
         val app = getApplication<Application>()
+        // The last clip of a batch is the one left on screen: that is seen.
+        // The ones before it were replaced as they landed and stay "nuevo".
+        if (WorkStore.all(app).none { it.active }) SessionStore.markSeen(app, j.id)
         _state.update {
             it.copy(
                 screen = Screen.Home,
@@ -702,6 +695,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 analysis = j.result,
                 current = j,
                 selectedDate = j.result?.sessionDate ?: SessionStore.today(),
+                unseen = SessionStore.unseen(app),
                 days = SessionStore.days(app),
                 faults = SessionStore.faults(app),
                 weeklyNote = WeeklyReviewWorker.buildReview(app)?.body,

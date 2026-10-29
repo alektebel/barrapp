@@ -78,4 +78,13 @@ class TopFixesTest {
             assertNotNull("no cue for $n", cueEs(n))
         }
     }
+
+    @Test
+    fun `capture notes are read from the payload`() {
+        val a = BarraApi.parseAnalysis(JSONObject(
+            """{"blockers":["b"],"notes":["El vídeo estaba del revés y lo hemos girado."]}"""))
+        assertEquals(listOf("El vídeo estaba del revés y lo hemos girado."), a.notes)
+        // an older server has no notes at all
+        assertEquals(emptyList<String>(), BarraApi.parseAnalysis(JSONObject("{}")).notes)
+    }
 }
