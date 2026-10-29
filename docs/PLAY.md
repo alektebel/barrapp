@@ -21,3 +21,23 @@ keytool -genkeypair -v \
 ```
 
 Losing `keystore/barrapp-release.jks` means you cannot update the Play listing.
+
+## Subida automática
+
+`.github/workflows/play-release.yml` compila el `.aab` firmado y lo sube a Play:
+al empujar una etiqueta `vX.Y.Z` (pista **internal**) o a mano desde Actions
+eligiendo la pista. Pasos, una sola vez:
+
+1. **Cuenta de servicio.** Google Cloud → IAM → Cuentas de servicio → crear una →
+   Claves → JSON. Activa la «Google Play Android Developer API» en ese proyecto.
+2. **Permisos en Play.** Play Console → Usuarios y permisos → invitar el correo de la
+   cuenta de servicio con el rol de **gestor de versiones** sobre barrapp.
+3. **Secretos del repositorio** (Settings → Secrets → Actions): `PLAY_SERVICE_ACCOUNT_JSON`
+   (el JSON entero), `PLAY_KEYSTORE_BASE64` (`base64 -w0 keystore/barrapp-release.jks`),
+   `PLAY_KEYSTORE_PASSWORD`, `PLAY_KEY_ALIAS`, `PLAY_KEY_PASSWORD`.
+4. **Cada release:** sube `versionCode` (y `versionName`) en `app/build.gradle.kts`, commit,
+   `git tag v1.5.0 && git push --tags`. Play rechaza un `versionCode` ya usado.
+
+El keystore sigue siendo el de subida: si usas Play App Signing, perderlo se arregla
+desde Play Console; si no, no hay vuelta atrás (ver arriba). Promocionar de internal a
+producción se hace en Play Console o relanzando el workflow con `track=production`.
