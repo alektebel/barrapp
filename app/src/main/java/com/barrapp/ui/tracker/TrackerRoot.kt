@@ -83,6 +83,12 @@ fun TrackerRoot(
     val state by vm.state.collectAsState()
     var tab by remember { mutableStateOf(initialTab) }
     var sheet by remember { mutableStateOf(Sheet.NONE) }
+    // A session opened from a day's list goes back to that day, not Home.
+    var sessionFromDay by remember { mutableStateOf(false) }
+    val closeSheet = {
+        if (sheet == Sheet.SESSION && sessionFromDay) sheet = Sheet.DAY else sheet = Sheet.NONE
+        sessionFromDay = false
+    }
     var repsOpen by remember { mutableStateOf(false) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val declared = remember { com.barrapp.data.ProfileStore.declaration(context) }
@@ -128,7 +134,7 @@ fun TrackerRoot(
     // in-app recorder that does not exist.
     val measuring = state.works.any { it.active }
 
-    androidx.activity.compose.BackHandler(enabled = sheet != Sheet.NONE) { sheet = Sheet.NONE }
+    androidx.activity.compose.BackHandler(enabled = sheet != Sheet.NONE) { closeSheet() }
     androidx.activity.compose.BackHandler(
         enabled = sheet == Sheet.NONE && tab != TrackerTab.HOME
     ) { tab = TrackerTab.HOME }
@@ -200,9 +206,11 @@ fun TrackerRoot(
             onOpenDay = { sheet = Sheet.DAY },
             onOpenJob = { jobId ->
                 vm.selectDate(state.selectedDate.orEmpty(), jobId)
+                sessionFromDay = true
                 sheet = Sheet.SESSION
             },
-            onReplay = { replayOpen = true }) { sheet = Sheet.NONE }
+            onReplay = { replayOpen = true },
+            backLabel = if (sessionFromDay) "← Día" else "← Semana") { closeSheet() }
         return
     }
 
@@ -340,6 +348,7 @@ private fun SheetHost(
     onOpenDay: () -> Unit,
     onOpenJob: (String) -> Unit,
     onReplay: () -> Unit,
+    backLabel: String,
     onClose: () -> Unit,
 ) {
     Box(Modifier.fillMaxSize().background(Tk.bg)) {
@@ -361,7 +370,7 @@ private fun SheetHost(
                     .padding(horizontal = 16.dp, vertical = 12.dp),
             ) {
                 when (sheet) {
-                    Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onReplay, onClose)
+                    Sheet.SESSION -> SessionSheet(vm, state, repsOpen, onToggleReps, onReplay, backLabel, onClose)
                     Sheet.CALENDAR -> CalendarSheet(vm, state, onOpenDay)
                     Sheet.DAY -> state.days.firstOrNull { it.date == state.selectedDate }?.let {
                         DaySheet(it, state.unseen, onOpenSession = onOpenJob, onClose = onClose)
@@ -383,6 +392,7 @@ private fun SessionSheet(
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
     onReplay: () -> Unit,
+    backLabel: String,
     onClose: () -> Unit,
 ) {
     val a = state.analysis
@@ -443,6 +453,7 @@ private fun SessionSheet(
         },
         runLine = "run ${a.traceId} · build ${a.provenance?.commit ?: "?"}",
         onBackToWeek = onClose,
+        backLabel = backLabel,
         repsOpen = repsOpen,
         onToggleReps = onToggleReps,
         standard = "",

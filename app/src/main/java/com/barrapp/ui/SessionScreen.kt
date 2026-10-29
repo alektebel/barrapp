@@ -47,6 +47,7 @@ fun SessionScreen(
     reps: List<RepCardData>,
     runLine: String,
     onBackToWeek: () -> Unit,
+    backLabel: String = "← Semana",
     repsOpen: Boolean,
     onToggleReps: () -> Unit,
     standard: String = "",
@@ -68,7 +69,7 @@ fun SessionScreen(
         }
     }
     Column(Modifier.fillMaxWidth()) {
-        androidx.compose.material3.Text("← Semana", style = N.back,
+        androidx.compose.material3.Text(backLabel, style = N.back,
             modifier = Modifier.padding(bottom = 14.dp)
                 .then(NoRipple.noRipple(onBackToWeek)))
 

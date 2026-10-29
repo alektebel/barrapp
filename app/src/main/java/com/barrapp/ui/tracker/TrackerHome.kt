@@ -133,6 +133,7 @@ fun TrackerHome(
         StatStrip(data, onOpenCalendar)
         MissionCard(data.mission, onRecord)
         LastSessionSection(data.lastSession, onOpenSession, onRecord)
+        if (data.lastSession != null) TkSecondaryButton("Historial por día", onOpenCalendar)
         NextGoalRow(data.nextGoal, onOpenLadder)
     }
 }
