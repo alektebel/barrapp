@@ -257,6 +257,28 @@ class FastProse(unittest.TestCase):
         self.assertEqual(out["proseSource"], "fallback")
         self.assertTrue(out["headline"])
 
+    def test_record_trace_false_leaves_the_trace_to_the_caller(self):
+        """The worker runs the prose beside the vision pass; two threads on one
+        trace would scramble its current stage, so it records the step itself."""
+        good = json.dumps({"headline": "3 dominadas verificadas, sólidas",
+                           "narrative": "Hiciste 3 repeticiones bien verificadas.",
+                           "nextSession": "Graba cinco o seis repeticiones."}, ensure_ascii=False)
+
+        def go():
+            out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
+            ref = process.trace_ref(out)
+            self.assertIsNotNone(ref)
+            before = len(ref[0].entries)
+            done = process.finish_prose({"id": "j"}, out, record_trace=False)
+            self.assertEqual(len(ref[0].entries), before)   # untouched
+            self.assertEqual(done["proseStatus"], "done")
+            process.record_prose_trace({"id": "j"}, done, ref)
+            self.assertGreater(len(ref[0].entries), before)
+            self.assertIn("model prose", [e.message for e in ref[0].of_stage("prose")])
+        with mock.patch.object(llm, "complete",
+                               return_value=llm.ChatResult(model="m", text=good)):
+            self.run_with(go, ps=self.patches(llm_configured=True))
+
     def test_without_an_llm_there_is_no_pending_state(self):
         def go():
             out = process.measure_job({"id": "j"}, Path("/tmp/x.mp4"))
