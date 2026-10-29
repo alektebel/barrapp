@@ -85,6 +85,107 @@ class MediapipeBackend:
         return PoseResult(remap(blaze, COCO_FROM_BLAZE), fps, w, h)
 
 
+PREFETCH = 8   # frames decoded ahead of the landmarker
+
+
+def _prefetch_enabled() -> bool:
+    return os.environ.get("BARRA_POSE_PREFETCH", "1").strip().lower() not in ("0", "false", "off", "no")
+
+
+def _decode(cap, warm: int, end: int, w: int, h: int):
+    """(index, RGB frame ready for the landmarker) for frames [warm, end) in
+    decode order. Frames before `warm` are advanced with grab(), which does
+    not convert them. The same pixels, in the same order, whoever consumes
+    them."""
+    idx = 0
+    while end < 0 or idx < end:
+        if idx < warm:
+            if not cap.grab():
+                return
+            idx += 1
+            continue
+        ok, frame = cap.read()
+        if not ok:
+            return
+        if w > PROCESS_WIDTH:
+            scale = PROCESS_WIDTH / w
+            frame = cv2.resize(frame, (PROCESS_WIDTH, max(1, int(h * scale))),
+                               interpolation=cv2.INTER_AREA)
+        yield idx, np.ascontiguousarray(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+        idx += 1
+
+
+class _Prefetch:
+    """`_decode` on a second thread, a few frames ahead of the landmarker.
+
+    Decoding, resizing and colour conversion (cv2 releases the GIL in all
+    three) used to run between two landmarker calls; they now overlap with
+    them. Nothing about WHAT is posed changes - same frames, same order, same
+    pixels - so the keypoints are bit-for-bit those of the serial loop
+    (tests/test_pose_prefetch.py; scripts/pose_prefetch_check.py on real
+    clips). A decode error is re-raised in the consumer, where the serial loop
+    would have raised it."""
+
+    _END = object()
+
+    def __init__(self, source, depth: int = PREFETCH) -> None:
+        import queue
+        import threading
+        self._q: queue.Queue = queue.Queue(maxsize=max(1, depth))
+        self._stop = threading.Event()
+        self._source = source
+        self._thread = threading.Thread(target=self._run, name="pose-decode", daemon=True)
+        self._thread.start()
+
+    def _put(self, item) -> bool:
+        import queue
+        while not self._stop.is_set():
+            try:
+                self._q.put(item, timeout=0.1)
+                return True
+            except queue.Full:
+                continue
+        return False
+
+    def _run(self) -> None:
+        try:
+            for item in self._source:
+                if not self._put(item):
+                    return
+            self._put(self._END)
+        except BaseException as exc:  # noqa: BLE001 - re-raised in the consumer
+            self._put(exc)
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        item = self._q.get()
+        if item is self._END:
+            raise StopIteration
+        if isinstance(item, BaseException):
+            raise item
+        return item
+
+    def close(self) -> None:
+        self._stop.set()
+        self._thread.join(timeout=5)
+
+
+def _prepared_frames(cap, warm: int, end: int, w: int, h: int):
+    """The frames to pose: prefetched on a thread unless BARRA_POSE_PREFETCH=0."""
+    source = _decode(cap, warm, end, w, h)
+    if not _prefetch_enabled():
+        class _Serial:
+            def __iter__(self):
+                return source
+
+            def close(self) -> None:
+                source.close()
+        return _Serial()
+    return _Prefetch(source)
+
+
 def pose_range(model: Path, video: Path, warm: int, start: int, end: int,
                fps: float) -> np.ndarray:
     """BlazePose landmarks (frames, 33, 3) for frames [start, end) of the clip
@@ -112,41 +213,27 @@ def pose_range(model: Path, video: Path, warm: int, start: int, end: int,
         output_segmentation_masks=False,
     )
     frames: list[np.ndarray] = []
-    with vision.PoseLandmarker.create_from_options(options) as landmarker:
-        idx = 0
-        while end < 0 or idx < end:
-            if idx < warm:
-                # Decode but do not pose: grab() advances without converting.
-                if not cap.grab():
-                    break
-                idx += 1
-                continue
-            ok, frame = cap.read()
-            if not ok:
-                break
-            if w > PROCESS_WIDTH:
-                scale = PROCESS_WIDTH / w
-                frame = cv2.resize(frame, (PROCESS_WIDTH, max(1, int(h * scale))),
-                                   interpolation=cv2.INTER_AREA)
-            image = mp.Image(
-                image_format=mp.ImageFormat.SRGB,
-                data=cv2.cvtColor(frame, cv2.COLOR_BGR2RGB),
-            )
-            ts = int(idx * 1000.0 / max(fps, 1.0))
-            res = landmarker.detect_for_video(image, ts)
-            row = np.zeros((33, 3), dtype=np.float32)
-            if res.pose_landmarks:
-                for i, lm in enumerate(res.pose_landmarks[0]):
-                    # visibility x presence: a landmark the model placed but
-                    # believes is out of frame is not a usable observation.
-                    # lm.x/lm.y are normalised to the processed image, so
-                    # scaling back by the ORIGINAL dimensions keeps the
-                    # pixel coordinates downstream has always expected.
-                    row[i] = (lm.x * w, lm.y * h,
-                              float(lm.visibility) * float(lm.presence))
-            if idx >= start:
-                frames.append(row)
-            idx += 1
+    prepared = _prepared_frames(cap, warm, end, w, h)
+    try:
+        with vision.PoseLandmarker.create_from_options(options) as landmarker:
+            for idx, rgb in prepared:
+                image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb)
+                ts = int(idx * 1000.0 / max(fps, 1.0))
+                res = landmarker.detect_for_video(image, ts)
+                row = np.zeros((33, 3), dtype=np.float32)
+                if res.pose_landmarks:
+                    for i, lm in enumerate(res.pose_landmarks[0]):
+                        # visibility x presence: a landmark the model placed but
+                        # believes is out of frame is not a usable observation.
+                        # lm.x/lm.y are normalised to the processed image, so
+                        # scaling back by the ORIGINAL dimensions keeps the
+                        # pixel coordinates downstream has always expected.
+                        row[i] = (lm.x * w, lm.y * h,
+                                  float(lm.visibility) * float(lm.presence))
+                if idx >= start:
+                    frames.append(row)
+    finally:
+        prepared.close()
     cap.release()
     if not frames:
         return np.zeros((0, 33, 3), dtype=np.float32)

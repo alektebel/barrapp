@@ -828,6 +828,11 @@ def _after_result(job_id: str, owner: str, item: dict, dest: Path, result: dict,
 
 
 def worker(event, _context):
+    try:  # a cold container reads its files in parallel while the clip downloads
+        import prewarm
+        prewarm.start()
+    except Exception:  # noqa: BLE001 - never worth a job
+        pass
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
     dest = Path("/tmp") / f"{job_id}.mp4"
