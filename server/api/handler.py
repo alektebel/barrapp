@@ -715,6 +715,118 @@ def _write_result(job_id: str, result: dict) -> None:
     )
 
 
+_PROSE_KEYS = ("headline", "narrative", "nextSession", "proseStatus",
+               "proseSource", "proseRejected")
+
+
+def _changed(base: dict, out: dict, skip: tuple = ()) -> dict:
+    """The keys a branch changed or added relative to the result it started
+    from. Branches return whole payloads; merging only their differences lets
+    three of them run at once without one overwriting another's keys."""
+    return {k: v for k, v in out.items() if k not in skip and base.get(k) != v}
+
+
+def _after_result(job_id: str, owner: str, item: dict, dest: Path, result: dict,
+                  located_future) -> dict:
+    """Everything that follows the measured result, all at once.
+
+    Until 2026-10-29 these ran one after the other - the stored-clip cut and
+    upload (15-45 s), then the vision note (14-180 s), then the model prose
+    (20-40 s) - so the prose, which depends on none of the others (its digest
+    reads only measured keys), reached the phone up to ~230 s after the
+    result. The three are independent: each returns the keys it owns and they
+    are merged under a lock, the phone seeing each as it lands. `done` is
+    already written; a failure in a branch costs that branch only.
+    """
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    from process import add_vision, finish_prose, record_prose_trace, trace_ref
+
+    base = dict(result)
+    shared = dict(result)
+    lock = threading.Lock()
+    ref = trace_ref(base)  # add_vision pops the trace; the prose step needs it
+
+    def _publish(updates: dict) -> None:
+        if not updates:
+            return
+        with lock:
+            shared.update(updates)
+            _write_result(job_id, shared)
+
+    def _store() -> None:
+        try:
+            located = located_future.result(timeout=300)
+        except Exception:  # noqa: BLE001
+            located = None
+        localization = None
+        if located and located.get("usable"):
+            loc = dict(located)
+            loc["source"] = "vision"
+            loc["trimmed"] = _store_trimmed_clip(
+                dest, owner, job_id, located["startS"], located["endS"],
+                located.get("durationS"))
+            localization = loc
+        # Vision unavailable or it found no window: fall back to the geometric
+        # working set the measurement already computed.
+        if localization is None:
+            trim = base.get("trim") or {}
+            s, e = trim.get("startS"), trim.get("endS")
+            if s is not None and e is not None and e > s:
+                if _store_trimmed_clip(dest, owner, job_id, s, e,
+                                       base.get("duration_s")):
+                    localization = {"source": "geometry", "startS": s, "endS": e,
+                                    "durationS": base.get("duration_s"),
+                                    "trimmed": True}
+        if localization is not None:
+            _publish({"localization": localization})
+            print(f"[barra] stored clip localized by {localization.get('source')} "
+                  f"{localization.get('startS')}-{localization.get('endS')}s "
+                  f"trimmed={localization.get('trimmed')}", flush=True)
+        else:
+            print("[barra] localization skipped; storing the raw clip", flush=True)
+
+    def _vision() -> None:
+        if base.get("visionStatus") != "pending":
+            return
+        try:
+            out = add_vision(item, dest, dict(base))
+        except Exception as exc:  # noqa: BLE001 - the measurement stands
+            out = {**base, "visionStatus": "failed"}
+            print(f"[barra] vision pass failed: {exc}", flush=True)
+        _publish(_changed(base, out, skip=_PROSE_KEYS))
+        uploads.record(job_id, owner, "vision", out.get("visionStatus", ""))
+
+    def _prose() -> None:
+        if base.get("proseStatus") != "pending":
+            return
+        try:
+            out = finish_prose(item, dict(base), record_trace=False)
+        except Exception as exc:  # noqa: BLE001 - the fallback text stands
+            out = {**base, "proseStatus": "failed"}
+            print(f"[barra] prose pass failed: {exc}", flush=True)
+        _publish({k: out[k] for k in _PROSE_KEYS if k in out and base.get(k) != out[k]})
+        uploads.record(job_id, owner, "prose", out.get("proseStatus", ""))
+
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        futures = [pool.submit(fn) for fn in (_prose, _vision, _store)]
+        for f in futures:
+            try:
+                f.result()
+            except Exception as exc:  # noqa: BLE001 - a branch never fails the job
+                print(f"[barra] post-result branch failed: {exc}", flush=True)
+
+    with lock:
+        final = dict(shared)
+    try:
+        if base.get("proseStatus") == "pending":
+            record_prose_trace(item, final, ref)
+    except Exception as exc:  # noqa: BLE001 - a debugging aid never fails a job
+        print(f"[barra] could not record the prose trace: {exc}", flush=True)
+    _write_result(job_id, final)
+    return final
+
+
 def worker(event, _context):
     job_id = event["job_id"]
     owner = event.get("owner") or (_item(job_id) or {}).get("owner") or ""
@@ -797,57 +909,8 @@ def worker(event, _context):
         uploads.record(job_id, owner, "done",
                        f"{result.get('exercise', '?')}, {result.get('n_reps', 0)} rep(s)")
 
-        try:
-            located = located_future.result(timeout=300)
-        except Exception:  # noqa: BLE001
-            located = None
         pool.shutdown(wait=False)
-        localization = None
-        if located and located.get("usable"):
-            loc = dict(located)
-            loc["source"] = "vision"
-            loc["trimmed"] = _store_trimmed_clip(
-                dest, owner, job_id, located["startS"], located["endS"],
-                located.get("durationS"))
-            localization = loc
-        # Vision unavailable or it found no window: fall back to the geometric
-        # working set the measurement already computed.
-        if localization is None:
-            trim = result.get("trim") or {}
-            s, e = trim.get("startS"), trim.get("endS")
-            if s is not None and e is not None and e > s:
-                if _store_trimmed_clip(dest, owner, job_id, s, e,
-                                       result.get("duration_s")):
-                    localization = {"source": "geometry", "startS": s, "endS": e,
-                                    "durationS": result.get("duration_s"),
-                                    "trimmed": True}
-        if localization is not None:
-            result["localization"] = localization
-            print(f"[barra] stored clip localized by {localization.get('source')} "
-                  f"{localization.get('startS')}-{localization.get('endS')}s "
-                  f"trimmed={localization.get('trimmed')}", flush=True)
-        else:
-            print("[barra] localization skipped; storing the raw clip", flush=True)
-
-        if result.get("visionStatus") == "pending":
-            try:
-                result = add_vision(item, dest, result)
-            except Exception as exc:  # noqa: BLE001 - the measurement stands
-                result = {**result, "visionStatus": "failed"}
-                print(f"[barra] vision pass failed: {exc}", flush=True)
-            uploads.record(job_id, owner, "vision", result.get("visionStatus", ""))
-
-        # The model prose, like the vision note: after the result, judged,
-        # the fallback text standing until a good reply replaces it.
-        from process import finish_prose
-        if result.get("proseStatus") == "pending":
-            try:
-                result = finish_prose(item, result)
-            except Exception as exc:  # noqa: BLE001 - the fallback text stands
-                result = {**result, "proseStatus": "failed"}
-                print(f"[barra] prose pass failed: {exc}", flush=True)
-            uploads.record(job_id, owner, "prose", result.get("proseStatus", ""))
-        _write_result(job_id, result)
+        _after_result(job_id, owner, item, dest, result, located_future)
         uploads.trim(job_id)
     except Exception as exc:  # noqa: BLE001
         _fail(exc)

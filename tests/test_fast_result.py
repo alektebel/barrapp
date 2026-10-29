@@ -398,6 +398,106 @@ class Worker(unittest.TestCase):
         self.assertEqual(final["proseStatus"], "done")
         self.assertEqual(final["headline"], "3 flexiones del modelo")
 
+    # -- the three post-result branches run at once (docs/SPEED-ROUND3.md) ---
+    def _all_pending(self):
+        return {**measured(), "visionStatus": "pending", "proseStatus": "pending",
+                "proseSource": "fallback", "traceId": "t", "headline": "fallback",
+                "trim": {"startS": 1.0, "endS": 8.0}}
+
+    def _written(self):
+        return [c.kwargs["ExpressionAttributeValues"][":r"]
+                for c in self.table.update_item.call_args_list
+                if ":r" in c.kwargs.get("ExpressionAttributeValues", {})]
+
+    def test_store_vision_and_prose_overlap(self):
+        """Serial, they cost cut+upload (15-45 s) + vision (14-180 s) + prose
+        (20-40 s) after the result; the prose depends on neither."""
+        all_three = threading.Barrier(3, timeout=3)
+
+        def vision(j, p, r, **k):
+            all_three.wait()  # BrokenBarrierError if any branch waits for another
+            return {**r, "visionStatus": "done", "visionObservations": [{"rep": "r1"}]}
+
+        def prose(j, r, **k):
+            all_three.wait()
+            return {**r, "proseStatus": "done", "proseSource": "llm:m", "headline": "del modelo"}
+
+        def store(*a, **k):
+            all_three.wait()
+            return True
+
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=self._all_pending()), \
+                mock.patch("process.add_vision", side_effect=vision), \
+                mock.patch("process.finish_prose", side_effect=prose), \
+                mock.patch.object(self.h, "_store_trimmed_clip", side_effect=store):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        final = self._written()[-1]
+        # Every branch's keys survive the merge.
+        self.assertEqual(final["visionStatus"], "done")
+        self.assertEqual(final["visionObservations"], [{"rep": "r1"}])
+        self.assertEqual(final["proseStatus"], "done")
+        self.assertEqual(final["headline"], "del modelo")
+        self.assertEqual(final["localization"]["source"], "geometry")
+        self.assertEqual(final["n_reps"], 3)
+
+    def test_the_prose_reaches_the_phone_while_the_vision_is_still_running(self):
+        """The prose used to wait for the slowest vision call (up to ~180 s)."""
+        prose_seen = threading.Event()
+        seen = {}
+
+        def vision(j, p, r, **k):
+            seen["prose_landed_first"] = prose_seen.wait(3)
+            seen["on_phone"] = [w.get("proseStatus") for w in self._written()]
+            return {**r, "visionStatus": "done"}
+
+        def prose(j, r, **k):
+            return {**r, "proseStatus": "done", "proseSource": "llm:m", "headline": "del modelo"}
+
+        real_write = self.h._write_result
+
+        def write(job_id, result):
+            real_write(job_id, result)
+            if result.get("proseStatus") == "done":
+                prose_seen.set()
+
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=self._all_pending()), \
+                mock.patch("process.add_vision", side_effect=vision), \
+                mock.patch("process.finish_prose", side_effect=prose), \
+                mock.patch.object(self.h, "_write_result", side_effect=write):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        self.assertTrue(seen["prose_landed_first"])
+        self.assertIn("done", seen["on_phone"])
+        # ...and the prose written first was not lost when the vision landed.
+        self.assertEqual(self._written()[-1]["headline"], "del modelo")
+        self.assertEqual(self._written()[-1]["visionStatus"], "done")
+
+    def test_a_vision_crash_keeps_the_prose_and_the_job(self):
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=self._all_pending()), \
+                mock.patch("process.add_vision", side_effect=RuntimeError("boom")), \
+                mock.patch("process.finish_prose", side_effect=lambda j, r, **k: {
+                    **r, "proseStatus": "done", "headline": "del modelo"}):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        final = self._written()[-1]
+        self.assertEqual(final["visionStatus"], "failed")
+        self.assertEqual(final["proseStatus"], "done")
+        self.assertEqual(self.statuses()[-1][0], "done")
+
+    def test_the_prose_step_is_recorded_in_the_trace_once_at_the_end(self):
+        trace = mock.Mock()
+        with mock.patch("vision.locate_exercise", return_value=None), \
+                mock.patch("process.measure_job", return_value=self._all_pending()), \
+                mock.patch("process.trace_ref", return_value=(trace, "auto")), \
+                mock.patch("process.record_prose_trace") as record, \
+                mock.patch("process.add_vision", side_effect=lambda j, p, r, **k: r), \
+                mock.patch("process.finish_prose", side_effect=lambda j, r, **k: {
+                    **r, "proseStatus": "done"}):
+            self.h.worker({"job_id": "j1", "owner": "o"}, None)
+        record.assert_called_once()
+        self.assertEqual(record.call_args.args[1]["proseStatus"], "done")
+
     def test_a_prose_failure_does_not_fail_the_job(self):
         payload = {**measured(), "visionStatus": "skipped", "proseStatus": "pending",
                    "proseSource": "fallback", "traceId": "t"}

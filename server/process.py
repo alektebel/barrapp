@@ -289,16 +289,22 @@ def add_vision(job: dict, video_path: Path, report: dict) -> dict:
     return _finish(trace, report, job, requested)
 
 
-def finish_prose(job: dict, report: dict) -> dict:
+def finish_prose(job: dict, report: dict, record_trace: bool = True) -> dict:
     """The model prose, after the result (docs/SPEED-PLAN.md B): the sibling
     of `add_vision`, off the critical path. Asks the report model for the
     three prose keys, judges the reply by the same rules `write_report`
     applies, and only then replaces the fallback text. Whatever happens, the
     headline is never left empty, and `proseStatus` never stays pending:
     done, failed or fallback. Everything else in the payload is untouched.
+
+    `record_trace=False` is for the worker, which runs this alongside
+    `add_vision` (docs/SPEED-ROUND3.md): the two share one trace, whose
+    "current stage" two threads would scramble, so the worker records the
+    prose step itself afterwards with `record_prose_trace`.
     """
     report = dict(report)
-    trace, requested = _TRACES.get(str(report.get("traceId") or ""), (None, "auto"))
+    trace, requested = (_TRACES.get(str(report.get("traceId") or ""), (None, "auto"))
+                        if record_trace else (None, "auto"))
     if report.get("proseStatus") != "pending":
         return report
     # What the model is offered: the measured payload, without the prose keys
@@ -325,16 +331,7 @@ def finish_prose(job: dict, report: dict) -> dict:
             report["proseSource"] = "fallback"
             report["proseStatus"] = "failed"
             report["proseRejected"] = out["reason"]
-        if trace is not None:
-            trace.stage("prose")
-            trace.step("model prose",
-                       status=report["proseStatus"], source=report["proseSource"],
-                       rejected=report.get("proseRejected"))
-            # The same payload contract the measurement ran: Spanish prose,
-            # no invented numbers, nothing missing.
-            sentinel.watch(trace, "payload", {"payload": report},
-                           inputs={"job": job.get("id"), "requested": requested})
-            _write_trace(trace, str(job.get("id") or ""))
+        record_prose_trace(job, report, (trace, requested))
     except Exception as exc:  # noqa: BLE001 - advisory: the fallback stands
         report["proseSource"] = "fallback"
         report["proseStatus"] = "failed"
@@ -342,6 +339,27 @@ def finish_prose(job: dict, report: dict) -> dict:
         if trace is not None:
             trace.error("prose pass failed", reason=str(exc)[:200])
     return report
+
+
+def trace_ref(report: dict):
+    """(trace, requested) of a measured job, or None. The worker takes it
+    before `add_vision` pops it, to record the prose step afterwards."""
+    return _TRACES.get(str(report.get("traceId") or ""))
+
+
+def record_prose_trace(job: dict, report: dict, ref) -> None:
+    """The prose step in the job's trace, and the same payload contract the
+    measurement ran (Spanish prose, no invented numbers, nothing missing)."""
+    trace, requested = ref if ref else (None, "auto")
+    if trace is None:
+        return
+    trace.stage("prose")
+    trace.step("model prose",
+               status=report.get("proseStatus"), source=report.get("proseSource"),
+               rejected=report.get("proseRejected"))
+    sentinel.watch(trace, "payload", {"payload": report},
+                   inputs={"job": job.get("id"), "requested": requested})
+    _write_trace(trace, str(job.get("id") or ""))
 
 
 def _new_trace(job: dict, video_path: Path, requested: str):
