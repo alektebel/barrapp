@@ -130,15 +130,42 @@ def cut_technique(video_path: Path, start_s: float, end_s: float,
     return out_path if out_path.exists() and out_path.stat().st_size > 0 else None
 
 
+_FLIP_180 = "hflip,vflip"
+
+
+def rotate_clip(video_path: Path, out_path: Path, width: int = 720) -> Path | None:
+    """The clip turned 180 degrees, scaled down to `width` for the pose model
+    (which works at 640 anyway). ffmpeg applies the container's rotation first,
+    so the result is the picture as the phone would show it, then flipped.
+    None when there is no ffmpeg or the turn fails."""
+    exe = _ffmpeg_bin()
+    if exe is None:
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        subprocess.run(
+            [exe, "-y", "-loglevel", "error", "-i", str(video_path),
+             "-vf", f"{_FLIP_180},scale='min({int(width)},iw)':-2",
+             "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+             "-movflags", "+faststart", str(out_path)],
+            check=True, capture_output=True, timeout=300,
+        )
+    except Exception:  # noqa: BLE001 - no turned clip means no rotation
+        return None
+    return out_path if out_path.exists() and out_path.stat().st_size > 0 else None
+
+
 def trim_clip(video_path: Path, start_s: float, end_s: float,
-              out_path: Path) -> Path | None:
+              out_path: Path, rotate: int = 0) -> Path | None:
     """Cut [start_s, end_s] out of the clip, re-encoded frame-accurately.
 
     Unlike `cut_technique`, this is the clip that gets STORED as the exercise,
     so a stream-copy cut onto a keyframe is not good enough - it would keep
     seconds of the walk-in before the located window. Re-encoding to H.264 also
     makes the result playable on the phone. Best-effort: None means keep the
-    original.
+    original. `rotate=180` also turns the stored clip, so the phone replays it
+    the way up the measurement saw it (the skeleton drawn on it is in those
+    coordinates).
     """
     if end_s <= start_s:
         return None
@@ -151,6 +178,7 @@ def trim_clip(video_path: Path, start_s: float, end_s: float,
             [exe, "-y", "-loglevel", "error",
              "-ss", f"{max(0.0, start_s):.2f}", "-to", f"{max(0.1, end_s):.2f}",
              "-i", str(video_path),
+             *(["-vf", _FLIP_180] if int(rotate) % 360 == 180 else []),
              "-c:v", "libx264", "-preset", "fast", "-crf", "23",
              "-c:a", "aac", "-movflags", "+faststart",
              str(out_path)],

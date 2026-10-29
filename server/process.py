@@ -248,6 +248,7 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
                            vision_label=vision_label,
                            pose_backend_override=pose_backend_override,
                            vision_window=vision_window)
+    _annotate_capture(metrics)
     # The model prose is OFF the critical path (docs/SPEED-PLAN.md B): the
     # result reaches the phone with the deterministic Spanish text and
     # `proseStatus: "pending"`, and `finish_prose` upgrades it afterwards,
@@ -279,6 +280,44 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
               f"rejections={len(trace.rejections)} errors={len(trace.errors)}",
               flush=True)
     return report
+
+
+# What the app is told about HOW the clip was filmed, as catalog codes that
+# barra/i18n.py renders in Spanish (each one says what to do about it).
+_GENERIC_NOT_SEEN = "no stretch of this clip shows the athlete on the apparatus"
+
+
+def _annotate_capture(metrics: dict) -> None:
+    """Lift the orientation and framing findings out of `detected` into the
+    payload: `orientation` (what was done), `notes` (things worth knowing about
+    a measured clip) and - when nothing could be measured - the blockers that
+    say how to film it again, ahead of the generic one."""
+    detected = metrics.get("detected") or {}
+    ori = detected.get("orientation") or None
+    framing = list(detected.get("framing") or [])
+    notes: list[str] = []
+    if ori:
+        metrics["orientation"] = {"rotatedBy": ori.get("rotatedBy", 0),
+                                  "status": ori.get("status"),
+                                  "reason": ori.get("reason")}
+    else:
+        metrics.setdefault("orientation", None)
+    if ori and ori.get("status") == "rotated":
+        notes.append("orientation_rotated")
+    unmeasured = (metrics.get("countStatus") == "unmeasured"
+                  or not metrics.get("n_reps"))
+    if unmeasured:
+        actionable = []
+        if ori and ori.get("status") in ("uncertain", "ambiguous"):
+            actionable.append("orientation_suspect")
+        actionable += framing
+        if actionable:
+            kept = [b for b in metrics.get("blockers") or []
+                    if not str(b).startswith(_GENERIC_NOT_SEEN)]
+            metrics["blockers"] = actionable + kept
+    elif "framing_dark" in framing:
+        notes.append("framing_dark")
+    metrics["notes"] = notes
 
 
 def add_vision(job: dict, video_path: Path, report: dict) -> dict:
@@ -534,6 +573,18 @@ def _measure_hold(pose, fps: float, movement, session: str | None,
     }
 
 
+def _turn_clip(video_path: Path) -> Path | None:
+    """The clip turned 180 degrees in a temp file, or None (no ffmpeg, a failed
+    turn). The caller deletes it."""
+    import tempfile
+    try:
+        from barra.frames import rotate_clip
+        out = Path(tempfile.gettempdir()) / f"{video_path.stem}-turned180.mp4"
+        return rotate_clip(video_path, out)
+    except Exception:  # noqa: BLE001 - no turned clip means no rotation
+        return None
+
+
 def _unsupported(chosen: str, detected: dict | None) -> dict:
     """A movement the classifier can name but the pipeline has no profile
     for. The blocker is a catalog code (barra/i18n.py renders it in Spanish);
@@ -776,50 +827,131 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     sentinel.watch(tr, "pose", {"keypoints": pose.keypoints},
                    inputs={"backend": pose_backend, "fps": float(fps)}, fps=fps)
     _stage("recognising the movement")
-    detection = classify(pose.keypoints, tr, fps=fps)
-    detected = {
-        "exercise": detection.exercise,
-        "label": HUMAN.get(detection.exercise, detection.exercise),
-        "confidence": round(float(detection.confidence), 2),
-        # What that number is. It is a bounded distance from the measurement
-        # that decided the label to the threshold it was compared against, not
-        # a probability, and the phone renders it as one or the other on the
-        # strength of this field rather than on a guess about the pipeline.
-        "certainty": detection.certainty,
-        "reason": detection.reason,
-        "runnerUp": detection.runner_up,
-    }
-    sentinel.watch(tr, "detection", {"detected": detected},
-                   inputs={"frames": int(len(pose.keypoints))})
-    # The first learned model runs alongside the geometric classifier. It is a
-    # second opinion, never a replacement: `detected` stays the interpretable,
-    # verified answer, and `model` says what the model thinks and - with the
-    # load estimate - what it thinks the athlete is carrying. When no trained
-    # model is present (or it has no classes) this is null, and the phone says
-    # nothing rather than improvise.
-    model_out = None
-    tr.stage("model")
-    try:
-        from barra.model import load_default, model_classify, model_load
-        _model = load_default()
-        if _model is not None and _model.classes:
-            _feat = dict(getattr(detection, "features", None) or {})
-            # The geometric detector's own feature dict is the narrow vector
-            # its thresholds need. A model trained on the wider kinematic set
-            # asks for names that dict has never held, and every one of them
-            # arrives as the not-a-number sentinel - a model answering from a
-            # third of its inputs, confidently, with nothing raising. So when
-            # the loaded model wants more than the detector computed, compute
-            # the rest from the same keypoints it already has.
-            if any(n not in _feat for n in _model.feature_names):
-                from barra.kinematics import full_features
-                _feat = {**full_features(pose.keypoints, fps), **_feat}
-            model_out = {
-                "classification": model_classify(_model, _feat),
-                "load": model_load(_model, _feat),
-            }
-    except Exception:  # noqa: BLE001 - a model failure must not sink the analysis
+    def _read_movement(p, trc):
+        """What the two pose-based detectors say about keypoints `p`: the
+        geometric read, the dict the phone sees, and the learned model's
+        vote. A function so the same read can be repeated on the clip turned
+        180 degrees (barra/orientation.py) without a second copy of it."""
+        detection = classify(p.keypoints, trc, fps=fps)
+        detected = {
+            "exercise": detection.exercise,
+            "label": HUMAN.get(detection.exercise, detection.exercise),
+            "confidence": round(float(detection.confidence), 2),
+            # What that number is. It is a bounded distance from the measurement
+            # that decided the label to the threshold it was compared against, not
+            # a probability, and the phone renders it as one or the other on the
+            # strength of this field rather than on a guess about the pipeline.
+            "certainty": detection.certainty,
+            "reason": detection.reason,
+            "runnerUp": detection.runner_up,
+        }
+        sentinel.watch(trc, "detection", {"detected": detected},
+                       inputs={"frames": int(len(p.keypoints))})
+        # The first learned model runs alongside the geometric classifier. It is a
+        # second opinion, never a replacement: `detected` stays the interpretable,
+        # verified answer, and `model` says what the model thinks and - with the
+        # load estimate - what it thinks the athlete is carrying. When no trained
+        # model is present (or it has no classes) this is null, and the phone says
+        # nothing rather than improvise.
         model_out = None
+        trc.stage("model")
+        try:
+            from barra.model import load_default, model_classify, model_load
+            _model = load_default()
+            if _model is not None and _model.classes:
+                _feat = dict(getattr(detection, "features", None) or {})
+                # The geometric detector's own feature dict is the narrow vector
+                # its thresholds need. A model trained on the wider kinematic set
+                # asks for names that dict has never held, and every one of them
+                # arrives as the not-a-number sentinel - a model answering from a
+                # third of its inputs, confidently, with nothing raising. So when
+                # the loaded model wants more than the detector computed, compute
+                # the rest from the same keypoints it already has.
+                if any(n not in _feat for n in _model.feature_names):
+                    from barra.kinematics import full_features
+                    _feat = {**full_features(p.keypoints, fps), **_feat}
+                model_out = {
+                    "classification": model_classify(_model, _feat),
+                    "load": model_load(_model, _feat),
+                }
+        except Exception:  # noqa: BLE001 - a model failure must not sink the analysis
+            model_out = None
+        return detection, detected, model_out
+    detection, detected, model_out = _read_movement(pose, tr)
+
+    # Is the clip the right way up, and was it filmed well enough to read?
+    # The cheap look reads the keypoints already in hand; only a clip that
+    # reads inverted pays for a second pose on the clip turned 180 degrees
+    # (barra/orientation.py). A phone propped upside down writes the same
+    # container rotation as a correct clip, so this is the only place it shows.
+    orientation = None
+    framing: list[str] = []
+    pose_reliable = True
+    try:
+        from barra import orientation as _ori
+        suspect, ori_ev = _ori.suspect_inverted(pose.keypoints)
+        if suspect:
+            _stage("checking the orientation")
+            model_vote = ((model_out or {}).get("classification") or {})
+            votes_as_filmed = _ori.Votes(
+                geometry=detected.get("exercise") or "",
+                model=str(model_vote.get("exercise") or ""),
+                model_conf=float(model_vote.get("confidence") or 0.0))
+            votes_turned = None
+            turned_pose = None
+            turned = _turn_clip(video_path)
+            if turned is not None:
+                try:
+                    for name in order:
+                        try:
+                            turned_pose = get_backend(name).estimate(turned)
+                            break
+                        except Exception as exc:  # noqa: BLE001 - try the next backend
+                            tr.reject("pose backend failed", backend=name,
+                                      reason=str(exc)[:200], clip="turned 180")
+                    if turned_pose is not None:
+                        from barra.trace import NullTrace
+                        _tdet, _tdetected, _tmodel = _read_movement(turned_pose, NullTrace())
+                        _tvote = ((_tmodel or {}).get("classification") or {})
+                        votes_turned = _ori.Votes(
+                            geometry=_tdetected.get("exercise") or "",
+                            model=str(_tvote.get("exercise") or ""),
+                            model_conf=float(_tvote.get("confidence") or 0.0))
+                finally:
+                    try:
+                        turned.unlink()
+                    except OSError:
+                        pass
+            verdict = _ori.decide(votes_as_filmed, votes_turned)
+            if verdict.status != "rotated" and _ori.soft_candidate(votes_as_filmed, votes_turned):
+                # Only here, and only now, is the vision read worth waiting for:
+                # it is the independent witness the second path needs.
+                vision_label = _resolve_vote(vision_label, VISION_VOTE_WAIT_S)
+                verdict = _ori.decide(
+                    votes_as_filmed, votes_turned,
+                    vision_label=vision_label if isinstance(vision_label, str) else None)
+            orientation = {**verdict.as_dict(), "suspect": True,
+                           "poseEvidence": ori_ev}
+            tr.decision("orientation " + verdict.status, verdict.reason,
+                        rotatedBy=verdict.rotated_by, **{
+                            k: v for k, v in verdict.evidence.items()
+                            if k in ("agreedAsFilmed", "agreedTurned")})
+            if verdict.rotate and turned_pose is not None:
+                pose = turned_pose
+                detection, detected, model_out = _read_movement(pose, tr)
+                # Everything from here measures the turned clip, and the
+                # stored clip is turned to match (server/api/handler.py).
+            elif verdict.status in ("uncertain", "ambiguous"):
+                pose_reliable = False
+        framing = _ori.framing_issues(
+            pose.keypoints, _ori.brightness(_ori.frame_samples(video_path, n=6)))
+        if framing:
+            tr.note("framing issues", issues=framing)
+            pose_reliable = False
+    except Exception as exc:  # noqa: BLE001 - a check never sinks the analysis
+        tr.step("orientation check skipped", reason=str(exc)[:200])
+    detected["orientation"] = orientation
+    detected["framing"] = framing
     chosen = exercise
     if exercise in ("", "auto", None):
         fusion = None
@@ -841,6 +973,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                 nan_label=vision_label,
                 policy=(os.environ.get("BARRA_ULTRALYTICS_FUSION_POLICY", "default")
                         if pose_backend == "ultralytics" else "default"),
+                pose_reliable=pose_reliable,
             )
             tr.step("fusion", **fusion)
             sentinel.watch(tr, "fusion", {"fusion": fusion},
@@ -855,7 +988,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             # Detectors disagreed with no vision read: say we could not confirm
             # the exercise (catalog code), not the geometry detector's reason.
             blocker = ("movement_unconfirmed"
-                       if (fusion or {}).get("status") == "disagreement-no-vision-abstain"
+                       if (fusion or {}).get("status") in (
+                           "disagreement-no-vision-abstain",
+                           "three-way-disagreement-abstain")
                        else detection.reason)
             # Nothing was confirmed, so nothing is named: the geometry vote
             # stays on record as a vote, not as "reconocido como flexión"

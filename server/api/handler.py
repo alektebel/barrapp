@@ -39,6 +39,30 @@ BUCKET = os.environ["VIDEO_BUCKET"]
 WORKER = os.environ.get("WORKER_FUNCTION", "")
 
 
+# The movements the pipeline can measure: the names in barra.movements.MOVEMENTS.
+# Kept as a literal because this module must not import barra (numpy) at load;
+# tests/test_declared_exercise.py fails if the two ever drift apart.
+DECLARABLE_EXERCISES = frozenset({
+    "squat", "muscle_up", "pull_up", "knee_raise", "dip", "push_up",
+    "front_lever", "planche", "pistol_squat", "split_squat",
+    "bulgarian_split_squat",
+})
+
+
+def declared_exercise(raw) -> str | None:
+    """The exercise the athlete said it is: "auto" when they said nothing, the
+    catalog name when they named one, None when the value is not a movement the
+    pipeline knows. Separators are forgiving (`pull-up`, `pull up`)."""
+    if raw is None:
+        return "auto"
+    if not isinstance(raw, str):
+        return None
+    key = "_".join(raw.strip().lower().replace("-", " ").replace("_", " ").split())
+    if key in ("", "auto"):
+        return "auto"
+    return key if key in DECLARABLE_EXERCISES else None
+
+
 def _now() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
@@ -390,13 +414,22 @@ def _route(event):
         return _resp(200, {"owner": owner, "account": owner.startswith("u:")})
 
     if method == "POST" and path.rstrip("/") == "/v1/jobs":
+        # A declared movement is checked HERE, before a credit is charged or a
+        # row written: the pipeline resolves it with a function that raises
+        # SystemExit on a name it does not know, which would sink the worker.
+        exercise = declared_exercise(body.get("exercise"))
+        if exercise is None:
+            return _resp(400, {
+                "error": "unknown exercise - send one of: auto, "
+                         + ", ".join(sorted(DECLARABLE_EXERCISES)),
+            })
         job_id = uuid.uuid4().hex[:12]
         item = {
             "id": job_id,
             "owner": owner,
             "status": "created",
             # See local_server.py: detection is the safer default.
-            "exercise": body.get("exercise") or "auto",
+            "exercise": exercise,
             "createdAt": _now(),
         }
         # Same contract as local_server.py: declared variant and camera side
@@ -699,7 +732,8 @@ ORIGINAL_KEY = "{owner}/{job}.original.mp4"
 
 
 def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
-                        end_s: float, duration_s: float | None = None) -> bool:
+                        end_s: float, duration_s: float | None = None,
+                        rotate: int = 0) -> bool:
     """Cut the located window out of the clip and overwrite the stored object,
     after keeping the clip as uploaded at `ORIGINAL_KEY`.
 
@@ -712,6 +746,10 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
     Best-effort by design: if there is no cutter, the cut fails, or the upload
     fails, the original stays in S3 and the job still succeeds. A localization
     that cannot be stored is not a reason to lose the measurement.
+
+    `rotate=180` stores the clip the way up the measurement saw it: a clip the
+    pipeline had to turn (it was filmed upside down) is replayed turned, so the
+    skeleton drawn on it lands on the athlete.
     """
     try:
         from barra.frames import trim_clip
@@ -725,7 +763,9 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
     if end - start < 2.0:
         return False
     out = Path("/tmp") / f"{job_id}-exercise.mp4"
-    if trim_clip(src, start, end, out) is None:
+    # The normal path calls trim_clip exactly as before; `rotate` is only
+    # passed when the clip has to be turned.
+    if trim_clip(src, start, end, out, **({"rotate": rotate} if rotate else {})) is None:
         return False
     key = f"{owner}/{job_id}.mp4"
     try:
@@ -930,6 +970,8 @@ def worker(event, _context):
 
         result = measure_job(item, dest, on_stage=_stage, vision_label=_vision_vote,
                              vision_window=_vision_window)
+        # A clip the pipeline had to turn (filmed upside down) is stored turned.
+        rotate = int((result.get("orientation") or {}).get("rotatedBy") or 0)
 
         # The measurement reaches the phone now. Cutting and re-uploading the
         # stored clip (~44 s on 2026-10-11), the model prose (~10-15 s,
@@ -998,7 +1040,7 @@ def worker(event, _context):
             loc["source"] = "vision"
             loc["trimmed"] = _store_trimmed_clip(
                 dest, owner, job_id, located["startS"], located["endS"],
-                located.get("durationS"))
+                located.get("durationS"), rotate=rotate)
             localization = loc
         # Vision unavailable or it found no window: fall back to the geometric
         # working set the measurement already computed.
@@ -1007,7 +1049,7 @@ def worker(event, _context):
             s, e = trim.get("startS"), trim.get("endS")
             if s is not None and e is not None and e > s:
                 if _store_trimmed_clip(dest, owner, job_id, s, e,
-                                       result.get("duration_s")):
+                                       result.get("duration_s"), rotate=rotate):
                     localization = {"source": "geometry", "startS": s, "endS": e,
                                     "durationS": result.get("duration_s"),
                                     "trimmed": True}
@@ -1016,6 +1058,14 @@ def worker(event, _context):
             print(f"[barra] stored clip localized by {localization.get('source')} "
                   f"{localization.get('startS')}-{localization.get('endS')}s "
                   f"trimmed={localization.get('trimmed')}", flush=True)
+        elif rotate and result.get("duration_s"):
+            # Nothing to cut, but the measurement saw the clip turned: store
+            # the whole clip turned too.
+            turned = _store_trimmed_clip(dest, owner, job_id, 0.0,
+                                         result["duration_s"],
+                                         result["duration_s"], rotate=rotate)
+            print(f"[barra] stored the whole clip turned {rotate} degrees: {turned}",
+                  flush=True)
         else:
             print("[barra] localization skipped; storing the raw clip", flush=True)
 

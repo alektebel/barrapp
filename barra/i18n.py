@@ -294,6 +294,24 @@ CATALOG: list[Msg] = [
     Msg("job.never_terminal", "this job never reached a terminal state (stuck for {m} min). Retry.",
         "este análisis nunca terminó (atascado {m} min). Vuelve a intentarlo."),
     Msg("job.no_clip", "the clip never arrived in storage", "el vídeo nunca llegó al almacenamiento"),
+    # how the clip was filmed (barra/orientation.py, server/process.py): each one
+    # says what to do about it
+    Msg("capture.rotated", "orientation_rotated",
+        "El vídeo estaba del revés y lo hemos girado para medirlo. Si el móvil "
+        "está en un soporte, comprueba que la cámara no quede invertida."),
+    Msg("capture.suspect", "orientation_suspect",
+        "Parece que el móvil está del revés: el atleta sale con la cabeza abajo. "
+        "Dale la vuelta (cámara hacia arriba y el móvil recto) y vuelve a grabar."),
+    Msg("capture.dark", "framing_dark",
+        "Hay muy poca luz y barra no puede seguir bien el cuerpo. Graba con más luz "
+        "(bajo una farola o apuntando una linterna a la barra) y con el móvil fijo."),
+    Msg("capture.legs_only", "framing_legs_only",
+        "Solo se ven las piernas: el torso y las manos quedan fuera del encuadre. "
+        "Aleja el móvil unos 2-3 metros, a la altura del pecho, y que se vea el cuerpo "
+        "entero, de las manos a los pies."),
+    Msg("capture.no_athlete", "framing_no_athlete",
+        "No se ve al atleta en el encuadre. Pon el móvil fijo a 2-3 metros, con el "
+        "cuerpo entero dentro del plano durante toda la serie."),
     # unmeasurable movement (process.py; replaces the raw SystemExit text)
     Msg("movement.unsupported", "movement_unsupported:{name*}",
         "hemos detectado {name*}, que todavía no medimos. Graba dominadas, muscle-ups, fondos, flexiones o sentadillas"),
@@ -508,6 +526,9 @@ def localize_payload(payload: dict) -> dict:
     # an unknown one is left exactly as it came.
     p["blockers"] = [(_capital(t) if t != b else b)
                      for b in p.get("blockers") or [] for t in [L(b)]]
+    if "notes" in p:
+        p["notes"] = [(_capital(t) if t != n else n)
+                      for n in p.get("notes") or [] for t in [L(n)]]
     d = p.get("detected")
     if isinstance(d, dict):
         for k in ("label", "reason"):

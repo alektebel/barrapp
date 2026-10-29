@@ -157,12 +157,15 @@ def _float(value: Any, default: float = 0.0) -> float:
 def fuse_detection(geometry: Mapping[str, Any] | str,
                    model: Optional[Mapping[str, Any]] = None,
                    nan_label: Any = None,
-                   policy: str = "default") -> dict:
+                   policy: str = "default",
+                   pose_reliable: bool = True) -> dict:
     """Return a final suggested exercise and why, without hiding disagreement.
 
     `geometry` may be a label or a `detected` dict. `model` may be a label or a
     `model_classify()` dict with `confidence` and `marginToRunnerUp`.
     `nan_label` may be a label or dict with `label`/`exercise`.
+    `pose_reliable` is False when the caller knows the keypoints are suspect
+    (upside-down, dark, athlete out of frame); see 2b below.
     """
     g_label = _label(geometry)
     m_label = _label(model)
@@ -317,6 +320,27 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
                       "name different movements; both are unreliable alone "
                       "on such clips (37% and 26% right), so the exercise "
                       "is not claimed")
+
+    # --- 2b. all three speak, no two agree, and the pose is not trustworthy --
+    # Vision alone is right most of the time when geometry and the classifier
+    # split (21/25 on the 38 runs above), so a three-way split on a clean pose
+    # still lets vision decide: it is breaking a tie between two detectors that
+    # each had a case. What changes the odds is the footage. A clip filmed
+    # upside down (job f31bf9cfc335: geometry said muscle-up, the classifier
+    # back lever, vision hanging leg raise - the athlete was doing dips) or too
+    # dark to track makes ALL THREE misread together, and a name nothing
+    # corroborates is scored as a movement nobody did. When the caller says the
+    # pose cannot be trusted (`pose_reliable=False`: an inversion it could not
+    # resolve, darkness, the body out of frame) the exercise is not claimed.
+    # Default policy only, like 2a; a coin-flip model does not count as a voice.
+    if (policy == "default" and not pose_reliable and _canonical(n_label)
+            and _canonical(g_label) and _canonical(m_label)
+            and m_conf >= MODEL_MIN_CONFIDENCE):
+        return answer("unknown", 0.0, "three-way-disagreement-abstain",
+                      f"geometry ({g_label}), the learned classifier "
+                      f"({m_label}) and the vision read ({n_label}) all name "
+                      "different movements on a clip the pose could not read "
+                      "reliably, so the exercise is not claimed")
 
     # --- 2. no agreement: the most reliable detector that has an answer ----
     # Geometry keeps its say only where nothing better spoke. It is never
