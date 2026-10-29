@@ -143,6 +143,10 @@ USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
 # the completion budget on reasoning tokens and returns a 200 whose content is
 # "". Retrying is cheap next to dropping the pass.
 CHAT_ATTEMPTS = 3
+# The technique note is advisory and arrives after the result: three attempts,
+# but a note that is not coming gives up at this many seconds in total (three
+# timeouts of 60 s kept a failing note pending for ~183 s).
+NOTE_BUDGET_S = 100
 
 
 # Every call goes through the one client (api/llm.py): the cause of a failure,
@@ -164,18 +168,18 @@ def skip_reason() -> str:
 
 def _chat_result(base: str, key: str, model: str, system: str, content: list[dict],
                  timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS,
-                 check_model: bool = True) -> ChatResult:
+                 check_model: bool = True, budget: float | None = None) -> ChatResult:
     return llm.complete(model, [{"role": "user", "content": content}], system=system,
                         base=base, key=key, timeout=timeout, attempts=attempts,
-                        check_model=check_model)
+                        check_model=check_model, budget=budget)
 
 
 def _chat(base: str, key: str, model: str, system: str, content: list[dict],
           timeout: int = REQUEST_TIMEOUT, attempts: int = CHAT_ATTEMPTS,
-          check_model: bool = True) -> str | None:
+          check_model: bool = True, budget: float | None = None) -> str | None:
     """The reply text, or None; the cause of a None is in last_error()."""
     return _chat_result(base, key, model, system, content, timeout, attempts,
-                        check_model=check_model).text
+                        check_model=check_model, budget=budget).text
 
 
 def _strip_keys(obj):
@@ -430,7 +434,7 @@ def technique_note(art, report: dict | None = None) -> dict | None:
     if len(content) < 2:
         return None
 
-    text = _chat(base, key, model, SYSTEM, content)
+    text = _chat(base, key, model, SYSTEM, content, budget=NOTE_BUDGET_S)
     parsed = parse_json_object(text)
     if parsed is None:
         return None

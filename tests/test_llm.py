@@ -96,6 +96,27 @@ class Complete(Base):
         self.assertEqual(m.call_count, llm.ATTEMPTS)
         self.assertEqual(r.error, "empty reply")
 
+    def test_budget_caps_the_whole_call_not_each_attempt(self):
+        # Three timeouts of 60 s used to hold a failing call for ~183 s.
+        clock = iter([0.0, 0.0, 61.0, 99.0, 99.0, 99.0])
+        timeouts = []
+
+        def slow(req, timeout):
+            timeouts.append(timeout)
+            raise TimeoutError("timed out")
+
+        with mock.patch.object(llm.time, "monotonic", side_effect=lambda: next(clock)):
+            r, m, _ = self.call(slow, budget=100)
+        self.assertEqual(timeouts[0], 60)            # first attempt: the usual timeout
+        self.assertLessEqual(timeouts[1], 39)        # second: only what is left
+        self.assertEqual(m.call_count, 2)            # third never starts: <8 s left
+        self.assertTrue(r.error.startswith("timeout"))
+
+    def test_budget_does_not_cost_quick_failures_their_attempts(self):
+        r, m, _ = self.call([reply(""), http_error(503, "busy"), reply("ok")], budget=100)
+        self.assertEqual(m.call_count, 3)
+        self.assertEqual(r.text, "ok")
+
     def test_a_retired_model_is_caught_before_the_call(self):
         with mock.patch.object(llm, "model_listed", return_value=False), \
                 mock.patch.object(llm.urllib.request, "urlopen") as chat, \

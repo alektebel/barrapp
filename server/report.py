@@ -44,6 +44,9 @@ except ImportError:  # tests / local dev with `server/` on the path
 # qwen3.8-flash 6/6 at ~97 s (2026-10-21).
 REPORT_MODEL = os.environ.get("BARRA_REPORT_MODEL", "qwen3.6")
 BACKUP_MODEL = os.environ.get("BARRA_REPORT_BACKUP_MODEL", "qwen3.8-flash")
+# Three attempts, but a reply that is not coming stops costing time here: the
+# fallback text stands and the phone is not kept waiting on three timeouts.
+PROSE_BUDGET_S = 90
 PROSE_KEYS = ("headline", "narrative", "nextSession")
 
 SYSTEM = """Escribes el informe de una serie de calistenia para barrapp, una \
@@ -289,7 +292,8 @@ def write_prose(payload: dict) -> dict:
     reasons = []
     unanswered = False
     for model in dict.fromkeys((REPORT_MODEL, BACKUP_MODEL)):
-        result = llm.complete(model, user, system=SYSTEM, json_mode=True, temperature=0.2)
+        result = llm.complete(model, user, system=SYSTEM, json_mode=True, temperature=0.2,
+                              budget=PROSE_BUDGET_S)
         prose, why = _judge(result, facts)
         if prose is not None:
             return {"status": "done", "prose": prose, "source": f"llm:{result.model}"}

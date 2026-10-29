@@ -30,6 +30,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 
 /**
@@ -44,6 +45,10 @@ class UploadQueue private constructor(private val app: Application) {
     private val api = BarraApi(app)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val drainLock = Mutex()
+    /** Sólo un clip a la vez se recorta y se sube (comparten el ancho de banda
+     *  del móvil); en cuanto está en el servidor suelta la puerta y el
+     *  siguiente empieza mientras el primero se mide. */
+    private val uploadGate = Mutex()
     private val retryLogMutex = Mutex()
 
     /** Quién corta el clip. Real en producción, fake en las pruebas unitarias
@@ -82,12 +87,33 @@ class UploadQueue private constructor(private val app: Application) {
         }
         publish()
         val tried = mutableSetOf<String>()
-        while (true) {
-            val next = WorkStore.all(app)
-                .filter { it.status == WorkStore.STATUS_WAITING && it.id !in tried }
-                .minByOrNull { it.createdAt } ?: break
-            tried += next.id
-            runWork(next)
+        // Varios clips a la vez en el servidor, no más de MAX_IN_FLIGHT (los
+        // modelos de visión tienen cuota); la subida sigue siendo de una en
+        // una. Los clips que lleguen mientras tanto se recogen en la vuelta.
+        val inFlight = java.util.concurrent.atomic.AtomicInteger(0)
+        val slots = kotlinx.coroutines.sync.Semaphore(MAX_IN_FLIGHT)
+        kotlinx.coroutines.coroutineScope {
+            while (true) {
+                val next = WorkStore.all(app)
+                    .filter { it.status == WorkStore.STATUS_WAITING && it.id !in tried }
+                    .minByOrNull { it.createdAt }
+                if (next != null) {
+                    tried += next.id
+                    inFlight.incrementAndGet()
+                    // UNDISPATCHED: cada clip llega a la puerta de subida en
+                    // el orden en que se eligió, el más antiguo primero.
+                    launch(start = kotlinx.coroutines.CoroutineStart.UNDISPATCHED) {
+                        try {
+                            slots.withPermit { runWork(next) }
+                        } finally {
+                            inFlight.decrementAndGet()
+                        }
+                    }
+                    continue
+                }
+                if (inFlight.get() == 0) break
+                delay(500)
+            }
         }
         val waiting = WorkStore.all(app).any { it.status == WorkStore.STATUS_CONNECTING }
         if (WorkStore.all(app).none { it.active }) ProcessingNotifier.cancel(app)
@@ -420,7 +446,10 @@ class UploadQueue private constructor(private val app: Application) {
         val clip = java.io.File(work.clipPath)
         update { it.copy(status = WorkStore.STATUS_WAITING, stage = Stage.WAITING.text, stageCode = Stage.WAITING.code,
             error = null) }
+        var gateHeld = false
         try {
+            uploadGate.lock()
+            gateHeld = true
             if (!clip.exists() || clip.length() == 0L) {
                 fail("El clip ya no está en el teléfono.")
                 return
@@ -547,6 +576,8 @@ class UploadQueue private constructor(private val app: Application) {
                 log(WorkStore.Level.INFO, "el trabajo $jobId ya está «$serverStatus» en el servidor")
             }
             withContext(Dispatchers.IO) { Round2TimingStore.submitted(app, timingAttemptId) }
+            // En el servidor: el siguiente clip puede empezar a subirse.
+            if (gateHeld) { uploadGate.unlock(); gateHeld = false }
 
             // The wait. The server says where it is; the log keeps what it
             // said, so a wrong number later has a trail to be explained by.
@@ -690,11 +721,16 @@ class UploadQueue private constructor(private val app: Application) {
             throw err
         } catch (err: Exception) {
             fail(err.message ?: "No se pudo enviar ese clip.")
+        } finally {
+            if (gateHeld) uploadGate.unlock()
         }
     }
 
 
     companion object {
+        /** Clips midiéndose a la vez en el servidor. */
+        const val MAX_IN_FLIGHT = 3
+
         @Volatile private var instance: UploadQueue? = null
 
         fun get(context: Context): UploadQueue =

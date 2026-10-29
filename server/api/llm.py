@@ -34,6 +34,8 @@ except ImportError:  # tests / local dev with `server/` on the path
 DEFAULT_BASE = "https://api.nan.builders/v1"
 TIMEOUT = 60
 ATTEMPTS = 3
+# Least worth starting another attempt for when a budget is set.
+MIN_ATTEMPT_S = 8
 
 # The provider's edge 403s clients that look like a script.
 USER_AGENT = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -114,9 +116,15 @@ def complete(model: str, messages: list[dict], *, system: str | None = None,
              json_mode: bool = False, temperature: float = 0.3,
              timeout: int = TIMEOUT, attempts: int = ATTEMPTS,
              base: str | None = None, key: str | None = None,
-             check_model: bool = True) -> ChatResult:
+             check_model: bool = True, budget: float | None = None) -> ChatResult:
     """One chat completion. `messages` is the OpenAI list; `system`, when
-    given, is prepended. `base`/`key` default to config()."""
+    given, is prepended. `base`/`key` default to config().
+
+    `budget` (seconds) caps the WHOLE call, retries included: each attempt's
+    timeout shrinks to what is left and no new attempt starts with less than
+    MIN_ATTEMPT_S. Three 60 s timeouts in a row held a failing note for 183 s;
+    with a budget a failure comes back at the budget, while the quick failures
+    (empty reply, 5xx) still get all their attempts."""
     global _last_error
     if base is None or key is None:
         cfg = config()
@@ -141,11 +149,18 @@ def complete(model: str, messages: list[dict], *, system: str | None = None,
         method="POST",
     )
     error, status = "no attempt made", None
+    started = time.monotonic()
     for attempt in range(max(1, attempts)):
+        attempt_timeout = timeout
         if attempt:
             time.sleep(0.8 * attempt)
+        if budget is not None:
+            left = budget - (time.monotonic() - started)
+            if attempt and left < MIN_ATTEMPT_S:
+                break
+            attempt_timeout = max(MIN_ATTEMPT_S, min(timeout, left))
         try:
-            with urllib.request.urlopen(req, timeout=timeout) as resp:
+            with urllib.request.urlopen(req, timeout=attempt_timeout) as resp:
                 data = json.loads(resp.read().decode())
             text = data["choices"][0]["message"]["content"]
         except urllib.error.HTTPError as exc:
