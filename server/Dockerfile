@@ -20,7 +20,7 @@ RUN (dnf install -y gcc gcc-c++ make python3-devel \
      && microdnf clean all)
 
 ENV BARRA_ROOT=/opt/barra
-ENV BARRA_POSE_MODEL=/opt/barra/models/pose_landmarker_heavy.task
+ENV BARRA_POSE_MODEL=/opt/barra/models/pose_landmarker_full.task
 ENV PYTHONPATH=/opt/barra:${LAMBDA_TASK_ROOT}
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 

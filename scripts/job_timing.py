@@ -127,9 +127,35 @@ def main() -> None:
         events, trace = saved["uploads"], saved.get("trace")
     else:
         events, trace = fetch(a.job_id)
-    print(table(durations(events, trace)))
+    d = durations(events, trace)
+    print(table(d))
     print("Server persistence only; phone rendering is not measured. "
           "Stages can overlap; whole-second source timestamps remain coarse.")
+    # Pose budget vs clip length (docs/SPEED-PLAN.md). Production Heavy
+    # sequential was ~3.6 s pose per 1 s of video; Full+chunks targets ~0.52.
+    try:
+        from barra.pose.speed_budget import (
+            PRODUCTION_HEAVY_SEQUENTIAL_S_PER_S as heavy,
+            PROJECTED_FULL_PARALLEL_S_PER_S as full,
+            pose_seconds_for_minutes,
+        )
+        print(
+            f"pose budget: Heavy seq {heavy} s/s → "
+            f"{pose_seconds_for_minutes(1, heavy):.0f} s per video-minute; "
+            f"Full+chunks ~{full} s/s → "
+            f"{pose_seconds_for_minutes(1, full):.0f} s per video-minute"
+        )
+        if "pose" in d and d["pose"] > 0:
+            # Infer clip length from the historical Heavy rate when that is
+            # what ran; useful for "X minutes → this pose time" checks.
+            inferred_s = d["pose"] / heavy
+            print(
+                f"this job pose {d['pose']:.1f} s ≈ {inferred_s:.1f} s of video "
+                f"at Heavy {heavy} s/s "
+                f"(Full+chunks projection ~{inferred_s * full:.1f} s pose)"
+            )
+    except Exception:  # noqa: BLE001 - timing must still print without barra
+        pass
 
 
 if __name__ == "__main__":

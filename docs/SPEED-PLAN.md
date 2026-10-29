@@ -4,6 +4,44 @@
 > the upload finishes, without changing a single measured number. Every step is
 > measured before and after on real jobs, and has tests first.
 
+## Baseline rate (production, Heavy sequential)
+
+Pose dominates. From production jobs + `scripts/job_timing.py`:
+
+| | |
+|---|---|
+| Historical pose rate | **~3.6 s CPU per 1 s of video** |
+| For a clip of **X minutes** | pose ≈ **216·X seconds** (3.6 × 60 × X) |
+| Example: 30 s clip (~0.5 min) | pose ~108–134 s; upload→result ~149–202 s |
+| Fixture `31103ccedfc3` | pose **133.8 s**, upload end→result **202 s** |
+
+## 2026-10-29 speed cut (Full + chunks + bounded locate)
+
+Shipped defaults (rollback: `BARRA_POSE_MODEL=…/pose_landmarker_heavy.task` and
+delete `BARRA_POSE_WORKERS`):
+
+| Knob | Was | Now |
+|---|---|---|
+| Pose model | Heavy | **Full** |
+| `BARRA_POSE_WORKERS` | unset → 1 | **6** |
+| `MIN_CHUNK` | 240 | **120** (env `BARRA_POSE_MIN_CHUNK`) |
+| Fusion locate wait | up to 300 s | **2 s** (`BARRA_VISION_VOTE_WAIT_S`) |
+
+Projected pose rate on Lambda (Round-2 local Full+chunks × Heavy Lambda/local
+ratio): **~0.5–1.1 s pose / 1 s video** → for **X minutes**, pose ≈ **30–66·X s**
+(~3–7× faster than 216·X).
+
+**Verified on this host with real clip WA0020** (497 frames, 19.94 s;
+`tests/fixtures/pose_speed_bench.json`, `scripts/pose_speed_bench.py`):
+
+| Config | Wall | s pose / s video | 1 min of video |
+|---|---:|---:|---:|
+| Heavy sequential | 22.72 s | 1.139 | 68.4 s |
+| Full + 6 workers, floor 120 | 4.835 s | 0.242 | 14.5 s |
+| **Speedup** | | | **4.71×** |
+
+Confirm on the next deployed phone job with `scripts/job_timing.py`.
+
 ## Where the time goes (measured in production)
 
 | Stage | Job `7135be1d598a` (before) | Job `31103ccedfc3` (after deploy 4) |

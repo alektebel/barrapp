@@ -781,8 +781,18 @@ def worker(event, _context):
 
         located_future = pool.submit(_locate)
 
+        # When pose was ~128 s, locate was always done by fusion. Full + chunks
+        # finish pose in seconds while locate can still take tens of seconds —
+        # do not re-serialize that wait onto upload→result. A short grace lets
+        # a nearly-done call land; otherwise fusion runs on geometry+model and
+        # locate still drives the post-result clip trim below.
+        _VISION_VOTE_WAIT_S = float(os.environ.get("BARRA_VISION_VOTE_WAIT_S", "2") or 2)
+
         def _vision_vote():
-            located = located_future.result(timeout=300)
+            try:
+                located = located_future.result(timeout=_VISION_VOTE_WAIT_S)
+            except Exception:  # noqa: BLE001 - late locate is no vote, not a failure
+                return None
             label = (located or {}).get("exercise") or None
             if label and str(label).lower() in ("none", "unknown", ""):
                 return None

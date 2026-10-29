@@ -1,0 +1,49 @@
+{
+  "hostNote": "local wall times on real own clip WA0020; Lambda is slower — production budget uses 3.6→0.52 s/s",
+  "clip": {
+    "path": "/home/diego/orca/workspaces/barrapp/turbot/VID-20260827-WA0020.mp4",
+    "stem": "VID-20260827-WA0020",
+    "frames": 497,
+    "videoSeconds": 19.94
+  },
+  "productionBaseline": {
+    "config": "Heavy sequential",
+    "posePerVideoSecond": 3.6,
+    "minutes1": 216.0,
+    "minutes3": 648.0
+  },
+  "productionProjectionAfter": {
+    "config": "Full + parallel chunks",
+    "posePerVideoSecond": 0.52,
+    "minutes1": 31.2,
+    "minutes3": 93.6,
+    "speedupVsBaseline": 6.92
+  },
+  "localMeasured": {
+    "before": {
+      "model": "pose_landmarker_heavy.task",
+      "workers": 1,
+      "minChunk": 120,
+      "chunks": 1,
+      "frames": 497,
+      "videoSeconds": 19.94,
+      "wallSeconds": 22.72,
+      "posePerVideoSecond": 1.139,
+      "minutes1": 68.4,
+      "minutes3": 205.1
+    },
+    "after": {
+      "model": "pose_landmarker_full.task",
+      "workers": 6,
+      "minChunk": 120,
+      "chunks": 4,
+      "frames": 497,
+      "videoSeconds": 19.94,
+      "wallSeconds": 4.835,
+      "posePerVideoSecond": 0.242,
+      "minutes1": 14.5,
+      "minutes3": 43.6
+    },
+    "speedup": 4.71
+  }
+}

@@ -33,7 +33,10 @@ from typing import Callable
 import numpy as np
 
 OVERLAP = 45      # frames of warm-up before each chunk (1.5 s at 30 fps)
-MIN_CHUNK = 240   # below this many frames per worker, splitting does not pay
+# Floor for a chunk that is worth the subprocess + warm-up cost. 240 left
+# typical phone clips (<16 s @ 30 fps) sequential even with six workers;
+# 120 lets an ~8 s clip split in two. Override with BARRA_POSE_MIN_CHUNK.
+MIN_CHUNK = 120
 
 
 @dataclass(frozen=True)
@@ -46,17 +49,22 @@ class Chunk:
 def workers() -> int:
     """1 (sequential) unless BARRA_POSE_WORKERS says otherwise.
 
-    Off by default on purpose. Measured on 2026-10-11: sequential MediaPipe is
-    bit-for-bit deterministic, but a chunk never converges to it - VIDEO mode
-    carries tracking and smoothing state through the whole clip, and a chunk
-    started cold stays 1-10 px away for its full length, whatever the warm-up.
-    On two real clips that moved a score 55 -> 56 and a distance 1.2 -> 1.1
-    torso. Whether that is acceptable is a measurement decision, to be taken
-    on the reference clip set, not a default."""
+    Chunked pose is close to sequential MediaPipe, not equal to it - VIDEO
+    mode carries tracking state, and a cold chunk stays 1-10 px away for its
+    length (docs/SPEED-PLAN.md). Production pins workers via the worker
+    template when the latency budget needs the cores; unset stays sequential
+    so local runs and rollback stay one process."""
     pinned = os.environ.get("BARRA_POSE_WORKERS", "").strip()
     if pinned.isdigit() and int(pinned) > 0:
         return int(pinned)
     return 1
+
+
+def min_chunk() -> int:
+    pinned = os.environ.get("BARRA_POSE_MIN_CHUNK", "").strip()
+    if pinned.isdigit() and int(pinned) > 0:
+        return int(pinned)
+    return MIN_CHUNK
 
 
 def plan_chunks(n_frames: int, n_workers: int, overlap: int = OVERLAP,
@@ -112,7 +120,11 @@ def pose_frames(video: Path, n_frames: int, fps: float,
                 n_workers: int | None = None) -> np.ndarray:
     """Keypoints (n_frames, 33, 3) for the clip: in parallel when it pays,
     otherwise - or on any failure - from `sequential()`."""
-    chunks = plan_chunks(n_frames, workers() if n_workers is None else n_workers)
+    chunks = plan_chunks(
+        n_frames,
+        workers() if n_workers is None else n_workers,
+        min_chunk=min_chunk(),
+    )
     if len(chunks) == 1:
         return sequential()
     try:

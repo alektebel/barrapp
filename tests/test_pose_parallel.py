@@ -46,9 +46,14 @@ class Planning(unittest.TestCase):
         # Splitting below MIN_CHUNK frames costs more warm-up than it saves.
         self.assertEqual(len(parallel.plan_chunks(parallel.MIN_CHUNK, 6, overlap=45)), 1)
 
+    def test_eight_second_clip_splits_with_six_workers(self):
+        # 240 frames @ 30 fps ≈ 8 s: floor 120 → two chunks (was sequential at 240).
+        chunks = parallel.plan_chunks(240, 6, overlap=45, min_chunk=120)
+        self.assertEqual(len(chunks), 2)
+
     def test_sequential_unless_asked(self):
-        """Chunks are close to the sequential result, not equal to it (measured
-        2026-10-11), so production stays sequential until that is decided."""
+        """Unset BARRA_POSE_WORKERS keeps local/rollback sequential; production
+        pins workers in the worker template."""
         import os
         with mock.patch.dict("os.environ", {}, clear=False), \
                 mock.patch("os.cpu_count", return_value=6):
@@ -56,6 +61,14 @@ class Planning(unittest.TestCase):
             self.assertEqual(parallel.workers(), 1)
         with mock.patch.dict("os.environ", {"BARRA_POSE_WORKERS": "4"}):
             self.assertEqual(parallel.workers(), 4)
+
+    def test_min_chunk_env_override(self):
+        import os
+        with mock.patch.dict("os.environ", {"BARRA_POSE_MIN_CHUNK": "60"}):
+            self.assertEqual(parallel.min_chunk(), 60)
+        with mock.patch.dict("os.environ", {}, clear=False):
+            os.environ.pop("BARRA_POSE_MIN_CHUNK", None)
+            self.assertEqual(parallel.min_chunk(), parallel.MIN_CHUNK)
 
 
 class Stitching(unittest.TestCase):

@@ -75,7 +75,10 @@ data/calisthenics/videos/**
 
 out/**
 !out/.gitkeep
-models/
+# Ignore model artefacts, but keep the MediaPipe .task bundles the worker needs.
+models/*
+!models/pose_landmarker_full.task
+!models/pose_landmarker_heavy.task
 *.pt
 
 # Kotlin build residue

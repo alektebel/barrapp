@@ -598,7 +598,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         return _empty(exercise,
                       [f"Could not open the clip: {info.get('reason', 'unknown')}"])
 
-    os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_heavy.task"))
+    os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_full.task"))
     pose_error = None
     pose_backend = getattr(pose, "source", "caller") if pose is not None else None
     if pose is None:

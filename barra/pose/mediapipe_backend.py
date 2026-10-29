@@ -21,12 +21,15 @@ import numpy as np
 
 from .base import PoseResult, remap
 
+# Full is the production default (docs/SPEED-PLAN.md round 2): ~3× faster than
+# Heavy on the same frames, with Heavy kept as an env rollback
+# (`BARRA_POSE_MODEL=.../pose_landmarker_heavy.task`).
 MODEL_URL = (
     "https://storage.googleapis.com/mediapipe-models/pose_landmarker/"
-    "pose_landmarker_heavy/float16/latest/pose_landmarker_heavy.task"
+    "pose_landmarker_full/float16/latest/pose_landmarker_full.task"
 )
 DEFAULT_MODEL = Path(
-    os.environ.get("BARRA_POSE_MODEL", "models/pose_landmarker_heavy.task")
+    os.environ.get("BARRA_POSE_MODEL", "models/pose_landmarker_full.task")
 )
 
 # {coco_17_index: blazepose_33_index}

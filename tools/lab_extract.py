@@ -17,7 +17,7 @@ sys.path.insert(0, str(ROOT))
 CACHE = Path("/tmp/opencode/kp")
 CACHE.mkdir(parents=True, exist_ok=True)
 os.environ.setdefault(
-    "BARRA_POSE_MODEL", str(ROOT / "models" / "pose_landmarker_heavy.task"))
+    "BARRA_POSE_MODEL", str(ROOT / "models" / "pose_landmarker_full.task"))
 
 
 def clip_path(stem: str) -> Path:

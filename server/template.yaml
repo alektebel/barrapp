@@ -311,15 +311,16 @@ Resources:
       Timeout: 600
       # Lambda rations CPU by memory (1769 MB per vCPU): 10240 MB is exactly
       # six, what pose in parallel chunks needs to stay inside the round-2
-      # budget (docs/SPEED-PLAN.md steps 2-3). BARRA_POSE_WORKERS is unset on
-      # purpose - switching chunked pose on is a deploy decision, one line,
-      # documented in the plan next to the gate results.
+      # budget (docs/SPEED-PLAN.md steps 2-3). Full + six workers cut pose
+      # from ~3.6 s per video-second (Heavy sequential) toward ~0.5–1.1 s
+      # (local Full + chunks, scaled); Heavy remains a one-line rollback.
       MemorySize: 10240
       EphemeralStorage:
         Size: 2048
       Environment:
         Variables:
-          BARRA_POSE_MODEL: /opt/barra/models/pose_landmarker_heavy.task
+          BARRA_POSE_MODEL: /opt/barra/models/pose_landmarker_full.task
+          BARRA_POSE_WORKERS: "6"
           # MiMo does both passes in the worker: localizing the exercise in
           # the raw clip, and the rubric error read over the stills + the
           # geometry's measurements.

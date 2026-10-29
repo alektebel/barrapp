@@ -57,7 +57,7 @@ def file_digest(path: str) -> str:
 
 @lru_cache(maxsize=1)
 def pose_model() -> dict:
-    path = os.environ.get("BARRA_POSE_MODEL", "models/pose_landmarker_heavy.task")
+    path = os.environ.get("BARRA_POSE_MODEL", "models/pose_landmarker_full.task")
     p = Path(path)
     return {
         "path": str(path),

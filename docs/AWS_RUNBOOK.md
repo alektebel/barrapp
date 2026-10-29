@@ -78,7 +78,7 @@ barra explain --replay <trace-id>
 cd server
 bash vendor_barra.sh
 mkdir -p vendor/barra/models
-cp ../models/pose_landmarker_heavy.task vendor/barra/models/  # 30 MB, already in repo
+# vendor_barra.sh copies pose_landmarker_full.task (and heavy for rollback)
 sam build
 sam deploy   # samconfig.toml already holds stack name/region/ECR; answer Y to IAM creation
 ```

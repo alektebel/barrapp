@@ -111,11 +111,9 @@ class StackDefinesWhatTheCodeRequires(unittest.TestCase):
 class WorkerFunctionGetsItsCores(unittest.TestCase):
     """Lambda rations CPU by memory: 1769 MB buys one vCPU, 10240 MB is the
     exact six. Pose in parallel chunks (docs/SPEED-PLAN.md steps 2-3) is why:
-    sequential MediaPipe measured 3.6 s per second of video on ~2 cores, and
-    the round-2 goal needs six. A raise this size is invisible until a deploy,
-    so the stack states it - and BARRA_POSE_WORKERS stays OUT of the template:
-    switching chunked pose on is the deploy decision recorded in the plan,
-    not a default that ships by accident."""
+    sequential MediaPipe Heavy measured 3.6 s per second of video on ~2 cores.
+    Production now ships Full + six workers so pose time scales down with the
+    cores the memory already buys."""
 
     def setUp(self):
         self.t = (SERVER / "template.yaml").read_text()
@@ -128,10 +126,16 @@ class WorkerFunctionGetsItsCores(unittest.TestCase):
     def test_the_worker_buys_exactly_six_cores(self):
         self.assertEqual(self._worker_memory(), 10240)
 
-    def test_pose_workers_stay_unset_until_the_deploy_flip(self):
-        # The YAML key, not the name: a comment explaining the flip may name
-        # it, an entry under Environment: Variables: may not exist yet.
-        self.assertIsNone(re.search(r"BARRA_POSE_WORKERS\s*:", self.t))
+    def test_pose_workers_are_six_on_the_worker(self):
+        m = re.search(
+            r"\n  WorkerFunction:.*?Environment:\s*Variables:(.*?)\n  [A-Z]",
+            self.t, re.DOTALL)
+        self.assertIsNotNone(m, "WorkerFunction has no Environment Variables")
+        block = m.group(1)
+        self.assertRegex(block, r"BARRA_POSE_WORKERS:\s*\"6\"")
+
+    def test_pose_model_is_full(self):
+        self.assertRegex(self.t, r"BARRA_POSE_MODEL:\s*/opt/barra/models/pose_landmarker_full\.task")
 
 
 class ApiHasAStableName(unittest.TestCase):

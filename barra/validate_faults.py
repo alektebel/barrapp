@@ -53,7 +53,7 @@ MIN_REPS_TO_JUDGE = 1
 
 def _ensure_pose_model() -> None:
     os.environ.setdefault(
-        "BARRA_POSE_MODEL", str(ROOT / "models" / "pose_landmarker_heavy.task"))
+        "BARRA_POSE_MODEL", str(ROOT / "models" / "pose_landmarker_full.task"))
 
 
 def measure(video: Path, trick: str) -> tuple[dict[str, int], int]:
