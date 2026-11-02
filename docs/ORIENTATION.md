@@ -29,13 +29,17 @@ ignored `deviceOrientation.videoRotation`, and locate's open-vocabulary
 
 ## What now happens
 
-### 1. IMU rotation before pose (`device_rotation_degrees`, `rotate_clip`)
+### 1. IMU rotation before pose (`resolve_device_rotation`, `rotate_clip`)
 
 When the job carries `deviceOrientation.videoRotation` in `{90,180,270}`, the
 worker turns the clip **before** pose and vision (`server/process.py`
-`measure_job`). The payload records `orientation: {rotatedBy, status: rotated,
-source: imu}` and a Spanish `orientation_rotated` note. The stored trim is
-turned the same way so replay matches the skeleton.
+`measure_job`). For 90/270 it scores both turns on a few stills and keeps the
+upright one: after a phone re-encode the gallery tag is often the *complement*
+of what the pixels need (job `a038d832f870`, weighted dips → muscle_up: claimed
+270 left the athlete upside down; 90 classified as dip). The payload records
+`orientation: {rotatedBy, status: rotated, source: imu, evidence}` and a
+Spanish `orientation_rotated` note. The stored trim is turned the same way so
+replay matches the skeleton.
 
 ### 2. Pose-based 180° confirmation (`barra/orientation.py`)
 

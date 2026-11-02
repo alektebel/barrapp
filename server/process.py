@@ -178,8 +178,9 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
     # 93ebbf6e4894, cc61dc871b9d). Turn it before pose so gravity-relative
     # geometry and the vision stills see an upright athlete.
     try:
-        from barra.orientation import device_rotation_degrees
-        deg = device_rotation_degrees(job.get("deviceOrientation"))
+        from barra.orientation import resolve_device_rotation
+        deg, rot_evidence = resolve_device_rotation(
+            work_path, job.get("deviceOrientation"))
         if deg and pose is None:
             import tempfile
             from barra.frames import rotate_clip
@@ -194,6 +195,7 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
                     "status": "rotated",
                     "reason": "deviceOrientation.videoRotation",
                     "source": "imu",
+                    "evidence": rot_evidence,
                 }
     except Exception:  # noqa: BLE001 - a failed turn keeps the as-filmed clip
         orientation_meta = None

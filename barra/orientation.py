@@ -307,9 +307,15 @@ def framing_issues(keypoints: np.ndarray, luma: Optional[float]) -> list[str]:
 
 
 def device_rotation_degrees(device_orientation: Mapping[str, Any] | None) -> int:
-    """Degrees clockwise to turn the stored clip so gravity points down.
+    """Degrees clockwise the phone *claims* the stored clip needs.
 
     Returns 0, 90, 180 or 270. Missing / upright / noisy values → 0.
+
+    Prefer `resolve_device_rotation` at measure time: after a phone re-encode
+    the container tag is often gone while `videoRotation` still carries the
+    gallery value, and 90 vs 270 can be the complement of what the pixels need
+    (job a038d832f870: claimed 270, upright was 90; 270 left the athlete
+    upside down and weighted dips scored as muscle_up).
     """
     if not isinstance(device_orientation, Mapping):
         return 0
@@ -324,3 +330,83 @@ def device_rotation_degrees(device_orientation: Mapping[str, Any] | None) -> int
     # Snap to the nearest quarter turn; ignore near-zero wobble.
     snapped = int((round(deg / 90.0) % 4) * 90)
     return snapped if snapped in (90, 180, 270) else 0
+
+
+def _cv2_rotate(frame: np.ndarray, degrees: int) -> np.ndarray:
+    """Rotate a BGR frame by 90/180/270 clockwise."""
+    import cv2
+    d = int(degrees) % 360
+    if d == 90:
+        return cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+    if d == 180:
+        return cv2.rotate(frame, cv2.ROTATE_180)
+    if d == 270:
+        return cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
+    return frame
+
+
+def upright_luma_score(frame: np.ndarray) -> float:
+    """How much brighter the top fifth is than the bottom fifth.
+
+    Indoor clips lit from above score positive when gravity points down; an
+    upside-down turn flips the sign. Not a pose model - just enough to break
+    the 90-vs-270 tie when the phone's tag disagrees with the pixels.
+    """
+    if frame is None or getattr(frame, "size", 0) == 0:
+        return 0.0
+    img = np.asarray(frame)
+    if img.ndim == 3:
+        gray = img.mean(axis=2)
+    else:
+        gray = img.astype(float)
+    h = gray.shape[0]
+    if h < 10:
+        return 0.0
+    band = max(1, h // 5)
+    return float(gray[:band].mean() - gray[-band:].mean())
+
+
+def resolve_device_rotation(video_path: Path | str,
+                            device_orientation: Mapping[str, Any] | None,
+                            n_samples: int = 5) -> tuple[int, dict]:
+    """Clockwise degrees to apply, checked against the pixels when ambiguous.
+
+    For 90/270, scores both turns on a few stills and keeps the upright one.
+    180 and 0 are returned as claimed. Evidence goes on the orientation payload.
+    """
+    claimed = device_rotation_degrees(device_orientation)
+    evidence: dict[str, Any] = {"claimed": claimed}
+    if claimed not in (90, 270):
+        return claimed, evidence
+    complement = 360 - claimed  # 90 ↔ 270
+    try:
+        import cv2
+        cap = cv2.VideoCapture(str(video_path))
+        n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
+        if n <= 0:
+            cap.release()
+            return claimed, {**evidence, "why": "no frames"}
+        scores = {claimed: 0.0, complement: 0.0}
+        counted = 0
+        for i in range(n_samples):
+            idx = int((i + 0.5) * n / n_samples)
+            cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
+            ok, frame = cap.read()
+            if not ok or frame is None:
+                continue
+            counted += 1
+            for deg in (claimed, complement):
+                scores[deg] += upright_luma_score(_cv2_rotate(frame, deg))
+        cap.release()
+    except Exception as exc:  # noqa: BLE001 - keep the phone's claim
+        return claimed, {**evidence, "why": f"probe failed: {exc}"}
+    if counted == 0:
+        return claimed, {**evidence, "why": "no readable frames"}
+    evidence["samples"] = counted
+    evidence["lumaScore"] = {str(k): round(v / counted, 2) for k, v in scores.items()}
+    # Prefer the brighter-top turn; on a tie keep the phone's claim.
+    best = max(scores, key=lambda d: (scores[d], 1 if d == claimed else 0))
+    evidence["chosen"] = best
+    evidence["reason"] = ("claimed" if best == claimed
+                          else "complement: claimed turn left the top darker")
+    return best, evidence
