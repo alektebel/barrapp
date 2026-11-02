@@ -579,10 +579,15 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # A front lever is a hang held horizontal (hands overhead, body line near
     # horizontal). A planche is the same body line pressed off the ground
     # (hands below the shoulders, legs carried up).
+    # Both require the body to stay parked: an L-sit filmed sideways
+    # (job 31e6fc884110) can read body_line≈71° with moving hips and was
+    # reported as a front lever with eleven invented hold-attempts.
     if (anchored and f["hands_overhead_frac"] >= 0.35
-            and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0):
+            and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0
+            and parked >= HOLD_FRAC):
         tr.decision("front_lever", "hanging from a fixed bar, body held horizontal",
                     body_line_deg=f["body_line_deg"], horizontal_min=70.0,
+                    parked_frac=parked, parked_max=HOLD_FRAC,
                     arms_straight_frac=f["arms_straight_frac"],
                     legs_straight_frac=f["legs_straight_frac"], confidence=0.72)
         return Classification(
@@ -594,9 +599,11 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
 
     if (anchored and f["hands_below_frac"] >= 0.80
             and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0
-            and np.isfinite(f["legs_lifted_frac"]) and f["legs_lifted_frac"] >= 0.5):
+            and np.isfinite(f["legs_lifted_frac"]) and f["legs_lifted_frac"] >= 0.5
+            and parked >= HOLD_FRAC):
         tr.decision("planche", "body horizontal on straight arms, legs off the ground",
                     body_line_deg=f["body_line_deg"], horizontal_min=70.0,
+                    parked_frac=parked, parked_max=HOLD_FRAC,
                     legs_lifted_frac=f["legs_lifted_frac"], confidence=0.72)
         return Classification(
             "planche", 0.72,
@@ -686,13 +693,17 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # split except the one that matters, and would otherwise be reported as a
     # pull-up whose shoulders happen never to reach the bar.
     # Overhead gate: 0.35 misses pike / vertical-leg front-lever pulls where
-    # the wrists sit only slightly above the head in frame (job 93ebbf6e4894,
-    # oh≈0.20) and the squat family then invents a split squat. When the body
-    # clearly hangs below the hands, a lower overhead share is enough.
+    # the wrists sit only slightly above the head in frame (job 93ebbf6e4894
+    # trim: oh≈0.08, bel≈0.58) and no branch matches - or the squat family
+    # invents a split squat. When the body clearly hangs below the hands and
+    # the hands are not mostly in support, a low overhead share is enough.
     hang_oh = float(f["hands_overhead_frac"])
+    hang_bel = float(f["hands_below_frac"])
     body_hangs = (np.isfinite(f["body_below_hands"])
                   and float(f["body_below_hands"]) >= BELOW_HANDS_DIP)
-    hanging = hang_oh >= 0.35 or (hang_oh >= 0.15 and body_hangs and articulated)
+    hanging = hang_oh >= 0.35 or (
+        hang_oh >= 0.05 and body_hangs and articulated and hang_oh < hang_bel
+    )
     if (anchored and hanging
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
             and f["knee_excursion"] >= f["arm_articulation"]):

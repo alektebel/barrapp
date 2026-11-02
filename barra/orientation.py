@@ -372,15 +372,20 @@ def upright_luma_score(frame: np.ndarray) -> float:
 _LUMA_MARGIN = 25.0
 
 
-def _rotation_candidates(claimed: int, width: int, height: int) -> tuple[int, ...]:
+def _rotation_candidates(claimed: int, width: int, height: int,
+                         *, phone_landscape: bool | None = None) -> tuple[int, ...]:
     """Which turns are worth scoring for this file + IMU claim.
 
     Portrait files (h > w) that still carry a 90/270 gallery tag have usually
     already been re-encoded upright - applying another quarter turn lays the
-    athlete on their side (jobs a9884573d367, cc61dc871b9d, 31e6fc884110).
-    Only a 180 flip can still be wrong, so those compete as 0 vs 180.
-    Landscape + 90/270 still needs a quarter turn (90 vs 270). A plain 180
-    claim competes with 0.
+    athlete on their side (jobs a9884573d367, cc61dc871b9d). Only a 180 flip
+    can still be wrong, so those compete as 0 vs 180.
+
+    Landscape pixels + a 90/270 claim still need a quarter turn in general
+    (90 vs 270). When the phone also says it was *not* in landscape
+    (`landscape: false`, floor-cam L-sits like 31e6fc884110), the file is a
+    sideways portrait - any of the four turns may be upright, so all compete.
+    A plain 180 claim competes with 0.
     """
     if claimed not in (90, 180, 270):
         return (0,)
@@ -388,6 +393,8 @@ def _rotation_candidates(claimed: int, width: int, height: int) -> tuple[int, ..
     if claimed in (90, 270) and portrait:
         return (0, 180)
     if claimed in (90, 270):
+        if phone_landscape is False:
+            return (0, 90, 180, 270)
         return (90, 270)
     return (0, 180)
 
@@ -405,6 +412,10 @@ def resolve_device_rotation(video_path: Path | str,
     evidence: dict[str, Any] = {"claimed": claimed}
     if claimed not in (90, 180, 270):
         return claimed, evidence
+    phone_landscape = None
+    if isinstance(device_orientation, Mapping) and "landscape" in device_orientation:
+        phone_landscape = bool(device_orientation.get("landscape"))
+        evidence["phoneLandscape"] = phone_landscape
     try:
         import cv2
         cap = cv2.VideoCapture(str(video_path))
@@ -414,7 +425,8 @@ def resolve_device_rotation(video_path: Path | str,
             cap.release()
             return claimed, {**evidence, "why": "no frames"}
         h0, w0 = frame0.shape[:2]
-        candidates = _rotation_candidates(claimed, w0, h0)
+        candidates = _rotation_candidates(
+            claimed, w0, h0, phone_landscape=phone_landscape)
         evidence["candidates"] = list(candidates)
         evidence["frameSize"] = [w0, h0]
         scores = {deg: 0.0 for deg in candidates}
@@ -444,9 +456,13 @@ def resolve_device_rotation(video_path: Path | str,
     second = ranked[1] if len(ranked) > 1 else best
     margin = abs(scores[best] - scores[second]) / counted
     evidence["lumaMargin"] = round(margin, 2)
-    if (margin < _LUMA_MARGIN and claimed in scores
-            and claimed != best):
-        # Lighting too close to call - trust the IMU over a weak flip.
+    claim_gap = None
+    if claimed in scores:
+        claim_gap = (scores[best] - scores[claimed]) / counted
+        evidence["claimGap"] = round(claim_gap, 2)
+    if (claimed in scores and claimed != best
+            and claim_gap is not None and claim_gap < _LUMA_MARGIN):
+        # Claimed turn is nearly as upright as the luma winner - trust IMU.
         best = claimed
         evidence["reason"] = "claimed: luma margin too thin to override"
     elif best == claimed:

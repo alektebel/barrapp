@@ -132,5 +132,27 @@ class PeakTravelHelper(unittest.TestCase):
         self.assertIsNone(why, why)
 
 
+class HoldIsometric(unittest.TestCase):
+    def test_moving_horizontal_body_is_not_a_front_lever(self):
+        """L-sit / moving pike must not win the isometric front-lever gate."""
+        from tests.test_classify_quality import bar_clip
+        from barra import schema as S
+        kp = bar_clip(clearance=-0.25)
+        # Tilt the body nearly horizontal while keeping hips moving (not parked).
+        for f in range(len(kp)):
+            mid = 0.5 * (kp[f, S.KP_INDEX["left_hip"], 1]
+                         + kp[f, S.KP_INDEX["right_hip"], 1])
+            # Push ankles out to the side so the hip→ankle line is flat.
+            for side in ("left", "right"):
+                kp[f, S.KP_INDEX[f"{side}_ankle"], 0] = (
+                    kp[f, S.KP_INDEX[f"{side}_hip"], 0] + 200)
+                kp[f, S.KP_INDEX[f"{side}_ankle"], 1] = mid
+                kp[f, S.KP_INDEX[f"{side}_knee"], 0] = (
+                    kp[f, S.KP_INDEX[f"{side}_hip"], 0] + 100)
+                kp[f, S.KP_INDEX[f"{side}_knee"], 1] = mid
+        c = classify(kp)
+        self.assertNotEqual(c.exercise, "front_lever")
+
+
 if __name__ == "__main__":
     unittest.main()
