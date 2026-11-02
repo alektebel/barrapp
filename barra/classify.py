@@ -582,15 +582,18 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # A front lever is a hang held horizontal (hands overhead, body line near
     # horizontal). A planche is the same body line pressed off the ground
     # (hands below the shoulders, legs carried up).
-    # Both require the body to stay parked: an L-sit filmed sideways
-    # (job 31e6fc884110) can read body_line≈71° with moving hips and was
-    # reported as a front lever with eleven invented hold-attempts.
+    # Both require the body to stay parked AND the arms still: an L-sit filmed
+    # sideways (31e6fc884110) read body_line≈71° with moving hips; small-ROM
+    # inverted curls (cc61dc871b9d) look parked+horizontal while the elbows
+    # still articulate - those must reach the hang/pull branch, not a lever.
+    isometric_arms = (not arms_measured) or (float(f["arm_articulation"]) < ARTICULATION)
     if (anchored and f["hands_overhead_frac"] >= 0.35
             and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0
-            and parked >= HOLD_FRAC):
+            and parked >= HOLD_FRAC and isometric_arms):
         tr.decision("front_lever", "hanging from a fixed bar, body held horizontal",
                     body_line_deg=f["body_line_deg"], horizontal_min=70.0,
                     parked_frac=parked, parked_max=HOLD_FRAC,
+                    arm_articulation=f["arm_articulation"],
                     arms_straight_frac=f["arms_straight_frac"],
                     legs_straight_frac=f["legs_straight_frac"], confidence=0.72)
         return Classification(
@@ -603,10 +606,11 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     if (anchored and f["hands_below_frac"] >= 0.80
             and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0
             and np.isfinite(f["legs_lifted_frac"]) and f["legs_lifted_frac"] >= 0.5
-            and parked >= HOLD_FRAC):
+            and parked >= HOLD_FRAC and isometric_arms):
         tr.decision("planche", "body horizontal on straight arms, legs off the ground",
                     body_line_deg=f["body_line_deg"], horizontal_min=70.0,
                     parked_frac=parked, parked_max=HOLD_FRAC,
+                    arm_articulation=f["arm_articulation"],
                     legs_lifted_frac=f["legs_lifted_frac"], confidence=0.72)
         return Classification(
             "planche", 0.72,

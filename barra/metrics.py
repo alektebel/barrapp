@@ -115,7 +115,10 @@ def implausibilities(values: dict[str, float], movement: Movement,
             f"are only {arm:.2f} long - the wrist or shoulder track is wrong"
         )
     if movement.direction == "ascending":
-        if np.isfinite(depth) and depth < 0:
+        # Allow a hair above the hands: dip-station FL-pulls (93ebbf6e4894)
+        # start near support and were rejected at +0.02…+0.07. A real jump
+        # start sits much higher.
+        if np.isfinite(depth) and depth < -0.10:
             out.append(
                 f"rep starts {-depth:.2f} torso ABOVE the bar, so the detected "
                 "start is not a hang"
