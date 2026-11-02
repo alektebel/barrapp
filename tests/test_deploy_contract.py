@@ -93,6 +93,21 @@ class WorkerImageCarriesItsImports(unittest.TestCase):
                          f"the worker imports {sorted(missing)} but the Dockerfile "
                          "does not copy them: every clip would fail at import time")
 
+    def test_barra_modules_process_imports_exist_on_disk(self):
+        """2026-11-02: process.py imported barra.ops_signals while that file was
+        only in a stash; deploy.sh vendored the tree, Lambda died mid-pose with
+        No module named 'barra.ops_signals', and the four requeued miss-class
+        jobs all failed. Catch the gap before the image is pushed."""
+        process = (SERVER / "process.py").read_text()
+        needed = sorted(set(re.findall(
+            r"from barra\.([A-Za-z_][A-Za-z0-9_]*) import", process)))
+        missing = [m for m in needed
+                   if not (ROOT / "barra" / f"{m}.py").is_file()
+                   and not (ROOT / "barra" / m / "__init__.py").is_file()]
+        self.assertEqual(missing, [],
+                         f"process.py imports barra.{{{' ,'.join(missing)}}} "
+                         "but those modules are not in barra/")
+
 
 class StackDefinesWhatTheCodeRequires(unittest.TestCase):
     """`os.environ["X"]` raises KeyError at import time when X is unset."""

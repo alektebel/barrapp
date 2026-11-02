@@ -14,14 +14,18 @@ clip, so there is no metadata to correct: the picture itself is inverted.
 
 ### 2026-11-02 (IMU rotation + free-text vision)
 
-| Job | What it was | What the pipeline did |
+| Job | What it was | What the pipeline did (commit `a606a6b`, pre-fix) |
 |---|---|---|
 | `93ebbf6e4894` | Front-lever pull progression, legs vertical (Eric Flag station) | geometry `bulgarian_split_squat` (sideways pose); locate free-text `pull-up`; fusion `vision-decides` → scored 3 kipping pull-ups. Phone sent `videoRotation: 180`, `upright: false`. |
 | `cc61dc871b9d` | Inverted curls (biceps) | geometry `muscle_up` @ 0.98; locate free-text `leg raise (lying/hanging leg raise on dip station)`; fusion promoted the prose slug → unsupported, 0 reps. Phone sent `videoRotation: 270`. |
+| `31e6fc884110` | L-sit / hanging leg raise on dip bars | geometry `unknown`; locate free-text `inverted hanging leg raise (dip bar)`; fusion `vision-decides` → freeform id, unsupported, 0 reps. `videoRotation: 270`. |
+| `a9884573d367` | Dips (same station, same sideways phone) | geometry `bulgarian_split_squat`; vision `dips`; fusion `vision-decides` → scored 13 dips with `needsConfirmation`. Orientation was wrong; the name happened to be right. |
 
 Root causes shared with the October clips, plus two new ones: the worker
 ignored `deviceOrientation.videoRotation`, and locate's open-vocabulary
-`detected_exercise` was used as a fusion vote.
+`detected_exercise` was used as a fusion vote. All four jobs above ran on
+`a606a6b`. Fix deployed as `c1590bf` / image `worker-20261102-222453`
+(2026-11-02 ~21:28Z); the four clips were requeued on that image.
 
 ## What now happens
 
