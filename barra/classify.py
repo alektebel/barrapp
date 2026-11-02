@@ -751,12 +751,13 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         # (31e6fc884110, peak≈0.16) were scoring muscle_up ×3 on a hair over
         # OVER_BAR; demand a clearer lockout than a pull that barely clears.
         clear_overhead_hang = hang_oh >= 0.35
-        mu_clearance = OVER_BAR + 0.12  # ≈0.24: a real MU finishes well clear
+        # 93ebbf6e4894 peaked at 0.25 and still became a muscle_up; demand more.
+        mu_clearance = OVER_BAR + 0.20  # ≈0.32
         if (peak >= mu_clearance and started_from_hang and not support_dominant
                 and clear_overhead_hang):
             margin = min(1.0, (peak - mu_clearance) / 0.35)
             tr.decision("muscle_up", "the shoulders finish above the hands",
-                        peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                        peak_above_hands=peak, over_bar_threshold=mu_clearance,
                         shoulder_above_hands_p05=f.get("shoulder_above_hands_p05"),
                         hands_overhead_frac=hang_oh,
                         confidence=0.70 + 0.28 * margin)
@@ -764,6 +765,22 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 "muscle_up", 0.70 + 0.28 * margin,
                 f"hanging from a fixed bar, and the shoulders finish {peak:.2f} "
                 "torso-lengths above the hands",
+                f, runner_up="pull_up",
+            )
+        # L-sit / pike hold filmed as a hang (31e6fc884110): legs stay up and
+        # the shoulders never climb to the bar - not a pull-up set.
+        legs_up = (np.isfinite(f.get("legs_lifted_frac"))
+                   and float(f["legs_lifted_frac"]) >= 0.70)
+        if legs_up and peak < OVER_BAR:
+            tr.reject("pull_up", "legs held up without a pull to the bar - a hold",
+                      peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                      legs_lifted_frac=f.get("legs_lifted_frac"))
+            return Classification(
+                "unknown", 0.0,
+                f"hanging with the legs carried up ({float(f['legs_lifted_frac']):.0%} "
+                f"of the clip) but the shoulders only reach {peak:+.2f} "
+                "torso-lengths relative to the hands - an L-sit or similar hold, "
+                "not a set of pull-ups",
                 f, runner_up="pull_up",
             )
         margin = min(1.0, (OVER_BAR - peak) / 0.35) if peak < OVER_BAR else 0.55
