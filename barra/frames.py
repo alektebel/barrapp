@@ -130,17 +130,28 @@ def cut_technique(video_path: Path, start_s: float, end_s: float,
     return out_path if out_path.exists() and out_path.stat().st_size > 0 else None
 
 
-def trim_clip(video_path: Path, start_s: float, end_s: float,
-              out_path: Path) -> Path | None:
-    """Cut [start_s, end_s] out of the clip, re-encoded frame-accurately.
+def _rotate_vf(degrees: int) -> str | None:
+    """ffmpeg -vf fragment for a clockwise quarter-turn, or None."""
+    d = int(degrees) % 360
+    if d == 90:
+        return "transpose=1"
+    if d == 180:
+        return "hflip,vflip"
+    if d == 270:
+        return "transpose=2"
+    return None
 
-    Unlike `cut_technique`, this is the clip that gets STORED as the exercise,
-    so a stream-copy cut onto a keyframe is not good enough - it would keep
-    seconds of the walk-in before the located window. Re-encoding to H.264 also
-    makes the result playable on the phone. Best-effort: None means keep the
-    original.
+
+def rotate_clip(video_path: Path, out_path: Path, degrees: int = 180,
+                width: int = 720) -> Path | None:
+    """Turn the clip by `degrees` (90/180/270), scaled to `width` for pose.
+
+    ffmpeg honours the container rotation tag first, then applies the filter,
+    so the result matches what the phone would show upright. None when there
+    is no ffmpeg, an unsupported angle, or the turn fails.
     """
-    if end_s <= start_s:
+    vf = _rotate_vf(degrees)
+    if vf is None:
         return None
     exe = _ffmpeg_bin()
     if exe is None:
@@ -148,9 +159,41 @@ def trim_clip(video_path: Path, start_s: float, end_s: float,
     out_path.parent.mkdir(parents=True, exist_ok=True)
     try:
         subprocess.run(
+            [exe, "-y", "-loglevel", "error", "-i", str(video_path),
+             "-vf", f"{vf},scale='min({int(width)},iw)':-2",
+             "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+             "-movflags", "+faststart", str(out_path)],
+            check=True, capture_output=True, timeout=300,
+        )
+    except Exception:  # noqa: BLE001 - no turned clip means no rotation
+        return None
+    return out_path if out_path.exists() and out_path.stat().st_size > 0 else None
+
+
+def trim_clip(video_path: Path, start_s: float, end_s: float,
+              out_path: Path, rotate: int = 0) -> Path | None:
+    """Cut [start_s, end_s] out of the clip, re-encoded frame-accurately.
+
+    Unlike `cut_technique`, this is the clip that gets STORED as the exercise,
+    so a stream-copy cut onto a keyframe is not good enough - it would keep
+    seconds of the walk-in before the located window. Re-encoding to H.264 also
+    makes the result playable on the phone. Best-effort: None means keep the
+    original. `rotate` (90/180/270) also turns the stored clip so the phone
+    replays it the way up the measurement saw it.
+    """
+    if end_s <= start_s:
+        return None
+    exe = _ffmpeg_bin()
+    if exe is None:
+        return None
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    rot = _rotate_vf(rotate)
+    try:
+        subprocess.run(
             [exe, "-y", "-loglevel", "error",
              "-ss", f"{max(0.0, start_s):.2f}", "-to", f"{max(0.1, end_s):.2f}",
              "-i", str(video_path),
+             *(["-vf", rot] if rot else []),
              "-c:v", "libx264", "-preset", "fast", "-crf", "23",
              "-c:a", "aac", "-movflags", "+faststart",
              str(out_path)],

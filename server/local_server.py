@@ -411,20 +411,21 @@ def _run(job_id: str) -> None:
         with LOCK:
             JOBS[job_id]["stage"] = name
 
-    # Local parity with the worker: locate the exercise with MiMo, keep the
-    # measurement on the full clip, then replace the stored file with the
-    # located window. Best-effort throughout.
+    # Local parity with the worker: locate for trim, tree-name for the fusion
+    # vote (locate free-text is not a vote). Best-effort throughout.
     localization = None
     vision_label = None
     try:
-        from vision import locate_exercise
+        from vision import locate_exercise, name_movement
 
         located = locate_exercise(video, DATA / f"{job_id}-locate",
                                   job.get("exercise"))
+        named = name_movement(video, DATA / f"{job_id}-vote")
     except Exception:  # noqa: BLE001
         located = None
-    if located:
-        vision_label = located.get("exercise") or None
+        named = None
+    if named:
+        vision_label = named.get("exercise") or None
         if vision_label and str(vision_label).lower() in ("none", "unknown", ""):
             vision_label = None
     if located and located.get("usable"):

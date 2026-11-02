@@ -70,6 +70,15 @@ def _known(label: str) -> bool:
 _NOT_A_LABEL = {"", "unknown", "none", "null", "n/a", "other"}
 
 
+# Classes the learned model can name that have no measurement profile yet.
+# Kept as votes so the pipeline can say "deadlift, which I cannot measure"
+# instead of replacing them with confident geometry nonsense (3% right on
+# exactly those clips). Free-text locate prose is NOT on this list.
+_MODEL_ONLY_CLASSES = frozenset({
+    "deadlift", "bench_press", "barbell_squat", "handstand",
+})
+
+
 def _canonical(label: str) -> Optional[str]:
     """The label's canonical form, or None if the detector did not name one.
 
@@ -77,35 +86,46 @@ def _canonical(label: str) -> Optional[str]:
     vote instead of two detectors disagreeing. But the taxonomy is the set of
     movements the pipeline can MEASURE - it carries the geometry profile each
     one is analysed with - and that is a smaller set than the movements a
-    detector can NAME. The learned classifier is trained on 17 classes and six
-    of them (deadlift, bench_press, barbell_squat, handstand, human_flag,
-    back_lever) have no profile.
+    detector can NAME. The learned classifier is trained on 17 classes and a
+    few of them (deadlift, bench_press, barbell_squat, handstand) have no
+    profile; those stay as votes via `_MODEL_ONLY_CLASSES`.
 
-    Refusing those six here did not make anything safer. It deleted the vote
-    and left fusion to answer from geometry, which on exactly those clips was
-    right 3% of the time - so the pipeline replaced "deadlift, which I cannot
-    measure" with confident, meaningless squat numbers. Naming is not
-    certifying: `server/process.py` still resolves the chosen movement and
-    returns an empty analysis, saying so, when it has no profile for it.
+    Locate free-text (job cc61dc871b9d: "leg raise (lying/hanging…)") used to
+    be slugified into an exercise id and win fusion as vision-decides. A name
+    that is not a measured movement, a skill id, or a known model class is
+    therefore refused here: no vote, not a movement.
     """
     if not label or label.strip().lower() in _NOT_A_LABEL:
         return None
+    from .movements import resolve
     try:
-        from .movements import resolve
         return resolve(label).name
     except SystemExit:
-        # The taxonomy has no profile for it, so it cannot be canonicalised -
-        # but it is still a name, and aliases within it cannot be resolved, so
-        # it is normalised on its own terms instead.
-        #
-        # The line that used to be here asked `_known`, which asks
-        # `_canonical`, which lands back on this branch - every label the
-        # taxonomy rejected recursed until the stack gave out. Nothing raised
-        # where anyone would see it, because the one caller wraps fusion in
-        # `except Exception`: a RecursionError there reads as "fusion
-        # unavailable", and the vote silently stopped happening for exactly
-        # the labels it existed to arbitrate.
-        return label.strip().lower().replace(" ", "_").replace("-", "_")
+        pass
+    slug = (label.strip().lower()
+            .replace(" ", "_").replace("-", "_").replace("/", "_"))
+    import re
+    cleaned = re.sub(r"[^a-z0-9_]", "", slug).strip("_")
+    cleaned = re.sub(r"_+", "_", cleaned)
+    if not cleaned or cleaned in _NOT_A_LABEL:
+        return None
+    # "Pull-ups" → pull_ups; try the cleaned slug and a singular form.
+    for candidate in (cleaned, cleaned[:-1] if cleaned.endswith("s") else ""):
+        if not candidate:
+            continue
+        try:
+            return resolve(candidate).name
+        except SystemExit:
+            pass
+        if candidate in _MODEL_ONLY_CLASSES:
+            return candidate
+        try:
+            from .skills import SKILLS
+            if candidate in SKILLS:
+                return candidate
+        except Exception:  # noqa: BLE001 - skills import must not sink fusion
+            pass
+    return None
 
 
 def _same(a: str, b: str) -> bool:
@@ -123,12 +143,15 @@ def _float(value: Any, default: float = 0.0) -> float:
 
 def fuse_detection(geometry: Mapping[str, Any] | str,
                    model: Optional[Mapping[str, Any]] = None,
-                   nan_label: Any = None) -> dict:
+                   nan_label: Any = None,
+                   pose_reliable: bool = True) -> dict:
     """Return a final suggested exercise and why, without hiding disagreement.
 
     `geometry` may be a label or a `detected` dict. `model` may be a label or a
     `model_classify()` dict with `confidence` and `marginToRunnerUp`.
     `nan_label` may be a label or dict with `label`/`exercise`.
+    `pose_reliable` is False when the caller knows the keypoints are suspect
+    (upside-down unresolved, darkness, athlete out of frame).
     """
     g_label = _label(geometry)
     m_label = _label(model)
@@ -172,6 +195,20 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
                                 "model" in backers else 0.0), status,
                       f"{len(backers)} independent detectors agree on {best} "
                       f"({', '.join(sorted(backers))})")
+
+    # --- 1b. three different names on an untrustworthy pose -----------------
+    # Vision alone is usually right when geometry and the classifier split on
+    # a clean clip. A sideways / dark clip makes all three misread together
+    # (job f31bf9cfc335: dips filmed upside down). Do not claim a movement.
+    if (not pose_reliable and _canonical(n_label) and _canonical(g_label)
+            and _canonical(m_label) and m_conf >= MODEL_MIN_CONFIDENCE
+            and len({_canonical(n_label), _canonical(g_label),
+                     _canonical(m_label)}) == 3):
+        return answer("unknown", 0.0, "three-way-disagreement-abstain",
+                      f"geometry ({g_label}), the learned classifier "
+                      f"({m_label}) and the vision read ({n_label}) all name "
+                      "different movements on a clip the pose could not read "
+                      "reliably, so the exercise is not claimed")
 
     # --- 2. no agreement: the most reliable detector that has an answer ----
     # Geometry keeps its say only where nothing better spoke. It is never

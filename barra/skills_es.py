@@ -75,6 +75,7 @@ NAME_ES = {
     "front_lever": "Front lever",
     "front_lever_pull_up": "Dominada en front lever",
     "one_arm_front_lever": "Front lever a una mano",
+    "inverted_curl": "Curl invertido",
     "skin_the_cat": "Skin the cat",
     "tuck_back_lever": "Back lever agrupado",
     "adv_tuck_back_lever": "Back lever agrupado avanzado",

@@ -191,6 +191,11 @@ _add(_n(
                "The FEET stay on the ground under a low bar and the body is "
                "angled, pulling the chest up toward the bar.",
                skill="australian_row"),
+        Option("biceps_curl",
+               "Under a low bar the person lies or hangs nearly supine and "
+               "bends the ELBOWS to curl the chest or hips up toward the bar "
+               "(a bodyweight biceps curl / inverted curl), not a full pull-up.",
+               skill="inverted_curl"),
         Option("arms_pull",
                "The body stays roughly VERTICAL and the ARMS bend to pull the "
                "chest up toward the bar.", then="pull_how"),
@@ -198,8 +203,10 @@ _add(_n(
                "The torso stays roughly vertical and the LEGS lift up in front "
                "of the body.", then="hang_legs"),
         Option("horizontal_faceup",
-               "The body is held HORIZONTAL with the chest and face pointing "
-               "UP, the back toward the ground.", then="front_lever_how"),
+               "The body is held HORIZONTAL or piked with the chest and face "
+               "pointing UP (legs may point VERTICAL toward the ceiling in a "
+               "front-lever pull progression), the back toward the ground.",
+               then="front_lever_how"),
         Option("horizontal_facedown",
                "The body is held HORIZONTAL with the chest and face pointing "
                "DOWN, the back toward the ceiling.", then="back_lever_how"),

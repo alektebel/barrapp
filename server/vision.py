@@ -1,28 +1,29 @@
-"""The multimodal pass: a vision model studies the technique, given the evidence.
+"""The multimodal pass via nan.builders (EU inference, zero prompt/response logs).
 
-The measurement pipeline is geometric - pose landmarks in, numbers out - and
-the text model that writes the prose only ever sees those numbers. This module
-closes the gap: it shows a vision model stills that walk through the phases of
-representative reps (see barra/frames.py) together with what was measured, and
-asks for structured, frame-referenced observations it can abstain from.
+Roles (measurement stays geometric — keypoints in, numbers out):
+
+* **Locate** — finds the active window for trim. Its free-text
+  `detected_exercise` is NOT a fusion vote (2026-11-02: prose like
+  "leg raise (lying/…)" won fusion and blocked measurement).
+* **Tree vote (`name_movement`)** — walks `barra/movement_tree` for the
+  fusion label. Kept on the primary path because a constrained skill id
+  lifts fusion accuracy without inventing out-of-taxonomy strings; late
+  votes are skipped (BARRA_VISION_VOTE_WAIT_S) so they cannot block speed.
+* **Count** — **fallback only** when geometry finds zero reps
+  (`countedBy: vision-fallback`; off with BARRA_VISION_COUNT=0). Never sets
+  tempos, fatigue or session score.
+* **Technique note / second opinion** — advisory; never overwrites movement,
+  count or score. Prose report is separate and off unless BARRA_PROSE=1.
 
 Three rules, all of them about not letting a fluent model outrank a
 measurement:
 
-* The model's observations are ADVISORY and separately sourced. They never
-  overwrite the geometric movement label, the rep count or a calibrated score;
-  a disagreement with the geometry is recorded for review, not resolved here.
-* Every response is validated against the registry: an observation must name
-  a rule the detected movement defines, a rep the payload contains, frames the
-  request actually sent and a phase the pipeline knows. Anything else is
-  dropped and counted. Malformed JSON degrades to "no note", never to a failed
-  job.
-* Pose estimates are not called ground truth in the prompt, and the model is
-  told what it cannot see: forces, muscle activation, joints the camera hides,
-  phases no still shows, and the count or precise timing of fast reps from a
-  handful of frames.
+* Observations are ADVISORY and separately sourced.
+* Every response is validated against the registry (rules, reps, frames, phases).
+* Pose estimates are not called ground truth in the prompt.
 
 Optional by design. Without a key the pipeline behaves exactly as before.
+Privacy: https://nan.builders/privacy — no prompt/response logging; EU processing.
 """
 from __future__ import annotations
 
@@ -586,6 +587,68 @@ actually show. Do not name the exercise; later questions will narrow it down.
 Choose "unclear" whenever the frames do not settle the question. That is a \
 real answer and a useful one - a wrong confident choice sends every later \
 question down the wrong branch, and there is no way back up."""
+
+
+def skill_from_locate_label(label: str | None) -> str | None:
+    """A locate free-text name, only if it is already a known skill/movement.
+
+    Locate's `detected_exercise` is open vocabulary. Passing it straight into
+    fusion invented ids like `leg_raise_(lying/hanging_leg_raise_on_dip_station)`
+    (job cc61dc871b9d). Prefer `name_movement` (tree walk) for the vote; this
+    helper is the safety net when a caller still has a locate string.
+    """
+    if not label or not str(label).strip():
+        return None
+    text = str(label).strip()
+    # Prose with punctuation / clauses is never a skill id.
+    if any(ch in text for ch in "()/[],;:") or len(text.split()) > 3:
+        return None
+    try:
+        from barra.fusion import _canonical
+        return _canonical(text)
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def name_movement(video_path, out_dir, n_frames: int = 6) -> dict | None:
+    """Skill id for fusion via the movement tree, or None.
+
+    Samples stills and walks `classify_movement`. Locate keeps responsibility
+    for the trim window; this is the name that may cast a fusion vote.
+    """
+    cfg = _config()
+    if cfg is None:
+        return None
+    try:
+        from barra.frames import grab_frames
+        from barra.ingest import probe_video
+    except ImportError:
+        return None
+    try:
+        info = probe_video(Path(video_path))
+        duration = float(info.get("duration_s") or 0.0)
+        if not info.get("ok") or duration <= 0:
+            return None
+        n = max(4, int(n_frames))
+        moments = [round(duration * (i + 0.5) / n, 2) for i in range(n)]
+        grabbed = grab_frames(Path(video_path), moments, Path(out_dir),
+                              prefix="vote")
+        if not grabbed:
+            return None
+        frames = [p for _, p in sorted(grabbed, key=lambda x: x[0])]
+    except Exception as exc:  # noqa: BLE001
+        print(f"[barra] name_movement: could not sample: {exc}", flush=True)
+        return None
+    walked = classify_movement(frames)
+    if not walked:
+        return None
+    skill = str(walked.get("skill") or "").strip()
+    if not skill:
+        return {**walked, "exercise": None}
+    # Refuse empty / unclear leaves.
+    if skill.lower() in ("", "unknown", "none"):
+        return {**walked, "exercise": None}
+    return {**walked, "exercise": skill}
 
 
 def classify_movement(frames, log=None) -> dict | None:

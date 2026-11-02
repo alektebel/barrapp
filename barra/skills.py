@@ -161,6 +161,10 @@ SKILLS: dict[str, Skill] = {s.id: s for s in [
     _s("front_lever", "Front lever", CORE, ["half_front_lever"]),
     _s("front_lever_pull_up", "Front lever pull-up", CORE, ["front_lever"]),
     _s("one_arm_front_lever", "One-arm front lever", CORE, ["front_lever"]),
+    # Bodyweight biceps curl under a low bar (inverted / Australian curl).
+    # Named so fusion can say "we don't measure this yet" instead of inventing
+    # a freeform leg-raise id (job cc61dc871b9d, 2026-11-02).
+    _s("inverted_curl", "Inverted curl", BAR, ["australian_row", "chin_up"]),
 
     # -- back lever chain -----------------------------------------------
     _s("skin_the_cat", "Skin the cat", CORE, ["dead_hang"]),

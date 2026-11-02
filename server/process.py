@@ -157,7 +157,8 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
     `analyze_clip` unchanged; the debugging tool uses it to reuse the keypoint
     cache while still running the production post-analysis path.
     `vision_label` is the vision model's name for the movement, or a callable
-    that returns it when fusion asks (the worker locates in parallel).
+    that returns it when fusion asks (the worker names the movement in parallel
+    via the movement tree — locate free-text is not a vote).
 
     `exercise` may be omitted or "auto": the clip is then classified from its
     own geometry rather than from what the athlete remembered to tap.
@@ -170,31 +171,70 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
     _stage = _stager(on_stage)
     _stage("opening the clip")
     requested = (job.get("exercise") or "auto").strip() or "auto"
-    trace = _new_trace(job, video_path, requested)
+    work_path = Path(video_path)
+    rotated_tmp = None
+    orientation_meta = None
+    # Phone IMU said the picture is sideways / upside down (2026-11-02 jobs
+    # 93ebbf6e4894, cc61dc871b9d). Turn it before pose so gravity-relative
+    # geometry and the vision stills see an upright athlete.
+    try:
+        from barra.orientation import device_rotation_degrees
+        deg = device_rotation_degrees(job.get("deviceOrientation"))
+        if deg and pose is None:
+            import tempfile
+            from barra.frames import rotate_clip
+            _stage("straightening the clip")
+            rotated_tmp = (Path(tempfile.gettempdir())
+                           / f"{work_path.stem}-upright{deg}.mp4")
+            got = rotate_clip(work_path, rotated_tmp, degrees=deg)
+            if got is not None:
+                work_path = got
+                orientation_meta = {
+                    "rotatedBy": deg,
+                    "status": "rotated",
+                    "reason": "deviceOrientation.videoRotation",
+                    "source": "imu",
+                }
+    except Exception:  # noqa: BLE001 - a failed turn keeps the as-filmed clip
+        orientation_meta = None
+    trace = _new_trace(job, work_path, requested)
     def _visual_count():
         from pathlib import Path as _P
         root = _P(os.environ.get("BARRA_TRACE_DIR", str(BARRA_ROOT / "out" / "traces")))
-        return count_from_clip(video_path, root / str(job.get("id") or "vision"))
+        return count_from_clip(work_path, root / str(job.get("id") or "vision"))
 
-    metrics = analyze_clip(video_path, requested, session=job.get("session"),
-                           trace=trace, on_stage=_stage,
-                           visual_count=_visual_count,
-                           declared_bin=job.get("view"),
-                           variant=job.get("variant"),
-                           pose=pose,
-                           vision_label=vision_label)
-    # The model prose is OFF the critical path (docs/SPEED-PLAN.md B): the
-    # result reaches the phone with the deterministic Spanish text and
-    # `proseStatus: "pending"`, and `finish_prose` upgrades it afterwards,
-    # exactly like `add_vision` does for the vision note. The prose model
-    # owns exactly three keys; everything else the UI draws - the detected
-    # movement, the trim window, per-rep scores and traces - is carried
-    # through untouched from `metrics` below.
-    pending = llm.config() is not None
+    try:
+        metrics = analyze_clip(work_path, requested, session=job.get("session"),
+                               trace=trace, on_stage=_stage,
+                               visual_count=_visual_count,
+                               declared_bin=job.get("view"),
+                               variant=job.get("variant"),
+                               pose=pose,
+                               vision_label=vision_label)
+    finally:
+        if rotated_tmp is not None:
+            try:
+                rotated_tmp.unlink()
+            except OSError:
+                pass
+    if orientation_meta:
+        metrics["orientation"] = orientation_meta
+        detected = metrics.get("detected")
+        if isinstance(detected, dict):
+            detected["orientation"] = orientation_meta
+    _annotate_capture(metrics)
+    # LLM prose is off for now: the phone keeps the deterministic Spanish
+    # fallback (exercise + measured technique). Re-enable with BARRA_PROSE=1
+    # when a writer earns its keep on the labelled corpus.
+    prose_on = os.environ.get("BARRA_PROSE", "").strip().lower() in {"1", "true", "yes", "on"}
+    pending = prose_on and llm.config() is not None
     report = {**fallback_report(metrics),
-              "proseStatus": "pending" if pending else "done",
+              "proseStatus": ("pending" if pending
+                              else ("skipped" if not prose_on else "done")),
               "proseSource": "fallback"}
-    if not pending:
+    if not prose_on:
+        report["proseRejected"] = "disabled"
+    elif not pending:
         report["proseRejected"] = "not_configured"
     # Inverted on purpose: an allow-list of measurement keys has to be updated
     # every time one is added, and the failure mode is a field that silently
@@ -214,6 +254,45 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
               f"rejections={len(trace.rejections)} errors={len(trace.errors)}",
               flush=True)
     return report
+
+
+# What the app is told about HOW the clip was filmed, as catalog codes that
+# barra/i18n.py renders in Spanish (each one says what to do about it).
+_GENERIC_NOT_SEEN = "no stretch of this clip shows the athlete on the apparatus"
+
+
+def _annotate_capture(metrics: dict) -> None:
+    """Lift orientation / framing findings into `orientation`, `notes`, and —
+    when nothing could be measured — actionable blockers ahead of the generic
+    "not on the apparatus" line."""
+    detected = metrics.get("detected") or {}
+    ori = detected.get("orientation") or metrics.get("orientation") or None
+    framing = list(detected.get("framing") or [])
+    notes: list[str] = list(metrics.get("notes") or [])
+    if ori:
+        metrics["orientation"] = {"rotatedBy": ori.get("rotatedBy", 0),
+                                  "status": ori.get("status"),
+                                  "reason": ori.get("reason"),
+                                  **({"source": ori["source"]}
+                                     if ori.get("source") else {})}
+    else:
+        metrics.setdefault("orientation", None)
+    if ori and ori.get("status") == "rotated" and "orientation_rotated" not in notes:
+        notes.append("orientation_rotated")
+    unmeasured = (metrics.get("countStatus") == "unmeasured"
+                  or not metrics.get("n_reps"))
+    if unmeasured:
+        actionable = []
+        if ori and ori.get("status") in ("uncertain", "ambiguous"):
+            actionable.append("orientation_suspect")
+        actionable += framing
+        if actionable:
+            kept = [b for b in metrics.get("blockers") or []
+                    if not str(b).startswith(_GENERIC_NOT_SEEN)]
+            metrics["blockers"] = actionable + kept
+    elif "framing_dark" in framing and "framing_dark" not in notes:
+        notes.append("framing_dark")
+    metrics["notes"] = notes
 
 
 def add_vision(job: dict, video_path: Path, report: dict) -> dict:
@@ -601,12 +680,17 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     os.environ.setdefault("BARRA_POSE_MODEL", str(BARRA_ROOT / "models" / "pose_landmarker_full.task"))
     pose_error = None
     pose_backend = getattr(pose, "source", "caller") if pose is not None else None
+    pose_wall_s: float | None = 0.0 if pose is not None else None
     if pose is None:
+        import time as _time
         for name in order:
             try:
+                t_pose = _time.perf_counter()
                 pose = get_backend(name).estimate(video_path)
+                pose_wall_s = _time.perf_counter() - t_pose
                 pose_backend = name
-                tr.step("pose backend", backend=name)
+                tr.step("pose backend", backend=name,
+                        wallS=round(pose_wall_s, 3))
                 break
             except Exception as exc:  # noqa: BLE001 - the next backend may still work
                 pose_error = exc
@@ -615,6 +699,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         reason = str(pose_error) if pose_error else "unknown"
         return _empty(exercise, [f"Pose estimation failed: {reason}"])
     fps = pose.fps or info["fps"] or 30.0
+    video_s = float(info.get("duration_s") or (len(pose.keypoints) / max(fps, 1.0)))
+    if pose_wall_s is not None and video_s > 0:
+        from barra.ops_signals import pose_per_video_second
+        rate = pose_per_video_second(pose_wall_s, video_s)
+        tr.step("pose rate", poseWallS=round(pose_wall_s, 3), videoS=round(video_s, 3),
+                posePerVideoSecond=rate)
     # A caller building a feature corpus may want the just-estimated keypoints
     # kept without running the whole pipeline twice. BARRA_WRITE_POSE=1 caches
     # them (barra/posecache.store writes the same schema `barra ingest` reads),
@@ -711,10 +801,47 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         except Exception as exc:  # noqa: BLE001 - fusion is an improvement, not a requirement
             tr.error("could not fuse detector votes", reason=str(exc)[:200])
         detected["fusion"] = fusion
+        # Ask before scoring when fusion is empirically risky, or when vision
+        # alone disagreed with geometry (2026-11-02 miss-class clips).
+        try:
+            from barra.uncertainty import needs_confirmation
+            m_margin = float(((model_out or {}).get("classification")
+                              or {}).get("marginToRunnerUp") or 0.0)
+            grounding = needs_confirmation(fusion, model_margin=m_margin)
+        except Exception:  # noqa: BLE001
+            grounding = {"needsConfirmation": False, "reasons": [],
+                         "fusionStatus": (fusion or {}).get("status"),
+                         "suggestedExercise": (fusion or {}).get("exercise")}
+        detected["classificationGrounding"] = grounding
+        tr.step("classification grounding", **{
+            k: grounding.get(k) for k in
+            ("needsConfirmation", "reasons", "fusionStatus", "suggestedExercise")
+        })
         final = (fusion or {}).get("exercise") or detection.exercise
         if final == "unknown":
-            return _empty("auto", [detection.reason], detected=detected,
-                          duration_s=round(float(info.get("duration_s") or 0), 2))
+            return _empty("auto", ["movement_unconfirmed"], detected=detected,
+                          duration_s=round(float(info.get("duration_s") or 0), 2),
+                          classificationGrounding=grounding,
+                          countStatus="unmeasured")
+        # Vision alone against a different geometric name: do not score. Other
+        # risky statuses still set needsConfirmation for the phone, but keep
+        # measuring (the labelled-corpus gate) until the confirm UI owns them.
+        disagree = any(str(r).startswith("detectors_disagree")
+                       for r in (grounding.get("reasons") or []))
+        if disagree:
+            if final != detection.exercise:
+                detected["exercise"] = final
+                detected["label"] = HUMAN.get(final, final)
+                detected["reason"] = (fusion or {}).get("reason") or detected["reason"]
+                detected["certainty"] = "detector-fusion"
+                detected["runnerUp"] = (
+                    detection.exercise if detection.exercise != "unknown"
+                    else detected.get("runnerUp"))
+            return _empty("auto", ["movement_unconfirmed"], detected=detected,
+                          duration_s=round(float(info.get("duration_s") or 0), 2),
+                          classificationGrounding=grounding,
+                          suggestedExercise=grounding.get("suggestedExercise"),
+                          countStatus="unmeasured")
         chosen = final
         if chosen != detection.exercise:
             detected["exercise"] = chosen
@@ -758,14 +885,17 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             ]
             tr.note("rescue pass produced the count", standard_blockers=reasons)
 
-    # The last resort for a count: when every geometric pass found nothing,
-    # ask the configured vision models to count from stills of the clip. A
-    # count from watching is weaker than one from measurement, and the report
-    # says so - but it is an answer, where before there was only a blocker.
+    # Vision COUNT is a fallback only (BARRA_VISION_COUNT, default on): the
+    # geometric segmenter owns the number; the VLM (nan.builders, zero prompt
+    # logs / EU — https://nan.builders/privacy) may answer when every
+    # geometric pass found nothing. Tempos, fatigue and scores stay measured.
     # `visual_count` cuts its own stills, so barra stays free of server paths.
     vision_count = None
-    if not found and visual_count is not None and detected.get("exercise") not in (
-            None, "", "unknown"):
+    count_fallback = os.environ.get("BARRA_VISION_COUNT", "1").strip().lower() not in {
+        "0", "false", "no", "off",
+    }
+    if (count_fallback and not found and visual_count is not None
+            and detected.get("exercise") not in (None, "", "unknown")):
         _stage("counting from the frames")
         try:
             vision_count = visual_count()
@@ -781,7 +911,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                       range=vision_count.get("range"))
             vision_count = None
         if vision_count is not None:
-            tr.decision("vision count", "used the models' count",
+            tr.decision("vision count fallback", "geometry found no reps; used VLM",
                         reps=int(vision_count["reps"]),
                         range=vision_count.get("range"),
                         models=vision_count["models"])
@@ -1006,11 +1136,10 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     blockers_out = list(blockers)
     counted_by = None
     if vision_count is not None and not found:
-        counted_by = "vision"
+        counted_by = "vision-fallback"
         blockers_out.append(
-            f"the geometry could not time the reps, so two vision models "
-            f"counted {vision_count['reps']} from stills of the clip "
-            f"({vision_count['agreement']})")
+            f"geometry found no reps; vision fallback counted "
+            f"{vision_count['reps']} from stills ({vision_count['agreement']})")
 
     clip_faults = clip_failures(reps)
     from barra.fault_select import primary_from_assessments
@@ -1031,6 +1160,29 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     tr.step("assessment summary", **checks)
     if primary:
         tr.step("primary fault", **primary)
+
+    from barra.ops_signals import latency_block, signal_activity, suspect_missed_reps
+    n_reps_out = usable if found else (vision_count["reps"] if vision_count else 0)
+    # Suspicion is about the geometric miss: vision-fallback filling n_reps
+    # still means geometry failed to time the set.
+    active_frac, signal_span = signal_activity(pose.keypoints, fps, movement)
+    vision_est = None
+    if vision_count is not None and vision_count.get("reps") is not None:
+        vision_est = float(vision_count["reps"])
+    suspect = suspect_missed_reps(
+        n_reps=usable if found else 0,
+        exercise=movement.name,
+        is_hold=bool(getattr(movement, "is_hold", False)),
+        active_frac=active_frac,
+        signal_span=signal_span,
+        vision_reps_estimate=vision_est,
+        n_candidates=len(found),
+    )
+    if suspect["suspectMissedReps"]:
+        tr.note("suspect missed reps", **{k: suspect[k] for k in ("reasons", "evidence")})
+    latency = latency_block(pose_wall_s, video_s, backend=pose_backend)
+    tr.step("latency", **{k: v for k, v in latency.items() if v is not None})
+
     return {
         "exercise": movement.name,
         "track": movement.name,
@@ -1051,7 +1203,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # has fallen over and the next one produced the numbers.
         "poseBackend": pose_backend,
         "recommendation": rec,
-        "n_reps": usable if found else (vision_count["reps"] if vision_count else 0),
+        "n_reps": n_reps_out,
         "n_candidates": len(found),
         "rescued": rescued,
         "countedBy": counted_by,
@@ -1070,6 +1222,12 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # so two vision models counted N" line was built and then dropped on
         # every clip that needed it.
         "blockers": blockers_out,
+        "latency": latency,
+        "suspectMissedReps": suspect["suspectMissedReps"],
+        "suspectMissedEvidence": {
+            "reasons": suspect["reasons"],
+            **suspect["evidence"],
+        } if suspect["suspectMissedReps"] else None,
         "nextSession": (
             "Cinco o seis repeticiones, una serie, el móvil fijo en un punto marcado, "
             "siempre desde el mismo lado y con la parte de arriba dentro del encuadre."

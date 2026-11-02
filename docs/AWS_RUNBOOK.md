@@ -135,6 +135,13 @@ sam deploy            # samconfig.toml already holds stack/region/ECR
   rebuilds both; `sam deploy` uploads whatever changed.
 - nan.builders key changed → update the secret `barrapp/nan-api-key`
   (`{"NAN_API_KEY": "..."}`); every model call reads it through `api/llm.py`.
+- nan.builders privacy (https://nan.builders/privacy, 2026-10-14): **zero logs
+  of prompts and model responses**, inference in the **EU**, no training on
+  your inputs; they still keep account/billing data and aggregate metrics
+  (tokens/s, RPM). Vision is a **fallback** for zero-rep geometry
+  (`countedBy: vision-fallback`, disable with `BARRA_VISION_COUNT=0`); exercise
+  locate still votes in auto-detect because it lifts fusion accuracy
+  (~0.56 → ~0.82). LLM prose is off unless `BARRA_PROSE=1`.
   Or edit it in the Lambda console (Environment variables) and redeploy.
 
 ## 6.1 Two worker-image blockers (fixed and deployed)
@@ -201,8 +208,24 @@ Common failures:
   `vendor/barra/models/`.
 - `failed` → the error string is in the record's `error` field, and
   `barra explain --replay <trace-id>` replays that job's decision chain locally.
+- sideways / upside-down miss-class (geometry names a squat for under-bar work,
+  or vision invents a freeform id) → see [`docs/ORIENTATION.md`](ORIENTATION.md);
+  the worker applies `deviceOrientation.videoRotation` before pose, and fusion
+  refuses locate prose as a vote.
 - Worker times out (>10 min) → clip too long or MediaPipe hung; the job is
   capped at 600 s (`WorkerFunction.Timeout`).
+
+Each successful measure payload also carries ops fields:
+
+- `latency.posePerVideoSecond` — wall pose time / video seconds (alert if p50 > 0.8).
+- `suspectMissedReps` — geometry counted 0 reps but activity / vision still looks like a set.
+
+Nightly local roll-up (corpus health + classify/uncertainty evals + pose budget):
+
+```bash
+python scripts/ops_dashboard.py --out out/ops
+# → out/ops/dashboard.html + summary.json
+```
 
 ## 8. Stop it / tear down (stop the meter)
 

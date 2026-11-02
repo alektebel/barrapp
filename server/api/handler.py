@@ -383,6 +383,32 @@ def _route(event):
             value = (body.get(key) or "").strip() if isinstance(body.get(key), str) else ""
             if value:
                 item[key] = value
+        # Phone IMU / container rotation. Applied before pose so a sideways
+        # clip is not classified as a split squat (jobs 93ebbf6e4894,
+        # cc61dc871b9d). Pitch and roll are floats; DynamoDB takes Decimal.
+        device = body.get("deviceOrientation")
+        if isinstance(device, dict) and device:
+            cleaned = {}
+            for key in ("suggestedBin", "bin", "pitchDeg", "rollDeg",
+                        "upright", "landscape", "videoRotation",
+                        "confidence", "source"):
+                if key in device and device[key] is not None:
+                    cleaned[key] = device[key]
+            if cleaned:
+                item["deviceOrientation"] = _to_ddb(cleaned)
+        recent = body.get("recentMovements")
+        if isinstance(recent, dict) and recent:
+            cleaned_r = {}
+            for k, v in list(recent.items())[:12]:
+                name = str(k).strip()[:40]
+                try:
+                    n = int(v)
+                except (TypeError, ValueError):
+                    continue
+                if name and n > 0:
+                    cleaned_r[name] = n
+            if cleaned_r:
+                item["recentMovements"] = cleaned_r
         # A clip costs a credit only where the deployment charges for clips.
         # Off by default, so a phone in the field never hits a wall it did not
         # have yesterday; on, the balance is what referrals are worth.
@@ -646,12 +672,14 @@ def _route(event):
 
 
 def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
-                        end_s: float, duration_s: float | None = None) -> bool:
+                        end_s: float, duration_s: float | None = None,
+                        rotate: int = 0) -> bool:
     """Cut the located window out of the clip and overwrite the stored object.
 
     Best-effort by design: if there is no cutter, the cut fails, or the upload
     fails, the original stays in S3 and the job still succeeds. A localization
-    that cannot be stored is not a reason to lose the measurement.
+    that cannot be stored is not a reason to lose the measurement. `rotate`
+    (90/180/270) turns the stored clip to match the upright measurement.
     """
     try:
         from barra.frames import trim_clip
@@ -665,7 +693,7 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
     if end - start < 2.0:
         return False
     out = Path("/tmp") / f"{job_id}-exercise.mp4"
-    if trim_clip(src, start, end, out) is None:
+    if trim_clip(src, start, end, out, rotate=int(rotate or 0)) is None:
         return False
     try:
         s3.upload_file(str(out), BUCKET, f"{owner}/{job_id}.mp4",
@@ -758,18 +786,15 @@ def worker(event, _context):
             ExpressionAttributeValues={":s": "processing"},
         )
 
-        # Locate the exercise ALONGSIDE the pose, not before it: the vision call
-        # took 57 s of a 375 s job on 2026-10-11, and pose (128 s) does not need
-        # it. Fusion asks for the vote when it gets there, by which time the
-        # call has long finished. The measurement still runs on the FULL clip:
-        # every reported timestamp is in the source video's time, and the
-        # phone seeks its own local copy with them. Localization decides what
-        # is kept, not what is measured.
+        # Locate (trim window) and tree-name (fusion vote) run ALONGSIDE pose.
+        # Locate free-text is never a fusion vote (2026-11-02: prose like
+        # "leg raise (lying/…)" won and blocked measurement). The tree walk
+        # returns a skill id. Measurement still runs on the full clip.
         from concurrent.futures import ThreadPoolExecutor
         from process import add_vision, measure_job
 
         _stage("locating the exercise")
-        pool = ThreadPoolExecutor(max_workers=1)
+        pool = ThreadPoolExecutor(max_workers=2)
 
         def _locate():
             try:
@@ -779,10 +804,18 @@ def worker(event, _context):
             except Exception:  # noqa: BLE001 - localization never fails a job
                 return None
 
+        def _name():
+            try:
+                from vision import name_movement
+                return name_movement(dest, Path("/tmp") / f"{job_id}-vote")
+            except Exception:  # noqa: BLE001 - a missing vote never fails a job
+                return None
+
         located_future = pool.submit(_locate)
+        named_future = pool.submit(_name)
 
         # When pose was ~128 s, locate was always done by fusion. Full + chunks
-        # finish pose in seconds while locate can still take tens of seconds —
+        # finish pose in seconds while vision can still take tens of seconds —
         # do not re-serialize that wait onto upload→result. A short grace lets
         # a nearly-done call land; otherwise fusion runs on geometry+model and
         # locate still drives the post-result clip trim below.
@@ -790,10 +823,10 @@ def worker(event, _context):
 
         def _vision_vote():
             try:
-                located = located_future.result(timeout=_VISION_VOTE_WAIT_S)
-            except Exception:  # noqa: BLE001 - late locate is no vote, not a failure
-                return None
-            label = (located or {}).get("exercise") or None
+                named = named_future.result(timeout=_VISION_VOTE_WAIT_S)
+            except Exception:  # noqa: BLE001 - late name is no vote, not a failure
+                named = None
+            label = (named or {}).get("exercise") or None
             if label and str(label).lower() in ("none", "unknown", ""):
                 return None
             return label
@@ -811,14 +844,19 @@ def worker(event, _context):
             located = located_future.result(timeout=300)
         except Exception:  # noqa: BLE001
             located = None
+        try:
+            named_future.result(timeout=1)
+        except Exception:  # noqa: BLE001
+            pass
         pool.shutdown(wait=False)
+        rotate = int((result.get("orientation") or {}).get("rotatedBy") or 0)
         localization = None
         if located and located.get("usable"):
             loc = dict(located)
             loc["source"] = "vision"
             loc["trimmed"] = _store_trimmed_clip(
                 dest, owner, job_id, located["startS"], located["endS"],
-                located.get("durationS"))
+                located.get("durationS"), rotate=rotate)
             localization = loc
         # Vision unavailable or it found no window: fall back to the geometric
         # working set the measurement already computed.
@@ -827,7 +865,7 @@ def worker(event, _context):
             s, e = trim.get("startS"), trim.get("endS")
             if s is not None and e is not None and e > s:
                 if _store_trimmed_clip(dest, owner, job_id, s, e,
-                                       result.get("duration_s")):
+                                       result.get("duration_s"), rotate=rotate):
                     localization = {"source": "geometry", "startS": s, "endS": e,
                                     "durationS": result.get("duration_s"),
                                     "trimmed": True}

@@ -100,14 +100,15 @@ def test_a_label_outside_the_taxonomy_never_recurses():
     """`resolve` refusing a label used to bounce between `_known` and
     `_canonical` until the stack gave out - and the one caller wraps fusion in
     `except Exception`, so it read as "fusion unavailable" and the vote
-    silently stopped happening."""
+    silently stopped happening. Freeform / unknown labels are now refused
+    (no vote), so geometry answers alone."""
     fused = fuse_detection(
         {"exercise": "dip", "confidence": 0.40},
         {"exercise": "not_a_movement", "confidence": 0.99,
          "marginToRunnerUp": 0.9},
     )
-    assert fused["exercise"] == "not_a_movement"
-    assert fused["status"] == "model-decides"
+    assert fused["exercise"] == "dip"
+    assert fused["status"] == "geometry-only"
 
 
 def test_a_movement_with_no_profile_still_gets_named():

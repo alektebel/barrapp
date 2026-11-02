@@ -63,7 +63,7 @@ class ProcessJob(unittest.TestCase):
         # The deterministic Spanish prose stands; the note is advisory.
         self.assertEqual(out["headline"], "Ningún ejercicio que barra pueda medir")
         self.assertEqual(out["proseSource"], "fallback")
-        self.assertEqual(out["proseStatus"], "pending")
+        self.assertEqual(out["proseStatus"], "skipped")
         self.assertEqual(out["visionNote"]["headline"], "The stills show a floor push-up")
         self.assertEqual(out["visionObservations"], [{"rep": "r1"}])
 

@@ -213,6 +213,11 @@ def needs_confirmation(fusion: Mapping[str, Any] | None,
     Default rule (best precision on the labelled corpus, ~0.85 P / 0.61 R):
     fusion landed in a risky status (`RISKY_FUSION_STATUSES`). Model margin is
     opt-in (`use_margin=True`) — alone it flags too many correct majority votes.
+
+    Also asks when vision alone decides against a different geometric name
+    (jobs 93ebbf6e4894 / cc61dc871b9d, 2026-11-02): vision-decides is usually
+    right on the labelled corpus, but a free-text or sideways-clip miss that
+    disagrees with geometry must not be scored silently.
     """
     fus = fusion or {}
     status = str(fus.get("status") or "")
@@ -223,11 +228,16 @@ def needs_confirmation(fusion: Mapping[str, Any] | None,
         reasons.append(f"model_margin:{float(model_margin):.3f}<{margin_floor}")
     if not _canon(fus.get("exercise")):
         reasons.append("fusion_abstain")
+    chosen = _canon(fus.get("exercise"))
+    geometry = _canon(fus.get("geometry"))
+    if (status == "vision-decides" and chosen and geometry
+            and chosen != geometry):
+        reasons.append(f"detectors_disagree:vision={chosen},geometry={geometry}")
     return {
         "needsConfirmation": bool(reasons),
         "reasons": reasons,
         "fusionStatus": status or None,
-        "suggestedExercise": _canon(fus.get("exercise")),
+        "suggestedExercise": chosen,
     }
 
 

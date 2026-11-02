@@ -113,7 +113,8 @@ class Split(unittest.TestCase):
         out = self.run_with(lambda: process.process_job({"id": "j"}, Path("/tmp/x.mp4")),
                             note={"visionObservations": []})
         self.assertEqual(out["visionStatus"], "done")
-        self.assertEqual(out["proseStatus"], "done")
+        # LLM prose is off unless BARRA_PROSE=1; technique stays via vision.
+        self.assertEqual(out["proseStatus"], "skipped")
 
 
 class VisionInParallel(Split):
@@ -171,10 +172,12 @@ class FastProse(unittest.TestCase):
     it lands and passes the same judgement `report.write_report` applies.
     """
 
-    def patches(self, configured=True, llm_configured=None):
+    def patches(self, configured=True, llm_configured=None, prose=True):
         art = mock.Mock(clip=None, stills=[])
         art.as_trace_data.return_value = {}
+        env = {"BARRA_PROSE": "1"} if prose else {"BARRA_PROSE": "0"}
         ps = [
+            mock.patch.dict("os.environ", env, clear=False),
             mock.patch.object(process, "analyze_clip", return_value=measured()),
             mock.patch.object(process, "technique_artifacts", return_value=art),
             mock.patch.object(process, "technique_note", return_value=None),
@@ -188,12 +191,13 @@ class FastProse(unittest.TestCase):
         return ps
 
     def run_with(self, fn, ps=None):
-        for p in ps or self.patches():
+        started = ps if ps is not None else self.patches()
+        for p in started:
             p.start()
         try:
             return fn()
         finally:
-            for p in ps or []:
+            for p in started:
                 p.stop()
 
     def test_first_write_has_fallback_prose_and_no_model_call(self):
@@ -265,9 +269,17 @@ class FastProse(unittest.TestCase):
             out2 = process.finish_prose({"id": "j"}, out)
             self.assertEqual(out2["proseStatus"], "done")
             return out2
-        out = self.run_with(go, ps=self.patches(llm_configured=False))
+        out = self.run_with(go, ps=self.patches(llm_configured=False, prose=True))
         self.assertEqual(out["proseSource"], "fallback")
         self.assertEqual(out["proseRejected"], "not_configured")
+
+    def test_prose_is_off_by_default(self):
+        out = self.run_with(lambda: process.measure_job({"id": "j"}, Path("/tmp/x.mp4")),
+                            ps=self.patches(llm_configured=True, prose=False))
+        self.assertEqual(out["proseStatus"], "skipped")
+        self.assertEqual(out["proseRejected"], "disabled")
+        self.assertEqual(out["proseSource"], "fallback")
+        self.assertTrue(out["headline"])
 
     def test_finish_prose_keeps_the_trace_keys(self):
         """The deferred pass must not rebuild the payload's provenance from
@@ -281,11 +293,11 @@ class FastProse(unittest.TestCase):
         self.assertIn("i18n", out)
 
     def test_process_job_is_still_both(self):
-        # No note configured: the vision pass is skipped, the prose is done.
+        # No note configured: vision skipped; prose off by default.
         out = self.run_with(lambda: process.process_job({"id": "j"}, Path("/tmp/x.mp4")),
-                            ps=self.patches(llm_configured=False))
+                            ps=self.patches(llm_configured=False, prose=False))
         self.assertEqual(out["visionStatus"], "skipped")
-        self.assertEqual(out["proseStatus"], "done")
+        self.assertEqual(out["proseStatus"], "skipped")
 
 
 class Worker(unittest.TestCase):
