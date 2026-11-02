@@ -252,7 +252,9 @@ def robust_torso(kp: np.ndarray, torso: np.ndarray | None = None) -> float:
 # lengths (handheld camera included); over a subject walking away from the bar
 # it is 1.1-4.8. The gap is an order of magnitude, so the threshold sits
 # comfortably between rather than being tuned to either side.
-MAX_BAR_TRAVEL = 0.80
+# Pose jitter on handheld dip-station clips (93ebbf6e4894) lands around 1.1–
+# 1.4 torso-lengths even in a ±1.2 s peak window; 0.80 zeroed real pulls.
+MAX_BAR_TRAVEL = 1.25
 
 
 def anchor_travel(kp: np.ndarray, a: int, b: int, min_conf: float = 0.4) -> float:

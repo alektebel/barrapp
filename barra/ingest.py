@@ -267,10 +267,10 @@ def candidate_checks(kp: np.ndarray, raw: np.ndarray | None, valid: np.ndarray,
         # Measure travel near the turnaround, not over a walk that can run to
         # max_half_rep_s (~4 s) of lockout / approach on either side. Pose
         # drift and a handheld camera accumulate across a long support hold
-        # and rejected real weighted dips (job a038d832f870: one bottom at
-        # 13.7 s walked to a 6.7 s window with travel 0.99, while ±2.5 s
-        # around the peak stayed under MAX_BAR_TRAVEL).
-        half = max(int(round(2.5 * fps)), int(round(float(movement.min_rep_s) * fps)))
+        # (a038d832f870) and across a noisy dip-station FL-pull trim
+        # (93ebbf6e4894: ±0.6 s already 1.08, ±0.4 s stays at 0.05). Keep
+        # the window tight around the peak.
+        half = max(3, int(round(0.5 * fps)))
         ta, tb = max(int(a), int(pk) - half), min(int(b), int(pk) + half)
         travel = anchor_travel(kp, ta, tb)
         if not np.isfinite(travel) or travel > MAX_BAR_TRAVEL:
