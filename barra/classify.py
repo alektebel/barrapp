@@ -610,7 +610,12 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # happened: a 23-second inverted hold has hands as fixed as any bar
     # movement and shoulders that drift just enough to look articulated, and
     # was duly reported as a pull-up with two reps invented out of the drift.
-    if anchored and f["hands_overhead_frac"] >= 0.35 and parked >= HOLD_FRAC:
+    # Small-ROM hanging curls (job cc61dc871b9d, articulation≈0.19) also look
+    # "parked". Only reject when the arms are truly still - use a stricter
+    # bar than ARTICULATION so a quiet curl still reaches the hang branch.
+    truly_still = arms_measured and float(f["arm_articulation"]) < 0.10
+    if (anchored and f["hands_overhead_frac"] >= 0.35 and parked >= HOLD_FRAC
+            and truly_still):
         tr.reject("any movement", "the body stays parked - a hold or a rest, not a set",
                   parked_frac=parked, parked_max=HOLD_FRAC, band=HOLD_BAND,
                   arm_articulation=f["arm_articulation"],
@@ -623,11 +628,72 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f,
         )
 
+    # Hands clearly on a fixed support below the shoulders (dip / push-up).
+    # Checked BEFORE the squat family so an articulated support set cannot fall
+    # through to "feet planted, arms rigid". Still requires articulation: arms
+    # hanging at the sides of a squat also sit below the shoulders, and without
+    # that gate every squat_clip becomes a dip.
+    if anchored and articulated and f["hands_below_frac"] >= 0.80:
+        below = f["body_below_hands"]
+        if not np.isfinite(below):
+            tr.reject("dip/push-up", "too little of the body was seen to tell them apart",
+                      body_below_hands=below)
+            return Classification(
+                "unknown", 0.0,
+                "hands fixed below the shoulders, but too little of the body was "
+                "seen to tell a dip from a push-up",
+                f,
+            )
+        if below >= BELOW_HANDS_DIP:
+            ankle_known = (f.get("ankle_window_seen") is not None
+                           and f["ankle_window_seen"] >= MIN_SEEN)
+            ankle_seen_ok = (f.get("ankle_seen") is not None
+                             and f["ankle_seen"] >= MIN_SEEN)
+            if not planted and not ankle_known and not ankle_seen_ok:
+                tr.reject(
+                    "dip/squat",
+                    "hands fixed, body below them, but the feet were never seen",
+                    body_below_hands=below, planted=planted,
+                    ankle_window_seen=f.get("ankle_window_seen"),
+                    ankle_seen=f.get("ankle_seen"))
+                return Classification(
+                    "unknown", 0.0,
+                    f"hands fixed below the shoulders with {below:.0%} of the body "
+                    "below them, but the feet were never clearly seen - this is a "
+                    "dip (feet hanging) or a squat with the feet out of frame, and "
+                    "a dip is not justified",
+                    f, runner_up="squat",
+                )
+            tr.decision("dip", "the legs hang below the hands",
+                        body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
+            return Classification(
+                "dip", 0.78,
+                f"hands fixed below the shoulders, with {below:.0%} of the body "
+                "hanging below them - the legs are off the ground",
+                f, runner_up="push_up",
+            )
+        tr.decision("push_up", "nothing hangs below the hands, so they are on the floor",
+                    body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
+        return Classification(
+            "push_up", 0.78,
+            "hands fixed below the shoulders and nothing hanging below them, so "
+            "the hands are on the floor rather than on bars",
+            f, runner_up="dip",
+        )
+
     # Hanging, but with the legs coming up rather than the body. Checked before
     # the pull-up split because a knee raise satisfies every condition of that
     # split except the one that matters, and would otherwise be reported as a
     # pull-up whose shoulders happen never to reach the bar.
-    if (anchored and f["hands_overhead_frac"] >= 0.35
+    # Overhead gate: 0.35 misses pike / vertical-leg front-lever pulls where
+    # the wrists sit only slightly above the head in frame (job 93ebbf6e4894,
+    # oh≈0.20) and the squat family then invents a split squat. When the body
+    # clearly hangs below the hands, a lower overhead share is enough.
+    hang_oh = float(f["hands_overhead_frac"])
+    body_hangs = (np.isfinite(f["body_below_hands"])
+                  and float(f["body_below_hands"]) >= BELOW_HANDS_DIP)
+    hanging = hang_oh >= 0.35 or (hang_oh >= 0.15 and body_hangs and articulated)
+    if (anchored and hanging
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
             and f["knee_excursion"] >= f["arm_articulation"]):
         tr.decision("knee_raise", "the knees are carried above the hips, and travel "
@@ -643,12 +709,26 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f, runner_up="pull_up",
         )
 
-    if anchored and articulated and f["hands_overhead_frac"] >= 0.35:
+    if anchored and articulated and hanging:
         peak = f["shoulder_above_hands_p95"]
-        if peak >= OVER_BAR:
+        # A muscle-up must have started from a hang. Support work that briefly
+        # reads "shoulders above hands" (L-sit / dip-station holds) has p05
+        # still positive and must not win this branch.
+        started_from_hang = (
+            np.isfinite(f.get("shoulder_above_hands_p05"))
+            and float(f["shoulder_above_hands_p05"]) < -0.05
+        )
+        # Front-lever pull progressions on a dip station (job 93ebbf6e4894)
+        # spend most of the set with the hands below the shoulders and only
+        # clear them at the top - that is a pull, not a muscle-up transition.
+        support_dominant = (
+            float(f["hands_below_frac"]) > float(f["hands_overhead_frac"])
+        )
+        if peak >= OVER_BAR and started_from_hang and not support_dominant:
             margin = min(1.0, (peak - OVER_BAR) / 0.35)
             tr.decision("muscle_up", "the shoulders finish above the hands",
                         peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                        shoulder_above_hands_p05=f.get("shoulder_above_hands_p05"),
                         confidence=0.70 + 0.28 * margin)
             return Classification(
                 "muscle_up", 0.70 + 0.28 * margin,
@@ -656,9 +736,10 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 "torso-lengths above the hands",
                 f, runner_up="pull_up",
             )
-        margin = min(1.0, (OVER_BAR - peak) / 0.35)
+        margin = min(1.0, (OVER_BAR - peak) / 0.35) if peak < OVER_BAR else 0.55
         tr.decision("pull_up", "the shoulders never rise above the hands",
                     peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                    shoulder_above_hands_p05=f.get("shoulder_above_hands_p05"),
                     confidence=0.70 + 0.25 * margin)
         return Classification(
             "pull_up", 0.70 + 0.25 * margin,
@@ -734,63 +815,6 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
             f"feet stayed put, the hips moved through {f['hip_travel']:.2f} "
             "torso-lengths, and the arms did not move relative to the torso",
             f, runner_up=None,
-        )
-
-    if anchored and articulated and f["hands_below_frac"] >= 0.80:
-        below = f["body_below_hands"]
-        if not np.isfinite(below):
-            tr.reject("dip/push-up", "too little of the body was seen to tell them apart",
-                      body_below_hands=below)
-            return Classification(
-                "unknown", 0.0,
-                "hands fixed below the shoulders, but too little of the body was "
-                "seen to tell a dip from a push-up",
-                f,
-            )
-        if below >= BELOW_HANDS_DIP:
-            # A squat filmed with the arms held forward has fixed hands, arms
-            # that articulate, and most of the body below them - which is also,
-            # and exactly, what a dip looks like. The one thing that separates
-            # them is the feet: in a dip they hang and are seen; in a squat they
-            # are planted on the floor, often out of frame. When the feet were
-            # NEVER clearly seen, the geometry cannot tell the two apart, so
-            # this is reported as unknown with the interpretation named, rather
-            # than confidently called a dip (which is what a measured squat
-            # with out-of-frame feet was being reported as).
-            ankle_known = (f.get("ankle_window_seen") is not None
-                           and f["ankle_window_seen"] >= MIN_SEEN)
-            ankle_seen_ok = (f.get("ankle_seen") is not None
-                             and f["ankle_seen"] >= MIN_SEEN)
-            if not planted and not ankle_known and not ankle_seen_ok:
-                tr.reject(
-                    "dip/squat",
-                    "hands fixed, body below them, but the feet were never seen",
-                    body_below_hands=below, planted=planted,
-                    ankle_window_seen=f.get("ankle_window_seen"),
-                    ankle_seen=f.get("ankle_seen"))
-                return Classification(
-                    "unknown", 0.0,
-                    f"hands fixed below the shoulders with {below:.0%} of the body "
-                    "below them, but the feet were never clearly seen - this is a "
-                    "dip (feet hanging) or a squat with the feet out of frame, and "
-                    "a dip is not justified",
-                    f, runner_up="squat",
-                )
-            tr.decision("dip", "the legs hang below the hands",
-                        body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
-            return Classification(
-                "dip", 0.78,
-                f"hands fixed below the shoulders, with {below:.0%} of the body "
-                "hanging below them - the legs are off the ground",
-                f, runner_up="push_up",
-            )
-        tr.decision("push_up", "nothing hangs below the hands, so they are on the floor",
-                    body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
-        return Classification(
-            "push_up", 0.78,
-            "hands fixed below the shoulders and nothing hanging below them, so "
-            "the hands are on the floor rather than on bars",
-            f, runner_up="dip",
         )
 
     if not anchored and not planted:

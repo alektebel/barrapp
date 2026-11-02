@@ -264,11 +264,20 @@ def candidate_checks(kp: np.ndarray, raw: np.ndarray | None, valid: np.ndarray,
         return (f"candidate at {pk / fps:.1f}s is mostly interpolated - "
                 f"only {observed:.0%} of its frames were tracked")
     if movement.origin == "wrist":
-        travel = anchor_travel(kp, a, b)
+        # Measure travel near the turnaround, not over a walk that can run to
+        # max_half_rep_s (~4 s) of lockout / approach on either side. Pose
+        # drift and a handheld camera accumulate across a long support hold
+        # and rejected real weighted dips (job a038d832f870: one bottom at
+        # 13.7 s walked to a 6.7 s window with travel 0.99, while ±2.5 s
+        # around the peak stayed under MAX_BAR_TRAVEL).
+        half = max(int(round(2.5 * fps)), int(round(float(movement.min_rep_s) * fps)))
+        ta, tb = max(int(a), int(pk) - half), min(int(b), int(pk) + half)
+        travel = anchor_travel(kp, ta, tb)
         if not np.isfinite(travel) or travel > MAX_BAR_TRAVEL:
             tr.reject(label, "the hands were not on anything fixed",
                       wrist_travel=float(travel), max_travel=MAX_BAR_TRAVEL,
-                      window_s=[round(a / fps, 2), round(b / fps, 2)])
+                      window_s=[round(ta / fps, 2), round(tb / fps, 2)],
+                      rep_window_s=[round(a / fps, 2), round(b / fps, 2)])
             return (f"candidate at {pk / fps:.1f}s: the hands travelled "
                     f"{travel:.1f} torso-lengths, so they were not on a fixed bar "
                     "- this is movement around the rig, not a rep")

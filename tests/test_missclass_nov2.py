@@ -84,6 +84,83 @@ class DeviceRotation(unittest.TestCase):
         self.assertEqual(deg, 90, ev)
         self.assertEqual(ev.get("claimed"), 270)
 
+    def test_resolve_rejects_an_inverting_180(self):
+        """Clear luma gap: claimed 180 left the top darker than the floor."""
+        import cv2
+        import tempfile
+        from pathlib import Path
+
+        frames = []
+        for _ in range(8):
+            f = np.zeros((160, 90, 3), dtype=np.uint8)
+            f[:40] = (180, 180, 180)
+            f[-40:] = (30, 30, 30)
+            frames.append(f)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "up.mp4"
+            h, w = frames[0].shape[:2]
+            wri = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"),
+                                  5, (w, h))
+            for f in frames:
+                wri.write(f)
+            wri.release()
+            deg, ev = resolve_device_rotation(
+                path, {"videoRotation": 180}, n_samples=4)
+        self.assertEqual(deg, 0, ev)
+        self.assertEqual(ev.get("claimed"), 180)
+
+    def test_portrait_reencode_ignores_stale_90_tag(self):
+        """a988 / cc61: portrait file + videoRotation 270 must not quarter-turn."""
+        import cv2
+        import tempfile
+        from pathlib import Path
+
+        # Already-upright portrait (bright ceiling), stale 270 tag.
+        frames = []
+        for _ in range(8):
+            f = np.zeros((160, 90, 3), dtype=np.uint8)
+            f[:40] = (180, 180, 180)
+            f[-40:] = (30, 30, 30)
+            frames.append(f)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "portrait.mp4"
+            h, w = frames[0].shape[:2]
+            wri = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"),
+                                  5, (w, h))
+            for f in frames:
+                wri.write(f)
+            wri.release()
+            deg, ev = resolve_device_rotation(
+                path, {"videoRotation": 270}, n_samples=4)
+        self.assertEqual(deg, 0, ev)
+        self.assertEqual(list(ev.get("candidates") or []), [0, 180])
+
+    def test_weak_luma_keeps_claimed_180(self):
+        """Near-flat lighting must not flip a 180 claim (FL pull room)."""
+        import cv2
+        import tempfile
+        from pathlib import Path
+
+        frames = []
+        for _ in range(8):
+            # Almost uniform - margin well under _LUMA_MARGIN (20).
+            f = np.full((120, 160, 3), 80, dtype=np.uint8)
+            f[:20] = 84
+            f[-20:] = 76
+            frames.append(f)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "flat.mp4"
+            h, w = frames[0].shape[:2]
+            wri = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"),
+                                  5, (w, h))
+            for f in frames:
+                wri.write(f)
+            wri.release()
+            deg, ev = resolve_device_rotation(
+                path, {"videoRotation": 180}, n_samples=4)
+        self.assertEqual(deg, 180, ev)
+        self.assertIn("margin", (ev.get("reason") or ""))
+
 
 class FreeformVision(unittest.TestCase):
     def test_locate_prose_is_not_a_fusion_vote(self):

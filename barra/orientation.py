@@ -366,47 +366,95 @@ def upright_luma_score(frame: np.ndarray) -> float:
     return float(gray[:band].mean() - gray[-band:].mean())
 
 
+# When two luma scores sit closer than this (mean per sample), the lighting
+# cue is too weak to override the phone - bright wooden floors flip the sign
+# on an otherwise upright clip (job 93ebbf6e4894: 0 vs 180 differed by ~23).
+_LUMA_MARGIN = 25.0
+
+
+def _rotation_candidates(claimed: int, width: int, height: int) -> tuple[int, ...]:
+    """Which turns are worth scoring for this file + IMU claim.
+
+    Portrait files (h > w) that still carry a 90/270 gallery tag have usually
+    already been re-encoded upright - applying another quarter turn lays the
+    athlete on their side (jobs a9884573d367, cc61dc871b9d, 31e6fc884110).
+    Only a 180 flip can still be wrong, so those compete as 0 vs 180.
+    Landscape + 90/270 still needs a quarter turn (90 vs 270). A plain 180
+    claim competes with 0.
+    """
+    if claimed not in (90, 180, 270):
+        return (0,)
+    portrait = height > width > 0
+    if claimed in (90, 270) and portrait:
+        return (0, 180)
+    if claimed in (90, 270):
+        return (90, 270)
+    return (0, 180)
+
+
 def resolve_device_rotation(video_path: Path | str,
                             device_orientation: Mapping[str, Any] | None,
                             n_samples: int = 5) -> tuple[int, dict]:
     """Clockwise degrees to apply, checked against the pixels when ambiguous.
 
-    For 90/270, scores both turns on a few stills and keeps the upright one.
-    180 and 0 are returned as claimed. Evidence goes on the orientation payload.
+    Scores the candidate turns (see `_rotation_candidates`) on a few stills and
+    keeps the upright one. A weak luma margin keeps the phone's claim when it
+    is among the candidates; otherwise the brighter-top turn wins.
     """
     claimed = device_rotation_degrees(device_orientation)
     evidence: dict[str, Any] = {"claimed": claimed}
-    if claimed not in (90, 270):
+    if claimed not in (90, 180, 270):
         return claimed, evidence
-    complement = 360 - claimed  # 90 ↔ 270
     try:
         import cv2
         cap = cv2.VideoCapture(str(video_path))
         n = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
-        if n <= 0:
+        ok0, frame0 = cap.read()
+        if n <= 0 or not ok0 or frame0 is None:
             cap.release()
             return claimed, {**evidence, "why": "no frames"}
-        scores = {claimed: 0.0, complement: 0.0}
+        h0, w0 = frame0.shape[:2]
+        candidates = _rotation_candidates(claimed, w0, h0)
+        evidence["candidates"] = list(candidates)
+        evidence["frameSize"] = [w0, h0]
+        scores = {deg: 0.0 for deg in candidates}
         counted = 0
-        for i in range(n_samples):
+        # Re-use frame0 as sample 0, then walk the rest.
+        samples = [frame0]
+        for i in range(1, n_samples):
             idx = int((i + 0.5) * n / n_samples)
             cap.set(cv2.CAP_PROP_POS_FRAMES, idx)
             ok, frame = cap.read()
-            if not ok or frame is None:
-                continue
-            counted += 1
-            for deg in (claimed, complement):
-                scores[deg] += upright_luma_score(_cv2_rotate(frame, deg))
+            if ok and frame is not None:
+                samples.append(frame)
         cap.release()
+        for frame in samples:
+            counted += 1
+            for deg in candidates:
+                scores[deg] += upright_luma_score(
+                    frame if deg == 0 else _cv2_rotate(frame, deg))
     except Exception as exc:  # noqa: BLE001 - keep the phone's claim
         return claimed, {**evidence, "why": f"probe failed: {exc}"}
     if counted == 0:
         return claimed, {**evidence, "why": "no readable frames"}
     evidence["samples"] = counted
     evidence["lumaScore"] = {str(k): round(v / counted, 2) for k, v in scores.items()}
-    # Prefer the brighter-top turn; on a tie keep the phone's claim.
-    best = max(scores, key=lambda d: (scores[d], 1 if d == claimed else 0))
+    ranked = sorted(scores, key=lambda d: (-scores[d], 0 if d == claimed else 1))
+    best = ranked[0]
+    second = ranked[1] if len(ranked) > 1 else best
+    margin = abs(scores[best] - scores[second]) / counted
+    evidence["lumaMargin"] = round(margin, 2)
+    if (margin < _LUMA_MARGIN and claimed in scores
+            and claimed != best):
+        # Lighting too close to call - trust the IMU over a weak flip.
+        best = claimed
+        evidence["reason"] = "claimed: luma margin too thin to override"
+    elif best == claimed:
+        evidence["reason"] = "claimed"
+    elif claimed in (90, 270) and best in (0, 180) and claimed not in scores:
+        evidence["reason"] = ("portrait-reencode: file already upright, "
+                              f"scored {best} of {list(candidates)}")
+    else:
+        evidence["reason"] = "complement: claimed turn left the top darker"
     evidence["chosen"] = best
-    evidence["reason"] = ("claimed" if best == claimed
-                          else "complement: claimed turn left the top darker")
     return best, evidence
