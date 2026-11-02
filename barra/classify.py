@@ -712,11 +712,12 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         hang_oh >= 0.05 and body_hangs and articulated and hang_oh < hang_bel
     )
     # Vertical-leg FL-pull progressions (93ebbf6e4894) hold the knees high
-    # while the shoulders do the work. Require a clear overhead hang so a
-    # support-dominant soft hang cannot become a knee raise.
+    # while the shoulders do the work - knee_excursion from pose jitter can
+    # still meet a 1:1 comparison with arm_articulation. Demand clear overhead
+    # hang and knees travelling clearly more than the shoulders.
     if (anchored and hanging and hang_oh >= 0.35
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
-            and f["knee_excursion"] >= f["arm_articulation"]):
+            and f["knee_excursion"] >= max(1.5 * float(f["arm_articulation"]), 0.35)):
         tr.decision("knee_raise", "the knees are carried above the hips, and travel "
                     "further than the shoulders do",
                     knee_over_hip=f["knee_over_hip"], knees_up_threshold=KNEES_UP,
