@@ -767,11 +767,13 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 "torso-lengths above the hands",
                 f, runner_up="pull_up",
             )
-        # L-sit / pike hold filmed as a hang (31e6fc884110): legs stay up and
-        # the shoulders never climb to the bar - not a pull-up set.
+        # L-sit filmed as a hang (31e6fc884110, peak≈+0.09): legs stay up and
+        # the shoulders hover near the hands without a pull. Do NOT use a bare
+        # `peak < OVER_BAR` here - inverted curls (cc61dc871b9d) sit at peak
+        # ≈-0.57 with piked legs and must remain pull_up.
         legs_up = (np.isfinite(f.get("legs_lifted_frac"))
                    and float(f["legs_lifted_frac"]) >= 0.70)
-        if legs_up and peak < OVER_BAR:
+        if legs_up and -0.05 <= peak < OVER_BAR:
             tr.reject("pull_up", "legs held up without a pull to the bar - a hold",
                       peak_above_hands=peak, over_bar_threshold=OVER_BAR,
                       legs_lifted_frac=f.get("legs_lifted_frac"))
