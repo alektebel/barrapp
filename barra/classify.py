@@ -707,7 +707,10 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     hanging = hang_oh >= 0.35 or (
         hang_oh >= 0.05 and body_hangs and articulated and hang_oh < hang_bel
     )
-    if (anchored and hanging
+    # Vertical-leg FL-pull progressions (93ebbf6e4894) hold the knees high
+    # while the shoulders do the work. Require a clear overhead hang so a
+    # support-dominant soft hang cannot become a knee raise.
+    if (anchored and hanging and hang_oh >= 0.35
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
             and f["knee_excursion"] >= f["arm_articulation"]):
         tr.decision("knee_raise", "the knees are carried above the hips, and travel "
@@ -738,11 +741,20 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         support_dominant = (
             float(f["hands_below_frac"]) > float(f["hands_overhead_frac"])
         )
-        if peak >= OVER_BAR and started_from_hang and not support_dominant:
-            margin = min(1.0, (peak - OVER_BAR) / 0.35)
+        # Soft-hang geometry (oh < 0.35, used for dip-station FL pulls) must
+        # not promote to muscle_up - that path is for a clear overhead hang
+        # that finishes in support. L-sit clips misoriented as a hang
+        # (31e6fc884110, peak≈0.16) were scoring muscle_up ×3 on a hair over
+        # OVER_BAR; demand a clearer lockout than a pull that barely clears.
+        clear_overhead_hang = hang_oh >= 0.35
+        mu_clearance = OVER_BAR + 0.12  # ≈0.24: a real MU finishes well clear
+        if (peak >= mu_clearance and started_from_hang and not support_dominant
+                and clear_overhead_hang):
+            margin = min(1.0, (peak - mu_clearance) / 0.35)
             tr.decision("muscle_up", "the shoulders finish above the hands",
                         peak_above_hands=peak, over_bar_threshold=OVER_BAR,
                         shoulder_above_hands_p05=f.get("shoulder_above_hands_p05"),
+                        hands_overhead_frac=hang_oh,
                         confidence=0.70 + 0.28 * margin)
             return Classification(
                 "muscle_up", 0.70 + 0.28 * margin,
