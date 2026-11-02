@@ -46,7 +46,10 @@ _BODY = ["left_shoulder", "right_shoulder", "left_elbow", "right_elbow",
 OVER_BAR = 0.12
 # Wrist travel above this many torso-lengths means the hands were not on
 # anything fixed. Same constant the segmenter uses to reject walking.
-ANCHOR_FIXED = 0.80
+# Classification window can sit a little looser than the per-rep bar: pose
+# jitter on short trims (job 93ebbf6e4894 in Lambda: 1.13) would otherwise
+# refuse a real hang that the peak-centred segmenter still counts.
+ANCHOR_FIXED = 1.15
 # ...but measured over a WINDOW, not the whole clip. People walk to the bar and
 # walk away again, and a percentile spread over the whole video charges that
 # approach against the set: one real 40-second clip put its wrists 2.99
