@@ -706,6 +706,48 @@ def _route(event):
                        "handed to the worker" if WORKER else "measured in-process")
         return _resp(202, _public(_item(job_id)) or {"id": job_id, "status": "queued"})
 
+    # Athlete declared added load (kg) for a weighted set. Stored beside the
+    # measurement — no re-pose; geometry is the same with or without a belt.
+    if method == "POST" and len(parts) == 4 and parts[-1] == "load":
+        job_id = parts[2]
+        item = _item(job_id)
+        if not _owned(item, owner):
+            return _resp(404, {"error": "unknown job"})
+        raw_kg = body.get("kg") if isinstance(body, dict) else None
+        try:
+            kg = float(raw_kg)
+        except (TypeError, ValueError):
+            return _resp(400, {"error": "kg must be a positive number"})
+        if not (kg > 0) or kg > 500:
+            return _resp(400, {"error": "kg must be between 0 and 500"})
+        result = item.get("result") or {}
+        if isinstance(result, str):
+            try:
+                result = json.loads(result)
+            except Exception:  # noqa: BLE001
+                result = {}
+        try:
+            from barra.load import apply_declared_load
+            updated = apply_declared_load(result, kg)
+        except ValueError as exc:
+            return _resp(400, {"error": str(exc)})
+        table.update_item(
+            Key={"id": job_id},
+            UpdateExpression="SET #r = :r, loadKg = :k",
+            ExpressionAttributeNames={"#r": "result"},
+            ExpressionAttributeValues={
+                ":r": _to_ddb(updated),
+                ":k": _to_ddb(round(kg, 2)),
+            },
+        )
+        uploads.record(job_id, owner, "load-declared",
+                       f"{updated.get('weightedExercise') or updated.get('exercise')} "
+                       f"{kg:g} kg")
+        return _resp(200, _public(_item(job_id)) or {
+            "id": job_id, "status": "done", "loadKg": kg,
+            "weightedExercise": updated.get("weightedExercise"),
+        })
+
     # Athlete typed the exercise name freely (no options list). Resolve to a
     # known movement and re-measure; unknown text is stored as clientLabel and
     # left unscored.
@@ -992,6 +1034,11 @@ def worker(event, _context):
             print(f"[barra] stored clip localized by {localization.get('source')} "
                   f"{localization.get('startS')}-{localization.get('endS')}s "
                   f"trimmed={localization.get('trimmed')}", flush=True)
+            try:
+                from barra.load import refine_asks_load
+                result = refine_asks_load(result, localization)
+            except Exception as exc:  # noqa: BLE001
+                print(f"[barra] refine asksLoad skipped: {exc}", flush=True)
         else:
             print("[barra] localization skipped; storing the raw clip", flush=True)
 

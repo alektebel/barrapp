@@ -86,6 +86,12 @@ data class Analysis(
     val classificationConfidence: ClassificationConfidence? = null,
     /** Athlete should type the exercise name freely — no options list. */
     val clientNamesExercise: Boolean = false,
+    /** Pipeline suspects a weighted set — ask for kilograms. */
+    val asksLoad: Boolean = false,
+    /** Declared added load in kg, when the athlete entered it. */
+    val loadKg: Double = 0.0,
+    /** Skill claim for a weighted variant (weighted_dip, …). */
+    val weightedExercise: String = "",
     /** Pipeline's current guess, optional hint only. */
     val detectedLabel: String = "",
     /** Free text the athlete typed, when the name was not in the catalog. */

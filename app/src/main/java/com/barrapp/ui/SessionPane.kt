@@ -139,6 +139,8 @@ fun SessionDetail(
     modifier: Modifier = Modifier,
     onReplay: (() -> Unit)? = null,
     onNameExercise: ((String) -> Unit)? = null,
+    onDeclareLoad: ((Double) -> Unit)? = null,
+    suggestedLoadKg: Double = 0.0,
 ) {
     var repsExpanded by remember { mutableStateOf(false) }
     LazyColumn(
@@ -168,7 +170,9 @@ fun SessionDetail(
         }
         item { SessionHeader(analysis, repsExpanded, onToggleReps =
             if (analysis.reps.isEmpty()) null else ({ repsExpanded = !repsExpanded }),
-            onNameExercise = onNameExercise) }
+            onNameExercise = onNameExercise,
+            onDeclareLoad = onDeclareLoad,
+            suggestedLoadKg = suggestedLoadKg) }
 
         if (onReplay != null) {
             item {
@@ -289,6 +293,8 @@ private fun SessionHeader(
     repsExpanded: Boolean = false,
     onToggleReps: (() -> Unit)? = null,
     onNameExercise: ((String) -> Unit)? = null,
+    onDeclareLoad: ((Double) -> Unit)? = null,
+    suggestedLoadKg: Double = 0.0,
 ) {
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -417,6 +423,63 @@ private fun SessionHeader(
                 onClick = { if (typed.isNotBlank()) onNameExercise(typed.trim()) },
                 enabled = typed.isNotBlank(),
             ) { Text("Save name") }
+        }
+
+        if (analysis.asksLoad && onDeclareLoad != null && analysis.loadKg <= 0.0) {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "Parece un set lastrado. ¿Cuántos kg añadiste?",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+            var kgText by remember(analysis.weightedExercise, suggestedLoadKg) {
+                mutableStateOf(
+                    if (suggestedLoadKg > 0.0) suggestedLoadKg.toInt().toString() else ""
+                )
+            }
+            BasicTextField(
+                value = kgText,
+                onValueChange = { raw ->
+                    kgText = raw.filter { it.isDigit() || it == '.' }.take(6)
+                },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        MaterialTheme.shapes.small,
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                decorationBox = { inner ->
+                    if (kgText.isBlank()) {
+                        Text(
+                            "p. ej. 20",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    inner()
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            val kg = kgText.toDoubleOrNull() ?: 0.0
+            FilledTonalButton(
+                onClick = { if (kg > 0.0) onDeclareLoad(kg) },
+                enabled = kg > 0.0,
+            ) { Text("Guardar peso") }
+        } else if (analysis.loadKg > 0.0) {
+            Spacer(Modifier.height(8.dp))
+            Text(
+                "+${analysis.loadKg.toInt()} kg declarados",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
         }
 
         analysis.trim?.let { t ->

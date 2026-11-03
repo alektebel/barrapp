@@ -196,6 +196,15 @@ class BarraApi(context: Context) {
         return parseJob(call(request))
     }
 
+    /** Athlete declared added load (kg) for a weighted set. */
+    fun declareLoad(jobId: String, kg: Double): Job {
+        val body = JSONObject().put("kg", kg).toString().toRequestBody(JSON)
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/jobs/$jobId/load").post(body)
+        ).build()
+        return parseJob(call(request))
+    }
+
     fun getJob(jobId: String): Job {
         val request = authed(Request.Builder().url("$baseUrl/v1/jobs/$jobId").get()).build()
         return parseJob(call(request))
@@ -633,6 +642,9 @@ class BarraApi(context: Context) {
                     || json.optJSONObject("detected")
                         ?.optJSONObject("classificationGrounding")
                         ?.optBoolean("clientNamesExercise", false) == true,
+                asksLoad = json.optBoolean("asksLoad", false),
+                loadKg = json.optDouble("loadKg", 0.0).orZero(),
+                weightedExercise = json.optString("weightedExercise"),
                 detectedLabel = json.optString("detectedLabel").ifBlank {
                     json.optJSONObject("classificationGrounding")
                         ?.optString("detectedLabel").orEmpty()

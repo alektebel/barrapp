@@ -224,6 +224,34 @@ def measure_job(job: dict, video_path: Path, on_stage=None, pose=None,
         detected = metrics.get("detected")
         if isinstance(detected, dict):
             detected["orientation"] = orientation_meta
+    # Ask for kilograms when an independent signal says the set was weighted
+    # (vision skill, upload name, recent history). Pose cannot see a belt.
+    try:
+        from barra.load import asks_load
+        det = metrics.get("detected") or {}
+        fus = det.get("fusion") or {}
+        model_cls = ((metrics.get("model") or {})
+                     .get("classification") or {})
+        load_info = asks_load(
+            exercise=metrics.get("exercise"),
+            declared=requested,
+            vision_label=fus.get("nan") or fus.get("exercise"),
+            model_exercise=model_cls.get("exercise"),
+            recent=job.get("recentMovements"),
+            locate=None,
+        )
+        metrics["asksLoad"] = load_info["asksLoad"]
+        metrics["weightedExercise"] = load_info.get("weightedExercise")
+        metrics["baseExercise"] = (load_info.get("baseExercise")
+                                   or metrics.get("exercise"))
+        metrics["loadReasons"] = load_info.get("reasons") or []
+        metrics["loadKg"] = None
+        if load_info["asksLoad"]:
+            trace.step("asks load", **{k: load_info[k] for k in
+                                       ("asksLoad", "weightedExercise",
+                                        "baseExercise", "reasons")})
+    except Exception as exc:  # noqa: BLE001 - load prompt must never fail a job
+        trace.error("asks load failed", reason=str(exc)[:160])
     _annotate_capture(metrics)
     # LLM prose is off for now: the phone keeps the deterministic Spanish
     # fallback (exercise + measured technique). Re-enable with BARRA_PROSE=1

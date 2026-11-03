@@ -316,6 +316,8 @@ private fun MainPane(
                     onReplay = clip?.let { { vm.openReplay() } },
                     onNameExercise = if (analysis.clientNamesExercise)
                         vm::nameExercise else null,
+                    onDeclareLoad = if (analysis.asksLoad) vm::declareLoad else null,
+                    suggestedLoadKg = state.goals.loadKg,
                 )
             }
 

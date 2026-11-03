@@ -639,6 +639,28 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         }
     }
 
+    /** Athlete declared added load (kg) for a weighted set. */
+    fun declareLoad(kg: Double) {
+        val jobId = _state.value.current?.id ?: return
+        if (kg <= 0.0) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { api.declareLoad(jobId, kg) }
+            }.onSuccess { job ->
+                val app = getApplication<Application>()
+                val goals = _state.value.goals.copy(loadKg = kg)
+                GoalsStore.save(app, goals)
+                _state.update { s ->
+                    s.copy(
+                        analysis = job.result ?: s.analysis,
+                        current = job,
+                        goals = goals,
+                    )
+                }
+            }
+        }
+    }
+
     /** Confirmación: la ventana que hay en el work manda. A subir. */
     fun confirmTrim(workId: String) {
         val app = getApplication<Application>()
