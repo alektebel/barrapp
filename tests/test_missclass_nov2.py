@@ -135,15 +135,18 @@ class DeviceRotation(unittest.TestCase):
         self.assertEqual(deg, 0, ev)
         self.assertEqual(list(ev.get("candidates") or []), [0, 180])
 
-    def test_weak_luma_keeps_claimed_180(self):
-        """Near-flat lighting must not flip a 180 claim (FL pull room)."""
+    def test_weak_luma_still_rejects_an_inverted_claim(self):
+        """A thin luma margin no longer keeps a 180 claim that scores inverted.
+
+        Was: trust IMU whenever claimGap < 25. That left 93ebbf6e4894 upside
+        down when sample luck flipped the sign (claimed -8.9, upright +8.9).
+        """
         import cv2
         import tempfile
         from pathlib import Path
 
         frames = []
         for _ in range(8):
-            # Almost uniform - margin well under _LUMA_MARGIN (20).
             f = np.full((120, 160, 3), 80, dtype=np.uint8)
             f[:20] = 84
             f[-20:] = 76
@@ -158,8 +161,8 @@ class DeviceRotation(unittest.TestCase):
             wri.release()
             deg, ev = resolve_device_rotation(
                 path, {"videoRotation": 180}, n_samples=4)
-        self.assertEqual(deg, 180, ev)
-        self.assertIn("margin", (ev.get("reason") or ""))
+        self.assertEqual(deg, 0, ev)
+        self.assertLess(float((ev.get("lumaScore") or {}).get("180", 0)), 0)
 
     def test_inverted_claim_is_not_kept_when_luma_disagrees(self):
         """93eb flake: claimed 180 scored negative while 0 was upright."""
