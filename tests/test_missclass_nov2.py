@@ -161,6 +161,32 @@ class DeviceRotation(unittest.TestCase):
         self.assertEqual(deg, 180, ev)
         self.assertIn("margin", (ev.get("reason") or ""))
 
+    def test_inverted_claim_is_not_kept_when_luma_disagrees(self):
+        """93eb flake: claimed 180 scored negative while 0 was upright."""
+        import cv2
+        import tempfile
+        from pathlib import Path
+
+        # File is already upright (bright top). Claiming 180 would invert it.
+        frames = []
+        for _ in range(8):
+            f = np.zeros((120, 160, 3), dtype=np.uint8)
+            f[:30] = 200
+            f[-30:] = 20
+            frames.append(f)
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "upright.mp4"
+            h, w = frames[0].shape[:2]
+            wri = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"),
+                                  5, (w, h))
+            for f in frames:
+                wri.write(f)
+            wri.release()
+            deg, ev = resolve_device_rotation(
+                path, {"videoRotation": 180}, n_samples=4)
+        self.assertEqual(deg, 0, ev)
+        self.assertLess(float((ev.get("lumaScore") or {}).get("180", 0)), 0)
+
 
 class FreeformVision(unittest.TestCase):
     def test_locate_prose_is_not_a_fusion_vote(self):

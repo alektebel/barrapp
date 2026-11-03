@@ -460,8 +460,13 @@ def resolve_device_rotation(video_path: Path | str,
     if claimed in scores:
         claim_gap = (scores[best] - scores[claimed]) / counted
         evidence["claimGap"] = round(claim_gap, 2)
+    claimed_score = (scores[claimed] / counted) if claimed in scores else None
     if (claimed in scores and claimed != best
-            and claim_gap is not None and claim_gap < _LUMA_MARGIN):
+            and claim_gap is not None and claim_gap < _LUMA_MARGIN
+            # Never keep a claimed turn whose top is darker than its floor —
+            # that is inverted, not "nearly as upright" (93ebbf6e4894 flake:
+            # claimed 180 scored -8.9 while 0 scored +8.9, margin 17 < 25).
+            and claimed_score is not None and claimed_score >= 0):
         # Claimed turn is nearly as upright as the luma winner - trust IMU.
         best = claimed
         evidence["reason"] = "claimed: luma margin too thin to override"
