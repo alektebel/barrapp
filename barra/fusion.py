@@ -133,6 +133,53 @@ def _same(a: str, b: str) -> bool:
     return bool(ca and cb and ca == cb)
 
 
+def _related(a: str, b: str) -> bool:
+    """Same label, or an unmeasured skill leaf naming a measurable parent.
+
+    `diamond_push_up` (skill only) vs `push_up` (measured) is agreement on the
+    parent. `pull_up` vs `muscle_up` are BOTH measured and must still disagree —
+    sharing an ancestor in the skill graph is not enough.
+    """
+    ca, cb = _canonical(a), _canonical(b)
+    if not ca or not cb:
+        return False
+    if ca == cb:
+        return True
+    try:
+        from .movements import MOVEMENTS
+        from .skills import ancestors
+    except Exception:  # noqa: BLE001
+        return False
+    if ca in ancestors(cb) and ca in MOVEMENTS and cb not in MOVEMENTS:
+        return True
+    if cb in ancestors(ca) and cb in MOVEMENTS and ca not in MOVEMENTS:
+        return True
+    return False
+
+
+def _prefer_related(cans: list[str]) -> str:
+    """Pick one label from a hierarchical cluster — prefer a measurable parent."""
+    unique = list(dict.fromkeys(c for c in cans if c))
+    if not unique:
+        return ""
+    if len(unique) == 1:
+        return unique[0]
+    try:
+        from .movements import MOVEMENTS
+        from .skills import ancestors
+    except Exception:  # noqa: BLE001
+        return unique[0]
+    sets = [({c} | ancestors(c)) for c in unique]
+    shared = set.intersection(*sets) if sets else set()
+    measurable = [c for c in shared if c in MOVEMENTS]
+    if measurable:
+        # Most specific measurable shared ancestor (longest requires-chain).
+        return max(measurable, key=lambda c: len(ancestors(c)))
+    if shared:
+        return max(shared, key=lambda c: len(ancestors(c)))
+    return unique[0]
+
+
 def _float(value: Any, default: float = 0.0) -> float:
     try:
         v = float(value)
@@ -179,16 +226,26 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
     # Two independent detectors naming the same movement is the strongest
     # evidence available, and it does not matter which two: the vote is
     # counted on the canonical label so `pull-up` and `pull_up` are one vote,
-    # not two detectors disagreeing.
-    votes: dict[str, list[str]] = {}
-    for who in RELIABILITY:
-        can = _canonical(said[who])
-        if can:
-            votes.setdefault(can, []).append(who)
-    agreed = [c for c, who in votes.items() if len(who) >= 2]
-    if agreed:
-        best = max(agreed, key=lambda c: len(votes[c]))
-        backers = votes[best]
+    # not two detectors disagreeing. Parent/child skill pairs (diamond_push_up
+    # vs push_up) also count as agreement on the measurable shared parent —
+    # otherwise a correct vision leaf blocks geometry's parent forever.
+    entries = [(who, _canonical(said[who])) for who in RELIABILITY]
+    entries = [(w, c) for w, c in entries if c]
+    clusters: list[list[tuple[str, str]]] = []
+    for who, can in entries:
+        placed = False
+        for cluster in clusters:
+            if any(_related(can, other) for _, other in cluster):
+                cluster.append((who, can))
+                placed = True
+                break
+        if not placed:
+            clusters.append([(who, can)])
+    agreed_clusters = [c for c in clusters if len({w for w, _ in c}) >= 2]
+    if agreed_clusters:
+        best_cluster = max(agreed_clusters, key=len)
+        best = _prefer_related([c for _, c in best_cluster])
+        backers = [w for w, _ in best_cluster]
         status = ("geometry-model-agree"
                   if set(backers) == {"geometry", "model"} else "majority")
         return answer(best, max(AGREEMENT_CONFIDENCE, m_conf if
@@ -219,8 +276,8 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
         "half_front_lever", "tuck_back_lever", "dead_hang",
     })
     _HANG_REPS = frozenset({
-        "pull_up", "chin_up", "muscle_up", "knee_raise", "inverted_curl",
-        "front_lever_pull_up", "toes_to_bar",
+        "pull_up", "chin_up", "muscle_up", "knee_raise", "front_lever_raise",
+        "inverted_curl", "front_lever_pull_up", "toes_to_bar",
     })
 
     # --- 2. no agreement: the most reliable detector that has an answer ----

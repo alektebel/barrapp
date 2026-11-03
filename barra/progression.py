@@ -113,6 +113,35 @@ LADDER: dict[str, Step] = {
         note="Toes to bar is not in the measured vocabulary yet, so barra can "
              "confirm you have earned the attempt but not score the attempt.",
     ),
+    "leg_raise": Step(
+        "toes_to_bar", "Toes to bar", reps=_std("leg_raise").reps, quality=_std("leg_raise").quality, days=_std("leg_raise").days,
+        target_measurable=False,
+        note="Measured with the hanging knee-raise profile; toes-to-bar is next.",
+    ),
+    "front_lever_raise": Step(
+        "tuck_front_lever", "Tuck front lever",
+        reps=_std("front_lever_raise").reps, quality=_std("front_lever_raise").quality,
+        days=_std("front_lever_raise").days, target_measurable=False,
+        note="The raise is the dynamic entry; the tuck hold is the next gate.",
+    ),
+    "front_lever_pull_up": Step(
+        "one_arm_front_lever", "One-arm front lever",
+        reps=_std("front_lever_pull_up").reps, quality=_std("front_lever_pull_up").quality,
+        days=_std("front_lever_pull_up").days, target_measurable=False,
+        note="Barra cannot verify a one-arm front lever from video yet.",
+    ),
+    "inverted_curl": Step(
+        "chin_up", "Chin-up",
+        reps=_std("inverted_curl").reps, quality=_std("inverted_curl").quality,
+        days=_std("inverted_curl").days, target_measurable=False,
+        note="A stronger hang curl feeds the chin-up path.",
+    ),
+    "weighted_dip": Step(
+        "ring_dip", "Ring dip",
+        reps=_std("weighted_dip").reps, quality=_std("weighted_dip").quality,
+        days=_std("weighted_dip").days, target_measurable=False,
+        note="Load is claimed by the athlete; rings are the next support skill.",
+    ),
     "squat": Step(
         "pistol_squat", "Pistol squat", reps=_std("squat").reps, quality=_std("squat").quality, days=_std("squat").days,
         target_measurable=False,

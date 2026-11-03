@@ -48,6 +48,7 @@ NOUN = {
     "push_up": ("flexión", "flexiones", True),
     "squat": ("sentadilla", "sentadillas", True),
     "knee_raise": ("elevación de rodillas", "elevaciones de rodillas", True),
+    "front_lever_raise": ("progresión de front lever", "progresiones de front lever", True),
     "front_lever": ("front lever", "front levers", False),
     "planche": ("plancha", "planchas", True),
     "pistol_squat": ("sentadilla pistol", "sentadillas pistol", True),

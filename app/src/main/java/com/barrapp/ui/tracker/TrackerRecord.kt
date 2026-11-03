@@ -71,6 +71,7 @@ data class ResultsData(
     val xp: Int,
     /** null when there is no earlier training to compare against. */
     val aboveAverage: Boolean?,
+    val jobId: String? = null,
 )
 
 data class LastAnalyzed(val movement: String, val meta: String, val score: Int?)
@@ -359,6 +360,7 @@ private fun ResultsPhase(results: ResultsData, onDone: () -> Unit) {
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         SlideUp {
+            JobIdTag(results.jobId)
             TkCard(accent = true) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     ScoreRing(results.score, size = 72.dp, stroke = 6.dp)

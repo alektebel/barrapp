@@ -72,6 +72,7 @@ fun ReplayScreen(
     clip: java.io.File?,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    jobId: String? = null,
 ) {
     Column(modifier.fillMaxSize()) {
         Row(
@@ -81,6 +82,7 @@ fun ReplayScreen(
             TextButton(onClick = onBack) { Text("Back") }
             Spacer(Modifier.size(6.dp))
             Column(Modifier.weight(1f)) {
+                com.barrapp.ui.tracker.JobIdTag(jobId)
                 Text("Video review", style = MaterialTheme.typography.titleMedium)
                 Text(
                     analysis?.detected?.label?.replace('_', ' ')

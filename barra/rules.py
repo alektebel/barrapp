@@ -238,10 +238,12 @@ RULES: dict[str, tuple[Rule, ...]] = {
            T.straight_arm,
            "the median elbow angle in the support window before lowering",
            "Lock out fully at the top of every rep"),
-        _r("dip", "excessive_depth", "too deep", "turnaround", "bottom_elbow_deg",
-           "<", T.dip_bottom_deg,
-           "the median elbow angle in the turnaround window at the bottom",
-           "Stop at ninety degrees - deeper is shoulder, not chest"),
+        _r("dip", "excessive_depth", "too deep", "turnaround",
+           "dip_shoulder_below_elbow", ">", T.dip_shoulder_below_elbow,
+           "how far the shoulders sit below the elbows at the bottom, in "
+           "torso-lengths (height difference; camera yaw does not distort it)",
+           "Stop when the shoulders meet the elbows - deeper is shoulder, "
+           "not chest"),
         _r("dip", "bounce", "bounce at bottom", "turnaround", "turn_speed", ">",
            T.bounce_speed,
            "the slowest speed of the tracked point through the turnaround, in "

@@ -153,6 +153,8 @@ private val MOVEMENTS_ES = mapOf(
     "squat" to "Sentadilla",
     "pistol_squat" to "Pistol squat",
     "knee_raise" to "Elevación de rodillas",
+    "front_lever_raise" to "Progresión de front lever",
+    "front_lever_pull_up" to "Front lever pull-up",
     "toes_to_bar" to "Toes to bar",
     "l_sit" to "L-Sit",
     "handstand" to "Pino",

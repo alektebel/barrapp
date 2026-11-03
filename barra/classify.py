@@ -664,27 +664,19 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                            and f["ankle_window_seen"] >= MIN_SEEN)
             ankle_seen_ok = (f.get("ankle_seen") is not None
                              and f["ankle_seen"] >= MIN_SEEN)
-            if not planted and not ankle_known and not ankle_seen_ok:
-                tr.reject(
-                    "dip/squat",
-                    "hands fixed, body below them, but the feet were never seen",
-                    body_below_hands=below, planted=planted,
-                    ankle_window_seen=f.get("ankle_window_seen"),
-                    ankle_seen=f.get("ankle_seen"))
-                return Classification(
-                    "unknown", 0.0,
-                    f"hands fixed below the shoulders with {below:.0%} of the body "
-                    "below them, but the feet were never clearly seen - this is a "
-                    "dip (feet hanging) or a squat with the feet out of frame, and "
-                    "a dip is not justified",
-                    f, runner_up="squat",
-                )
+            # Weighted dips often hide the ankles behind a belt/plate. Once
+            # body_below_hands already cleared BELOW_HANDS_DIP and nothing is
+            # planted, accept dip from that geometry rather than abstaining.
+            ankles_occluded = not planted and not ankle_known and not ankle_seen_ok
             tr.decision("dip", "the legs hang below the hands",
-                        body_below_hands=below, dip_threshold=BELOW_HANDS_DIP)
+                        body_below_hands=below, dip_threshold=BELOW_HANDS_DIP,
+                        ankles_occluded=ankles_occluded)
             return Classification(
-                "dip", 0.78,
+                "dip", 0.70 if ankles_occluded else 0.78,
                 f"hands fixed below the shoulders, with {below:.0%} of the body "
-                "hanging below them - the legs are off the ground",
+                "hanging below them - the legs are off the ground"
+                + (" (ankles occluded; dip accepted from body/hand geometry)"
+                   if ankles_occluded else ""),
                 f, runner_up="push_up",
             )
         tr.decision("push_up", "nothing hangs below the hands, so they are on the floor",
@@ -745,6 +737,31 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     if (anchored and hanging and hang_oh >= 0.35
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
             and (knees_drive or legs_held_up) and not fl_pull_shape):
+        # Near-horizontal torso + knees cycling is a front-lever raise
+        # progression (f415, 71b4 on the dip station), not a vertical hanging
+        # knee raise. Sideways hanging clips can also read a high body_line —
+        # demand both tilt and a real horizontal share so 31e6-style hangs
+        # stay knee_raise.
+        fl_raise_shape = (
+            np.isfinite(f.get("torso_tilt")) and float(f["torso_tilt"]) >= 55.0
+            and np.isfinite(f.get("horizontal_frac"))
+            and float(f["horizontal_frac"]) >= 0.35
+        )
+        if fl_raise_shape:
+            tr.decision("front_lever_raise",
+                        "torso near horizontal while the knees cycle above the hips",
+                        knee_over_hip=f["knee_over_hip"], knees_up_threshold=KNEES_UP,
+                        torso_tilt=f.get("torso_tilt"), horizontal_frac=f.get("horizontal_frac"),
+                        knee_excursion=f["knee_excursion"],
+                        legs_lifted_frac=f.get("legs_lifted_frac"),
+                        confidence=0.78)
+            return Classification(
+                "front_lever_raise", 0.78,
+                f"torso near horizontal ({float(f['torso_tilt']):.0f}°) with the "
+                f"knees carried {f['knee_over_hip']:.2f} torso-lengths above the "
+                "hips - a front-lever raise progression",
+                f, runner_up="front_lever_pull_up",
+            )
         tr.decision("knee_raise", "the knees are carried above the hips, and travel "
                     "further than the shoulders do",
                     knee_over_hip=f["knee_over_hip"], knees_up_threshold=KNEES_UP,
@@ -873,16 +890,48 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 "torso-lengths relative to the hands - not a set of pull-ups",
                 f, runner_up="pull_up",
             )
+        # Affirmative pull-up: clear hanging legs are strongest. A tuck / L
+        # band (48c51560c95c: knee_over_hip≈0.06, legs_lifted≈0.54) used to
+        # hard-abstain after the morning run of the same clip returned pull_up
+        # 8 — grade confidence instead of inventing "unknown".
+        knee_oh = float(f["knee_over_hip"]) if np.isfinite(f.get("knee_over_hip")) else 0.0
+        legs_lift = (float(f["legs_lifted_frac"])
+                     if np.isfinite(f.get("legs_lifted_frac")) else 0.0)
+        legs_clearly_hanging = knee_oh < 0.05 and legs_lift < 0.35
+        legs_tucked_band = knee_oh < 0.25 and legs_lift < 0.70
+        if not legs_clearly_hanging and not legs_tucked_band:
+            tr.reject("pull_up", "hang without hanging legs - not an affirmed pull-up",
+                      peak_above_hands=peak,
+                      knee_over_hip=f.get("knee_over_hip"),
+                      legs_lifted_frac=f.get("legs_lifted_frac"))
+            return Classification(
+                "unknown", 0.0,
+                "hanging from a fixed bar without a clear hanging-leg pull "
+                "pattern - name the movement rather than guess pull-up",
+                f, runner_up="pull_up",
+            )
         margin = min(1.0, (OVER_BAR - peak) / 0.35) if peak < OVER_BAR else 0.55
+        conf = 0.70 + 0.25 * margin
+        if not legs_clearly_hanging:
+            # Tuck / lightly lifted legs: still a pull, lower confidence.
+            conf = min(conf, 0.62)
+            why_legs = "with the legs partly tucked"
+            runner = "front_lever_pull_up"
+        else:
+            why_legs = "with the legs hanging"
+            runner = "muscle_up"
         tr.decision("pull_up", "the shoulders never rise above the hands",
                     peak_above_hands=peak, over_bar_threshold=OVER_BAR,
                     shoulder_above_hands_p05=f.get("shoulder_above_hands_p05"),
-                    confidence=0.70 + 0.25 * margin)
+                    knee_over_hip=f.get("knee_over_hip"),
+                    legs_lifted_frac=f.get("legs_lifted_frac"),
+                    legs_clearly_hanging=legs_clearly_hanging,
+                    confidence=conf)
         return Classification(
-            "pull_up", 0.70 + 0.25 * margin,
-            f"hanging from a fixed bar, and the shoulders never rise above the "
-            f"hands (peak {peak:+.2f} torso-lengths)",
-            f, runner_up="muscle_up",
+            "pull_up", conf,
+            f"hanging from a fixed bar {why_legs}, and the shoulders "
+            f"never rise above the hands (peak {peak:+.2f} torso-lengths)",
+            f, runner_up=runner,
         )
 
     # A pistol is a single-leg squat: one ankle planted under the hips, the
@@ -1001,6 +1050,7 @@ HUMAN = {
     "push_up": "Push-up",
     "squat": "Squat",
     "knee_raise": "Hanging knee raise",
+    "front_lever_raise": "Front lever raise",
     "front_lever": "Front lever",
     "front_lever_pull_up": "Front lever pull-up",
     "inverted_curl": "Inverted curl",

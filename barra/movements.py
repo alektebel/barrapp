@@ -67,6 +67,17 @@ KNEE_RAISE = Movement(
              "hanging_knee_raise", "hanging_leg_raise", "hanging-leg-raise",
              "toes_to_bar", "toes-to-bar", "ttb"),
 )
+# Front-lever raise progression: torso near horizontal while the knees/hips
+# cycle (f415, 71b4 on the dip station). Same knees-toward-bar counter as a
+# hanging knee raise; not the isometric front_lever hold and not a lying
+# floor leg raise.
+FRONT_LEVER_RAISE = Movement(
+    name="front_lever_raise", origin="wrist", direction="ascending",
+    signal="knees_toward_bar", min_rep_s=0.7, turn_label="knees up",
+    aliases=("front-lever-raise", "front_lever_raises", "fl_raise",
+             "lying-leg-raise", "lying_leg_raise", "inverted_leg_raise",
+             "inverted_hanging_leg_raise"),
+)
 DIP = Movement(
     name="dip", origin="wrist", direction="descending", signal="shoulder_above_bar",
     min_rep_s=0.6, turn_label="bottom",
@@ -144,7 +155,7 @@ BULGARIAN_SPLIT_SQUAT = Movement(
 )
 
 MOVEMENTS = {m.name: m for m in (
-    SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP,
+    SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, FRONT_LEVER_RAISE, DIP, PUSH_UP,
     FRONT_LEVER, PLANCHE, PISTOL_SQUAT, SPLIT_SQUAT, BULGARIAN_SPLIT_SQUAT,
     INVERTED_CURL, FRONT_LEVER_PULL,
 )}
@@ -178,6 +189,13 @@ _FREE_TEXT = {
     "elevación de rodillas": "knee_raise",
     "leg raise": "knee_raise",
     "leg raise en paralelas": "knee_raise",
+    "lying leg raise": "front_lever_raise",
+    "elevacion de piernas tumbado": "front_lever_raise",
+    "elevación de piernas tumbado": "front_lever_raise",
+    "inverted leg raise": "front_lever_raise",
+    "front lever raise": "front_lever_raise",
+    "progresion de front lever": "front_lever_raise",
+    "progresión de front lever": "front_lever_raise",
     "front lever pull": "front_lever_pull_up",
     "front lever pull up": "front_lever_pull_up",
     "front lever pull-up": "front_lever_pull_up",

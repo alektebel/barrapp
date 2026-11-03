@@ -152,7 +152,23 @@ class Handler(BaseHTTPRequestHandler):
             return self._send(400, {"error": "invalid json"})
 
         if path == "/v1/jobs":
-            job_id = uuid.uuid4().hex[:12]
+            from barra.job_id import job_id_for, normalize_content_hash
+
+            content_hash = normalize_content_hash(body.get("contentHash"))
+            if body.get("contentHash") and content_hash is None:
+                return self._send(400, {
+                    "error": "contentHash must be a 64-character sha256 hex digest",
+                })
+            replacing = False
+            if content_hash:
+                job_id = job_id_for(owner, content_hash)
+                with LOCK:
+                    existing = JOBS.get(job_id)
+                if existing and existing.get("owner") != owner:
+                    return self._send(409, {"error": "job id collision"})
+                replacing = bool(existing and existing.get("owner") == owner)
+            else:
+                job_id = uuid.uuid4().hex[:12]
             job = {
                 "id": job_id,
                 "owner": owner,
@@ -171,15 +187,21 @@ class Handler(BaseHTTPRequestHandler):
                 "result": None,
                 "error": None,
             }
-            allowed, credits = referral.charge(REFERRALS, owner)
-            if not allowed:
-                return self._send(402, {
-                    "error": "no measurements left - invite a friend to earn more",
-                    "credits": credits,
-                })
+            if content_hash:
+                job["contentHash"] = content_hash
+            if not replacing:
+                allowed, credits = referral.charge(REFERRALS, owner)
+                if not allowed:
+                    return self._send(402, {
+                        "error": "no measurements left - invite a friend to earn more",
+                        "credits": credits,
+                    })
             with LOCK:
                 JOBS[job_id] = job
-            return self._send(201, _dump(job))
+            out = _dump(job)
+            if replacing:
+                out["replaced"] = True
+            return self._send(201, out)
         if path == "/v1/chat":
             from chat import chat
 

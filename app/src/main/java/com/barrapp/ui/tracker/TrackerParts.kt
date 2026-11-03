@@ -1,5 +1,9 @@
 package com.barrapp.ui.tracker
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -8,9 +12,11 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -41,10 +47,13 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.barrapp.ui.theme.T
 import com.barrapp.ui.theme.Tk
 import com.barrapp.ui.theme.scoreInk
@@ -103,6 +112,44 @@ fun Eyebrow(
     modifier: Modifier = Modifier,
     style: TextStyle = T.eyebrow,
 ) = Text(text.uppercase(), style = style, modifier = modifier)
+
+/**
+ * Light-gray job id above a video/session card so clips can be referenced by
+ * the first hex digits (`#a038d832f870`). Long-press copies the full id.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+fun JobIdTag(
+    id: String?,
+    modifier: Modifier = Modifier,
+) {
+    val trimmed = id?.trim().orEmpty()
+    if (trimmed.isEmpty()) return
+    val context = LocalContext.current
+    val label = if (trimmed.startsWith("#")) trimmed.lowercase() else "#${trimmed.lowercase()}"
+    Text(
+        text = label,
+        style = TextStyle(
+            color = Tk.muted.copy(alpha = 0.7f),
+            fontSize = 10.sp,
+            fontFamily = FontFamily.Monospace,
+            letterSpacing = 0.4.sp,
+        ),
+        modifier = modifier
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = {},
+                onLongClick = {
+                    val cm = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                        as? ClipboardManager
+                    cm?.setPrimaryClip(ClipData.newPlainText("barrapp job id", trimmed))
+                    Toast.makeText(context, "Id copiado", Toast.LENGTH_SHORT).show()
+                },
+            )
+            .padding(bottom = 4.dp),
+    )
+}
 
 /** `h-1.5 rounded-full` with a `#2a2a44` track, animating from zero the way
  *  the design's `transition-all duration-1000` does. */

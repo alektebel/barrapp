@@ -46,15 +46,17 @@ class TestTheGraphIsSound(unittest.TestCase):
 
 
 class TestMeasuredStaysSmallAndExplicit(unittest.TestCase):
-    def test_only_the_six_barra_can_verify_are_marked_measurable(self):
+    def test_measured_skills_are_an_explicit_allowlist(self):
         """If this ever grows silently, the graph has started claiming the app
         can see things it cannot."""
-        self.assertEqual(set(MEASURED),
-                         {"push_up", "dip", "pull_up", "muscle_up",
-                          "knee_raise", "squat"})
+        self.assertEqual(set(MEASURED), {
+            "push_up", "dip", "weighted_dip", "pull_up", "muscle_up",
+            "knee_raise", "leg_raise", "front_lever_raise",
+            "front_lever_pull_up", "inverted_curl", "squat",
+        })
 
     def test_most_of_the_graph_is_not_measurable(self):
-        self.assertLess(len(MEASURED) / len(SKILLS), 0.15)
+        self.assertLess(len(MEASURED) / len(SKILLS), 0.20)
 
     def test_a_standard_exists_exactly_where_it_can_be_judged(self):
         for skill in SKILLS.values():

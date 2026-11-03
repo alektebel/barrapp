@@ -46,6 +46,8 @@ data class LastSessionData(
     val rows: List<SessionRowData>,
     /** The fault the day showed most, and how many reps showed it. */
     val topFault: Pair<String, Int>?,
+    /** Latest job id for the day, shown as `#xxxxxxxxxxxx`. */
+    val jobId: String? = null,
 )
 
 data class HomeData(
@@ -286,6 +288,7 @@ private fun LastSessionCard(
         return
     }
     TkCard(modifier = Modifier.noRipple(onOpenSession)) {
+        JobIdTag(session.jobId)
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f)) {
                 Eyebrow("Última sesión")

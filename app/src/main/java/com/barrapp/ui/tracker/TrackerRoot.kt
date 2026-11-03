@@ -175,7 +175,9 @@ fun TrackerRoot(
                             },
                             stages = stages,
                             activeStage = active,
-                            results = state.analysis?.let { resultsData(it, state.days) },
+                            results = state.analysis?.let {
+                                resultsData(it, state.days, state.current?.id)
+                            },
                             lastAnalyzed = lastAnalyzed(state.days),
                             standard = standard,
                             camera = camera,
@@ -279,6 +281,7 @@ private fun SessionSheet(
         "unmeasured" -> "Sin medir." to "Barra no pudo puntuar esta serie."
         else -> "Serie sólida." to "Corrige el estancamiento."
     }
+    JobIdTag(state.current?.id)
     SessionScreen(
         eyebrow = "${shortDate(a.sessionDate)} · ${movementEs(a.exercise)}",
         verdict = "$l1\n$l2",
@@ -331,7 +334,7 @@ private fun SessionSheet(
     )
     // What to fix first, then the server's own account - which, on a clip
     // with nothing counted, is the only place the athlete learns why.
-    val summary = resultsData(a, state.days)
+    val summary = resultsData(a, state.days, state.current?.id)
     androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 16.dp))
     if (a.repCount > 0) {
         com.barrapp.ui.tracker.FixesCard(summary.fixes)
@@ -470,6 +473,7 @@ private fun homeData(state: UiState): HomeData {
                 topFault = state.faults[day.date]
                     ?.maxByOrNull { it.value }
                     ?.let { faultEs(it.key) to it.value },
+                jobId = day.jobIds.lastOrNull(),
             )
         },
         badges = Gamification.badges(days, focus),
@@ -494,7 +498,7 @@ private fun stagesFor(state: UiState): Pair<List<String>, Int> {
     return stages to idx
 }
 
-private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
+private fun resultsData(a: Analysis, days: List<DayEntry>, jobId: String? = null): ResultsData {
     val priorScores = days.filter { it.date != a.sessionDate }.mapNotNull { it.score }
     val priorMean = priorScores.takeIf { it.isNotEmpty() }?.average()
     val verifiedXp = a.reps.count { it.score != null && it.complete }
@@ -524,6 +528,7 @@ private fun resultsData(a: Analysis, days: List<DayEntry>): ResultsData {
         // screen totals: never a round number picked to look generous.
         xp = verifiedXp * ((a.sessionScore ?: 0) / 5) + 50,
         aboveAverage = priorMean?.let { (a.sessionScore ?: 0) >= it },
+        jobId = jobId,
     )
 }
 

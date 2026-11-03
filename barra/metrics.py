@@ -218,6 +218,11 @@ def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
 
     peak = float(np.nanmax(above)) if n else np.nan
     begin = float(above[0]) if n else np.nan
+    bottom = float(np.nanmin(above)) if n else np.nan
+    # Descending movements (dip, push-up) start at the top, so peak - begin ≈ 0
+    # and the range score was meaningless on every rep. Amplitude is always
+    # max − min of the shoulder-above series inside the rep.
+    amp = (peak - bottom) if (np.isfinite(peak) and np.isfinite(bottom)) else float("nan")
 
     # Transition: time the shoulders spend crossing the plane of the bar during
     # the lift. On a muscle-up this is the part that fails, and it is pure
@@ -243,7 +248,7 @@ def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
 
     # Time spent near lockout, as a fraction of the rep's own amplitude, so a
     # shallow rep is not credited with a long hold.
-    hold_gate = begin + 0.85 * (peak - begin) if np.isfinite(peak) else np.inf
+    hold_gate = (bottom + 0.85 * amp) if np.isfinite(amp) else np.inf
     top_hold_s = float((above >= hold_gate).sum()) / fps
 
     concentric_s = max(phases["lifting"].frames - 1, 1) / fps
@@ -263,7 +268,7 @@ def rep_metrics(kp: np.ndarray, start: int, turn: int, end: int, fps: float,
         "tempo_ratio": eccentric_s / concentric_s,
         "transition_s": transition_s,
         "top_hold_s": top_hold_s,
-        "rom": peak - begin,
+        "rom": amp,
         "peak_height": peak,
         "start_depth": -begin,          # positive = started from a deeper hang
         "shoulder_asymmetry": float(np.median(tilt_up)) if tilt_up.size else np.nan,

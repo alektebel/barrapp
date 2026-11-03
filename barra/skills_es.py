@@ -61,6 +61,7 @@ NAME_ES = {
     "plank": "Plancha abdominal",
     "hollow_hold": "Hollow hold",
     "knee_raise": "Elevación de rodillas colgado",
+    "front_lever_raise": "Progresión de front lever",
     "leg_raise": "Elevación de piernas colgado",
     "toes_to_bar": "Pies a la barra",
     "l_sit": "L-sit",

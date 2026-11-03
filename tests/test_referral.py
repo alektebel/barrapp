@@ -242,6 +242,29 @@ class TestLocalReferral(unittest.TestCase):
                                   device=device)
             self.assertEqual(status, 201)
 
+    def test_same_content_hash_replaces_prior_job(self):
+        import hashlib
+        device = "dev-hash"
+        digest = hashlib.sha256(b"same-clip-bytes").hexdigest()
+        status, first = self._req(
+            "POST", "/v1/jobs",
+            {"exercise": "auto", "contentHash": digest},
+            device=device,
+        )
+        self.assertEqual(status, 201)
+        status, second = self._req(
+            "POST", "/v1/jobs",
+            {"exercise": "auto", "contentHash": digest},
+            device=device,
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(first["id"], second["id"])
+        self.assertTrue(second.get("replaced"))
+        # One row for this hash — not two jobs for the same bytes.
+        owned = [j for j in self.mod.JOBS.values()
+                 if j.get("contentHash") == digest]
+        self.assertEqual(len(owned), 1)
+
 
 if __name__ == "__main__":
     unittest.main()

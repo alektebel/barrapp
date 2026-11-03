@@ -76,6 +76,9 @@ private fun WorkRow(
             Column(Modifier.weight(1f).clickable(enabled = work.log.isNotEmpty()) {
                 onOpenLog(work.id)
             }) {
+                if (work.jobId.isNotBlank()) {
+                    com.barrapp.ui.tracker.JobIdTag(work.jobId)
+                }
                 Text(
                     work.exercise.ifBlank {
                         "Clip · " + stamp.format(Date(work.createdAt))

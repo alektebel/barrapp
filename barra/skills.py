@@ -154,7 +154,12 @@ SKILLS: dict[str, Skill] = {s.id: s for s in [
     _s("manna", "Manna", CORE, ["v_sit"]),
 
     # -- front lever chain ----------------------------------------------
-    _s("tuck_front_lever", "Tuck front lever", CORE, ["pull_up", "hollow_hold"]),
+    _s("front_lever_raise", "Front lever raise", CORE,
+       ["pull_up", "hollow_hold"],
+       measurable=True, standard=Standard(8),
+       note="Dynamic raise toward a front lever; knees-toward-bar on a near-horizontal torso."),
+    _s("tuck_front_lever", "Tuck front lever", CORE,
+       ["pull_up", "hollow_hold", "front_lever_raise"]),
     _s("adv_tuck_front_lever", "Advanced tuck front lever", CORE,
        ["tuck_front_lever"]),
     _s("straddle_front_lever", "Straddle front lever", CORE,

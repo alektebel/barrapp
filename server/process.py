@@ -733,8 +733,50 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             backend=pose_backend)
     sentinel.watch(tr, "pose", {"keypoints": pose.keypoints},
                    inputs={"backend": pose_backend, "fps": float(fps)}, fps=fps)
+
+    # Stage 1: locate the working set BEFORE classify/count/faults so prep
+    # (walk-in, idle hang, belt) cannot become a pull-up.
+    _stage("finding the working set")
+    working_set_info = None
+    kp_measure = pose.keypoints
+    ws_offset = 0
+    try:
+        from barra.working_set import find_working_set
+        ws = find_working_set(pose.keypoints, fps)
+        working_set_info = ws.as_dict(fps)
+        tr.step("working set", **working_set_info)
+        if ws.confidence >= 0.35 and ws.source != "whole-clip":
+            ws_offset = int(ws.start)
+            kp_measure = pose.keypoints[ws.start:ws.end + 1]
+            if len(kp_measure) < 8:
+                kp_measure = pose.keypoints
+                ws_offset = 0
+                working_set_info["applied"] = False
+            else:
+                working_set_info["applied"] = True
+        else:
+            working_set_info["applied"] = False
+    except Exception as exc:  # noqa: BLE001 - fall back to whole clip
+        tr.error("working set failed", reason=str(exc)[:200])
+        working_set_info = {"source": "whole-clip", "confidence": 0.0,
+                            "applied": False, "error": str(exc)[:120]}
+
     _stage("recognising the movement")
-    detection = classify(pose.keypoints, tr, fps=fps)
+    detection = classify(kp_measure, tr, fps=fps)
+    # Working-set crop can leave a walk-in / rest window that classifies as
+    # unknown (f415/fd29 after a harsh amp gate). Fall back to the full clip
+    # rather than ask the athlete to name a movement we already saw before.
+    if (detection.exercise in (None, "", "unknown")
+            and working_set_info and working_set_info.get("applied")
+            and ws_offset != 0):
+        tr.step("working set classify unknown - retrying whole clip",
+                croppedExercise=detection.exercise,
+                croppedReason=(detection.reason or "")[:160])
+        detection = classify(pose.keypoints, tr, fps=fps)
+        kp_measure = pose.keypoints
+        ws_offset = 0
+        working_set_info["applied"] = False
+        working_set_info["fallback"] = "whole-clip-after-unknown"
     detected = {
         "exercise": detection.exercise,
         "label": HUMAN.get(detection.exercise, detection.exercise),
@@ -900,15 +942,20 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
                              variant=variant_info)
 
     _stage("finding the reps")
-    found, reasons = segment_reps_verbose(pose.keypoints, fps, movement, trace=tr)
+    found_local, reasons = segment_reps_verbose(kp_measure, fps, movement, trace=tr)
+    found = [(a + ws_offset, b + ws_offset, c + ws_offset)
+             for a, b, c in found_local]
     sentinel.watch(tr, "segments", {"found": found, "blockers": reasons},
-                   subject=found, n_frames=int(len(pose.keypoints)),
-                   inputs={"movement": movement.name, "fps": float(fps)})
+                   subject=found, n_frames=int(len(kp_measure)),
+                   inputs={"movement": movement.name, "fps": float(fps),
+                           "wsOffset": ws_offset})
     rescued = False
     if not found:
         from barra.ingest import rescue_reps
         _stage("trying the relaxed pass")
-        found, rescue_note = rescue_reps(pose.keypoints, fps, movement, trace=tr)
+        found_local, rescue_note = rescue_reps(kp_measure, fps, movement, trace=tr)
+        found = [(a + ws_offset, b + ws_offset, c + ws_offset)
+                 for a, b, c in found_local]
         if found:
             rescued = True
             reasons = [
@@ -1135,11 +1182,15 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
     if usable < 3:
         note += " — need 3 for a session median"
 
-    # The trim the phone plays back: from the first rep's start to the last
-    # rep's end, with a little air either side. Everything outside it is the
-    # walk to the bar and the walk away, which is not the exercise.
+    # The trim the phone plays back. Prefer the working-set window when it
+    # was applied; otherwise the first-to-last rep span with a little air.
     trim = None
-    if found:
+    if working_set_info and working_set_info.get("applied"):
+        trim = {
+            "startS": float(working_set_info["startS"]),
+            "endS": float(working_set_info["endS"]),
+        }
+    elif found:
         pad = 0.6
         first, last = found[0][0], found[-1][2]
         trim = {
@@ -1254,6 +1305,7 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "fps": round(float(fps), 3),
         "duration_s": round(float(info.get("duration_s") or 0), 2),
         "trim": trim,
+        "workingSet": working_set_info,
         "session": session,
         "sessionScore": session_score,
         "sessionBand": qband(session_score),

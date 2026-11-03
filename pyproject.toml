@@ -19,9 +19,11 @@ dependencies = [
 # dependency and is opt-in. Pick exactly one:
 #   uv pip install -e ".[mediapipe]"     # CPU, fast, 33-kpt BlazePose
 #   uv pip install -e ".[ultralytics]"   # CPU/GPU, 17-kpt COCO, YOLO-pose
+#   uv pip install -e ".[libreyolo]"     # MIT alt: EdgeCrafter / HRNet pose
 [project.optional-dependencies]
 mediapipe = ["mediapipe>=0.10"]
 ultralytics = ["ultralytics>=8.3"]
+libreyolo = ["libreyolo[rfdetr]>=1.0"]
 astra = ["astrapy>=2.0"]
 
 [project.scripts]

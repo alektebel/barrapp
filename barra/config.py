@@ -146,7 +146,13 @@ class Thresholds:
     hip_sag: float = 0.12              # hip off the shoulder-ankle line, torso
 
     # -- dip -----------------------------------------------------------------
-    dip_bottom_deg: float = 90.0       # elbow angle at the bottom, below = too deep
+    # Legacy 2D elbow angle. Kept as a sagittal-only secondary check; oblique
+    # views foreshorten it (a988: 86-90° read as "too deep"). Prefer
+    # dip_shoulder_below_elbow (height, rotation-stable).
+    dip_bottom_deg: float = 80.0       # elbow angle at bottom; only from sagittal
+    # Shoulder clearly below elbow at the bottom, in torso lengths. ≈0 is
+    # parallel; > this is excessive depth.
+    dip_shoulder_below_elbow: float = 0.15
     bounce_speed: float = 0.15         # torso/s at the turnaround, above = bounced
 
     # -- pull-up -------------------------------------------------------------

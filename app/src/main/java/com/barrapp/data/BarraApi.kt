@@ -33,12 +33,20 @@ class BarraApi(context: Context) {
      * and an unknown word comes back as `unspecified` with the word beside it
      * rather than switching on the wrong fault taxonomy.
      */
-    fun createJob(exercise: String, variant: String? = null, view: String? = null): CreatedJob {
+    fun createJob(
+        exercise: String,
+        variant: String? = null,
+        view: String? = null,
+        contentHash: String? = null,
+    ): CreatedJob {
         val body = JSONObject()
             .put("exercise", exercise)
             .apply {
                 variant?.takeIf { it.isNotBlank() }?.let { put("variant", it) }
                 view?.takeIf { it.isNotBlank() }?.let { put("view", it) }
+                // SHA-256 of the bytes about to upload. Same hash → same job
+                // id on the server, so a re-upload replaces the prior result.
+                contentHash?.takeIf { it.isNotBlank() }?.let { put("contentHash", it) }
             }
             .toString()
             .toRequestBody(JSON)

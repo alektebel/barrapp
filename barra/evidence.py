@@ -305,8 +305,11 @@ PRIMITIVES: dict[str, tuple[str, str, str]] = {
     "turn_speed": (SCALED, "", "torso/s"),
     # joint angles
     "start_elbow_deg": (SCALED, "", "deg"),
-    "bottom_elbow_deg": (SCALED, "", "deg"),
+    # 2D elbow angle foreshortens in oblique views — planar/sagittal only.
+    "bottom_elbow_deg": (PLANAR, "sagittal", "deg"),
     "top_elbow_deg": (SCALED, "", "deg"),
+    # Height difference: positive => shoulder below elbow. Rotation-stable.
+    "dip_shoulder_below_elbow": (SCALED, "", "torso"),
     "arms_straight_frac": (SCALED, "", ""),
     "legs_straight_frac": (SCALED, "", ""),
     "body_line_deg": (SCALED, "", "deg"),
@@ -648,6 +651,24 @@ def rep_evidence(metrics: dict, arm: float, signal, start: int, turn: int,
     _angle_at("bottom_elbow_deg", elbow,
               "turnaround" if "turnaround" in ph else "setup")
     _angle_at("top_elbow_deg", elbow, "support")
+
+    # Dip depth via shoulder-vs-elbow height at the turnaround. Image y grows
+    # downward, so (shoulder_y - elbow_y)/torso > 0 means the shoulder is
+    # below the elbow. Unlike bottom_elbow_deg this is not foreshortened by
+    # camera yaw.
+    turn_name = "turnaround" if "turnaround" in ph else "setup"
+    turn_p = ph[turn_name]
+    sh_m = midpoint(kp, "left_shoulder", "right_shoulder")[turn_p.as_slice()]
+    el_m = midpoint(kp, "left_elbow", "right_elbow")[turn_p.as_slice()]
+    sh_el_conf = np.minimum(
+        pair_confidence(kp, "left_shoulder", "right_shoulder")[turn_p.as_slice()],
+        pair_confidence(kp, "left_elbow", "right_elbow")[turn_p.as_slice()],
+    )
+    sh_el_ok = sh_el_conf >= MIN_CONF
+    sh_below = np.where(sh_el_ok, (sh_m[:, 1] - el_m[:, 1]) / torso, np.nan)
+    ev.add("dip_shoulder_below_elbow", _med(sh_below), SCALED, "", "torso",
+           phase=turn_name, window=(turn_p.start, turn_p.end),
+           coverage=_coverage(sh_below))
     ev.add("arms_straight_frac", _frac_at_least(elbow[seg], THRESHOLDS.straight_arm),
            phase="rep", window=rep_w, coverage=_coverage(elbow[seg]))
     ev.add("legs_straight_frac", _frac_at_least(knee[seg], THRESHOLDS.straight_leg),

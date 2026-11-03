@@ -8,7 +8,7 @@ Roles (measurement stays geometric — keypoints in, numbers out):
 * **Tree vote (`name_movement`)** — walks `barra/movement_tree` for the
   fusion label. Kept on the primary path because a constrained skill id
   lifts fusion accuracy without inventing out-of-taxonomy strings; late
-  votes are skipped (BARRA_VISION_VOTE_WAIT_S) so they cannot block speed.
+  votes wait up to BARRA_VISION_VOTE_WAIT_S (default 25) then fuse without them.
 * **Count** — **fallback only** when geometry finds zero reps
   (`countedBy: vision-fallback`; off with BARRA_VISION_COUNT=0). Never sets
   tempos, fatigue or session score.

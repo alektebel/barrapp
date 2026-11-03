@@ -39,6 +39,14 @@ class Aliases(unittest.TestCase):
         self.assertEqual(resolve("hanging_leg_raise").name, "knee_raise")
         self.assertEqual(resolve("leg_raise").name, "knee_raise")
 
+    def test_front_lever_raise_has_its_own_profile(self):
+        self.assertEqual(resolve("front_lever_raise").name, "front_lever_raise")
+        self.assertEqual(normalize_free_name("front lever raise"), "front_lever_raise")
+        self.assertEqual(normalize_free_name("progresión de front lever"),
+                         "front_lever_raise")
+        # Legacy free-text still maps onto the FL raise profile.
+        self.assertEqual(normalize_free_name("lying leg raise"), "front_lever_raise")
+
     def test_inverted_curl_and_fl_pull_have_profiles(self):
         self.assertEqual(resolve("inverted_curl").name, "inverted_curl")
         self.assertEqual(resolve("front_lever_pull_up").name, "front_lever_pull_up")
@@ -219,6 +227,21 @@ class Naming(unittest.TestCase):
     def test_ordinary_pull_up_still_wins(self):
         c = classify(bar_clip(clearance=-0.25))
         self.assertEqual(c.exercise, "pull_up", c.reason)
+
+    def test_tucked_leg_pull_is_still_pull_up(self):
+        """48c5 shape: knee_over_hip≈0.06, legs_lifted≈0.54 — not unknown."""
+        kp = bar_clip(clearance=-0.25)
+        # Tuck the knees up toward the hips without reaching FL-pull lift.
+        for f in range(len(kp)):
+            hip_y = float(np.mean(kp[f, [11, 12], 1]))
+            # Knees slightly above hips → knee_over_hip ~0.08 torso.
+            kp[f, 13, 1] = hip_y - 10
+            kp[f, 14, 1] = hip_y - 10
+            kp[f, 15, 1] = hip_y + 40
+            kp[f, 16, 1] = hip_y + 40
+        c = classify(kp)
+        self.assertEqual(c.exercise, "pull_up", c.reason)
+        self.assertGreater(c.confidence, 0.4)
 
 
 if __name__ == "__main__":

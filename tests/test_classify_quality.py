@@ -167,14 +167,16 @@ class TestClassifier(unittest.TestCase):
         self.assertLess(push.features["body_below_hands"], 0.25)
         self.assertGreater(dip.features["body_below_hands"], 0.25)
 
-    def test_torso_angle_is_not_used_to_decide(self):
+    def test_torso_angle_is_not_used_for_dip_vs_push_up(self):
         """Filmed head-on, a real push-up's torso projects to 5 degrees from
-        vertical - indistinguishable from a dip. The angle is reported as a
-        diagnostic and must not drive the decision."""
+        vertical - indistinguishable from a dip. The angle may name a lying
+        leg raise, but must not drive the dip / push-up split."""
         source = (pathlib.Path(__file__).resolve().parents[1]
                   / "barra" / "classify.py").read_text()
         decision = source[source.index("def classify("):]
-        self.assertNotIn("torso_tilt", decision)
+        dip_branch = decision[decision.index('if below >= BELOW_HANDS_DIP'):
+                              decision.index("# Hanging, but with the legs")]
+        self.assertNotIn("torso_tilt", dip_branch)
 
     def test_walking_is_not_a_movement(self):
         """The failure that produced textbook muscle-ups from real footage of

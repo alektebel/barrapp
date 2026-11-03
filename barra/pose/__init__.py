@@ -2,12 +2,14 @@
 from __future__ import annotations
 
 from .base import PoseBackend, PoseResult
+from .libreyolo_backend import LibreYoloBackend
 from .mediapipe_backend import MediapipeBackend
 from .ultralytics_backend import UltralyticsBackend
 
 BACKENDS: dict[str, PoseBackend] = {
     "mediapipe": MediapipeBackend(),
     "ultralytics": UltralyticsBackend(),
+    "libreyolo": LibreYoloBackend(),
 }
 
 

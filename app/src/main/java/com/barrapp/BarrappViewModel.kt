@@ -921,7 +921,10 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
             // work with nothing in flight asks for a fresh job.
             val resuming = work.jobId.isNotBlank() && work.uploadId.isNotBlank()
             val jobId = if (resuming) work.jobId else withRetry("creating the job", work.id) {
-                withContext(Dispatchers.IO) { api.createJob("auto", work.variant, work.view) }
+                withContext(Dispatchers.IO) {
+                    val hash = sha256Hex(clipToUpload)
+                    api.createJob("auto", work.variant, work.view, contentHash = hash)
+                }
             }.job.id
             update { it.copy(jobId = jobId, status = WorkStore.STATUS_SENDING,
                 stage = Stage.SENDING.text, stageCode = Stage.SENDING.code) }
@@ -1321,4 +1324,19 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         ))
         _state.update { it.copy(profile = updated, goals = goals) }
     }
+}
+
+/** SHA-256 hex of a file. Sent as contentHash so the server can address the
+ *  job by the clip bytes (re-upload → same id, prior result replaced). */
+private fun sha256Hex(file: java.io.File): String {
+    val digest = java.security.MessageDigest.getInstance("SHA-256")
+    file.inputStream().use { input ->
+        val buf = ByteArray(64 * 1024)
+        while (true) {
+            val n = input.read(buf)
+            if (n <= 0) break
+            digest.update(buf, 0, n)
+        }
+    }
+    return digest.digest().joinToString("") { b -> "%02x".format(b) }
 }

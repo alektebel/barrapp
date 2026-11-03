@@ -132,3 +132,14 @@ def test_an_abstention_is_not_a_vote():
     )
     assert fused["exercise"] == "unknown"
     assert fused["status"] == "abstain"
+
+
+def test_parent_child_labels_agree_on_measurable_parent():
+    """Vision diamond_push_up must not block geometry push_up (2d0d morning)."""
+    fused = fuse_detection(
+        {"exercise": "push_up", "confidence": 0.70},
+        nan_label="diamond_push_up",
+    )
+    assert fused["exercise"] == "push_up"
+    assert fused["status"] == "majority"
+    assert fused["confidence"] >= 0.86

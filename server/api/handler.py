@@ -367,7 +367,26 @@ def _route(event):
         return _resp(200, {"owner": owner, "account": owner.startswith("u:")})
 
     if method == "POST" and path.rstrip("/") == "/v1/jobs":
-        job_id = uuid.uuid4().hex[:12]
+        # Content-addressed id when the client sends sha256 of the bytes it
+        # will upload. Same owner + same bytes → same job id, so a re-upload
+        # replaces the prior measurement instead of leaving a duplicate.
+        # Old clients that omit contentHash still get a random id.
+        from barra.job_id import job_id_for, normalize_content_hash
+
+        content_hash = normalize_content_hash(body.get("contentHash"))
+        if body.get("contentHash") and content_hash is None:
+            return _resp(400, {
+                "error": "contentHash must be a 64-character sha256 hex digest",
+            })
+        replacing = False
+        if content_hash:
+            job_id = job_id_for(owner, content_hash)
+            existing = _item(job_id)
+            if existing and not _owned(existing, owner):
+                return _resp(409, {"error": "job id collision"})
+            replacing = bool(existing and _owned(existing, owner))
+        else:
+            job_id = uuid.uuid4().hex[:12]
         item = {
             "id": job_id,
             "owner": owner,
@@ -376,6 +395,8 @@ def _route(event):
             "exercise": body.get("exercise") or "auto",
             "createdAt": _now(),
         }
+        if content_hash:
+            item["contentHash"] = content_hash
         # Same contract as local_server.py: declared variant and camera side
         # travel with the job to process_job. DynamoDB rejects empty strings
         # in some item shapes, so absent stays absent.
@@ -410,27 +431,40 @@ def _route(event):
             if cleaned_r:
                 item["recentMovements"] = cleaned_r
         # A clip costs a credit only where the deployment charges for clips.
-        # Off by default, so a phone in the field never hits a wall it did not
-        # have yesterday; on, the balance is what referrals are worth.
-        allowed, credits = referral.charge(_referral_store(), owner)
-        if not allowed:
-            return _resp(402, {
-                "error": "no measurements left - invite a friend to earn more",
-                "credits": credits,
-            })
+        # Replacing an existing content-hash job is not a new measurement slot.
+        if not replacing:
+            allowed, credits = referral.charge(_referral_store(), owner)
+            if not allowed:
+                return _resp(402, {
+                    "error": "no measurements left - invite a friend to earn more",
+                    "credits": credits,
+                })
+        # put_item replaces the whole row: previous result/error/stage drop so
+        # only the latest upload of these bytes remains valid.
         table.put_item(Item=item)
+        if replacing:
+            for key in (f"{owner}/{job_id}.exercise.mp4",):
+                try:
+                    s3.delete_object(Bucket=BUCKET, Key=key)
+                except Exception:  # noqa: BLE001
+                    pass
         upload = s3.generate_presigned_url(
             "put_object",
             Params={"Bucket": BUCKET, "Key": f"{owner}/{job_id}.mp4", "ContentType": "video/mp4"},
             ExpiresIn=3600,
         )
-        uploads.record(job_id, owner, "job-created",
-                       f"exercise={item['exercise']}",
+        uploads.record(job_id, owner, "job-replaced" if replacing else "job-created",
+                       f"exercise={item['exercise']}"
+                       + (f" contentHash={content_hash[:12]}…" if content_hash else ""),
                        variant=item.get("variant"), view=item.get("view"),
                        userAgent=_header(event, "user-agent")[:120])
         pub = _public(item)
         pub["uploadUrl"] = upload
         pub["uploadMethod"] = "PUT"
+        if content_hash:
+            pub["contentHash"] = content_hash
+        if replacing:
+            pub["replaced"] = True
         return _resp(201, pub)
 
     if method == "GET" and path.rstrip("/") == "/v1/jobs":
@@ -500,7 +534,11 @@ def _route(event):
         item = _item(job_id)
         if not _owned(item, owner):
             return _resp(404, {"error": "unknown job"})
-        s3.delete_object(Bucket=BUCKET, Key=f"{owner}/{job_id}.mp4")
+        for key in (f"{owner}/{job_id}.mp4", f"{owner}/{job_id}.exercise.mp4"):
+            try:
+                s3.delete_object(Bucket=BUCKET, Key=key)
+            except Exception:  # noqa: BLE001
+                pass
         table.delete_item(Key={"id": job_id})
         return _resp(200, {"ok": True, "id": job_id})
 
@@ -740,12 +778,12 @@ def _route(event):
 def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
                         end_s: float, duration_s: float | None = None,
                         rotate: int = 0) -> bool:
-    """Cut the located window out of the clip and overwrite the stored object.
+    """Cut the working-set window into `{owner}/{job}.exercise.mp4`.
 
-    Best-effort by design: if there is no cutter, the cut fails, or the upload
-    fails, the original stays in S3 and the job still succeeds. A localization
-    that cannot be stored is not a reason to lose the measurement. `rotate`
-    (90/180/270) turns the stored clip to match the upright measurement.
+    The original upload stays at `{owner}/{job}.mp4` so requeue / rename
+    re-measures the full clip (prep included), not a previously trimmed cut.
+    Best-effort: cutter or upload failure leaves the original alone.
+    `rotate` (90/180/270) turns the stored clip to match upright measurement.
     """
     try:
         from barra.frames import trim_clip
@@ -762,11 +800,22 @@ def _store_trimmed_clip(src: Path, owner: str, job_id: str, start_s: float,
     if trim_clip(src, start, end, out, rotate=int(rotate or 0)) is None:
         return False
     try:
-        s3.upload_file(str(out), BUCKET, f"{owner}/{job_id}.mp4",
+        s3.upload_file(str(out), BUCKET, f"{owner}/{job_id}.exercise.mp4",
                        ExtraArgs={"ContentType": "video/mp4"})
         return True
     except Exception:  # noqa: BLE001 - keep the original on any upload failure
         return False
+
+
+def _playback_key(owner: str, job_id: str) -> str:
+    """Prefer the trimmed exercise clip for replay; fall back to the original."""
+    exercise = f"{owner}/{job_id}.exercise.mp4"
+    original = f"{owner}/{job_id}.mp4"
+    try:
+        s3.head_object(Bucket=BUCKET, Key=exercise)
+        return exercise
+    except Exception:  # noqa: BLE001
+        return original
 
 
 def _set_stage(job_id: str, owner: str, name: str) -> None:
@@ -885,7 +934,10 @@ def worker(event, _context):
         # do not re-serialize that wait onto upload→result. A short grace lets
         # a nearly-done call land; otherwise fusion runs on geometry+model and
         # locate still drives the post-result clip trim below.
-        _VISION_VOTE_WAIT_S = float(os.environ.get("BARRA_VISION_VOTE_WAIT_S", "2") or 2)
+        # Pose finishes in tens of seconds; a 2 s grace never caught the tree
+        # vote (2026-11-03 afternoon batch: 12/14 traces waited exactly 2000 ms
+        # and fused geometry-only). 25 s lets a typical name_movement land.
+        _VISION_VOTE_WAIT_S = float(os.environ.get("BARRA_VISION_VOTE_WAIT_S", "25") or 25)
 
         def _vision_vote():
             try:

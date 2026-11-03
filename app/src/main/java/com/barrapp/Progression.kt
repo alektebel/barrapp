@@ -98,6 +98,31 @@ object Progression {
             note = "Toes to bar is not in the measured vocabulary yet, so barra " +
                 "can confirm you have earned the attempt but not score it.",
         ),
+        "leg_raise" to Step(
+            "toes_to_bar", "Toes to bar", reps = 12, quality = SOLID, days = 2,
+            targetMeasurable = false,
+            note = "Measured with the hanging knee-raise profile; toes-to-bar is next.",
+        ),
+        "front_lever_raise" to Step(
+            "tuck_front_lever", "Tuck front lever",
+            reps = 8, quality = SOLID, days = 2, targetMeasurable = false,
+            note = "The raise is the dynamic entry; the tuck hold is the next gate.",
+        ),
+        "front_lever_pull_up" to Step(
+            "one_arm_front_lever", "One-arm front lever",
+            reps = 5, quality = SOLID, days = 2, targetMeasurable = false,
+            note = "Barra cannot verify a one-arm front lever from video yet.",
+        ),
+        "inverted_curl" to Step(
+            "chin_up", "Chin-up",
+            reps = 8, quality = SOLID, days = 2, targetMeasurable = false,
+            note = "A stronger hang curl feeds the chin-up path.",
+        ),
+        "weighted_dip" to Step(
+            "ring_dip", "Ring dip",
+            reps = 10, quality = SOLID, days = 2, targetMeasurable = false,
+            note = "Load is claimed by the athlete; rings are the next support skill.",
+        ),
         "squat" to Step(
             "pistol_squat", "Pistol squat", reps = 20, quality = SOLID, days = 2,
             targetMeasurable = false,

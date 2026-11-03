@@ -179,6 +179,7 @@ fun BarrappApp(vm: BarrappViewModel = viewModel()) {
                 analysis = state.analysis,
                 clip = remember(state.current?.id) { vm.replayClip() },
                 onBack = vm::openHome,
+                jobId = state.current?.id,
             )
 
             Screen.Plan -> PlanScreen(
