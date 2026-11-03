@@ -721,6 +721,17 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # shoulder work dominates. A hanging leg raise with the legs held up
     # (31e6fc884110) can move the arms too — accept it when legs stay lifted
     # and the shoulders never clear the bar.
+    #
+    # A parked hang with the legs held up and the elbows cycling is a
+    # front-lever pull progression, not a knee raise — even when pose noise
+    # makes knee_excursion clear 1.5× arm_articulation (Lambda vs local on
+    # 93ebbf6e4894). That shape is named later in the hang/pull branch.
+    fl_pull_shape = (
+        np.isfinite(f.get("legs_lifted_frac"))
+        and float(f["legs_lifted_frac"]) >= 0.85
+        and float(f.get("parked_frac") or 0.0) >= HOLD_FRAC
+        and float(f["arm_articulation"]) >= ARTICULATION
+    )
     knees_drive = f["knee_excursion"] >= max(
         1.5 * float(f["arm_articulation"]), 0.35)
     legs_held_up = (
@@ -733,7 +744,7 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     )
     if (anchored and hanging and hang_oh >= 0.35
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
-            and (knees_drive or legs_held_up)):
+            and (knees_drive or legs_held_up) and not fl_pull_shape):
         tr.decision("knee_raise", "the knees are carried above the hips, and travel "
                     "further than the shoulders do",
                     knee_over_hip=f["knee_over_hip"], knees_up_threshold=KNEES_UP,
