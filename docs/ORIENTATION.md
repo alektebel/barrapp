@@ -21,17 +21,19 @@ clip, so there is no metadata to correct: the picture itself is inverted.
 | `31e6fc884110` | Hanging leg raise on dip bars (not an L-sit) | geometry `unknown`; locate free-text `inverted hanging leg raise (dip bar)`; fusion `vision-decides` → freeform id, unsupported, 0 reps. `videoRotation: 270`. |
 | `a9884573d367` | Dips (same station, same sideways phone) | geometry `bulgarian_split_squat`; vision `dips`; fusion `vision-decides` → scored 13 dips with `needsConfirmation`. Orientation was wrong; the name happened to be right. |
 
-### 2026-11-03 local re-eval (`scripts/nov2_eval.py --strict`)
+### 2026-11-03 re-eval + production (`worker-20261103-101602`, commit `021d014`)
+
+Local: `scripts/nov2_eval.py --strict`. Production: five jobs requeued on the new image.
 
 | Job | Got | Confidence |
 |---|---|---|
 | `a038d832f870` | `dip` | 0.55 |
 | `a9884573d367` | `dip` | 0.55 |
-| `93ebbf6e4894` | `front_lever_pull_up` | 0.61 |
+| `93ebbf6e4894` | `front_lever_pull_up` | ~0.59 |
 | `cc61dc871b9d` | `inverted_curl` | 0.52 |
 | `31e6fc884110` | `knee_raise` | 0.56 |
 
-Vertical-leg FL pull is named from `legs_lifted` + `knee_over_hip` + `parked` (not body-line ≥55°). Vision hold labels (`l_sit`) no longer outrank articulated hang geometry. When unsure the client types the name (`POST /v1/jobs/{id}/exercise`); there is no options list.
+Vertical-leg FL pull is named from `legs_lifted` + `parked` (not body-line ≥55°). Vision hold labels (`l_sit`) no longer outrank articulated hang geometry. A 180 IMU claim is not kept when luma says that turn is inverted. When unsure the client types the name (`POST /v1/jobs/{id}/exercise`); there is no options list.
 
 Root causes shared with the October clips, plus two new ones: the worker
 ignored `deviceOrientation.videoRotation`, and locate's open-vocabulary
