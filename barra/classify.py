@@ -582,10 +582,11 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # A front lever is a hang held horizontal (hands overhead, body line near
     # horizontal). A planche is the same body line pressed off the ground
     # (hands below the shoulders, legs carried up).
-    # Both require the body to stay parked AND the arms still: an L-sit filmed
-    # sideways (31e6fc884110) read body_line≈71° with moving hips; small-ROM
-    # inverted curls (cc61dc871b9d) look parked+horizontal while the elbows
-    # still articulate - those must reach the hang/pull branch, not a lever.
+    # Both require the body to stay parked AND the arms still: a hanging leg
+    # raise filmed sideways (31e6fc884110) read body_line≈71° with moving hips;
+    # small-ROM inverted curls (cc61dc871b9d) look parked+horizontal while the
+    # elbows still articulate - those must reach the hang/pull branch, not a
+    # lever.
     isometric_arms = (not arms_measured) or (float(f["arm_articulation"]) < ARTICULATION)
     if (anchored and f["hands_overhead_frac"] >= 0.35
             and np.isfinite(f["body_line_deg"]) and f["body_line_deg"] >= 70.0
@@ -715,14 +716,32 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
     # while the shoulders do the work - knee_excursion from pose jitter can
     # still meet a 1:1 comparison with arm_articulation. Demand clear overhead
     # hang and knees travelling clearly more than the shoulders.
+    # Knees clearly above the hips and travelling. The strict 1.5× arm gate
+    # stops vertical-leg FL pulls (93ebbf6e4894) from becoming knee raises when
+    # shoulder work dominates. A hanging leg raise with the legs held up
+    # (31e6fc884110) can move the arms too — accept it when legs stay lifted
+    # and the shoulders never clear the bar.
+    knees_drive = f["knee_excursion"] >= max(
+        1.5 * float(f["arm_articulation"]), 0.35)
+    legs_held_up = (
+        np.isfinite(f.get("legs_lifted_frac"))
+        and float(f["legs_lifted_frac"]) >= 0.70
+        and f["knee_excursion"] >= 0.35
+        and np.isfinite(f.get("shoulder_above_hands_p95"))
+        # Hair over OVER_BAR is still "did not lock out" (31e6fc884110 peak≈0.12002).
+        and float(f["shoulder_above_hands_p95"]) <= OVER_BAR + 0.02
+    )
     if (anchored and hanging and hang_oh >= 0.35
             and np.isfinite(f["knee_over_hip"]) and f["knee_over_hip"] >= KNEES_UP
-            and f["knee_excursion"] >= max(1.5 * float(f["arm_articulation"]), 0.35)):
+            and (knees_drive or legs_held_up)):
         tr.decision("knee_raise", "the knees are carried above the hips, and travel "
                     "further than the shoulders do",
                     knee_over_hip=f["knee_over_hip"], knees_up_threshold=KNEES_UP,
                     knee_excursion=f["knee_excursion"],
-                    arm_articulation=f["arm_articulation"], confidence=0.80)
+                    arm_articulation=f["arm_articulation"],
+                    legs_lifted_frac=f.get("legs_lifted_frac"),
+                    knees_drive=knees_drive, legs_held_up=legs_held_up,
+                    confidence=0.80)
         return Classification(
             "knee_raise", 0.80,
             f"hanging from a fixed bar with the knees carried "
@@ -748,8 +767,8 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
         )
         # Soft-hang geometry (oh < 0.35, used for dip-station FL pulls) must
         # not promote to muscle_up - that path is for a clear overhead hang
-        # that finishes in support. L-sit clips misoriented as a hang
-        # (31e6fc884110, peak≈0.16) were scoring muscle_up ×3 on a hair over
+        # that finishes in support. A hang with a weak lockout peak (job
+        # 31e6fc884110, peak≈0.16) was scoring muscle_up on a hair over
         # OVER_BAR; demand a clearer lockout than a pull that barely clears.
         clear_overhead_hang = hang_oh >= 0.35
         # 93ebbf6e4894 peaked at 0.25 and still became a muscle_up; demand more.
@@ -768,22 +787,79 @@ def classify(kp: np.ndarray, trace: Trace | None = None,
                 "torso-lengths above the hands",
                 f, runner_up="pull_up",
             )
-        # L-sit filmed as a hang (31e6fc884110, peak≈+0.09): legs stay up and
-        # the shoulders hover near the hands without a pull. Do NOT use a bare
-        # `peak < OVER_BAR` here - inverted curls (cc61dc871b9d) sit at peak
-        # ≈-0.57 with piked legs and must remain pull_up.
+        # Inverted curls (cc61dc871b9d, peak≈-0.57): shoulders stay far below
+        # the hands. Checked before the near-horizontal FL-pull branch — that
+        # clip is also piked (~70° body line) and would otherwise win as a
+        # front-lever pull. A chin-to-bar pull-up (clearance -0.5) stays pull_up.
+        curl_peak_max = -0.52
+        if np.isfinite(peak) and float(peak) <= curl_peak_max:
+            margin = min(1.0, (curl_peak_max - float(peak)) / 0.30)
+            tr.decision("inverted_curl",
+                        "hanging curl - shoulders stay far below the hands",
+                        peak_above_hands=peak, curl_peak_max=curl_peak_max,
+                        arm_articulation=f["arm_articulation"],
+                        confidence=0.70 + 0.22 * margin)
+            return Classification(
+                "inverted_curl", 0.70 + 0.22 * margin,
+                f"hanging from a fixed bar with the shoulders peaking at "
+                f"{peak:+.2f} torso-lengths - an inverted curl, not a pull-up",
+                f, runner_up="pull_up",
+            )
+        # Front-lever pull progression. Two shapes share the name:
+        #   * body near horizontal (classic), peak below the bar;
+        #   * legs held vertical / piked while the elbows cycle (job
+        #     93ebbf6e4894, body_line≈15°, legs_lifted≈0.96, parked≈0.88).
+        # An ordinary pull-up hangs the legs (legs_lifted≈0, knee_over_hip≪0).
+        body_line = f.get("body_line_deg")
+        near_horizontal = (np.isfinite(body_line) and float(body_line) >= 55.0)
+        legs_up = (np.isfinite(f.get("legs_lifted_frac"))
+                   and float(f["legs_lifted_frac"]) >= 0.85)
+        knees_above = (np.isfinite(f.get("knee_over_hip"))
+                       and float(f["knee_over_hip"]) >= 0.20)
+        body_parked = float(f.get("parked_frac") or 0.0) >= HOLD_FRAC
+        vertical_leg_fl_pull = (
+            legs_up and knees_above and body_parked and peak < mu_clearance)
+        if (near_horizontal and peak < OVER_BAR) or vertical_leg_fl_pull:
+            if near_horizontal and peak < OVER_BAR:
+                margin = min(1.0, (float(body_line) - 55.0) / 35.0)
+                why = (f"hanging near horizontal ({float(body_line):.0f} degrees "
+                       f"from vertical) with the elbows cycling and the "
+                       f"shoulders peaking at {peak:+.2f} torso-lengths")
+            else:
+                margin = min(1.0, (float(f["legs_lifted_frac"]) - 0.85) / 0.15)
+                why = (f"hanging with the legs held up "
+                       f"({float(f['legs_lifted_frac']):.0%} of the clip) while "
+                       f"the elbows cycle and the body stays parked "
+                       f"({float(f['parked_frac']):.0%}) - a front-lever pull "
+                       f"progression")
+            tr.decision("front_lever_pull_up",
+                        "front-lever pull - elbows cycle with the legs up",
+                        body_line_deg=body_line, horizontal_min=55.0,
+                        legs_lifted_frac=f.get("legs_lifted_frac"),
+                        knee_over_hip=f.get("knee_over_hip"),
+                        parked_frac=f.get("parked_frac"),
+                        peak_above_hands=peak, over_bar_threshold=OVER_BAR,
+                        vertical_leg=vertical_leg_fl_pull,
+                        confidence=0.70 + 0.22 * margin)
+            return Classification(
+                "front_lever_pull_up", 0.70 + 0.22 * margin,
+                f"{why} - a front-lever pull",
+                f, runner_up="pull_up",
+            )
+        # Hang with legs held up and almost no shoulder travel: not a pull set.
+        # (Not an L-sit claim — Nov 2 clips had no L-sit; this is the honest
+        # abstain when hang geometry cannot name a repetition pattern.)
         legs_up = (np.isfinite(f.get("legs_lifted_frac"))
                    and float(f["legs_lifted_frac"]) >= 0.70)
         if legs_up and -0.05 <= peak < OVER_BAR:
-            tr.reject("pull_up", "legs held up without a pull to the bar - a hold",
+            tr.reject("pull_up", "legs held up without a pull to the bar",
                       peak_above_hands=peak, over_bar_threshold=OVER_BAR,
                       legs_lifted_frac=f.get("legs_lifted_frac"))
             return Classification(
                 "unknown", 0.0,
                 f"hanging with the legs carried up ({float(f['legs_lifted_frac']):.0%} "
                 f"of the clip) but the shoulders only reach {peak:+.2f} "
-                "torso-lengths relative to the hands - an L-sit or similar hold, "
-                "not a set of pull-ups",
+                "torso-lengths relative to the hands - not a set of pull-ups",
                 f, runner_up="pull_up",
             )
         margin = min(1.0, (OVER_BAR - peak) / 0.35) if peak < OVER_BAR else 0.55
@@ -915,6 +991,8 @@ HUMAN = {
     "squat": "Squat",
     "knee_raise": "Hanging knee raise",
     "front_lever": "Front lever",
+    "front_lever_pull_up": "Front lever pull-up",
+    "inverted_curl": "Inverted curl",
     "planche": "Planche",
     "pistol_squat": "Pistol squat",
     "split_squat": "Split squat",

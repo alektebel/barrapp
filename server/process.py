@@ -806,24 +806,41 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         # Ask before scoring when fusion is empirically risky, or when vision
         # alone disagreed with geometry (2026-11-02 miss-class clips).
         try:
-            from barra.uncertainty import needs_confirmation
+            from barra.uncertainty import (classification_confidence,
+                                           needs_confirmation)
             m_margin = float(((model_out or {}).get("classification")
                               or {}).get("marginToRunnerUp") or 0.0)
             grounding = needs_confirmation(fusion, model_margin=m_margin)
+            class_conf = classification_confidence(
+                fusion,
+                geometry_confidence=detected.get("confidence"),
+                grounding=grounding,
+            )
         except Exception:  # noqa: BLE001
             grounding = {"needsConfirmation": False, "reasons": [],
                          "fusionStatus": (fusion or {}).get("status"),
+                         "detectedLabel": (fusion or {}).get("exercise"),
+                         "clientNamesExercise": False,
                          "suggestedExercise": (fusion or {}).get("exercise")}
+            class_conf = {"value": 0.0, "band": "low", "kind": "fusion",
+                          "needsConfirmation": False, "fusionStatus": None,
+                          "clientNamesExercise": False}
         detected["classificationGrounding"] = grounding
+        detected["classificationConfidence"] = class_conf
         tr.step("classification grounding", **{
             k: grounding.get(k) for k in
-            ("needsConfirmation", "reasons", "fusionStatus", "suggestedExercise")
+            ("needsConfirmation", "reasons", "fusionStatus",
+             "detectedLabel", "clientNamesExercise")
         })
+        tr.step("classification confidence", **class_conf)
         final = (fusion or {}).get("exercise") or detection.exercise
         if final == "unknown":
             return _empty("auto", ["movement_unconfirmed"], detected=detected,
                           duration_s=round(float(info.get("duration_s") or 0), 2),
                           classificationGrounding=grounding,
+                          classificationConfidence=class_conf,
+                          # Client types the name — no options list from us.
+                          clientNamesExercise=True,
                           countStatus="unmeasured")
         # Vision alone against a different geometric name: do not score. Other
         # risky statuses still set needsConfirmation for the phone, but keep
@@ -842,7 +859,9 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             return _empty("auto", ["movement_unconfirmed"], detected=detected,
                           duration_s=round(float(info.get("duration_s") or 0), 2),
                           classificationGrounding=grounding,
-                          suggestedExercise=grounding.get("suggestedExercise"),
+                          classificationConfidence=class_conf,
+                          detectedLabel=grounding.get("detectedLabel"),
+                          clientNamesExercise=True,
                           countStatus="unmeasured")
         chosen = final
         if chosen != detection.exercise:
@@ -851,6 +870,16 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
             detected["reason"] = (fusion or {}).get("reason") or detected["reason"]
             detected["certainty"] = "detector-fusion"
             detected["runnerUp"] = detection.exercise if detection.exercise != "unknown" else detected.get("runnerUp")
+    else:
+        # Athlete named the exercise freely on upload — that claim is the label.
+        detected["classificationConfidence"] = {
+            "value": 1.0,
+            "band": "high",
+            "kind": "client-named",
+            "needsConfirmation": False,
+            "fusionStatus": None,
+            "clientNamesExercise": False,
+        }
 
     try:
         movement = resolve(chosen)
@@ -1189,6 +1218,17 @@ def analyze_clip(video_path: Path, exercise: str = "auto",
         "exercise": movement.name,
         "track": movement.name,
         "detected": detected,
+        "classificationConfidence": (
+            (detected or {}).get("classificationConfidence")
+            or {"value": round(float(detected.get("confidence") or 0.0), 3),
+                "band": ("high" if float(detected.get("confidence") or 0) >= 0.75
+                         else "medium" if float(detected.get("confidence") or 0) >= 0.5
+                         else "low"),
+                "kind": "geometry-margin",
+                "needsConfirmation": False,
+                "fusionStatus": None,
+                "clientNamesExercise": False}
+        ),
         "model": model_out,
         "variant": variant_info,
         "failures": clip_faults,

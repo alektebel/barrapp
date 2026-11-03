@@ -198,10 +198,17 @@ _add(_n(
                skill="inverted_curl"),
         Option("arms_pull",
                "The body stays roughly VERTICAL and the ARMS bend to pull the "
-               "chest up toward the bar.", then="pull_how"),
+               "chest up toward the bar. The legs hang down or are quiet.",
+               then="pull_how"),
+        Option("fl_pull_legs_up",
+               "The ARMS bend to pull while the LEGS stay UP (piked or "
+               "vertical toward the ceiling) — a front-lever pull progression, "
+               "not an ordinary pull-up and not a static L-sit.",
+               skill="front_lever_pull_up"),
         Option("legs_lift",
                "The torso stays roughly vertical and the LEGS lift up in front "
-               "of the body.", then="hang_legs"),
+               "of the body; the arms stay mostly straight.",
+               then="hang_legs"),
         Option("horizontal_faceup",
                "The body is held HORIZONTAL or piked with the chest and face "
                "pointing UP (legs may point VERTICAL toward the ceiling in a "

@@ -210,6 +210,19 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
                       "different movements on a clip the pose could not read "
                       "reliably, so the exercise is not claimed")
 
+    # Static holds that vision invents for an articulated hang (job
+    # 93ebbf6e4894: vision said l_sit for a front-lever pull). A hold label
+    # must not outrank a rep-based hang geometry named.
+    _HOLD_SKILLS = frozenset({
+        "l_sit", "v_sit", "manna", "front_lever", "back_lever", "planche",
+        "tuck_front_lever", "adv_tuck_front_lever", "straddle_front_lever",
+        "half_front_lever", "tuck_back_lever", "dead_hang",
+    })
+    _HANG_REPS = frozenset({
+        "pull_up", "chin_up", "muscle_up", "knee_raise", "inverted_curl",
+        "front_lever_pull_up", "toes_to_bar",
+    })
+
     # --- 2. no agreement: the most reliable detector that has an answer ----
     # Geometry keeps its say only where nothing better spoke. It is never
     # silently discarded - `geometry` is on every payload above, so a consumer
@@ -219,6 +232,10 @@ def fuse_detection(geometry: Mapping[str, Any] | str,
         if not can:
             continue
         if who == "vision":
+            g_can = _canonical(g_label)
+            if (can in _HOLD_SKILLS and g_can in _HANG_REPS):
+                # Skip vision; let model or geometry speak for the hang.
+                continue
             return answer(can, 0.90, "vision-decides",
                           "the vision read of the frames is the most reliable "
                           "single detector and the others did not agree")

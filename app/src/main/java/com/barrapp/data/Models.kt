@@ -82,6 +82,25 @@ data class Analysis(
     /** True when the vision model saw a different movement than the
      *  geometry labelled - flagged for review, never applied. */
     val visionDisagreesOnMovement: Boolean = false,
+    /** Per-clip exercise-identity confidence (not a calibrated probability). */
+    val classificationConfidence: ClassificationConfidence? = null,
+    /** Athlete should type the exercise name freely — no options list. */
+    val clientNamesExercise: Boolean = false,
+    /** Pipeline's current guess, optional hint only. */
+    val detectedLabel: String = "",
+    /** Free text the athlete typed, when the name was not in the catalog. */
+    val clientLabel: String = "",
+    val countStatus: String = "",
+)
+
+/** How sure the pipeline is about the exercise name for this clip. */
+data class ClassificationConfidence(
+    val value: Double,
+    val band: String = "low",
+    val kind: String = "fusion",
+    val needsConfirmation: Boolean = false,
+    val clientNamesExercise: Boolean = false,
+    val fusionStatus: String = "",
 )
 
 data class TopFix(

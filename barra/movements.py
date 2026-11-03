@@ -52,7 +52,8 @@ MUSCLE_UP = Movement(
 PULL_UP = Movement(
     name="pull_up", origin="wrist", direction="ascending",
     signal="shoulder_above_bar", min_rep_s=0.6, turn_label="top",
-    aliases=("pullup", "pull-up", "chin_up", "chinup"),
+    aliases=("pullup", "pull-up", "chin_up", "chinup", "weighted_pull_up",
+             "weighted_pullup"),
 )
 # Hanging from the bar with the shoulders still and the legs coming up. It is
 # in here because it is what the athlete was actually doing on one of the
@@ -63,11 +64,31 @@ KNEE_RAISE = Movement(
     name="knee_raise", origin="wrist", direction="ascending",
     signal="knees_toward_bar", min_rep_s=0.7, turn_label="knees up",
     aliases=("knee-raise", "kneeraise", "leg_raise", "leg-raise", "legraise",
-             "hanging_knee_raise", "toes_to_bar", "toes-to-bar", "ttb"),
+             "hanging_knee_raise", "hanging_leg_raise", "hanging-leg-raise",
+             "toes_to_bar", "toes-to-bar", "ttb"),
 )
 DIP = Movement(
     name="dip", origin="wrist", direction="descending", signal="shoulder_above_bar",
-    min_rep_s=0.6, turn_label="bottom", aliases=("dips",),
+    min_rep_s=0.6, turn_label="bottom",
+    # weighted_dip is the same geometry; load is declared by the athlete, not
+    # seen in 2D pose (job a038d832f870).
+    aliases=("dips", "weighted_dip", "weighted_dips"),
+)
+# Small-ROM hanging biceps curl (job cc61dc871b9d). Same hang origin as a
+# pull-up; the shoulders never approach the bar. Counted on the shoulder-to-
+# bar gap so the segmenter still finds elbow-driven turnarounds.
+INVERTED_CURL = Movement(
+    name="inverted_curl", origin="wrist", direction="ascending",
+    signal="shoulder_above_bar", min_rep_s=0.5, turn_label="top",
+    aliases=("biceps_curl", "hanging_curl", "inverted_bicep_curl",
+             "inverted_biceps_curl"),
+)
+# Pull while the body is held near horizontal (job 93ebbf6e4894). Not the
+# isometric front_lever hold: the elbows cycle.
+FRONT_LEVER_PULL = Movement(
+    name="front_lever_pull_up", origin="wrist", direction="ascending",
+    signal="shoulder_above_bar", min_rep_s=0.6, turn_label="top",
+    aliases=("front_lever_pull", "fl_pull", "fl_pull_up", "pike_pull"),
 )
 # Geometrically a dip lying down: hands fixed, shoulders above them, body
 # descending. What separates the two is which way the torso points - see
@@ -125,10 +146,83 @@ BULGARIAN_SPLIT_SQUAT = Movement(
 MOVEMENTS = {m.name: m for m in (
     SQUAT, MUSCLE_UP, PULL_UP, KNEE_RAISE, DIP, PUSH_UP,
     FRONT_LEVER, PLANCHE, PISTOL_SQUAT, SPLIT_SQUAT, BULGARIAN_SPLIT_SQUAT,
+    INVERTED_CURL, FRONT_LEVER_PULL,
 )}
 _ALIASES = {a: m for m in MOVEMENTS.values() for a in (m.name, *m.aliases)}
 
 DEFAULT = SQUAT
+
+
+# Free-text names the athlete types when the pipeline asks. Mapped onto the
+# same alias table resolve() uses — never a menu of options.
+_FREE_TEXT = {
+    # Spanish
+    "fondos": "dip",
+    "fondo": "dip",
+    "fondos lastrados": "weighted_dip",
+    "fondo lastrado": "weighted_dip",
+    "dominadas": "pull_up",
+    "dominada": "pull_up",
+    "dominadas lastradas": "weighted_pull_up",
+    "flexiones": "push_up",
+    "flexion": "push_up",
+    "flexión": "push_up",
+    "sentadilla": "squat",
+    "sentadillas": "squat",
+    "curl invertido": "inverted_curl",
+    "curl de biceps invertido": "inverted_curl",
+    "curl de bíceps invertido": "inverted_curl",
+    "elevacion de piernas": "knee_raise",
+    "elevación de piernas": "knee_raise",
+    "elevacion de rodillas": "knee_raise",
+    "elevación de rodillas": "knee_raise",
+    "leg raise": "knee_raise",
+    "leg raise en paralelas": "knee_raise",
+    "front lever pull": "front_lever_pull_up",
+    "front lever pull up": "front_lever_pull_up",
+    "front lever pull-up": "front_lever_pull_up",
+    "pull de front lever": "front_lever_pull_up",
+    "jalon de front lever": "front_lever_pull_up",
+    "jalón de front lever": "front_lever_pull_up",
+    "muscle up": "muscle_up",
+    "muscle-up": "muscle_up",
+}
+
+
+def normalize_free_name(text: str | None) -> str | None:
+    """Map athlete free text onto a movement id, or None if unknown.
+
+    Does not raise. Unknown input stays the athlete's words for the phone to
+    show; the pipeline must not invent a profile from a guess.
+    """
+    if text is None:
+        return None
+    raw = str(text).strip().lower()
+    if not raw:
+        return None
+    # Strip accents for matching without losing the raw clientLabel upstream.
+    import unicodedata
+    flat = "".join(
+        c for c in unicodedata.normalize("NFD", raw)
+        if unicodedata.category(c) != "Mn"
+    )
+    for candidate in (raw, flat, raw.replace("-", " "), flat.replace("-", " ")):
+        if candidate in _FREE_TEXT:
+            return _FREE_TEXT[candidate]
+        key = candidate.replace(" ", "_")
+        if key in _ALIASES:
+            return _ALIASES[key].name
+        if key in MOVEMENTS:
+            return key
+    # Last try: collapse punctuation.
+    import re
+    cleaned = re.sub(r"[^a-z0-9_]+", "_", flat.replace(" ", "_")).strip("_")
+    if cleaned in _ALIASES:
+        return _ALIASES[cleaned].name
+    if cleaned in MOVEMENTS:
+        return cleaned
+    mapped = _FREE_TEXT.get(cleaned.replace("_", " "))
+    return mapped
 
 
 def resolve(name: str | None) -> Movement:
@@ -140,6 +234,11 @@ def resolve(name: str | None) -> Movement:
     key = str(name).strip().lower().replace(" ", "_")
     if key in _ALIASES:
         return _ALIASES[key]
+    free = normalize_free_name(name)
+    if free and free in _ALIASES:
+        return _ALIASES[free]
+    if free and free in MOVEMENTS:
+        return MOVEMENTS[free]
     raise SystemExit(
         f"unknown movement {name!r}. Known: {', '.join(sorted(MOVEMENTS))}.\n"
         "Set it per video in the exercise column of sessions.csv, or add a "

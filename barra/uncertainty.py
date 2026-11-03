@@ -208,7 +208,7 @@ def needs_confirmation(fusion: Mapping[str, Any] | None,
                        model_margin: float | None = None,
                        margin_floor: float = 0.32,
                        use_margin: bool = False) -> dict[str, Any]:
-    """Whether the athlete should confirm the exercise before scoring.
+    """Whether the athlete should name the exercise before scoring.
 
     Default rule (best precision on the labelled corpus, ~0.85 P / 0.61 R):
     fusion landed in a risky status (`RISKY_FUSION_STATUSES`). Model margin is
@@ -218,6 +218,10 @@ def needs_confirmation(fusion: Mapping[str, Any] | None,
     (jobs 93ebbf6e4894 / cc61dc871b9d, 2026-11-02): vision-decides is usually
     right on the labelled corpus, but a free-text or sideways-clip miss that
     disagrees with geometry must not be scored silently.
+
+    When confirmation is needed the *client* names the exercise freely — there
+    is no server-side options list. `detectedLabel` is only the pipeline's
+    current guess (optional hint), never a menu of candidates.
     """
     fus = fusion or {}
     status = str(fus.get("status") or "")
@@ -233,11 +237,62 @@ def needs_confirmation(fusion: Mapping[str, Any] | None,
     if (status == "vision-decides" and chosen and geometry
             and chosen != geometry):
         reasons.append(f"detectors_disagree:vision={chosen},geometry={geometry}")
+    ask = bool(reasons)
     return {
-        "needsConfirmation": bool(reasons),
+        "needsConfirmation": ask,
         "reasons": reasons,
         "fusionStatus": status or None,
+        # Pipeline guess only — the client types the name; never an options list.
+        "detectedLabel": chosen,
+        "clientNamesExercise": ask,
+        # Kept for older phones that still read this key; same as detectedLabel.
         "suggestedExercise": chosen,
+    }
+
+
+def classification_confidence(
+    fusion: Mapping[str, Any] | None = None,
+    *,
+    geometry_confidence: float | None = None,
+    grounding: Mapping[str, Any] | None = None,
+) -> dict[str, Any]:
+    """A single 0–1 confidence for the clip's exercise identity.
+
+    Higher means more confident. This is not a calibrated probability; it
+    combines fusion's own confidence with the confirmation gate. When the
+    athlete must name the exercise, confidence is capped low so the phone
+    cannot present a disputed label as settled.
+    """
+    fus = fusion or {}
+    ground = grounding or {}
+    ask = bool(ground.get("needsConfirmation"))
+    status = str(fus.get("status") or ground.get("fusionStatus") or "")
+    raw = _f(fus.get("confidence"), 0.0)
+    if raw <= 0.0 and geometry_confidence is not None:
+        raw = _f(geometry_confidence, 0.0)
+    # Status prior: majority/vision-backed votes start higher than geometry-only.
+    status_prior = 1.0 - float(STATUS_UNCERTAINTY.get(status, 0.7))
+    value = max(raw, 0.0) * 0.7 + status_prior * 0.3
+    if not _canon(fus.get("exercise")) and not ask:
+        value = 0.0
+    value = float(max(0.0, min(1.0, value)))
+    if value >= 0.75:
+        band = "high"
+    elif value >= 0.50:
+        band = "medium"
+    else:
+        band = "low"
+    # `value` stays the per-clip confidence measure (discriminative across
+    # videos). `needsConfirmation` / `clientNamesExercise` are the separate
+    # gate that asks the athlete to type the name — not a second collapse of
+    # every risky clip to the same number.
+    return {
+        "value": round(value, 3),
+        "band": band,
+        "kind": "fusion",
+        "needsConfirmation": ask,
+        "fusionStatus": status or None,
+        "clientNamesExercise": ask,
     }
 
 

@@ -612,6 +612,33 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
         publishWorks()
     }
 
+    /** Athlete typed the exercise name freely (no options list). */
+    fun nameExercise(name: String) {
+        val jobId = _state.value.current?.id ?: return
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        viewModelScope.launch {
+            runCatching {
+                withContext(Dispatchers.IO) { api.nameExercise(jobId, trimmed) }
+            }.onSuccess { job ->
+                // Re-fetch until the worker finishes re-measuring.
+                var latest = job
+                repeat(40) {
+                    if (latest.status == "done" || latest.status == "failed") return@repeat
+                    delay(1500)
+                    latest = withContext(Dispatchers.IO) {
+                        runCatching { api.getJob(jobId) }.getOrDefault(latest)
+                    }
+                }
+                latest.result?.let { result ->
+                    _state.update { s ->
+                        s.copy(analysis = result, current = latest)
+                    }
+                }
+            }
+        }
+    }
+
     /** Confirmación: la ventana que hay en el work manda. A subir. */
     fun confirmTrim(workId: String) {
         val app = getApplication<Application>()

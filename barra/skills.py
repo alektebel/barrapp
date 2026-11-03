@@ -96,7 +96,8 @@ SKILLS: dict[str, Skill] = {s.id: s for s in [
        measurable=True, standard=Standard(10),
        note="One of the six barra can verify."),
     _s("weighted_dip", "Weighted dip", PUSH, ["dip"],
-       note="Barra cannot see added load, so this is yours to claim."),
+       measurable=True, standard=Standard(10),
+       note="Measured as a dip; added load is yours to claim."),
     _s("ring_dip", "Ring dip", PUSH, ["dip"]),
     _s("korean_dip", "Korean dip", PUSH, ["dip"]),
 
@@ -142,7 +143,9 @@ SKILLS: dict[str, Skill] = {s.id: s for s in [
     _s("knee_raise", "Hanging knee raise", CORE, ["dead_hang", "hollow_hold"],
        measurable=True, standard=Standard(12),
        note="One of the six barra can verify."),
-    _s("leg_raise", "Hanging leg raise", CORE, ["knee_raise"]),
+    _s("leg_raise", "Hanging leg raise", CORE, ["knee_raise"],
+       measurable=True, standard=Standard(12),
+       note="Measured with the hanging knee-raise profile."),
     _s("toes_to_bar", "Toes to bar", CORE, ["leg_raise"]),
     _s("l_sit", "L-sit", CORE, ["hollow_hold", "dip"]),
     _s("ab_wheel", "Ab wheel rollout", CORE, ["hollow_hold"]),
@@ -159,12 +162,15 @@ SKILLS: dict[str, Skill] = {s.id: s for s in [
     _s("half_front_lever", "Half-lay front lever", CORE,
        ["straddle_front_lever"]),
     _s("front_lever", "Front lever", CORE, ["half_front_lever"]),
-    _s("front_lever_pull_up", "Front lever pull-up", CORE, ["front_lever"]),
+    _s("front_lever_pull_up", "Front lever pull-up", CORE, ["front_lever"],
+       measurable=True, standard=Standard(5),
+       note="Pull while near horizontal; not the isometric front-lever hold."),
     _s("one_arm_front_lever", "One-arm front lever", CORE, ["front_lever"]),
     # Bodyweight biceps curl under a low bar (inverted / Australian curl).
-    # Named so fusion can say "we don't measure this yet" instead of inventing
-    # a freeform leg-raise id (job cc61dc871b9d, 2026-11-02).
-    _s("inverted_curl", "Inverted curl", BAR, ["australian_row", "chin_up"]),
+    # Job cc61dc871b9d, 2026-11-02.
+    _s("inverted_curl", "Inverted curl", BAR, ["australian_row", "chin_up"],
+       measurable=True, standard=Standard(8),
+       note="Small-ROM hang curl; shoulders stay well below the hands."),
 
     # -- back lever chain -----------------------------------------------
     _s("skin_the_cat", "Skin the cat", CORE, ["dead_hang"]),

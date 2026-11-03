@@ -22,6 +22,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
@@ -39,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -136,6 +138,7 @@ fun SessionDetail(
     onDelete: (() -> Unit)?,
     modifier: Modifier = Modifier,
     onReplay: (() -> Unit)? = null,
+    onNameExercise: ((String) -> Unit)? = null,
 ) {
     var repsExpanded by remember { mutableStateOf(false) }
     LazyColumn(
@@ -164,7 +167,8 @@ fun SessionDetail(
             }
         }
         item { SessionHeader(analysis, repsExpanded, onToggleReps =
-            if (analysis.reps.isEmpty()) null else ({ repsExpanded = !repsExpanded })) }
+            if (analysis.reps.isEmpty()) null else ({ repsExpanded = !repsExpanded }),
+            onNameExercise = onNameExercise) }
 
         if (onReplay != null) {
             item {
@@ -284,6 +288,7 @@ private fun SessionHeader(
     analysis: Analysis,
     repsExpanded: Boolean = false,
     onToggleReps: (() -> Unit)? = null,
+    onNameExercise: ((String) -> Unit)? = null,
 ) {
     Panel {
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -291,8 +296,11 @@ private fun SessionHeader(
                 Eyebrow(analysis.sessionDate.ifBlank { "Session" })
                 Spacer(Modifier.height(6.dp))
                 Text(
-                    analysis.detected?.label
-                        ?: analysis.exercise.replace('_', ' ').replaceFirstChar { it.uppercase() },
+                    analysis.clientLabel.ifBlank {
+                        analysis.detected?.label
+                            ?: analysis.exercise.replace('_', ' ')
+                                .replaceFirstChar { it.uppercase() }
+                    },
                     style = MaterialTheme.typography.headlineSmall,
                 )
                 Spacer(Modifier.height(6.dp))
@@ -351,6 +359,64 @@ private fun SessionHeader(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+        }
+
+        analysis.classificationConfidence?.let { conf ->
+            Spacer(Modifier.height(10.dp))
+            Text(
+                "Confidence ${conf.band} · ${(conf.value * 100).toInt()}%",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+
+        if (analysis.clientNamesExercise && onNameExercise != null) {
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f))
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "What exercise was this? Type the name — no list.",
+                style = MaterialTheme.typography.bodyMedium,
+            )
+            Spacer(Modifier.height(8.dp))
+            var typed by remember(analysis.detectedLabel, analysis.clientLabel) {
+                mutableStateOf(
+                    analysis.clientLabel.ifBlank {
+                        analysis.detectedLabel.replace('_', ' ')
+                    }
+                )
+            }
+            BasicTextField(
+                value = typed,
+                onValueChange = { typed = it },
+                singleLine = true,
+                textStyle = MaterialTheme.typography.bodyLarge.copy(
+                    color = MaterialTheme.colorScheme.onSurface,
+                ),
+                cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                        MaterialTheme.shapes.small,
+                    )
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
+                decorationBox = { inner ->
+                    if (typed.isBlank()) {
+                        Text(
+                            "e.g. front lever pull, curl invertido",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    inner()
+                },
+            )
+            Spacer(Modifier.height(8.dp))
+            FilledTonalButton(
+                onClick = { if (typed.isNotBlank()) onNameExercise(typed.trim()) },
+                enabled = typed.isNotBlank(),
+            ) { Text("Save name") }
         }
 
         analysis.trim?.let { t ->

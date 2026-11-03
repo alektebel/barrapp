@@ -179,6 +179,15 @@ class BarraApi(context: Context) {
         return parseJob(call(request))
     }
 
+    /** Athlete typed the exercise name freely — no options list. */
+    fun nameExercise(jobId: String, name: String): Job {
+        val body = JSONObject().put("name", name).toString().toRequestBody(JSON)
+        val request = authed(
+            Request.Builder().url("$baseUrl/v1/jobs/$jobId/exercise").post(body)
+        ).build()
+        return parseJob(call(request))
+    }
+
     fun getJob(jobId: String): Job {
         val request = authed(Request.Builder().url("$baseUrl/v1/jobs/$jobId").get()).build()
         return parseJob(call(request))
@@ -597,6 +606,35 @@ class BarraApi(context: Context) {
                 },
                 visionDisagreesOnMovement = json.optJSONObject("visionMovement")
                     ?.optBoolean("review", false) ?: false,
+                classificationConfidence = json.optJSONObject("classificationConfidence")
+                    ?.let { c ->
+                        ClassificationConfidence(
+                            value = c.optDouble("value", 0.0).orZero(),
+                            band = c.optString("band").ifBlank { "low" },
+                            kind = c.optString("kind").ifBlank { "fusion" },
+                            needsConfirmation = c.optBoolean("needsConfirmation", false),
+                            clientNamesExercise = c.optBoolean("clientNamesExercise", false),
+                            fusionStatus = c.optString("fusionStatus"),
+                        )
+                    },
+                clientNamesExercise = json.optBoolean("clientNamesExercise", false)
+                    || json.optJSONObject("classificationConfidence")
+                        ?.optBoolean("clientNamesExercise", false) == true
+                    || json.optJSONObject("classificationGrounding")
+                        ?.optBoolean("clientNamesExercise", false) == true
+                    || json.optJSONObject("detected")
+                        ?.optJSONObject("classificationGrounding")
+                        ?.optBoolean("clientNamesExercise", false) == true,
+                detectedLabel = json.optString("detectedLabel").ifBlank {
+                    json.optJSONObject("classificationGrounding")
+                        ?.optString("detectedLabel").orEmpty()
+                }.ifBlank {
+                    json.optJSONObject("detected")
+                        ?.optJSONObject("classificationGrounding")
+                        ?.optString("detectedLabel").orEmpty()
+                },
+                clientLabel = json.optString("clientLabel"),
+                countStatus = json.optString("countStatus"),
             )
         }
 

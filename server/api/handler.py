@@ -668,6 +668,72 @@ def _route(event):
                        "handed to the worker" if WORKER else "measured in-process")
         return _resp(202, _public(_item(job_id)) or {"id": job_id, "status": "queued"})
 
+    # Athlete typed the exercise name freely (no options list). Resolve to a
+    # known movement and re-measure; unknown text is stored as clientLabel and
+    # left unscored.
+    if method == "POST" and len(parts) == 4 and parts[-1] == "exercise":
+        job_id = parts[2]
+        item = _item(job_id)
+        if not _owned(item, owner):
+            return _resp(404, {"error": "unknown job"})
+        raw_name = body.get("name") if isinstance(body, dict) else None
+        if not isinstance(raw_name, str) or not raw_name.strip():
+            return _resp(400, {"error": "name is required"})
+        raw_name = raw_name.strip()[:80]
+        try:
+            from barra.movements import normalize_free_name
+            resolved = normalize_free_name(raw_name)
+        except Exception:  # noqa: BLE001
+            resolved = None
+        if resolved:
+            table.update_item(
+                Key={"id": job_id},
+                UpdateExpression="SET #s = :s, exercise = :e, clientLabel = :c",
+                ExpressionAttributeNames={"#s": "status"},
+                ExpressionAttributeValues={
+                    ":s": "queued", ":e": resolved, ":c": raw_name,
+                },
+            )
+            if WORKER:
+                lam.invoke(
+                    FunctionName=WORKER,
+                    InvocationType="Event",
+                    Payload=json.dumps({"job_id": job_id, "owner": owner}).encode(),
+                )
+            else:
+                worker({"job_id": job_id, "owner": owner}, None)
+            uploads.record(job_id, owner, "client-named",
+                           f"raw={raw_name!r} resolved={resolved}")
+            return _resp(202, _public(_item(job_id)) or {
+                "id": job_id, "status": "queued", "exercise": resolved,
+                "clientLabel": raw_name,
+            })
+        # Unknown name: keep the athlete's words, do not invent a measurement.
+        from datetime import date as _date
+        empty = {
+            "exercise": "auto",
+            "clientLabel": raw_name,
+            "n_reps": 0,
+            "countStatus": "unmeasured",
+            "blockers": ["unsupported_movement"],
+            "session": _date.today().isoformat(),
+            "clientNamesExercise": False,
+        }
+        table.update_item(
+            Key={"id": job_id},
+            UpdateExpression="SET #s = :s, clientLabel = :c, #r = :r",
+            ExpressionAttributeNames={"#s": "status", "#r": "result"},
+            ExpressionAttributeValues={
+                ":s": "done", ":c": raw_name, ":r": _to_ddb(empty),
+            },
+        )
+        uploads.record(job_id, owner, "client-named-unknown",
+                       f"raw={raw_name!r} (stored, unscored)", level="warn")
+        return _resp(200, _public(_item(job_id)) or {
+            "id": job_id, "status": "done", "clientLabel": raw_name,
+            "countStatus": "unmeasured",
+        })
+
     return _resp(404, {"error": "not found"})
 
 

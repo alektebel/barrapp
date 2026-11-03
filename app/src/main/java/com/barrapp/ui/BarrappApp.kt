@@ -313,6 +313,8 @@ private fun MainPane(
                     onAdd = onPick,
                     onDelete = if (state.current != null) vm::deleteCurrent else null,
                     onReplay = clip?.let { { vm.openReplay() } },
+                    onNameExercise = if (analysis.clientNamesExercise)
+                        vm::nameExercise else null,
                 )
             }
 

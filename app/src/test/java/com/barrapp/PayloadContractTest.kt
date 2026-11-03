@@ -75,6 +75,35 @@ class PayloadContractTest {
     }
 
     @Test
+    fun classificationConfidenceAndFreeNamingParse() {
+        val json = org.json.JSONObject(
+            """
+            {
+              "headline": "", "narrative": "", "sessions": [], "reps": [],
+              "blockers": ["movement_unconfirmed"], "nextSession": "",
+              "exercise": "auto", "n_reps": 0, "n_candidates": 0,
+              "countStatus": "unmeasured",
+              "clientNamesExercise": true,
+              "detectedLabel": "pull_up",
+              "classificationConfidence": {
+                "value": 0.59, "band": "medium", "kind": "fusion",
+                "needsConfirmation": true, "clientNamesExercise": true,
+                "fusionStatus": "geometry-only"
+              }
+            }
+            """.trimIndent()
+        )
+        val a = BarraApi.parseAnalysis(json)
+        assertTrue(a.clientNamesExercise)
+        assertEquals("pull_up", a.detectedLabel)
+        assertEquals("unmeasured", a.countStatus)
+        assertNotNull(a.classificationConfidence)
+        assertEquals(0.59, a.classificationConfidence!!.value, 1e-9)
+        assertEquals("medium", a.classificationConfidence!!.band)
+        assertTrue(a.classificationConfidence!!.clientNamesExercise)
+    }
+
+    @Test
     fun pushUpPayloadKeepsUnobservableApartFromClean() {
         val a = load("push_up_v2.json")
         assertEquals("push_up", a.exercise)

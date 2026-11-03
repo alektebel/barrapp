@@ -18,8 +18,20 @@ clip, so there is no metadata to correct: the picture itself is inverted.
 |---|---|---|
 | `93ebbf6e4894` | Front-lever pull progression, legs vertical (Eric Flag station) | geometry `bulgarian_split_squat` (sideways pose); locate free-text `pull-up`; fusion `vision-decides` → scored 3 kipping pull-ups. Phone sent `videoRotation: 180`, `upright: false`. |
 | `cc61dc871b9d` | Inverted curls (biceps) | geometry `muscle_up` @ 0.98; locate free-text `leg raise (lying/hanging leg raise on dip station)`; fusion promoted the prose slug → unsupported, 0 reps. Phone sent `videoRotation: 270`. |
-| `31e6fc884110` | L-sit / hanging leg raise on dip bars | geometry `unknown`; locate free-text `inverted hanging leg raise (dip bar)`; fusion `vision-decides` → freeform id, unsupported, 0 reps. `videoRotation: 270`. |
+| `31e6fc884110` | Hanging leg raise on dip bars (not an L-sit) | geometry `unknown`; locate free-text `inverted hanging leg raise (dip bar)`; fusion `vision-decides` → freeform id, unsupported, 0 reps. `videoRotation: 270`. |
 | `a9884573d367` | Dips (same station, same sideways phone) | geometry `bulgarian_split_squat`; vision `dips`; fusion `vision-decides` → scored 13 dips with `needsConfirmation`. Orientation was wrong; the name happened to be right. |
+
+### 2026-11-03 local re-eval (`scripts/nov2_eval.py --strict`)
+
+| Job | Got | Confidence |
+|---|---|---|
+| `a038d832f870` | `dip` | 0.55 |
+| `a9884573d367` | `dip` | 0.55 |
+| `93ebbf6e4894` | `front_lever_pull_up` | 0.61 |
+| `cc61dc871b9d` | `inverted_curl` | 0.52 |
+| `31e6fc884110` | `knee_raise` | 0.56 |
+
+Vertical-leg FL pull is named from `legs_lifted` + `knee_over_hip` + `parked` (not body-line ≥55°). Vision hold labels (`l_sit`) no longer outrank articulated hang geometry. When unsure the client types the name (`POST /v1/jobs/{id}/exercise`); there is no options list.
 
 Root causes shared with the October clips, plus two new ones: the worker
 ignored `deviceOrientation.videoRotation`, and locate's open-vocabulary
@@ -77,8 +89,12 @@ returns `movement_unconfirmed` / `countStatus: unmeasured` with
 
 ### 6. Catalog
 
-- Skill `inverted_curl` (unsupported) and tree options `biceps_curl` /
-  `pike_pull` under `hang_what`, so those movements can be *named* cleanly.
+- `inverted_curl` and `front_lever_pull_up` are measurable profiles
+  (`barra/movements.py`); tree option `biceps_curl` still names the curl.
+- `weighted_dip` / `hanging_leg_raise` resolve to `dip` / `knee_raise`.
+- When confirmation is needed the **client names the exercise freely** — the
+  payload sets `clientNamesExercise: true` and may echo `detectedLabel` as a
+  hint. There is no server-side options list of suggested exercises.
 - Spanish capture notes: `orientation_rotated`, `orientation_suspect`,
   `framing_dark`, `framing_legs_only`, `framing_no_athlete`,
   `movement_unconfirmed`.
