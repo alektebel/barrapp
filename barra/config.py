@@ -155,7 +155,15 @@ class Thresholds:
                                        # own median is a rep thrown, not pulled
 
     # -- segmentation (mirrored from the literals ingest.py used inline) -----
-    peak_prominence: float = 0.35      # share of span amplitude for a turnaround
+    # 0.35 hid quieter bottoms in a mixed-ROM set (a038 weighted dips: the
+    # deep middle cleared, the later ~0.5-amp bottom never proposed). 0.20
+    # still refuses hang jitter and keeps a988's eight even dips intact.
+    peak_prominence: float = 0.20      # share of span amplitude for a turnaround
+    # Fraction of span amplitude a peak must clear above rest. Was 0.60 inline;
+    # that gate, judged against the deepest rep in the span, drops late/tired
+    # dips that are still real (a038's second bottom at ~0.5 of amp). Matches
+    # the rescue pass's long-standing 0.45 floor.
+    peak_depth_frac: float = 0.45
     rescue_prominence: float = 0.15
     max_half_rep_s: float = 4.0        # longest half-rep the standard pass keeps
     # The least a span may move and still be a set, in torso-lengths.

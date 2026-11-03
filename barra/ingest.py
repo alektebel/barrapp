@@ -494,9 +494,12 @@ def segment_reps_verbose(kp: np.ndarray, fps: float, movement=None,
             ((x, y, r, a) for x, y, r, a in span_stats if x <= pk <= y),
             (0, len(sig) - 1, clip_rest, clip_amplitude))
         gate = rest + 0.30 * amplitude
-        if sig[pk] < rest + 0.6 * amplitude:
+        depth_frac = THRESHOLDS.peak_depth_frac
+        if sig[pk] < rest + depth_frac * amplitude:
             tr.reject(f"candidate at {at}s", "peak too shallow to be a turnaround",
-                      peak_value=float(sig[pk]), required=rest + 0.6 * amplitude)
+                      peak_value=float(sig[pk]),
+                      required=rest + depth_frac * amplitude,
+                      depth_frac=depth_frac)
             continue
         if not valid[pk]:
             # The turnaround itself was never observed. Everything a rep record
@@ -712,9 +715,10 @@ def _rescue_candidates(sig: np.ndarray, valid: np.ndarray, fps: float,
     kept: list[tuple[int, int, int]] = []
     for pk in peaks:
         at = round(float(pk) / fps, 2)
-        if sig[pk] < rest + 0.45 * amplitude:
+        depth_frac = THRESHOLDS.peak_depth_frac
+        if sig[pk] < rest + depth_frac * amplitude:
             tr.reject(f"rescue candidate at {at}s", "too shallow",
-                      peak=float(sig[pk]), floor=rest + 0.45 * amplitude)
+                      peak=float(sig[pk]), floor=rest + depth_frac * amplitude)
             continue
         if not valid[pk]:
             tr.reject(f"rescue candidate at {at}s", "turnaround never tracked")

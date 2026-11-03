@@ -1,9 +1,10 @@
 """Regressions for naming + counting the 2026-11-02 production clips.
 
 Evidence-backed (local upright replays of the S3 clips):
-  * a038d832f870 weighted dips: named dip, but 1 bottom rejected because
-    anchor_travel ran over a 6.7 s walk-window (pose drift). Cap travel near
-    the peak.
+  * a038d832f870 weighted dips: named dip, but undercounted — a deep bottom
+    set the span amplitude so a later ~0.5-amp bottom failed the old 0.60
+    shallow gate / 0.35 prominence. Also anchor_travel used to run over a
+    long lockout window; travel is capped near the peak.
   * a9884573d367 dips: hands_below + body hanging, but squat won because the
     dip branch sat after squat and required articulation.
   * Muscle-up must have started from a hang (p05 < 0); support work that
@@ -24,7 +25,9 @@ from barra.classify import OVER_BAR, classify  # noqa: E402
 from barra.ingest import candidate_checks, segment_reps  # noqa: E402
 from barra.movements import DIP, MAX_BAR_TRAVEL, MUSCLE_UP, anchor_travel  # noqa: E402
 from barra import schema as S  # noqa: E402
-from tests.test_classify_quality import bar_clip, dip_clip, squat_clip  # noqa: E402
+from tests.test_classify_quality import (  # noqa: E402
+    _fill, bar_clip, dip_clip, squat_clip,
+)
 
 
 def _torso_bar_clip_with_lockout_drift(n_reps=1, fpr=50, drift_per_frame=0.015):
@@ -59,6 +62,51 @@ def _torso_bar_clip_with_lockout_drift(n_reps=1, fpr=50, drift_per_frame=0.015):
         for n in ("left_eye", "right_eye", "left_ear", "right_ear"):
             kp[f, S.KP_INDEX[n]] = kp[f, S.KP_INDEX["nose"]]
     return kp
+
+
+def _mixed_depth_dips(depths=(0.45, 0.22), fpr=50, seed=0):
+    """Deep dip then a quieter one in the same support span (a038 shape).
+
+    The quieter bottom is ~0.5 of the span amplitude: under the old 0.60
+    shallow gate / 0.35 prominence it was never counted.
+    """
+    rng = np.random.default_rng(seed)
+    torso = 120.0
+    n_reps = len(depths)
+    total = n_reps * fpr + 40
+    kp = np.zeros((total, 17, 3), np.float32)
+    bx, by = 300.0, 420.0
+    for f in range(total):
+        if f >= n_reps * fpr:
+            drop = 0.0
+        else:
+            i = f // fpr
+            drop = np.sin(np.pi * ((f % fpr) / fpr)) ** 2 * depths[i]
+        sh = by - 0.62 * torso + drop * torso
+        hip = sh + torso
+        _fill(kp, f, (
+            ("left_wrist", bx - 42, by), ("right_wrist", bx + 42, by),
+            ("left_elbow", bx - 44, (by + sh) / 2), ("right_elbow", bx + 44, (by + sh) / 2),
+            ("left_shoulder", bx - 38, sh), ("right_shoulder", bx + 38, sh),
+            ("left_hip", bx - 22, hip), ("right_hip", bx + 22, hip),
+            ("left_knee", bx - 24, hip + 80), ("right_knee", bx + 24, hip + 80),
+            ("left_ankle", bx - 24, hip + 150), ("right_ankle", bx + 24, hip + 150),
+            ("nose", bx, sh - 30),
+        ), rng)
+    return kp
+
+
+class MixedDepthDips(unittest.TestCase):
+    def test_quieter_bottom_in_the_same_span_still_counts(self):
+        reps = segment_reps(_mixed_depth_dips(), 25.0, DIP)
+        self.assertGreaterEqual(
+            len(reps), 2,
+            "a later ~0.5-amp dip must not be erased by a deeper neighbour",
+        )
+
+    def test_even_depth_set_still_counts_each_bottom(self):
+        reps = segment_reps(_mixed_depth_dips(depths=(0.40,) * 8, fpr=40), 25.0, DIP)
+        self.assertEqual(len(reps), 8)
 
 
 class TravelNearPeak(unittest.TestCase):
