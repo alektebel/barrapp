@@ -648,7 +648,7 @@ class BarrappViewModel(application: Application) : AndroidViewModel(application)
                 withContext(Dispatchers.IO) { api.declareLoad(jobId, kg) }
             }.onSuccess { job ->
                 val app = getApplication<Application>()
-                val goals = _state.value.goals.copy(loadKg = kg)
+                val goals = (_state.value.goals ?: Goals()).copy(loadKg = kg)
                 GoalsStore.save(app, goals)
                 _state.update { s ->
                     s.copy(

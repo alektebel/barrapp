@@ -3,6 +3,9 @@
 The same owner uploading the same bytes must land on the same primary key so
 the latest upload replaces the previous measurement. Different owners never
 share a key even when the bytes match (privacy + DynamoDB single-table id).
+
+The API Lambda imports `server/api/job_id.py` (same body) because its zip has
+no barra package. Keep the two files identical — see test_deploy_contract.
 """
 from __future__ import annotations
 

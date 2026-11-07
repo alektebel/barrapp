@@ -317,7 +317,7 @@ private fun MainPane(
                     onNameExercise = if (analysis.clientNamesExercise)
                         vm::nameExercise else null,
                     onDeclareLoad = if (analysis.asksLoad) vm::declareLoad else null,
-                    suggestedLoadKg = state.goals.loadKg,
+                    suggestedLoadKg = state.goals?.loadKg ?: 0.0,
                 )
             }
 

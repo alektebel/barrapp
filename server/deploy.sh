@@ -43,6 +43,17 @@ docker buildx build \
   --output type=docker,oci-mediatypes=false \
   --build-arg BARRA_COMMIT="$COMMIT" \
   -t "$REPO:$TAG" .
+
+# Catch an empty vendor/barra before ECR/Lambda ever see it. The live smoke
+# used to miss this: worker() returned {"ok": true} even after _fail, so
+# worker-20261107-142018 shipped with /opt/barra empty and every clip died
+# with "No module named 'barra'".
+if ! docker run --rm --entrypoint /bin/bash "$REPO:$TAG" -c \
+    'test -f /opt/barra/barra/__init__.py && python -c "import barra, process"'; then
+  echo "worker image is missing barra under /opt/barra (vendor_barra.sh produced an empty tree?)" >&2
+  exit 1
+fi
+
 docker push "$REPO:$TAG"
 
 # Fail here rather than halfway through a stack update: if the media type is

@@ -176,6 +176,39 @@ class ApiHasAStableName(unittest.TestCase):
         self.assertIn("RegionalDomainName", self.t)
 
 
+class ApiZipDoesNotImportBarraForJobCreate(unittest.TestCase):
+    """2026-11-07: POST /v1/jobs did `from barra.job_id import …` while the
+    API Lambda zip is only api/. Every upload died with ModuleNotFoundError
+    before a clip was accepted. The helpers live in api/job_id.py now."""
+
+    def test_handler_creates_jobs_via_api_job_id(self):
+        text = (SERVER / "api" / "handler.py").read_text()
+        self.assertIn("from job_id import job_id_for, normalize_content_hash", text)
+        # The jobs path must not pull barra.job_id (unguarded).
+        self.assertNotRegex(
+            text,
+            r"from barra\.job_id import",
+            "POST /v1/jobs must not import barra.job_id — the API zip has no barra",
+        )
+
+    def test_api_and_barra_job_id_bodies_match(self):
+        def body(path: Path) -> str:
+            lines = path.read_text().splitlines()
+            # Drop the module docstring; keep the executable body identical.
+            if lines and lines[0].startswith('"""'):
+                end = 1
+                while end < len(lines) and '"""' not in lines[end]:
+                    end += 1
+                lines = lines[end + 1:]
+            return "\n".join(lines).strip()
+
+        self.assertEqual(
+            body(SERVER / "api" / "job_id.py"),
+            body(ROOT / "barra" / "job_id.py"),
+            "server/api/job_id.py and barra/job_id.py must stay identical",
+        )
+
+
 class BuildIsStamped(unittest.TestCase):
     def setUp(self):
         from barra import provenance

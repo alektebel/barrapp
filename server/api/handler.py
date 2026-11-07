@@ -371,7 +371,10 @@ def _route(event):
         # will upload. Same owner + same bytes → same job id, so a re-upload
         # replaces the prior measurement instead of leaving a duplicate.
         # Old clients that omit contentHash still get a random id.
-        from barra.job_id import job_id_for, normalize_content_hash
+        # api/job_id.py — not barra.job_id: the API zip has no barra package
+        # (CodeUri is api/). Importing barra here is exactly the
+        # ModuleNotFoundError that blocked every upload on 2026-11-07.
+        from job_id import job_id_for, normalize_content_hash
 
         content_hash = normalize_content_hash(body.get("contentHash"))
         if body.get("contentHash") and content_hash is None:
@@ -727,7 +730,8 @@ def _route(event):
             except Exception:  # noqa: BLE001
                 result = {}
         try:
-            from barra.load import apply_declared_load
+            # api/load.py — not barra.load: the API zip has no barra package.
+            from load import apply_declared_load
             updated = apply_declared_load(result, kg)
         except ValueError as exc:
             return _resp(400, {"error": str(exc)})
@@ -763,6 +767,9 @@ def _route(event):
         try:
             from barra.movements import normalize_free_name
             resolved = normalize_free_name(raw_name)
+        except ImportError:
+            # API zip has no barra; free-text resolve needs the worker package.
+            return _resp(503, {"error": "naming the exercise needs a redeploy of the API"})
         except Exception:  # noqa: BLE001
             resolved = None
         if resolved:
@@ -1064,4 +1071,9 @@ def worker(event, _context):
         uploads.trim(job_id)
     except Exception as exc:  # noqa: BLE001
         _fail(exc)
+        # Must not report ok: deploy.sh greps the invoke payload for
+        # "No module named" / ImportModuleError. Returning ok after _fail
+        # is how worker-20261107-142018 shipped with an empty /opt/barra
+        # while the smoke still printed "worker imports cleanly".
+        return {"ok": False, "error": str(exc)}
     return {"ok": True}

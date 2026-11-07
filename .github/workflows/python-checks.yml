@@ -1,0 +1,50 @@
+name: Python checks
+
+on:
+  push:
+    paths:
+      - "barra/**"
+      - "server/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/python-checks.yml"
+  pull_request:
+    paths:
+      - "barra/**"
+      - "server/**"
+      - "tests/**"
+      - "pyproject.toml"
+      - ".github/workflows/python-checks.yml"
+  workflow_dispatch:
+
+jobs:
+  unit-and-contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install package (no heavy extras)
+        run: pip install -e . pytest
+
+      - name: Deploy contract + job id tests
+        run: pytest tests/test_deploy_contract.py tests/test_job_id.py -v
+
+  worker-vendor:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vendor barra into the worker tree
+        run: bash server/vendor_barra.sh
+
+      - name: Assert the worker package is not empty
+        run: |
+          test -f server/vendor/barra/barra/__init__.py
+          test -f server/vendor/barra/models/pose_landmarker_full.task
+          test "$(find server/vendor/barra/barra -name '*.py' | wc -l)" -ge 20
+          echo "vendor ok: $(find server/vendor/barra/barra -name '*.py' | wc -l) modules"
