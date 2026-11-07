@@ -4,6 +4,13 @@ Phone films a set. AWS measures it. The phone shows the numbers.
 
 Package id for Play: `com.fitness.barrapp`.
 
+<p align="center">
+  <img src="docs/screenshots/tracker-home.png" alt="Home" width="180"/>
+  <img src="docs/screenshots/tracker-record-results.png" alt="Results" width="180"/>
+  <img src="docs/screenshots/tracker-progress.png" alt="Progress" width="180"/>
+  <img src="docs/screenshots/tracker-coach.png" alt="Coach" width="180"/>
+</p>
+
 ## Local
 
 ```bash
